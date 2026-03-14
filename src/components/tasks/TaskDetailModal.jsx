@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
     TASK_STATUS, TASK_PRIORITY, COLLECTIONS,
 } from '../../models/schemas';
@@ -183,8 +184,11 @@ export default function TaskDetailModal({
 
     // ── Render ──
 
-    return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-start justify-center p-4 pt-6 overflow-y-auto">
+    return createPortal(
+        <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-start justify-center p-4 pt-6 overflow-y-auto"
+            onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+        >
             <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-4xl animate-in zoom-in-95 duration-200 my-4 flex flex-col max-h-[90vh] ring-1 ring-slate-700 border border-slate-800">
 
                 {/* Header */}
@@ -266,6 +270,7 @@ export default function TaskDetailModal({
                     onClose={onClose}
                 />
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

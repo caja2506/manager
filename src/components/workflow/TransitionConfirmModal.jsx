@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, Info, ChevronRight, X, CheckCircle, AlertOctagon } from 'lucide-react';
 
 /**
@@ -22,7 +23,7 @@ export default function TransitionConfirmModal({
 
     const hasBlockers = missingFields?.length > 0;
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-200">
             {/* Backdrop */}
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
@@ -121,6 +122,7 @@ export default function TransitionConfirmModal({
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

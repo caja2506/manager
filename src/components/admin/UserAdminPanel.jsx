@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Shield, Trash2, X, Search, Users } from 'lucide-react';
+import { useRole } from '../../contexts/RoleContext';
+import { Shield, Trash2, X, Search, Users, ShieldCheck } from 'lucide-react';
 
 const ROLE_CONFIG = {
     admin: { label: 'Admin', color: 'emerald', desc: 'Control total' },
@@ -12,6 +13,7 @@ const ROLE_CONFIG = {
 
 export default function UserAdminPanel({ onClose }) {
     const { user: currentUser } = useAuth();
+    const { isSuperAdmin: currentIsSuperAdmin } = useRole();
     const [users, setUsers] = useState([]);
     const [search, setSearch] = useState('');
     const [confirmAction, setConfirmAction] = useState(null);
@@ -27,7 +29,23 @@ export default function UserAdminPanel({ onClose }) {
         return () => unsub();
     }, []);
 
+    // Check if a user email is in the super admin list
+    const isUserSuperAdmin = (email) => {
+        const SUPER_ADMIN_EMAILS = ['caja2506@gmail.com'];
+        return email && SUPER_ADMIN_EMAILS.map(e => e.toLowerCase()).includes(email.toLowerCase());
+    };
+
     const handleRoleChange = async (uid, newRole) => {
+        // Prevent changing super admin's role
+        const targetUser = users.find(u => u.uid === uid);
+        if (targetUser && isUserSuperAdmin(targetUser.email)) {
+            setConfirmAction({
+                title: '🔒 Super Admin Protegido',
+                message: 'Este usuario es un Super Admin y su rol no puede ser modificado desde la interfaz.',
+                onConfirm: () => setConfirmAction(null),
+            });
+            return;
+        }
         if (uid === currentUser.uid && newRole !== 'admin') {
             setConfirmAction({
                 title: '¿Cambiar tu propio rol?',
@@ -133,6 +151,7 @@ export default function UserAdminPanel({ onClose }) {
                     <tbody className="divide-y divide-slate-50">
                         {filtered.map((u) => {
                             const isSelf = u.uid === currentUser.uid;
+                            const userIsSuperAdmin = isUserSuperAdmin(u.email);
                             const roleConfig = ROLE_CONFIG[u.role] || ROLE_CONFIG.viewer;
                             return (
                                 <tr key={u.uid} className="hover:bg-slate-800/50 transition-colors">
@@ -145,26 +164,38 @@ export default function UserAdminPanel({ onClose }) {
                                                 <div className="font-bold text-white text-sm truncate">
                                                     {u.displayName || 'Sin nombre'}
                                                     {isSelf && <span className="ml-2 text-[10px] bg-indigo-600/20 text-indigo-400 px-2 py-0.5 rounded-full font-black">TÚ</span>}
+                                                    {userIsSuperAdmin && (
+                                                        <span className="ml-2 text-[10px] bg-emerald-600/20 text-emerald-400 px-2 py-0.5 rounded-full font-black inline-flex items-center gap-0.5">
+                                                            <ShieldCheck className="w-3 h-3" /> SUPER
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <div className="text-[11px] text-slate-400 truncate">{u.email}</div>
                                             </div>
                                         </div>
                                     </td>
                                     <td className="p-5">
-                                        <div className="flex gap-1">
-                                            {Object.entries(ROLE_CONFIG).map(([roleKey, config]) => (
-                                                <button
-                                                    key={roleKey}
-                                                    onClick={() => handleRoleChange(u.uid, roleKey)}
-                                                    className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all ${u.role === roleKey
+                                        {userIsSuperAdmin ? (
+                                            <div className="flex items-center gap-1.5 text-emerald-400 text-[10px] font-black">
+                                                <ShieldCheck className="w-4 h-4" />
+                                                Admin Protegido
+                                            </div>
+                                        ) : (
+                                            <div className="flex gap-1">
+                                                {Object.entries(ROLE_CONFIG).map(([roleKey, config]) => (
+                                                    <button
+                                                        key={roleKey}
+                                                        onClick={() => handleRoleChange(u.uid, roleKey)}
+                                                        className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all ${u.role === roleKey
                                                             ? `bg-${config.color}-100 text-${config.color}-700 border-2 border-${config.color}-300 shadow-sm`
                                                             : 'bg-slate-800 text-slate-400 border-2 border-transparent hover:bg-slate-800'
-                                                        }`}
-                                                >
-                                                    {config.label}
-                                                </button>
-                                            ))}
-                                        </div>
+                                                            }`}
+                                                    >
+                                                        {config.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
                                     </td>
                                     <td className="p-5 text-center">
                                         <span className="text-[11px] text-slate-400 font-bold">
@@ -172,7 +203,7 @@ export default function UserAdminPanel({ onClose }) {
                                         </span>
                                     </td>
                                     <td className="p-5 text-center">
-                                        {!isSelf && (
+                                        {!isSelf && !userIsSuperAdmin && (
                                             <button
                                                 onClick={() => handleRemoveUser(u)}
                                                 className="p-2 text-red-500 bg-red-500/15 rounded-lg hover:bg-red-100 transition-all active:scale-90"
