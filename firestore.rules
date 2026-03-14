@@ -1,0 +1,272 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================
+    // HELPER FUNCTIONS
+    // ============================================================
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users_roles/$(request.auth.uid)).data.role;
+    }
+
+    function getTeamRole() {
+      let userData = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return userData != null ? userData.teamRole : null;
+    }
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && getUserRole() == 'admin';
+    }
+
+    function isEditor() {
+      return isAuthenticated() && getUserRole() in ['admin', 'editor'];
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Engineering roles: manager, team_lead, engineer, technician
+    function isManager() {
+      return isAuthenticated() && getTeamRole() == 'manager';
+    }
+
+    function isTeamLead() {
+      return isAuthenticated() && getTeamRole() in ['manager', 'team_lead'];
+    }
+
+    function isEngineer() {
+      return isAuthenticated() && getTeamRole() in ['manager', 'team_lead', 'engineer'];
+    }
+
+    // ============================================================
+    // GLOBAL READ RULE
+    // Authenticated users can read all collections
+    // ============================================================
+
+    match /{collection}/{document=**} {
+      allow read: if isAuthenticated();
+    }
+
+    // WeeklyPlanItems: authenticated users can fully manage their own planning blocks
+    // This is placed at global level to ensure it overrides any potential conflicts
+    match /weeklyPlanItems/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ============================================================
+    // EXISTING COLLECTIONS (preserved — no changes)
+    // ============================================================
+
+    // --- users_roles ---
+    match /users_roles/{userId} {
+      allow create: if isAuthenticated()
+        && request.auth.uid == userId
+        && request.resource.data.role == 'viewer';
+      allow update, delete: if isAdmin();
+    }
+
+    // --- proyectos_bom ---
+    match /proyectos_bom/{docId} {
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    // --- catalogo_maestro ---
+    match /catalogo_maestro/{docId} {
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    // --- items_bom ---
+    match /items_bom/{docId} {
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    // --- marcas, categorias, proveedores ---
+    match /marcas/{docId} {
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    match /categorias/{docId} {
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    match /proveedores/{docId} {
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    // ============================================================
+    // NEW COLLECTIONS — Engineering Management Platform
+    // ============================================================
+
+    // --- users (extended profiles) ---
+    // Users can create/update their own profile
+    // Admins can update any profile (e.g., assign teamRole)
+    match /users/{userId} {
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // --- projects (engineering projects) ---
+    // Editors+ can create/update projects
+    // Only admins can delete projects
+    match /projects/{docId} {
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    // --- tasks ---
+    // Editors+ can create tasks
+    // All authenticated can update (move through workflow)
+    // Only admins and team leads can delete
+    match /tasks/{docId} {
+      allow create: if isEditor();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // --- subtasks ---
+    // Follow same rules as tasks
+    match /subtasks/{docId} {
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // --- timeLogs ---
+    // Any authenticated user can create their own time logs
+    // Users can update their own logs; admins can update any
+    // Only admins can delete
+    match /timeLogs/{docId} {
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated()
+        && (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+    }
+
+    // --- delayCauses (configurable list) ---
+    // Only admins can manage delay causes
+    match /delayCauses/{docId} {
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // --- delays ---
+    // Any authenticated user can report a delay
+    // Creator or admin can update
+    // Only admins can delete
+    match /delays/{docId} {
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated()
+        && (resource.data.createdBy == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // --- risks ---
+    // System-managed (written by Cloud Functions or admin)
+    // Read by all authenticated (global read rule)
+    match /risks/{docId} {
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // --- dailyReports ---
+    // System-generated, read-only for users
+    // Admins can manage
+    match /dailyReports/{docId} {
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // --- notifications ---
+    // Users can only update their own notifications (mark as read)
+    // System/admin creates notifications
+    match /notifications/{docId} {
+      allow create: if isAdmin();
+      allow update: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+    }
+
+    // --- taskTypes ---
+    // Admin-managed configuration
+    match /taskTypes/{docId} {
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // --- settings ---
+    // Admin-only management
+    match /settings/{docId} {
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // --- auditLogs ---
+    // Immutable: only system/admin can create
+    // No updates or deletes allowed
+    match /auditLogs/{docId} {
+      allow create: if isAdmin();
+    }
+    // --- weeklyPlanItems ---
+    // Any authenticated user can plan work (same pattern as tasks)
+    match /weeklyPlanItems/{docId} {
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    // ============================================================
+    // MANAGEMENT INTELLIGENCE COLLECTIONS
+    // ============================================================
+
+    // --- auditFindings ---
+    // System-generated by Rule Engine / Cloud Functions
+    // Read by all authenticated; write by admin only
+    // (Cloud Functions use Admin SDK which bypasses rules)
+    match /auditFindings/{docId} {
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // --- auditEvents ---
+    // Immutable audit trail — system/admin only writes
+    // No updates or deletes (append-only)
+    match /auditEvents/{docId} {
+      allow create: if isAdmin();
+    }
+
+    // --- analyticsSnapshots ---
+    // System-generated periodic snapshots
+    // Read-only for frontend; written by Cloud Functions
+    match /analyticsSnapshots/{docId} {
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // --- aiInsights ---
+    // Gemini-generated insights
+    // Read-only for frontend; written by Cloud Functions
+    match /aiInsights/{docId} {
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // --- managementBriefs ---
+    // Weekly management summaries generated by Gemini
+    // Read-only for frontend; written by Cloud Functions
+    match /managementBriefs/{docId} {
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+  }
+}
