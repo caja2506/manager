@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LayoutGrid, Search, Bell, Settings, Plus } from 'lucide-react';
+import { LayoutGrid, Plus } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAppData } from '../../contexts/AppDataContext';
 
@@ -14,13 +14,14 @@ import { useAppData } from '../../contexts/AppDataContext';
  */
 
 const TABS = [
-    { label: 'Main Table',      path: '/main-table' },
-    { label: 'Kanban',          path: '/tasks' },
-    { label: 'Weekly Planner',  path: '/planner' },
-    { label: 'Gantt',           path: '/gantt' },
+    { label: 'Proyectos', path: '/projects' },
+    { label: 'Main Table', path: '/main-table' },
+    { label: 'Kanban', path: '/tasks' },
+    { label: 'Weekly Planner', path: '/planner' },
+    { label: 'Gantt', path: '/gantt' },
 ];
 
-export default function TaskModuleBanner({ onNewTask, canEdit = false, children }) {
+export default function TaskModuleBanner({ onNewTask, canEdit = false, actionLabel = 'Nueva Tarea', children }) {
     const navigate = useNavigate();
     const location = useLocation();
     const { user } = useAuth();
@@ -40,58 +41,47 @@ export default function TaskModuleBanner({ onNewTask, canEdit = false, children 
     return (
         <div className="flex-shrink-0">
             {/* ── Main Banner Row ── */}
-            <div className="flex items-center justify-between px-6 py-4 bg-slate-900/90 backdrop-blur-md border-b border-slate-800/60">
+            <div className="flex items-center justify-between px-3 md:px-6 py-3 md:py-4 bg-slate-900/90 backdrop-blur-md border-b border-slate-800/60">
                 {/* Left: Icon + Title + Stats */}
-                <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center">
-                        <LayoutGrid className="w-5 h-5 text-indigo-400" />
+                <div className="flex items-center gap-2.5 md:gap-3.5 min-w-0">
+                    <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
+                        <LayoutGrid className="w-4 h-4 md:w-5 md:h-5 text-indigo-400" />
                     </div>
-                    <div>
-                        <h1 className="font-black text-lg text-white tracking-tight leading-none">
+                    <div className="min-w-0">
+                        <h1 className="font-black text-base md:text-lg text-white tracking-tight leading-none truncate">
                             Gestión de Tareas
                         </h1>
-                        <p className="text-[11px] text-slate-400 font-medium mt-0.5 flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
-                            {activeTasks.length} tarea{activeTasks.length !== 1 ? 's' : ''} activa{activeTasks.length !== 1 ? 's' : ''}
-                            {engProjects.length > 0 && (
-                                <>
-                                    <span className="text-slate-600">•</span>
-                                    {engProjects.length} proyecto{engProjects.length !== 1 ? 's' : ''}
-                                </>
-                            )}
+                        <p className="text-[10px] md:text-[11px] text-slate-400 font-medium mt-0.5 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0" />
+                            <span className="truncate">
+                                {activeTasks.length} tarea{activeTasks.length !== 1 ? 's' : ''} activa{activeTasks.length !== 1 ? 's' : ''}
+                                {engProjects.length > 0 && (
+                                    <>
+                                        <span className="text-slate-600"> · </span>
+                                        {engProjects.length} proyecto{engProjects.length !== 1 ? 's' : ''}
+                                    </>
+                                )}
+                            </span>
                         </p>
                     </div>
                 </div>
 
                 {/* Right: Actions */}
-                <div className="flex items-center gap-2">
-                    {/* Inline action icons */}
-                    <div className="hidden md:flex items-center gap-1 bg-slate-800/60 rounded-xl p-1 border border-slate-700/50">
-                        <button className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors" title="Buscar">
-                            <Search className="w-4 h-4" />
-                        </button>
-                        <button className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors" title="Notificaciones">
-                            <Bell className="w-4 h-4" />
-                        </button>
-                        <button className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors" title="Configuración">
-                            <Settings className="w-4 h-4" />
-                        </button>
-                    </div>
-
+                <div className="flex items-center gap-2 shrink-0">
                     {/* + New Task */}
                     {canEdit && onNewTask && (
                         <button
                             onClick={onNewTask}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold rounded-xl shadow-lg shadow-indigo-600/25 border border-indigo-500/50 active:scale-95 transition-all"
+                            className="flex items-center gap-1.5 md:gap-2 px-3 md:px-5 py-2 md:py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs md:text-sm font-bold rounded-xl shadow-lg shadow-indigo-600/25 border border-indigo-500/50 active:scale-95 transition-all"
                         >
                             <Plus className="w-4 h-4" />
-                            Nueva Tarea
+                            <span className="hidden sm:inline">{actionLabel}</span>
                         </button>
                     )}
 
                     {/* User avatar */}
                     <div
-                        className="w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-bold ring-2 ring-amber-500/40 cursor-pointer hover:ring-amber-400/60 transition-all"
+                        className="w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center text-[10px] md:text-[11px] font-bold ring-2 ring-amber-500/40 cursor-pointer hover:ring-amber-400/60 transition-all shrink-0 hidden sm:flex"
                         style={{ background: 'linear-gradient(135deg, #fef3c7, #fde68a)', color: '#b45309' }}
                         title={user?.displayName || user?.email}
                     >
@@ -101,18 +91,17 @@ export default function TaskModuleBanner({ onNewTask, canEdit = false, children 
             </div>
 
             {/* ── Tab Navigation ── */}
-            <div className="flex items-center gap-0 px-6 bg-slate-900/70 border-b border-slate-800/50">
+            <div className="flex items-center gap-0 px-3 md:px-6 bg-slate-900/70 border-b border-slate-800/50 overflow-x-auto scrollbar-none">
                 {TABS.map(tab => {
                     const isActive = location.pathname === tab.path;
                     return (
                         <button
                             key={tab.path}
                             onClick={() => navigate(tab.path)}
-                            className={`relative px-4 py-3 text-sm font-semibold transition-colors whitespace-nowrap ${
-                                isActive
-                                    ? 'text-white'
-                                    : 'text-slate-500 hover:text-slate-300'
-                            }`}
+                            className={`relative px-3 md:px-4 py-2.5 md:py-3 text-xs md:text-sm font-semibold transition-colors whitespace-nowrap shrink-0 ${isActive
+                                ? 'text-white'
+                                : 'text-slate-500 hover:text-slate-300'
+                                }`}
                         >
                             {tab.label}
                             {isActive && (

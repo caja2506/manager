@@ -42,7 +42,7 @@ export const COLLECTIONS = {
     NOTIFICATIONS: 'notifications',
     TASK_TYPES: 'taskTypes',
     SETTINGS: 'settings',
-    AUDIT_LOGS: 'auditLogs',
+    // AUDIT_LOGS: deprecated — use AUDIT_EVENTS instead
     WEEKLY_PLAN_ITEMS: 'weeklyPlanItems',
     TASK_DEPENDENCIES: 'taskDependencies',
     TASK_TYPE_CATEGORIES: 'taskTypeCategories',
@@ -53,6 +53,17 @@ export const COLLECTIONS = {
     ANALYTICS_SNAPSHOTS: 'analyticsSnapshots',
     AI_INSIGHTS: 'aiInsights',
     MANAGEMENT_BRIEFS: 'managementBriefs',
+
+    // --- Automation Operations & Accountability Foundation ---
+    AUTOMATION_ROUTINES: 'automationRoutines',
+    AUTOMATION_RUNS: 'automationRuns',
+    AUTOMATION_METRICS_DAILY: 'automationMetricsDaily',
+    OPERATION_INCIDENTS: 'operationIncidents',
+    TELEGRAM_SESSIONS: 'telegramSessions',
+    TELEGRAM_REPORTS: 'telegramReports',
+    TELEGRAM_ESCALATIONS: 'telegramEscalations',
+    TELEGRAM_BOT_LOGS: 'telegramBotLogs',
+    TELEGRAM_DELIVERIES: 'telegramDeliveries',
 };
 
 
@@ -340,6 +351,14 @@ export function createUserDocument({
     department = 'Engineering',
     weeklyCapacityHours = 40,       // Standard weekly hours
     active = true,
+    // --- Automation Operations hierarchy fields ---
+    operationalRole = null,         // 'manager' | 'team_lead' | 'engineer' | 'technician'
+    providerLinks = {},             // { telegram: { chatId, username, linkedAt } }
+    reportsTo = null,               // UID of direct supervisor
+    isAutomationParticipant = false, // Enrolled in automation flows
+    escalationTargetUserId = null,  // UID of escalation target (override chain)
+    activeShift = null,             // e.g. 'morning' | 'afternoon' | null
+    workSchedule = null,            // e.g. { start: '08:00', end: '17:00' }
 } = {}) {
     return {
         name,
@@ -350,6 +369,14 @@ export function createUserDocument({
         department,
         weeklyCapacityHours,
         active,
+        // Automation hierarchy
+        operationalRole,
+        providerLinks,
+        reportsTo,
+        isAutomationParticipant,
+        escalationTargetUserId,
+        activeShift,
+        workSchedule,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
     };
@@ -405,7 +432,27 @@ export function createProjectDocument({
 }
 
 /**
- * Tasks Collection
+ * Tasks Collection — OFFICIAL FIELD CONTRACT
+ * ===========================================
+ *
+ * IMPORTANT: All code reading/writing task documents MUST use these field names.
+ * Legacy documents may use deprecated aliases — use taskNormalizer.js at read-time.
+ *
+ * OFFICIAL FIELDS:
+ *   status:         'backlog' | 'pending' | 'in_progress' | 'blocked' | 'validation' | 'completed' | 'cancelled'
+ *   completedDate:  ISO string | null    ← NOT "completedAt" (deprecated alias)
+ *   blockedReason:  string               ← NOT "blockReason" (deprecated typo)
+ *   reopenedAt:     ISO string | null     (set by CF on reopen)
+ *   reopenedBy:     string (uid) | null   (set by CF on reopen)
+ *   updatedAt:      ISO string            (set by CF on transitions, serverTimestamp on edits)
+ *   updatedBy:      string (uid) | null   (set by CF on transitions)
+ *
+ * STATUS ALIASES (DB value → Display):
+ *   'pending'    → "Planificado"   (WORKFLOW_STATUS.PLANNED)
+ *   'validation' → "En Revisión"   (WORKFLOW_STATUS.REVIEW)
+ *
+ * See: src/utils/taskNormalizer.js for legacy document normalization.
+ * See: src/core/workflow/workflowModel.js for the official state machine.
  *
  * Document ID: auto-generated
  */
@@ -913,31 +960,35 @@ export function createAuditFindingDocument({
 }
 
 /**
- * AuditEvents Collection
- * Immutable system audit trail for status changes and key actions.
+ * AuditEvents Collection — OFFICIAL SCHEMA
+ * =========================================
+ * Immutable, append-only system audit trail.
+ * Written by Cloud Functions (task transitions, scheduled audits)
+ * and by client (audit run summaries only).
+ *
+ * IMPORTANT: All producers (CF + client) MUST follow this contract.
+ * See: functions/index.js, src/services/auditPersistence.js
  *
  * Document ID: auto-generated
  */
 export function createAuditEventDocument({
-    eventType = '',                 // 'task_status_changed' | 'task_created' | 'delay_reported' | etc.
-    entityType = '',                // 'task' | 'project' | 'user' | 'delay'
-    entityId = '',
-    performedBy = null,             // User UID
-    performedByName = '',           // Denormalized display name
-    previousValue = null,           // Value before the change
-    newValue = null,                // Value after the change
-    metadata = {},                  // Additional context
+    eventType = '',           // 'task_transition' | 'audit_run' | 'delay_reported' | ...
+    entityType = '',          // 'task' | 'project' | 'user' | 'delay' | 'system'
+    entityId = '',            // Document ID of affected entity
+    userId = null,            // Firebase Auth UID (or 'system' for scheduled)
+    source = 'client',       // 'cloud_function' | 'scheduled' | 'client_audit'
+    correlationId = null,     // Groups related events (audit runId, batch ops)
+    details = {},             // Event-specific payload
 } = {}) {
     return {
         eventType,
         entityType,
         entityId,
-        performedBy,
-        performedByName,
-        previousValue,
-        newValue,
-        metadata,
-        createdAt: new Date().toISOString(),
+        userId,
+        source,
+        correlationId,
+        details,
+        timestamp: new Date().toISOString(),
     };
 }
 

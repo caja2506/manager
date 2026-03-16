@@ -41,7 +41,7 @@ export function setActiveTimer(timer) {
 /**
  * Start a new timer. Creates an "open" time log in Firestore.
  */
-export async function startTimer({ taskId, projectId, userId, notes = '', overtime = false }) {
+export async function startTimer({ taskId, projectId, userId, notes = '', overtime = false, taskTitle = '', projectName = '' }) {
     const now = new Date().toISOString();
     const logData = createTimeLogDocument({
         taskId,
@@ -56,7 +56,7 @@ export async function startTimer({ taskId, projectId, userId, notes = '', overti
     const ref = doc(collection(db, COLLECTIONS.TIME_LOGS));
     await setDoc(ref, logData);
 
-    const timer = { logId: ref.id, taskId, projectId, startTime: now, overtime, notes };
+    const timer = { logId: ref.id, taskId, projectId, startTime: now, overtime, notes, taskTitle, projectName };
     setActiveTimer(timer);
     return timer;
 }

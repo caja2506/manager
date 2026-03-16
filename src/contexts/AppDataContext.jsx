@@ -31,7 +31,7 @@ const analyzeQuotePdfFn = httpsCallable(functions, 'analyzeQuotePdf');
 const testGeminiConnectionFn = httpsCallable(functions, 'testGeminiConnection');
 
 // --- Version ---
-export const APP_VERSION = "4.0";
+export const APP_VERSION = "4.5";
 
 const AppDataContext = createContext(null);
 
@@ -135,7 +135,12 @@ export function AppDataProvider({ children }) {
         const unsubTaskTypes = onSnapshot(collection(db, COLLECTIONS.TASK_TYPES), s =>
             setTaskTypes(s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => safeLocaleCompare(a, b, 'name')))
         );
-        const unsubTeamMembers = onSnapshot(collection(db, 'users_roles'), s =>
+        // ── Team Members ──
+        // IMPORTANT: Loads from `users` collection (operational profiles),
+        // NOT from `users_roles` (RBAC only). This ensures teamRole and
+        // weeklyCapacityHours are available to dashboards, analytics,
+        // and planner. Profile docs are bootstrapped by RoleContext on login.
+        const unsubTeamMembers = onSnapshot(collection(db, COLLECTIONS.USERS), s =>
             setTeamMembers(s.docs.map(d => ({ ...d.data(), uid: d.id })))
         );
         const unsubTimeLogs = onSnapshot(collection(db, COLLECTIONS.TIME_LOGS), s =>

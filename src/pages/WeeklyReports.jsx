@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { useAppData } from '../contexts/AppDataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { generateWeeklyReport } from '../services/reportService';
@@ -11,10 +12,11 @@ export default function WeeklyReports() {
     const { user } = useAuth();
     const { timeLogs, engTasks, engProjects, delays, teamMembers } = useAppData();
 
-    const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-    const [selectedUser, setSelectedUser] = useState(user.uid);
+    // Get selectedUser from shared ReportsLayout via outlet context
+    const outletCtx = useOutletContext() || {};
+    const selectedUser = outletCtx.selectedUser || user.uid;
 
-    const engineersAndTechs = teamMembers.filter(u => ['engineer', 'technician', 'team_lead', 'manager'].includes(u.teamRole) || !u.teamRole);
+    const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
     const report = useMemo(() => {
         if (!timeLogs || !engTasks || !engProjects) return null;
@@ -30,6 +32,7 @@ export default function WeeklyReports() {
 
     const handleExport = () => {
         if (!report) return;
+        const tUser = teamMembers.find(t => t.uid === selectedUser);
         exportWeeklyReport(report, tUser?.displayName || tUser?.email || 'Ingeniero');
     };
 
@@ -37,7 +40,6 @@ export default function WeeklyReports() {
         return <div className="p-8 text-center text-slate-400">Cargando reporte semanal...</div>;
     }
 
-    const tUser = teamMembers.find(t => t.uid === selectedUser);
     const startObj = parseISO(report.startDate);
     const endObj = parseISO(report.endDate);
 
@@ -45,34 +47,13 @@ export default function WeeklyReports() {
     const maxHours = Math.max(...report.dailyReports.map(d => d.totalHours), 8);
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-300">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between gap-4 bg-slate-900/70 backdrop-blur-sm p-6 rounded-2xl border border-slate-800 shadow-lg">
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-indigo-600/20 border border-indigo-500/30 rounded-2xl flex items-center justify-center">
-                        <BarChart3 className="w-7 h-7 text-indigo-400" />
-                    </div>
-                    <div>
-                        <h2 className="font-black text-2xl text-white tracking-tight">Reporte Semanal</h2>
-                        <p className="text-sm text-slate-400 font-bold capitalize mt-1">
-                            Semana: {format(startObj, "d MMM", { locale: es })} - {format(endObj, "d MMM, yyyy", { locale: es })}
-                        </p>
-                    </div>
+        <div className="space-y-6">
+            {/* Action bar (date picker + export) */}
+            <div className="flex items-center justify-between gap-3">
+                <div className="text-sm text-slate-400 font-bold capitalize">
+                    Semana: {format(startObj, "d MMM", { locale: es })} - {format(endObj, "d MMM, yyyy", { locale: es })}
                 </div>
-
-                <div className="flex flex-col sm:flex-row gap-3 items-end md:items-center">
-                    <div className="bg-slate-800 border border-slate-700 rounded-xl flex items-center p-1.5 w-full sm:w-auto">
-                        <select
-                            value={selectedUser}
-                            onChange={e => setSelectedUser(e.target.value)}
-                            className="bg-transparent border-none text-sm font-bold text-slate-200 py-1.5 px-3 focus:ring-0 cursor-pointer outline-none w-full"
-                        >
-                            {engineersAndTechs.map(m => (
-                                <option key={m.uid} value={m.uid}>{m.displayName || m.email}</option>
-                            ))}
-                        </select>
-                    </div>
-
+                <div className="flex gap-3 items-center">
                     <div className="bg-slate-800 border border-slate-700 rounded-xl flex items-center p-1 w-full sm:w-auto">
                         <CalendarIcon className="w-5 h-5 text-slate-400 ml-3" />
                         <input
@@ -123,7 +104,6 @@ export default function WeeklyReports() {
                         const oh = Math.max(0, day.overtimeHours);
                         const standardH = Math.max(0, h - oh);
 
-                        // Heights relative to maxHours in this week (cap at 100%)
                         const renderScale = maxHours > 0 ? 100 / maxHours : 0;
                         const standardPct = (standardH * renderScale) + '%';
                         const ovrPct = (oh * renderScale) + '%';

@@ -37,8 +37,17 @@ export async function calculateProjectRisk(projectId) {
             }
         });
 
-        // TBD: 'ownerOverloaded' requires capacity checks on the engineer, but for now we set it to false
-        const ownerOverloaded = false;
+        // ownerOverloaded: check if any project assignee has > 8 active tasks across all projects
+        const allTasksSnap = await getDocs(query(collection(db, COLLECTIONS.TASKS)));
+        const allTasks = allTasksSnap.docs.map(d => d.data());
+        const projectAssignees = [...new Set(tasks.map(t => t.assignedTo).filter(Boolean))];
+
+        const ownerOverloaded = projectAssignees.some(uid => {
+            const activeTaskCount = allTasks.filter(
+                t => t.assignedTo === uid && !['completed', 'cancelled'].includes(t.status)
+            ).length;
+            return activeTaskCount > 8;
+        });
 
         // 3. Risk formula
         // delayedTasks × 20
@@ -58,6 +67,7 @@ export async function calculateProjectRisk(projectId) {
         if (activeDelays > 0) factors.push(`${activeDelays} retrasos activos`);
         if (overtimeHours > 0) factors.push(`${overtimeHours.toFixed(1)} horas de horas extra`);
         if (tasksInValidation > 0) factors.push(`${tasksInValidation} tareas en validación`);
+        if (ownerOverloaded) factors.push('Responsable(s) sobrecargado(s) (>8 tareas activas)');
 
         const summary = factors.length > 0
             ? `Riesgo detectado por: ${factors.join(', ')}.`

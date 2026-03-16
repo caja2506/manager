@@ -82,7 +82,7 @@ export function useAnalyticsData() {
         const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         const completedThisWeek = engTasks.filter(t =>
             t.status === 'completed' &&
-            new Date(t.completedAt || t.updatedAt) >= sevenDaysAgo
+            new Date(t.completedDate || t.updatedAt) >= sevenDaysAgo
         ).length;
 
         // Overdue

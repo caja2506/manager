@@ -13,40 +13,49 @@ import React, { useRef, useMemo, useState, useCallback } from 'react';
 import GanttBar from './GanttBar';
 import DependencyArrows from './DependencyArrows';
 import {
-    CheckCircle, Clock, AlertTriangle, Ban, Circle,
-    ChevronDown, ChevronRight, Link2,
+    ChevronDown, ChevronRight, Plus, Ban, Circle, Play, CheckCircle2,
+    Clock, PanelLeftOpen, PanelLeftClose, CheckCircle, AlertTriangle, Link2,
 } from 'lucide-react';
 
 // ---- Layout constants ----
 const ROW_HEIGHT = 42;
 const GROUP_HEADER_HEIGHT = 32;
 const LEFT_PANEL_W = 340;
-const DAY_WIDTH_WEEKLY  = 96;
+const DAY_WIDTH_WEEKLY = 96;
 const DAY_WIDTH_MONTHLY = 32;
 
 // Status icons
 const STATUS_ICONS = {
-    backlog:     <Circle className="w-3 h-3 text-slate-400" />,
-    pending:     <Clock className="w-3 h-3 text-red-400" />,
+    backlog: <Circle className="w-3 h-3 text-slate-400" />,
+    pending: <Clock className="w-3 h-3 text-red-400" />,
     in_progress: <Clock className="w-3 h-3 text-amber-400" />,
-    validation:  <AlertTriangle className="w-3 h-3 text-purple-400" />,
-    completed:   <CheckCircle className="w-3 h-3 text-emerald-400" />,
-    blocked:     <Ban className="w-3 h-3 text-red-500" />,
-    cancelled:   <Ban className="w-3 h-3 text-slate-500" />,
+    validation: <AlertTriangle className="w-3 h-3 text-purple-400" />,
+    completed: <CheckCircle className="w-3 h-3 text-emerald-400" />,
+    blocked: <Ban className="w-3 h-3 text-red-500" />,
+    cancelled: <Ban className="w-3 h-3 text-slate-500" />,
 };
 
 const GROUP_COLORS = ['indigo', 'violet', 'sky', 'emerald', 'amber', 'rose', 'cyan', 'fuchsia'];
 
 function toMidnight(dateOrStr) {
-    const d = typeof dateOrStr === 'string' ? new Date(dateOrStr) : new Date(dateOrStr);
+    // When parsing "YYYY-MM-DD" strings, new Date() treats them as UTC.
+    // In negative UTC offsets (e.g. CST/-6), this shifts the date back by 1 day.
+    // Fix: append T12:00:00 so it's parsed as local noon — safe from both UTC shift and DST.
+    let d;
+    if (typeof dateOrStr === 'string') {
+        d = new Date(dateOrStr.length === 10 ? dateOrStr + 'T12:00:00' : dateOrStr);
+    } else {
+        d = new Date(dateOrStr);
+    }
     d.setHours(0, 0, 0, 0);
     return d;
 }
 function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
-function daysBetween(a, b) { return Math.round((toMidnight(b) - toMidnight(a)) / (24*60*60*1000)); }
+function daysBetween(a, b) { return Math.round((toMidnight(b) - toMidnight(a)) / (24 * 60 * 60 * 1000)); }
 
 export default function GanttGrid({
     tasks, dependencies, viewMode, viewStart, taskTypes, users,
+    placingTask, onPlacementComplete, onStartPlacement,
     onTaskClick, onBarDragEnd, onLinkCreated, onDeleteDependency,
 }) {
     const timelineRef = useRef(null);
@@ -54,31 +63,34 @@ export default function GanttGrid({
 
     // Collapsed groups
     const [collapsedGroups, setCollapsedGroups] = useState(new Set());
+    const [leftPanelOpen, setLeftPanelOpen] = useState(false);
     const toggleGroup = (id) => setCollapsedGroups(prev => {
         const next = new Set(prev);
         next.has(id) ? next.delete(id) : next.add(id);
         return next;
     });
 
-    // Link mode
-    const [linkSource, setLinkSource] = useState(null); // taskId of source
-    const [linkMouse, setLinkMouse] = useState(null); // {x, y} for the temp line
+    // Link mode (2-click: click source bar, then click target bar)
+    const [linkSource, setLinkSource] = useState(null);
 
     const handleLinkStart = useCallback((taskId) => {
-        setLinkSource(taskId);
+        // Toggle: clicking same bar cancels linking
+        setLinkSource(prev => prev === taskId ? null : taskId);
     }, []);
 
-    const handleTimelineMouseMove = useCallback((e) => {
+    // ESC to cancel link mode
+    React.useEffect(() => {
         if (!linkSource) return;
-        const rect = timelineRef.current?.getBoundingClientRect();
-        if (!rect) return;
-        setLinkMouse({ x: e.clientX - rect.left + (timelineRef.current?.scrollLeft || 0), y: e.clientY - rect.top + (timelineRef.current?.scrollTop || 0) });
+        const handleEsc = (e) => { if (e.key === 'Escape') setLinkSource(null); };
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
     }, [linkSource]);
 
-    const handleTimelineMouseUp = useCallback(() => {
-        setLinkSource(null);
-        setLinkMouse(null);
-    }, []);
+    const handleTimelineMouseMove = useCallback(() => { }, []);
+    const handleTimelineMouseUp = useCallback(() => { }, []);
+
+    // Placement hover preview
+    const [hoverDayIndex, setHoverDayIndex] = useState(-1);
 
     // Date columns
     const numDays = viewMode === 'weekly' ? 7 : 35;
@@ -173,7 +185,7 @@ export default function GanttGrid({
             y += ROW_HEIGHT;
         });
         return map;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [rows, viewStart, dayWidth]);
 
     // Today
@@ -199,14 +211,45 @@ export default function GanttGrid({
         if (linkSource && linkSource !== targetTaskId) {
             onLinkCreated?.(linkSource, targetTaskId);
             setLinkSource(null);
-            setLinkMouse(null);
         }
     }, [linkSource, onLinkCreated]);
 
+    // --- Fixed Y position for placingTask (locked to its row) ---
+    const placingTaskRowY = useMemo(() => {
+        if (!placingTask) return 0;
+        let y = 0;
+        for (const row of rows) {
+            if (row.type === 'group') { y += GROUP_HEADER_HEIGHT; continue; }
+            if (row.task.id === placingTask.id) {
+                return y + (ROW_HEIGHT - (ROW_HEIGHT * 0.55)) / 2;
+            }
+            y += ROW_HEIGHT;
+        }
+        return 0;
+    }, [placingTask, rows]);
+
     return (
-        <div className="flex flex-1 overflow-hidden rounded-xl border border-slate-700/50">
+        <div className="flex flex-1 overflow-hidden rounded-xl border border-slate-700/50 relative">
+            {/* Mobile left panel toggle */}
+            <button
+                onClick={() => setLeftPanelOpen(o => !o)}
+                className="md:hidden fixed bottom-20 left-3 z-50 w-10 h-10 rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 flex items-center justify-center active:scale-90 transition-all"
+                title={leftPanelOpen ? 'Cerrar panel' : 'Lista de tareas'}
+            >
+                {leftPanelOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />}
+            </button>
+
+            {/* Mobile overlay backdrop */}
+            {leftPanelOpen && (
+                <div
+                    className="md:hidden fixed inset-0 bg-black/50 z-40"
+                    onClick={() => setLeftPanelOpen(false)}
+                />
+            )}
+
             {/* ---- LEFT PANEL ---- */}
-            <div className="flex-shrink-0 bg-slate-900 border-r border-slate-700/50 overflow-y-auto" style={{ width: LEFT_PANEL_W }}>
+            <div className={`${leftPanelOpen ? 'translate-x-0' : '-translate-x-full'
+                } md:translate-x-0 fixed md:relative z-40 md:z-auto h-full transition-transform duration-200 ease-in-out flex-shrink-0 bg-slate-900 border-r border-slate-700/50 overflow-y-auto`} style={{ width: LEFT_PANEL_W }}>
                 <div className="sticky top-0 z-20 bg-slate-800 border-b border-slate-700/50 px-4 flex items-center" style={{ height: headerHeight }}>
                     <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Tarea por tipo</span>
                 </div>
@@ -247,7 +290,16 @@ export default function GanttGrid({
                             {hasDates ? (
                                 <span className="text-[10px] font-bold text-slate-400">{task.percentComplete || 0}%</span>
                             ) : (
-                                <span className="text-[9px] font-medium text-slate-600 italic">Sin fecha</span>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onStartPlacement?.(task);
+                                    }}
+                                    className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-400/50 transition-all active:scale-95"
+                                    title="Colocar en el Gantt"
+                                >
+                                    <Plus className="w-3 h-3" />
+                                </button>
                             )}
                         </div>
                     );
@@ -255,7 +307,7 @@ export default function GanttGrid({
             </div>
 
             {/* ---- RIGHT PANEL (timeline) ---- */}
-            <div className={`flex-1 overflow-x-auto overflow-y-auto bg-slate-900/50 ${linkSource ? 'cursor-crosshair' : ''}`}
+            <div className={`flex-1 overflow-x-auto overflow-y-auto bg-slate-900/50 ${linkSource ? 'cursor-crosshair' : ''} ${placingTask ? 'cursor-crosshair ring-2 ring-amber-400/30 ring-inset' : ''}`}
                 ref={timelineRef}
                 onMouseMove={handleTimelineMouseMove}
                 onMouseUp={handleTimelineMouseUp}>
@@ -307,7 +359,34 @@ export default function GanttGrid({
                     </div>
 
                     {/* Grid body */}
-                    <div className="relative" style={{ height: totalGridHeight }}>
+                    <div className={`relative ${placingTask ? 'cursor-crosshair' : ''}`}
+                        style={{ height: totalGridHeight }}
+                        onMouseMove={(e) => {
+                            if (!placingTask) { if (hoverDayIndex >= 0) setHoverDayIndex(-1); return; }
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const x = e.clientX - rect.left + (timelineRef.current?.scrollLeft || 0);
+                            const idx = Math.floor(x / dayWidth);
+                            if (idx >= 0 && idx < numDays && idx !== hoverDayIndex) setHoverDayIndex(idx);
+                        }}
+                        onMouseLeave={() => { if (hoverDayIndex >= 0) setHoverDayIndex(-1); }}
+                        onClick={(e) => {
+                            if (!placingTask || !onPlacementComplete) return;
+                            if (linkSource) return;
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const x = e.clientX - rect.left + (timelineRef.current?.scrollLeft || 0);
+                            const dayIndex = Math.floor(x / dayWidth);
+                            if (dayIndex >= 0 && dayIndex < numDays) {
+                                const clickedDate = addDays(viewStart, dayIndex);
+                                // Local timezone safe formatting (avoid UTC shift from toISOString)
+                                const yy = clickedDate.getFullYear();
+                                const mm = String(clickedDate.getMonth() + 1).padStart(2, '0');
+                                const dd = String(clickedDate.getDate()).padStart(2, '0');
+                                const dateStr = `${yy}-${mm}-${dd}`;
+                                setHoverDayIndex(-1);
+                                onPlacementComplete(dateStr);
+                            }
+                        }}
+                    >
                         {/* Column lines */}
                         {dateCols.map((d, i) => {
                             const isWeekend = d.getDay() === 0 || d.getDay() === 6;
@@ -320,6 +399,32 @@ export default function GanttGrid({
                             <div className="absolute top-0 bottom-0 w-px bg-indigo-400/70 z-10" style={{ left: todayOffset }}>
                                 <div className="absolute -top-1 -left-1 w-2.5 h-2.5 rounded-full bg-indigo-400" />
                             </div>
+                        )}
+
+                        {/* Placement preview — green column + bar LOCKED to task's row */}
+                        {placingTask && hoverDayIndex >= 0 && (
+                            <>
+                                {/* Full-column green highlight */}
+                                <div
+                                    className="absolute top-0 bottom-0 bg-emerald-500/15 border-x border-emerald-400/40 z-[5] pointer-events-none transition-all duration-75"
+                                    style={{ left: hoverDayIndex * dayWidth, width: dayWidth * 4 }}
+                                />
+                                {/* Preview bar — locked to the task's own row */}
+                                <div
+                                    className="absolute z-[6] pointer-events-none flex items-center gap-1.5 px-2 rounded-lg border-2 border-emerald-400/60 bg-emerald-500/25 backdrop-blur-sm transition-[left] duration-75"
+                                    style={{
+                                        left: hoverDayIndex * dayWidth + 4,
+                                        width: dayWidth * 4 - 8,
+                                        top: placingTaskRowY,
+                                        height: ROW_HEIGHT * 0.55,
+                                    }}
+                                >
+                                    <span className="text-[10px] font-bold text-emerald-300 truncate">
+                                        {placingTask.title}
+                                    </span>
+                                    <span className="text-[9px] text-emerald-400/70 ml-auto flex-shrink-0">3 días</span>
+                                </div>
+                            </>
                         )}
 
                         {/* Rows + bars */}
@@ -345,6 +450,8 @@ export default function GanttGrid({
                                                 onClick={() => {
                                                     if (linkSource && linkSource !== task.id) {
                                                         handleBarClickForLink(task.id);
+                                                    } else if (!linkSource) {
+                                                        handleLinkStart(task.id);
                                                     }
                                                 }}>
                                                 <GanttBar
@@ -358,7 +465,9 @@ export default function GanttGrid({
                                                     onClick={onTaskClick}
                                                     onDragEnd={onBarDragEnd}
                                                     onLinkStart={handleLinkStart}
+                                                    onLinkComplete={handleBarClickForLink}
                                                     isLinking={!!linkSource}
+                                                    isLinkSource={linkSource === task.id}
                                                 />
                                             </div>
                                         )}
@@ -376,29 +485,24 @@ export default function GanttGrid({
                             svgHeight={totalGridHeight}
                         />
 
-                        {/* Temp link line (while dragging to link) */}
-                        {linkSource && linkMouse && taskRowMap.get(linkSource) && (
-                            <svg className="absolute inset-0 pointer-events-none" width={totalTimelineWidth} height={totalGridHeight} style={{ zIndex: 50, overflow: 'visible' }}>
-                                <line
-                                    x1={taskRowMap.get(linkSource).left + taskRowMap.get(linkSource).width}
-                                    y1={taskRowMap.get(linkSource).top + ROW_HEIGHT / 2}
-                                    x2={linkMouse.x}
-                                    y2={linkMouse.y}
-                                    stroke="#6366f1"
-                                    strokeWidth={2}
-                                    strokeDasharray="6,4"
-                                    opacity={0.8}
-                                />
-                            </svg>
-                        )}
+
 
                         {/* Link mode indicator */}
-                        {linkSource && (
-                            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xl flex items-center gap-2 animate-pulse">
-                                <Link2 className="w-4 h-4" />
-                                Click en otra tarea para crear dependencia — ESC para cancelar
-                            </div>
-                        )}
+                        {linkSource && (() => {
+                            const srcTask = tasks.find(t => t.id === linkSource);
+                            return (
+                                <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-xl flex items-center gap-2.5 animate-bounce">
+                                    <Link2 className="w-4 h-4" />
+                                    <span>Enlazando desde "<span className="text-indigo-200">{srcTask?.title || '...'}</span>" — click en otra tarea</span>
+                                    <button
+                                        onClick={() => setLinkSource(null)}
+                                        className="ml-2 px-2 py-0.5 bg-white/20 text-white rounded-lg text-[10px] font-bold hover:bg-white/30 transition-colors"
+                                    >
+                                        ESC Cancelar
+                                    </button>
+                                </div>
+                            );
+                        })()}
                     </div>
                 </div>
             </div>

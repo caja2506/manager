@@ -7,8 +7,10 @@ import { useAuth } from './contexts/AuthContext';
 import { useRole } from './contexts/RoleContext';
 import LoginPage from './components/auth/LoginPage';
 
-// --- Layout ---
+// --- Layout & Error Handling ---
 import AppLayout from './components/layout/AppLayout';
+import ReportsLayout from './components/layout/ReportsLayout';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // --- Pages ---
 import Dashboard from './pages/Dashboard';
@@ -31,6 +33,7 @@ import SettingsPage from './pages/Settings';
 import AuditFindings from './pages/AuditFindings';
 import ControlTower from './pages/ControlTower';
 import ManagedListsPage from './pages/ManagedListsPage';
+import AutomationControlCenter from './pages/AutomationControlCenter';
 
 
 // ========================================================
@@ -62,41 +65,49 @@ export default function App() {
 
   // --- Authenticated App ---
   return (
-    <Routes>
-      <Route element={<AppLayout />}>
-        {/* Main */}
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/my-work" element={<MyWork />} />
+    <ErrorBoundary module="App">
+      <Routes>
+        <Route element={<AppLayout />}>
+          {/* Main */}
+          <Route path="/" element={<ErrorBoundary module="Dashboard"><Dashboard /></ErrorBoundary>} />
+          <Route path="/my-work" element={<ErrorBoundary module="Mi Trabajo"><MyWork /></ErrorBoundary>} />
 
-        {/* AutoBOM */}
-        <Route path="/bom/projects" element={<BomProjects />} />
-        <Route path="/bom/projects/:projectId" element={<BomProjectDetail />} />
-        <Route path="/catalog" element={<Catalog />} />
+          {/* AutoBOM */}
+          <Route path="/bom/projects" element={<ErrorBoundary module="BOM Proyectos"><BomProjects /></ErrorBoundary>} />
+          <Route path="/bom/projects/:projectId" element={<ErrorBoundary module="BOM Detalle"><BomProjectDetail /></ErrorBoundary>} />
+          <Route path="/catalog" element={<ErrorBoundary module="Catálogo"><Catalog /></ErrorBoundary>} />
 
-        {/* Engineering */}
-        <Route path="/projects" element={<Projects />} />
-        <Route path="/tasks" element={<TaskManager />} />
-        <Route path="/main-table" element={<MainTable />} />
-        <Route path="/work-logs" element={<WorkLogs />} />
-        <Route path="/reports/daily" element={<DailyReports />} />
-        <Route path="/reports/weekly" element={<WeeklyReports />} />
-        <Route path="/analytics" element={<EngineeringAnalytics />} />
-        <Route path="/audit" element={<AuditFindings />} />
-        <Route path="/control-tower" element={<ControlTower />} />
-        <Route path="/planner" element={<WeeklyPlanner />} />
-        <Route path="/gantt" element={<ProjectGantt />} />
+          {/* Engineering */}
+          <Route path="/projects" element={<ErrorBoundary module="Proyectos"><Projects /></ErrorBoundary>} />
+          <Route path="/tasks" element={<ErrorBoundary module="Tareas"><TaskManager /></ErrorBoundary>} />
+          <Route path="/main-table" element={<ErrorBoundary module="Tabla Principal"><MainTable /></ErrorBoundary>} />
 
-        {/* Team */}
-        <Route path="/team" element={<Team />} />
-        <Route path="/notifications" element={<Notifications />} />
-        <Route path="/listas" element={<ManagedListsPage />} />
+          {/* Reports & Analytics — shared layout with tabs */}
+          <Route element={<ReportsLayout />}>
+            <Route path="/work-logs" element={<ErrorBoundary module="Bitácora"><WorkLogs /></ErrorBoundary>} />
+            <Route path="/reports/daily" element={<ErrorBoundary module="Reportes Diarios"><DailyReports /></ErrorBoundary>} />
+            <Route path="/reports/weekly" element={<ErrorBoundary module="Reportes Semanales"><WeeklyReports /></ErrorBoundary>} />
+            <Route path="/analytics" element={<ErrorBoundary module="Analítica"><EngineeringAnalytics /></ErrorBoundary>} />
+          </Route>
+          <Route path="/audit" element={<ErrorBoundary module="Auditoría"><AuditFindings /></ErrorBoundary>} />
+          <Route path="/control-tower" element={<ErrorBoundary module="Control Tower"><ControlTower /></ErrorBoundary>} />
+          <Route path="/planner" element={<ErrorBoundary module="Planner Semanal"><WeeklyPlanner /></ErrorBoundary>} />
+          <Route path="/gantt" element={<ErrorBoundary module="Gantt"><ProjectGantt /></ErrorBoundary>} />
 
-        {/* Admin */}
-        <Route path="/settings" element={<SettingsPage />} />
+          {/* Team */}
+          <Route path="/team" element={<ErrorBoundary module="Equipo"><Team /></ErrorBoundary>} />
+          <Route path="/notifications" element={<ErrorBoundary module="Notificaciones"><Notifications /></ErrorBoundary>} />
+          <Route path="/listas" element={<ErrorBoundary module="Listas"><ManagedListsPage /></ErrorBoundary>} />
 
-        {/* Catch-all redirect */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Route>
-    </Routes>
+          {/* Admin */}
+          <Route path="/automation" element={<ErrorBoundary module="Automatización"><AutomationControlCenter /></ErrorBoundary>} />
+          <Route path="/settings" element={<ErrorBoundary module="Configuración"><SettingsPage /></ErrorBoundary>} />
+
+          {/* Catch-all redirect */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+    </ErrorBoundary>
   );
 }
+

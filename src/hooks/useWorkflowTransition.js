@@ -1,18 +1,26 @@
 /**
  * useWorkflowTransition Hook
  * ==========================
- * 
- * Validates task status transitions against the workflow model,
- * logs audit events, and wraps updateTaskStatus with enforcement.
+ *
+ * Client-side workflow transition orchestrator.
+ *
+ * ARCHITECTURE:
+ *   - Validates transitions client-side for instant UX feedback
+ *   - Calls updateTaskStatus() which routes to the transitionTaskStatus
+ *     Cloud Function for server-enforced execution
+ *   - Audit events are created server-side (no duplicate writes)
+ *
+ * Flow:
+ *   1. requestTransition() → client-side validation (immediate)
+ *   2. If warnings/missing fields → show confirmation UI
+ *   3. executeTransition() or confirmTransition() → calls CF via taskService
+ *   4. CF validates again server-side → writes status + audit event atomically
  */
 
 import { useState, useCallback } from 'react';
 import { validateTransition } from '../core/workflow/transitionValidator';
-import { WORKFLOW_STATUS, getRequiredFields, getWorkflowSequence } from '../core/workflow/workflowModel';
+import { getRequiredFields, getWorkflowSequence } from '../core/workflow/workflowModel';
 import { updateTaskStatus } from '../services/taskService';
-import { doc, setDoc, collection } from 'firebase/firestore';
-import { db } from '../firebase';
-import { createAuditEventDocument, COLLECTIONS } from '../models/schemas';
 
 /**
  * @returns Hook for managing validated workflow transitions.
@@ -24,12 +32,13 @@ export function useWorkflowTransition() {
 
     /**
      * Attempt to transition a task to a new status.
+     * Performs client-side validation for instant feedback.
      * Returns a result object that indicates if the transition needs confirmation.
      */
     const requestTransition = useCallback((task, targetStatus, userId) => {
         setTransitionError(null);
 
-        // Validate transition using the transitionValidator
+        // Client-side validation (instant UX — server re-validates)
         const validation = validateTransition(task, targetStatus);
 
         if (!validation.valid) {
@@ -54,7 +63,7 @@ export function useWorkflowTransition() {
             }
         }
 
-        // Gather warnings from validation + our own
+        // Gather warnings from validation
         const warnings = validation.warnings.map(w => w.message);
 
         // Additional warning: moving backward
@@ -92,45 +101,32 @@ export function useWorkflowTransition() {
     }, []);
 
     /**
-     * Execute a validated transition (writes to Firestore).
+     * Execute a validated transition via Cloud Function.
+     * If called after user confirmation (pending), sends force=true
+     * to allow the CF to skip required field validation.
      */
-    const executeTransition = useCallback(async (transitionData) => {
-        const { task, targetStatus, userId } = transitionData || pendingTransition || {};
+    const executeTransition = useCallback(async (transitionData, forceOverride = false) => {
+        const data = transitionData || pendingTransition;
+        const { task, targetStatus } = data || {};
         if (!task || !targetStatus) return;
 
         setIsTransitioning(true);
         setTransitionError(null);
 
         try {
-            // Execute the actual status update
-            await updateTaskStatus(task.id, targetStatus, task.projectId);
+            // force=true when user confirmed despite warnings/missing fields
+            const force = forceOverride || (data.missingFields?.length > 0);
 
-            // Log audit event
-            try {
-                const auditEvent = createAuditEventDocument({
-                    eventType: 'task_transition',
-                    entityType: 'task',
-                    entityId: task.id,
-                    userId: userId,
-                    details: {
-                        previousStatus: task.status,
-                        newStatus: targetStatus,
-                        taskTitle: task.title,
-                        projectId: task.projectId,
-                    },
-                });
-
-                const auditRef = doc(collection(db, COLLECTIONS.AUDIT_EVENTS));
-                await setDoc(auditRef, auditEvent);
-            } catch (auditErr) {
-                // Audit logging should not block the transition
-                console.warn('Failed to log audit event:', auditErr);
-            }
+            // Calls Cloud Function via taskService.updateTaskStatus()
+            // CF handles: validation, status write, audit event, risk recalc
+            const result = await updateTaskStatus(task.id, targetStatus, task.projectId, force);
 
             setPendingTransition(null);
-            return { success: true };
+            return { success: true, ...result };
         } catch (err) {
-            const error = `Error al actualizar: ${err.message}`;
+            // Extract CF error message if available
+            const cfMessage = err?.message || err?.details || 'Error desconocido';
+            const error = `Error al actualizar: ${cfMessage}`;
             setTransitionError(error);
             return { success: false, error };
         } finally {
@@ -147,11 +143,11 @@ export function useWorkflowTransition() {
     }, []);
 
     /**
-     * Confirm and execute a pending transition.
+     * Confirm and execute a pending transition (force=true).
      */
     const confirmTransition = useCallback(async () => {
         if (pendingTransition) {
-            return executeTransition(pendingTransition);
+            return executeTransition(pendingTransition, true);
         }
     }, [pendingTransition, executeTransition]);
 

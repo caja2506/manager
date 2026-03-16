@@ -61,11 +61,12 @@ const PROGRESS_MAP = {
  *   onDragEnd: ({ taskId, newStartDate, newEndDate }) => void,
  *   onLinkStart: (taskId) => void,
  *   isLinking: boolean,
+ *   isLinkSource: boolean,
  * }} props
  */
 export default function GanttBar({
     task, left, width, color = 'indigo', rowHeight = 42, dayWidth = 96,
-    viewStart, onClick, onDragEnd, onLinkStart, isLinking,
+    viewStart, onClick, onDragEnd, onLinkStart, onLinkComplete, isLinking, isLinkSource,
 }) {
     const [hovered, setHovered] = useState(false);
     const [dragState, setDragState] = useState(null); // { mode: 'move'|'left'|'right', startX, origLeft, origWidth }
@@ -75,13 +76,20 @@ export default function GanttBar({
     const progressClasses = PROGRESS_MAP[color] || PROGRESS_MAP.indigo;
     const pct = Math.min(Math.max(task.percentComplete || 0, 0), 100);
 
-    // --- Date from pixel offset ---
+    // --- Date from pixel offset (local timezone safe) ---
+    const toLocalDateStr = useCallback((d) => {
+        const yy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yy}-${mm}-${dd}`;
+    }, []);
+
     const pixelToDate = useCallback((pixelLeft) => {
         const dayOffset = Math.round(pixelLeft / dayWidth);
         const d = new Date(viewStart);
         d.setDate(d.getDate() + dayOffset);
-        return d.toISOString().substring(0, 10);
-    }, [dayWidth, viewStart]);
+        return toLocalDateStr(d);
+    }, [dayWidth, viewStart, toLocalDateStr]);
 
     // --- Drag handlers ---
     const startDrag = useCallback((e, mode) => {
@@ -125,16 +133,19 @@ export default function GanttBar({
             }
 
             const newStartDate = pixelToDate(newLeft);
-            // width → number of days = width/dayWidth, but end date is start + days
+            // width → number of days = width/dayWidth, but end date is start + (days - 1)
             const durationDays = Math.max(Math.round(newWidth / dayWidth) - 1, 0);
-            const endD = new Date(newStartDate);
+            const endD = new Date(newStartDate + 'T12:00:00'); // noon to avoid DST issues
             endD.setDate(endD.getDate() + durationDays);
-            const newEndDate = endD.toISOString().substring(0, 10);
+            const newEndDate = toLocalDateStr(endD);
 
             setDragState(null);
 
             if (daySnap !== 0 && onDragEnd) {
                 onDragEnd({ taskId: task.id, newStartDate, newEndDate });
+            } else if (daySnap === 0 && mode === 'move') {
+                // No movement = a click → start linking
+                onLinkStart?.(task.id);
             }
         };
 
@@ -192,28 +203,42 @@ export default function GanttBar({
     return (
         <div
             ref={barRef}
-            className={`absolute rounded-md overflow-hidden ${barClasses} shadow-lg transition-shadow ${isDragging ? 'shadow-xl opacity-90 z-30' : 'hover:shadow-md'}`}
+            className={`absolute rounded-md overflow-visible ${barClasses} shadow-lg transition-shadow ${isDragging ? 'shadow-xl opacity-90 z-30' : 'hover:shadow-md'} ${isLinkSource ? 'ring-2 ring-indigo-400 ring-offset-1 ring-offset-slate-900 animate-pulse z-20' : ''} ${isLinking && !isLinkSource ? 'cursor-crosshair hover:ring-2 hover:ring-emerald-400' : ''}`}
             style={{
                 left: displayLeft,
                 width: Math.max(displayWidth, 8),
                 height: barH,
                 top: barTop,
-                zIndex: isDragging ? 30 : 5,
-                cursor: isDragging ? 'grabbing' : 'grab',
+                zIndex: isDragging ? 30 : isLinkSource ? 20 : 5,
+                cursor: isDragging ? 'grabbing' : isLinking ? 'crosshair' : 'grab',
                 userSelect: 'none',
             }}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
             onMouseDown={(e) => {
-                // Only start drag if not on a handle
+                // Don't start drag if in linking mode
+                if (isLinking) return;
                 if (e.target.dataset?.handle) return;
                 startDrag(e, 'move');
             }}
+            onClick={(e) => {
+                e.stopPropagation();
+                if (isDragging) return;
+                if (isLinking && !isLinkSource) {
+                    onLinkComplete?.(task.id);
+                    return;
+                }
+                if (isLinking && isLinkSource) {
+                    onLinkStart?.(task.id);
+                    return;
+                }
+            }}
             onDoubleClick={(e) => {
                 e.stopPropagation();
+                if (isLinking) return;
                 onClick?.(task);
             }}
-            title={`${task.title} (${pct}%) — Doble click para editar, arrastrar para mover`}
+            title={isLinking && !isLinkSource ? `Click para enlazar con "${task.title}"` : `${task.title} (${pct}%) — Click para enlazar, doble click para editar`}
         >
             {/* Progress fill */}
             {pct > 0 && (
@@ -228,43 +253,35 @@ export default function GanttBar({
             )}
 
             {/* Left resize handle */}
-            <div
-                data-handle="left"
-                className={`absolute left-0 top-0 bottom-0 cursor-col-resize transition-opacity ${hovered || isDragging ? 'opacity-100' : 'opacity-0'}`}
-                style={{ width: HANDLE_W, background: 'rgba(255,255,255,0.3)', borderRadius: '4px 0 0 4px' }}
-                onMouseDown={(e) => startDrag(e, 'left')}
-            />
+            {!isLinking && (
+                <div
+                    data-handle="left"
+                    className={`absolute left-0 top-0 bottom-0 cursor-col-resize transition-opacity ${hovered || isDragging ? 'opacity-100' : 'opacity-0'}`}
+                    style={{ width: HANDLE_W, background: 'rgba(255,255,255,0.3)', borderRadius: '4px 0 0 4px' }}
+                    onMouseDown={(e) => startDrag(e, 'left')}
+                />
+            )}
 
             {/* Right resize handle */}
-            <div
-                data-handle="right"
-                className={`absolute right-0 top-0 bottom-0 cursor-col-resize transition-opacity ${hovered || isDragging ? 'opacity-100' : 'opacity-0'}`}
-                style={{ width: HANDLE_W, background: 'rgba(255,255,255,0.3)', borderRadius: '0 4px 4px 0' }}
-                onMouseDown={(e) => startDrag(e, 'right')}
-            />
-
-            {/* Link connector dot (right edge) */}
-            {hovered && !isDragging && (
+            {!isLinking && (
                 <div
-                    data-handle="link"
-                    className="absolute cursor-crosshair"
-                    style={{
-                        right: -5,
-                        top: barH / 2 - 5,
-                        width: 10,
-                        height: 10,
-                        borderRadius: '50%',
-                        background: '#6366f1',
-                        border: '2px solid white',
-                        zIndex: 20,
-                    }}
-                    onMouseDown={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        onLinkStart?.(task.id);
-                    }}
-                    title="Arrastrar para crear dependencia"
+                    data-handle="right"
+                    className={`absolute right-0 top-0 bottom-0 cursor-col-resize transition-opacity ${hovered || isDragging ? 'opacity-100' : 'opacity-0'}`}
+                    style={{ width: HANDLE_W, background: 'rgba(255,255,255,0.3)', borderRadius: '0 4px 4px 0' }}
+                    onMouseDown={(e) => startDrag(e, 'right')}
                 />
+            )}
+
+            {/* Link source indicator — only after click */}
+            {isLinkSource && (
+                <div
+                    className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-indigo-500 border-2 border-white shadow-lg z-30 flex items-center justify-center"
+                    title="Click en otra tarea para enlazar"
+                >
+                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                </div>
             )}
         </div>
     );

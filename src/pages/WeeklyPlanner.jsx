@@ -3,17 +3,18 @@ import { useAppData } from '../contexts/AppDataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
 import { plannerService } from '../services/plannerService';
+import { syncPlannerToGantt } from '../services/ganttPlannerSync';
 import { enrichPlanItemsWithTasks } from '../utils/plannerUtils';
 import PlannerSidebar from '../components/planner/PlannerSidebar';
 import PlannerGrid from '../components/planner/PlannerGrid';
 import WeeklyCapacitySummary from '../components/planner/WeeklyCapacitySummary';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
 import TaskModuleBanner from '../components/layout/TaskModuleBanner';
-import { 
-    CalendarDays, ChevronLeft, ChevronRight, Plus
+import {
+    CalendarDays, ChevronLeft, ChevronRight, Plus, PanelLeftOpen, PanelLeftClose
 } from 'lucide-react';
-import { 
-    format, startOfWeek, addDays, addWeeks, subWeeks, isToday, isSameDay, parseISO 
+import {
+    format, startOfWeek, addDays, addWeeks, subWeeks, isToday, isSameDay, parseISO
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -28,8 +29,8 @@ export default function WeeklyPlanner() {
     // ──────────────── Week navigation ────────────────
     const [weekOffset, setWeekOffset] = useState(0);
     const [filterAssignee, setFilterAssignee] = useState('all');
-    const [filterProject,  setFilterProject]  = useState('all');
-    const [searchQuery,    setSearchQuery]     = useState('');
+    const [filterProject, setFilterProject] = useState('all');
+    const [searchQuery, setSearchQuery] = useState('');
 
     const weekStart = useMemo(() => {
         const base = startOfWeek(new Date(), { weekStartsOn: 1 }); // Monday
@@ -45,11 +46,14 @@ export default function WeeklyPlanner() {
     const weekStartStr = format(weekStart, 'yyyy-MM-dd');
 
     // ──────────────── Plan items state ────────────────
-    const [rawPlanItems, setRawPlanItems]     = useState([]); // Raw Firestore data
-    const [loading,   setLoading]             = useState(false);
-    const [selectedItem, setSelectedItem]     = useState(null); // planner block (for moves/resize)
-    const [taskModalTask, setTaskModalTask]   = useState(undefined); // undefined=closed, null=new, obj=edit
-    const [placingTask, setPlacingTask]        = useState(null); // task being placed via "+" button
+    const [rawPlanItems, setRawPlanItems] = useState([]); // Raw Firestore data
+    const [loading, setLoading] = useState(false);
+    const [selectedItem, setSelectedItem] = useState(null); // planner block (for moves/resize)
+    const [taskModalTask, setTaskModalTask] = useState(undefined); // undefined=closed, null=new, obj=edit
+    const [placingTask, setPlacingTask] = useState(null); // task being placed via "+" button
+    const [plannerError, setPlannerError] = useState(null); // user-facing validation error
+    const [plannerWarnings, setPlannerWarnings] = useState([]); // non-blocking warnings
+    const [sidebarOpen, setSidebarOpen] = useState(false); // mobile sidebar toggle
 
     // Fetch plan items for the visible week
     const fetchPlanItems = useCallback(async () => {
@@ -93,7 +97,7 @@ export default function WeeklyPlanner() {
             .filter(t => !['completed', 'cancelled'].includes(t.status))
             .filter(t => {
                 if (filterAssignee !== 'all' && t.assignedTo !== filterAssignee) return false;
-                if (filterProject  !== 'all' && t.projectId  !== filterProject)  return false;
+                if (filterProject !== 'all' && t.projectId !== filterProject) return false;
                 // Consider "unscheduled" = hasn't hit estimatedHours yet or zero plan
                 const planned = taskPlannedMap[t.id] || 0;
                 return planned < (t.estimatedHours || 0.1); // include tasks with no estimate
@@ -109,7 +113,7 @@ export default function WeeklyPlanner() {
     const visiblePlanItems = useMemo(() => {
         return planItems.filter(pi => {
             if (filterAssignee !== 'all' && pi.assignedTo !== filterAssignee) return false;
-            if (filterProject  !== 'all' && pi.projectId  !== filterProject)  return false;
+            if (filterProject !== 'all' && pi.projectId !== filterProject) return false;
             return true;
         });
     }, [planItems, filterAssignee, filterProject]);
@@ -121,43 +125,72 @@ export default function WeeklyPlanner() {
 
         const assignedMember = teamMembers.find(m => m.uid === task.assignedTo);
 
-        const startDt = new Date(`${date}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:00`);
+        const startDt = new Date(`${date}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`);
         const defaultHours = task.estimatedHours > 0 ? Math.min(2, task.estimatedHours) : 1;
         const endDt = new Date(startDt.getTime() + defaultHours * 3600000);
 
         const planItem = {
             // ── Required scheduling fields ──
-            taskId:              task.id,
-            weekStartDate:       weekStartStr,
+            taskId: task.id,
+            weekStartDate: weekStartStr,
             date,
-            dayOfWeek:           startDt.getDay(),
-            startDateTime:       startDt.toISOString(),
-            endDateTime:         endDt.toISOString(),
-            plannedHours:        defaultHours,
-            createdBy:           user.uid,
+            dayOfWeek: startDt.getDay(),
+            startDateTime: startDt.toISOString(),
+            endDateTime: endDt.toISOString(),
+            plannedHours: defaultHours,
+            createdBy: user.uid,
 
             // ── Optional (for filtering queries) ──
-            assignedTo:          task.assignedTo,
-            projectId:           task.projectId,
+            assignedTo: task.assignedTo,
+            projectId: task.projectId,
 
             // ── TRANSITIONAL: snapshot fields ──
             // Still written for backward compatibility with existing data.
             // The frontend reads live data via enrichPlanItemsWithTasks().
             // TODO migration: stop writing these after full migration.
-            taskTitleSnapshot:   task.title,
+            taskTitleSnapshot: task.title,
             projectNameSnapshot: engProjects.find(p => p.id === task.projectId)?.name || '',
-            assignedToName:      assignedMember?.displayName || assignedMember?.email || '',
-            statusSnapshot:      task.status,
-            priority:            task.priority,
-            colorKey:            projectColorMap[task.projectId] || 'indigo',
+            assignedToName: assignedMember?.displayName || assignedMember?.email || '',
+            statusSnapshot: task.status,
+            priority: task.priority,
+            colorKey: projectColorMap[task.projectId] || 'indigo',
         };
 
         try {
-            const newId = await plannerService.createPlanItem(planItem);
+            // Build validation context for W1-W5 warnings
+            const member = teamMembers.find(m => m.uid === task.assignedTo);
+            const validationContext = {
+                existingItems: rawPlanItems,
+                linkedTask: task,
+                weeklyCapacityHours: member?.weeklyCapacityHours || 40,
+                allItemsForTask: rawPlanItems.filter(pi => pi.taskId === task.id),
+            };
+
+            const { id: newId, warnings } = await plannerService.createPlanItem(planItem, validationContext);
+
+            // Show warnings (non-blocking)
+            if (warnings && warnings.length > 0) {
+                setPlannerWarnings(warnings);
+                setTimeout(() => setPlannerWarnings([]), 8000);
+            }
+
+            // Clear any previous error
+            setPlannerError(null);
+
             // Add to rawPlanItems — enrichment happens automatically via useMemo
             setRawPlanItems(prev => [...prev, { id: newId, ...planItem }]);
+
+            // Sync to Gantt: update task dates from all planner blocks
+            syncPlannerToGantt(taskId).catch(console.warn);
         } catch (e) {
-            console.error("Error saving plan item:", e);
+            if (e.name === 'PlannerValidationError') {
+                setPlannerError(e.validationErrors?.join(' | ') || e.message);
+                setTimeout(() => setPlannerError(null), 8000);
+            } else {
+                console.error("Error saving plan item:", e);
+                setPlannerError('Error inesperado al guardar el bloque.');
+                setTimeout(() => setPlannerError(null), 5000);
+            }
         }
     }, [engTasks, engProjects, teamMembers, weekStartStr, projectColorMap, user.uid]);
 
@@ -167,8 +200,8 @@ export default function WeeklyPlanner() {
         if (!item) return;
 
         const startDt = parseISO(item.startDateTime);
-        const endDt   = new Date(newEndDateTime);
-        const diffH   = parseFloat(((endDt - startDt) / 3600000).toFixed(2));
+        const endDt = new Date(newEndDateTime);
+        const diffH = parseFloat(((endDt - startDt) / 3600000).toFixed(2));
 
         try {
             await plannerService.updatePlanItem(itemId, {
@@ -189,24 +222,26 @@ export default function WeeklyPlanner() {
         if (!item) return;
 
         // Preserve the original duration
-        const origStart  = parseISO(item.startDateTime);
-        const origEnd    = parseISO(item.endDateTime);
+        const origStart = parseISO(item.startDateTime);
+        const origEnd = parseISO(item.endDateTime);
         const durationMs = origEnd - origStart;
 
-        const newStart   = new Date(`${date}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:00`);
-        const newEnd     = new Date(newStart.getTime() + durationMs);
+        const newStart = new Date(`${date}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`);
+        const newEnd = new Date(newStart.getTime() + durationMs);
 
         const updates = {
             date,
-            dayOfWeek:     newStart.getDay(),
+            dayOfWeek: newStart.getDay(),
             startDateTime: newStart.toISOString(),
-            endDateTime:   newEnd.toISOString(),
+            endDateTime: newEnd.toISOString(),
             weekStartDate: weekStartStr,
         };
 
         try {
             await plannerService.updatePlanItem(itemId, updates);
             setRawPlanItems(prev => prev.map(pi => pi.id === itemId ? { ...pi, ...updates } : pi));
+            // Sync to Gantt
+            syncPlannerToGantt(item.taskId).catch(console.warn);
         } catch (e) {
             console.error("Error moving block:", e);
         }
@@ -214,14 +249,17 @@ export default function WeeklyPlanner() {
 
     // ──────────────── Delete handler ────────────────
     const handleBlockDelete = useCallback(async (itemId) => {
+        const item = rawPlanItems.find(pi => pi.id === itemId);
         try {
             await plannerService.deletePlanItem(itemId);
             setRawPlanItems(prev => prev.filter(pi => pi.id !== itemId));
             setSelectedItem(null);
+            // Sync to Gantt: recalculate dates from remaining blocks
+            if (item?.taskId) syncPlannerToGantt(item.taskId).catch(console.warn);
         } catch (e) {
             console.error("Error deleting block:", e);
         }
-    }, []);
+    }, [rawPlanItems]);
 
     // ──────────────── Modal save handler ────────────────
     const handleModalSave = useCallback(async (updates) => {
@@ -303,6 +341,23 @@ export default function WeeklyPlanner() {
     return (
         <div className="flex flex-col h-[calc(100vh-5rem)] -m-4 md:-m-8 overflow-hidden bg-slate-950">
 
+            {/* ══ Validation Error Bar ══ */}
+            {plannerError && (
+                <div className="mx-4 mt-2 flex items-center gap-3 bg-rose-500/15 border border-rose-500/30 text-rose-300 px-4 py-2.5 rounded-xl text-xs font-bold animate-in slide-in-from-top duration-200">
+                    <span className="text-rose-400">✕</span>
+                    <span className="flex-1">{plannerError}</span>
+                    <button onClick={() => setPlannerError(null)} className="text-rose-400 hover:text-rose-300 p-1">✕</button>
+                </div>
+            )}
+
+            {/* ══ Warnings Bar ══ */}
+            {plannerWarnings.length > 0 && (
+                <div className="mx-4 mt-2 flex flex-col gap-1 bg-amber-500/10 border border-amber-500/25 text-amber-300 px-4 py-2.5 rounded-xl text-xs font-bold animate-in slide-in-from-top duration-200">
+                    {plannerWarnings.map((w, i) => <div key={i}>{w}</div>)}
+                    <button onClick={() => setPlannerWarnings([])} className="self-end text-amber-400 hover:text-amber-300 text-[10px] mt-1">Cerrar</button>
+                </div>
+            )}
+
             {/* ══ Shared Banner ══ */}
             <TaskModuleBanner onNewTask={() => setTaskModalTask(null)} canEdit={canEdit}>
                 {/* Week navigation */}
@@ -349,16 +404,37 @@ export default function WeeklyPlanner() {
             </TaskModuleBanner>
 
             {/* ── Main workspace ── */}
-            <div className="flex flex-1 min-h-0">
-                {/* Unscheduled tasks sidebar */}
-                <PlannerSidebar
-                    unscheduledTasks={unscheduledTasks}
-                    searchQuery={searchQuery}
-                    setSearchQuery={setSearchQuery}
-                    onStartPlacement={handleStartPlacement}
-                    placingTask={placingTask}
-                    onCancelPlacement={handleCancelPlacement}
-                />
+            <div className="flex flex-1 min-h-0 relative">
+                {/* Mobile sidebar toggle */}
+                <button
+                    onClick={() => setSidebarOpen(o => !o)}
+                    className="md:hidden fixed bottom-20 left-3 z-50 w-10 h-10 rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 flex items-center justify-center active:scale-90 transition-all"
+                    title={sidebarOpen ? 'Cerrar panel' : 'Tareas sin planificar'}
+                >
+                    {sidebarOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />}
+                </button>
+
+                {/* Mobile overlay backdrop */}
+                {sidebarOpen && (
+                    <div
+                        className="md:hidden fixed inset-0 bg-black/50 z-40"
+                        onClick={() => setSidebarOpen(false)}
+                    />
+                )}
+
+                {/* Unscheduled tasks sidebar: hidden on mobile, shown on md+ */}
+                <div className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+                    } md:translate-x-0 fixed md:relative z-40 md:z-auto h-full transition-transform duration-200 ease-in-out`}>
+                    <PlannerSidebar
+                        unscheduledTasks={unscheduledTasks}
+                        searchQuery={searchQuery}
+                        setSearchQuery={setSearchQuery}
+                        onStartPlacement={(task) => { handleStartPlacement(task); setSidebarOpen(false); }}
+                        onTaskEdit={(task) => { setTaskModalTask(task); setSidebarOpen(false); }}
+                        placingTask={placingTask}
+                        onCancelPlacement={handleCancelPlacement}
+                    />
+                </div>
 
                 {/* Grid area */}
                 <div className="flex flex-col flex-1 min-w-0 overflow-hidden">

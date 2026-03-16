@@ -37,8 +37,8 @@ export function buildDepartmentSnapshot(data) {
     // Task velocity: completed tasks in last 7 days
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const recentlyCompleted = completedTasks.filter(t => {
-        const completedAt = t.completedAt || t.updatedAt;
-        return completedAt && new Date(completedAt) >= sevenDaysAgo;
+        const completedDate = t.completedDate || t.updatedAt;
+        return completedDate && new Date(completedDate) >= sevenDaysAgo;
     });
 
     // Hours logged in last 7 days
@@ -58,7 +58,7 @@ export function buildDepartmentSnapshot(data) {
     // On-time delivery rate
     const tasksWithDueDate = completedTasks.filter(t => t.dueDate);
     const onTimeTasks = tasksWithDueDate.filter(t => {
-        const completed = new Date(t.completedAt || t.updatedAt);
+        const completed = new Date(t.completedDate || t.updatedAt);
         return completed <= new Date(t.dueDate);
     });
     const onTimeRate = tasksWithDueDate.length > 0 ? onTimeTasks.length / tasksWithDueDate.length : null;
@@ -163,7 +163,7 @@ export function buildUserSnapshot(userId, tasks, timeLogs, teamMembers) {
 
     const activeTasks = userTasks.filter(t => !['completed', 'cancelled'].includes(t.status));
     const completedRecent = userTasks.filter(t =>
-        t.status === 'completed' && new Date(t.completedAt || t.updatedAt) >= sevenDaysAgo
+        t.status === 'completed' && new Date(t.completedDate || t.updatedAt) >= sevenDaysAgo
     );
 
     return createAnalyticsSnapshotDocument({

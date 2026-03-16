@@ -5,6 +5,8 @@
  * React hook that provides access to the audit engine.
  * Runs client-side evaluation against data from AppDataContext.
  * 
+ * REAL CONTEXT: fetches planner data on-demand for accurate scoring.
+ * 
  * Usage:
  *   const { auditResult, scores, isAuditing, runClientAudit } = useAuditData();
  */
@@ -14,6 +16,8 @@ import { useAppData } from '../contexts/AppDataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { runAudit } from '../core/audit/auditEngine';
 import { persistAuditResults } from '../services/auditPersistence';
+import { plannerService } from '../services/plannerService';
+import { format, startOfWeek } from 'date-fns';
 
 /**
  * Hook to manage audit execution and state.
@@ -38,12 +42,24 @@ export function useAuditData() {
 
     /**
      * Run a client-side audit using current AppDataContext data.
+     * Fetches planner data on-demand for accurate planning scores.
      * Returns the audit result and caches it in state.
      */
-    const runClientAudit = useCallback(() => {
+    const runClientAudit = useCallback(async () => {
         setIsAuditing(true);
 
         try {
+            // Fetch current week's planner data for accurate scoring
+            const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+            const weekStartStr = format(weekStart, 'yyyy-MM-dd');
+            let plannerSlots = [];
+            try {
+                plannerSlots = await plannerService.getWeeklyPlanItems(weekStartStr);
+            } catch (err) {
+                console.warn('[useAuditData] Could not fetch planner data:', err.message);
+                // Continue with empty — planner rules will skip gracefully
+            }
+
             const result = runAudit({
                 engTasks,
                 engProjects,
@@ -51,7 +67,7 @@ export function useAuditData() {
                 timeLogs,
                 delays,
                 teamMembers,
-                plannerSlots: [], // TODO: add planner slots when available from context
+                plannerSlots,
                 existingFindings: [],
                 dependencies: [],
                 auditEvents: [],

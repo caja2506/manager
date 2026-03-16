@@ -36,16 +36,16 @@ export default function TodaySummaryCard({ todayTasksCount, urgentCount, blocked
     ];
 
     return (
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
             {stats.map((s, i) => (
                 <div
                     key={i}
-                    className={`${s.bg} rounded-2xl px-4 py-3 flex items-center gap-3 ${s.pulse ? 'animate-pulse' : ''}`}
+                    className={`${s.bg} rounded-2xl px-3 py-2.5 md:px-4 md:py-3 flex items-center gap-2 md:gap-3 ${s.pulse ? 'animate-pulse' : ''}`}
                 >
                     <span className={`${s.color} shrink-0`}>{s.icon}</span>
                     <div>
-                        <div className={`text-xl font-black ${s.color} leading-none`}>{s.value}</div>
-                        <div className="text-[10px] font-bold text-slate-400 mt-0.5">{s.label}</div>
+                        <div className={`text-lg md:text-xl font-black ${s.color} leading-none`}>{s.value}</div>
+                        <div className="text-[9px] md:text-[10px] font-bold text-slate-400 mt-0.5">{s.label}</div>
                     </div>
                 </div>
             ))}

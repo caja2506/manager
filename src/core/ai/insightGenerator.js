@@ -154,42 +154,97 @@ Responde ÚNICAMENTE con el JSON.`;
  */
 export function parseGeminiResponse(responseText) {
     if (!responseText) return null;
-    
-    // If the response is already a JSON object (e.g. implicitly parsed by a pre-processor or Firebase), return it directly.
+
+    // If the response is already a JSON object, return it directly.
     if (typeof responseText === 'object') {
+        console.log('[parseGeminiResponse] Response is already an object, returning directly.');
         return responseText;
     }
 
+    console.log('[parseGeminiResponse] Attempting to parse string of length:', responseText.length);
+    console.log('[parseGeminiResponse] First 200 chars:', responseText.substring(0, 200));
+
     // Remove trailing commas to fix invalid formatting commonly returned by Gemini 
     const sanitizeJson = (str) => {
-        return str.replace(/,\s*([\]}])/g, '$1').trim();
+        return str
+            .replace(/,\s*([\]}])/g, '$1')  // trailing commas
+            .replace(/[\x00-\x1F\x7F]/g, (ch) => ch === '\n' || ch === '\r' || ch === '\t' ? ch : '') // control chars
+            .trim();
     };
 
+    // Strategy 1: Direct parse
     try {
-        // Try direct parse
-        return JSON.parse(sanitizeJson(responseText));
-    } catch {
-        // Try stripping markdown code blocks
-        const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (jsonMatch && jsonMatch[1]) {
-            try {
-                return JSON.parse(sanitizeJson(jsonMatch[1]));
-            } catch {
-                // Fall through
-            }
-        }
-
-        // Try finding JSON object in text
-        const braceMatch = responseText.match(/\{[\s\S]*\}/);
-        if (braceMatch) {
-            try {
-                return JSON.parse(sanitizeJson(braceMatch[0]));
-            } catch {
-                // Fall through
-            }
-        }
-
-        console.warn('Failed to parse Gemini response:', responseText.substring(0, 200));
-        return null;
+        const result = JSON.parse(sanitizeJson(responseText));
+        console.log('[parseGeminiResponse] Strategy 1 (direct) succeeded.');
+        return result;
+    } catch (e) {
+        console.warn('[parseGeminiResponse] Strategy 1 failed:', e.message);
     }
+
+    // Strategy 2: Strip markdown code blocks
+    const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch && jsonMatch[1]) {
+        try {
+            const result = JSON.parse(sanitizeJson(jsonMatch[1]));
+            console.log('[parseGeminiResponse] Strategy 2 (markdown strip) succeeded.');
+            return result;
+        } catch (e) {
+            console.warn('[parseGeminiResponse] Strategy 2 failed:', e.message);
+        }
+    }
+
+    // Strategy 3: Find JSON object in text
+    const braceMatch = responseText.match(/\{[\s\S]*\}/);
+    if (braceMatch) {
+        try {
+            const result = JSON.parse(sanitizeJson(braceMatch[0]));
+            console.log('[parseGeminiResponse] Strategy 3 (brace match) succeeded.');
+            return result;
+        } catch (e) {
+            console.warn('[parseGeminiResponse] Strategy 3 failed:', e.message);
+        }
+    }
+
+    // Strategy 4: If responseText is a stringified-then-re-stringified JSON (double encoded)
+    try {
+        const unescaped = JSON.parse(`"${responseText.replace(/"/g, '\\"')}"`);
+        if (typeof unescaped === 'string') {
+            const result = JSON.parse(sanitizeJson(unescaped));
+            console.log('[parseGeminiResponse] Strategy 4 (double-encoded) succeeded.');
+            return result;
+        }
+    } catch {
+        // Fall through
+    }
+
+    // Strategy 5: Truncated JSON recovery — close open strings/objects/arrays
+    try {
+        let truncated = responseText.trim();
+        // If it looks like truncated JSON (starts with { but doesn't end with })
+        if (truncated.startsWith('{') && !truncated.endsWith('}')) {
+            console.warn('[parseGeminiResponse] Detected truncated JSON, attempting repair...');
+            // Close any open string
+            const quoteCount = (truncated.match(/(?<!\\)"/g) || []).length;
+            if (quoteCount % 2 !== 0) {
+                truncated += '"';
+            }
+            // Close open arrays and objects
+            const openBraces = (truncated.match(/\{/g) || []).length;
+            const closeBraces = (truncated.match(/\}/g) || []).length;
+            const openBrackets = (truncated.match(/\[/g) || []).length;
+            const closeBrackets = (truncated.match(/\]/g) || []).length;
+
+            for (let i = 0; i < openBrackets - closeBrackets; i++) truncated += ']';
+            for (let i = 0; i < openBraces - closeBraces; i++) truncated += '}';
+
+            const result = JSON.parse(sanitizeJson(truncated));
+            console.log('[parseGeminiResponse] Strategy 5 (truncated recovery) succeeded.');
+            return result;
+        }
+    } catch (e) {
+        console.warn('[parseGeminiResponse] Strategy 5 failed:', e.message);
+    }
+
+    console.error('[parseGeminiResponse] All strategies failed. Full response:', responseText.substring(0, 500));
+    return null;
 }

@@ -1,8 +1,8 @@
 # AutoBOM Pro — Engineering Management Platform Blueprint
 
-> **Version:** 3.0 — Platform + Management Intelligence  
-> **Last Updated:** 2026-03-13  
-> **Status:** Phase 11 Complete — Management Intelligence Layer Operational
+> **Version:** 4.0 — Full Platform + Management Intelligence + Hardening  
+> **Last Updated:** 2026-03-14  
+> **Status:** All core modules implemented — hardening and remediation in progress
 
 ---
 
@@ -25,6 +25,7 @@
 15. [Export Requirements](#15-export-requirements)
 16. [Technology Stack](#16-technology-stack)
 17. [Development Roadmap](#17-development-roadmap)
+18. [Audit Remediation Program](#18-audit-remediation-program)
 
 ---
 
@@ -242,15 +243,34 @@ The existing RBAC system (`admin`, `editor`, `viewer`) will be extended to suppo
 | **AI Import** (PDF, Excel) | ✅ Complete | Existing |
 | **Auth & RBAC** | ✅ Complete | Existing |
 | **Managed Lists** (Brands, Categories, Providers) | ✅ Complete | Existing |
-| **Firestore Data Model** (new collections) | 📋 Planned | Phase 2 |
-| **Navigation & Page Structure** | 📋 Planned | Phase 3 |
-| **Projects & Task Management** | 📋 Planned | Phase 4 |
-| **Time Tracking** | 📋 Planned | Phase 5 |
-| **Delays & Risk Detection** | 📋 Planned | Phase 6 |
-| **Reports (Daily/Weekly)** | 📋 Planned | Phase 7 |
-| **Engineering Dashboard** | 📋 Planned | Phase 8 |
-| **Engineering Analytics** | 📋 Planned | Phase 9 |
-| **Project Gantt (Weekly + Monthly)** | 📋 Planned | Phase 10 |
+| **Firestore Data Model** (new collections) | ✅ Complete | Phase 2 |
+| **Navigation & Page Structure** | ✅ Complete | Phase 3 |
+| **Projects & Task Management** | ✅ Complete | Phase 4 |
+| **Time Tracking** | ✅ Complete | Phase 5 |
+| **Delays & Risk Detection** | ✅ Complete | Phase 6 |
+| **Reports (Daily/Weekly)** | ✅ Complete | Phase 7 |
+| **Engineering Dashboard (Obeya)** | ✅ Complete | Phase 8 |
+| **Engineering Analytics** | ✅ Complete | Phase 9 |
+| **Project Gantt** | ✅ Complete | Phase 10 |
+| **Management Intelligence** (Rule Engine, Audit, AI) | ✅ Complete | Phase 11 |
+| **Workflow Enforcement** (CF-controlled transitions) | ✅ Complete | Phase 12 |
+| **Audit Trail** (Immutable events, scheduled audits) | ✅ Complete | Phase 13 |
+| **Team Overview** | ✅ Complete | Phase 14 |
+| **Notifications** (Firestore-based, user-scoped) | ✅ Complete | Phase 14 |
+| **Settings** | ⚠️ Placeholder | — |
+
+### Remediation & Hardening (2026-03-14)
+
+| Area | Action | Status |
+|------|--------|--------|
+| Data model: `completedAt` vs `completedDate` | Normalized to `completedDate` | ✅ Fixed |
+| Data model: `blockReason` vs `blockedReason` | Normalized to `blockedReason` | ✅ Fixed |
+| Planner validation (blocking + warnings) | Enforced B1-B7 blocking rules | ✅ Fixed |
+| CF score placeholders (`estimationAccuracy`, `dataDiscipline`) | Replaced with real formulas | ✅ Fixed |
+| `ownerOverloaded` in riskService | Implemented real overload detection | ✅ Fixed |
+| Audit engine: empty planner context | Now fetches real planner data | ✅ Fixed |
+| `taskNormalizer.js` for legacy docs | Created read-time normalizer | ✅ Created |
+| Official field contract | Documented in `schemas.js` | ✅ Documented |
 
 ---
 
@@ -654,6 +674,64 @@ The system must support **Excel export** for:
 - [x] Build `GanttTaskEditDrawer` (quick edit: dates, % avance, showInGantt)
 - [x] Build `ProjectGantt` page with Weekly / Monthly toggle + filters
 - [x] Add route `/gantt` and sidebar nav item "Project Gantt"
+
+### Phase 11 — Management Intelligence (MI) Layer ✅
+> **Status:** COMPLETE
+
+- [x] Analytics engine (`src/core/analytics/`) — snapshotBuilder, trendCalculator, teamUtilization
+- [x] Rule engine (`src/core/rules/`) — ruleEvaluator, ruleCatalog, taskRules, projectRules, plannerRules, userDisciplineRules
+- [x] Audit engine (`src/core/audit/`) — auditEngine, complianceScorer, findingBuilder
+- [x] Workflow engine (`src/core/workflow/`) — workflowModel, transitionValidator
+- [x] Gemini Copilot integration (`src/core/ai/`) — geminiService, insightGenerator
+- [x] Control Tower page (`src/pages/ControlTower.jsx`)
+- [x] Audit Findings page (`src/pages/AuditFindings.jsx`)
+- [x] Cloud Function: `generateInsights` (Gemini proxy for MI)
+- [x] Cloud Function: `scheduledAudit` (daily 6 AM CST)
+- [x] Audit persistence service (`src/services/auditPersistence.js`)
+- [x] Workflow transition UI (`src/components/workflow/TransitionConfirmModal.jsx`)
+
+### Phase R — Audit Remediation Program 📋
+> **Status:** BASELINE ESTABLISHED — See [`remediation-plan.md`](file:///c:/Users/CJ00083620/.gemini/antigravity/scratch/autobom-pro/remediation-plan.md)
+
+- [ ] Phase R.0 — Housekeeping & Documentation Consistency
+- [ ] Phase R.1 — Error Boundaries & Resilience
+- [ ] Phase R.2 — Test Infrastructure & Critical Path Coverage
+- [ ] Phase R.3 — AppDataContext Decomposition
+- [ ] Phase R.4 — schemas.js Modularization
+- [ ] Phase R.5 — Cloud Functions Modularization & Testing
+- [ ] Phase R.6 — CI/CD & Build Verification
+
+---
+
+## 18. Audit Remediation Program
+
+> **Reference:** [`remediation-plan.md`](file:///c:/Users/CJ00083620/.gemini/antigravity/scratch/autobom-pro/remediation-plan.md) — Full specification with Definition of Done per phase, dependency graph, regression risk matrix, and timeline.
+
+### Purpose
+
+Stabilize and harden the Engineering Management Platform after rapid iterative development across 11 feature phases. Focus on auditability, traceability, consistency, and regression prevention — **without breaking existing production functionality**.
+
+### Key Findings
+
+| Area | Current State | Target |
+|------|--------------|--------|
+| Test coverage | 1 test file (0.8%) | ≥ 70% on `src/core/` |
+| `AppDataContext` | 672 lines (god-context) | < 150 lines (decomposed) |
+| `architecture.md` | Outdated (pre-Phase 3) | Reflects actual structure |
+| Error boundaries | None | All major route groups |
+| CI/CD | None | Lint + Test + Build on PR |
+
+### Protected Modules (DO NOT MODIFY)
+
+The following modules **MUST NOT** be modified during remediation, except for mechanical import-path changes required by shared infrastructure refactoring:
+
+- **BOM Core**: `BomProjects.jsx`, `BomProjectDetail.jsx`, `Catalog.jsx`
+- **BOM Components**: `components/catalog/*`, `components/projects/*`
+- **AI Import Pipeline**: PDF/Excel import flows in `AppDataContext`
+- **Image Search**: `ImagePickerModal.jsx`, `searchImages` Cloud Function
+- **Login/Auth**: `LoginPage.jsx`, `AuthContext.jsx`
+- **Firestore Rules**: `firestore.rules`
+- **Cloud Function `analyzeQuotePdf`**: Production AI pipeline
 
 ---
 

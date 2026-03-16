@@ -106,10 +106,24 @@ export default function ControlTower() {
                 onRunAudit={runClientAudit}
             />
 
-            {/* ── MAIN SPLIT: Issues + AI ── */}
-            <div className="grid lg:grid-cols-3 gap-6">
+            {/* ── MAIN SPLIT: AI (Fibonacci left) + Issues ── */}
+            <div className="grid lg:grid-cols-5 gap-6">
 
-                {/* LEFT: Top Issues + Team Utilization */}
+                {/* LEFT: AI Insights — Fibonacci proportion (~62%) */}
+                <div className="lg:col-span-3">
+                    <AIInsightsPanel
+                        insights={insights}
+                        teamAnalysis={teamAnalysis}
+                        weeklyBrief={weeklyBrief}
+                        isGenerating={isAIGenerating}
+                        error={aiError}
+                        onGenerateAudit={handleAuditInsights}
+                        onGenerateTeam={handleTeamInsights}
+                        onGenerateBrief={handleWeeklyBrief}
+                    />
+                </div>
+
+                {/* RIGHT: Top Issues + Team Utilization (~38%) */}
                 <div className="lg:col-span-2 space-y-6">
 
                     {/* Top Issues */}
@@ -123,18 +137,25 @@ export default function ControlTower() {
                             </button>
                         </div>
 
-                        {auditResult?.findings?.length > 0 ? (
-                            <div className="space-y-2">
-                                {auditResult.findings
-                                    .filter(f => f.severity === 'critical' || f.severity === 'warning')
-                                    .slice(0, 8)
-                                    .map((f, i) => (
-                                        <div key={`${f.ruleId}-${f.entityId}-${i}`} className={`flex items-start gap-3 p-3 rounded-xl border-l-4 ${
-                                            f.severity === 'critical' ? 'bg-rose-500/5 border-rose-500' : 'bg-amber-500/5 border-amber-500'
-                                        }`}>
+                        {auditResult?.findings?.length > 0 ? (() => {
+                            const prioritized = auditResult.findings
+                                .sort((a, b) => {
+                                    const order = { critical: 0, warning: 1, info: 2 };
+                                    return (order[a.severity] ?? 3) - (order[b.severity] ?? 3);
+                                })
+                                .slice(0, 10);
+                            return prioritized.length > 0 ? (
+                                <div className="space-y-2">
+                                    {prioritized.map((f, i) => (
+                                        <div key={`${f.ruleId}-${f.entityId}-${i}`} className={`flex items-start gap-3 p-3 rounded-xl border-l-4 ${f.severity === 'critical' ? 'bg-rose-500/5 border-rose-500' :
+                                                f.severity === 'warning' ? 'bg-amber-500/5 border-amber-500' :
+                                                    'bg-blue-500/5 border-blue-500'
+                                            }`}>
                                             {f.severity === 'critical'
                                                 ? <AlertOctagon className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
-                                                : <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                                                : f.severity === 'warning'
+                                                    ? <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                                                    : <Shield className="w-4 h-4 text-blue-400 mt-0.5 shrink-0" />
                                             }
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-xs font-bold text-slate-200 truncate">{f.title}</p>
@@ -142,10 +163,10 @@ export default function ControlTower() {
                                             </div>
                                             <span className="text-[9px] font-mono text-slate-600 shrink-0">{f.ruleId}</span>
                                         </div>
-                                    ))
-                                }
-                            </div>
-                        ) : (
+                                    ))}
+                                </div>
+                            ) : null;
+                        })() : (
                             <div className="text-center py-6 border border-dashed border-slate-700 rounded-xl">
                                 <Shield className="w-6 h-6 text-emerald-500 mx-auto mb-2 opacity-50" />
                                 <p className="text-xs font-bold text-slate-500">Sin hallazgos prioritarios</p>
@@ -159,11 +180,10 @@ export default function ControlTower() {
                             <h3 className="font-bold text-sm text-white flex items-center gap-2">
                                 <Users className="w-4 h-4 text-violet-400" /> Utilización del Equipo
                             </h3>
-                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
-                                utilizationLevel === 'optimal' ? 'text-emerald-400 bg-emerald-500/15' :
+                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${utilizationLevel === 'optimal' ? 'text-emerald-400 bg-emerald-500/15' :
                                 utilizationLevel === 'overloaded' || utilizationLevel === 'heavy' ? 'text-amber-400 bg-amber-500/15' :
-                                'text-blue-400 bg-blue-500/15'
-                            }`}>
+                                    'text-blue-400 bg-blue-500/15'
+                                }`}>
                                 {teamUtilization?.teamLevel || '—'}
                             </span>
                         </div>
@@ -175,14 +195,14 @@ export default function ControlTower() {
                                     const barWidth = Math.min((pct / 100) * 100, 100);
                                     const barColor =
                                         member.level === 'overloaded' ? 'bg-rose-500' :
-                                        member.level === 'heavy' ? 'bg-amber-500' :
-                                        member.level === 'optimal' ? 'bg-emerald-500' :
-                                        member.level === 'light' ? 'bg-blue-400' :
-                                        'bg-slate-600';
+                                            member.level === 'heavy' ? 'bg-amber-500' :
+                                                member.level === 'optimal' ? 'bg-emerald-500' :
+                                                    member.level === 'light' ? 'bg-blue-400' :
+                                                        'bg-slate-600';
 
                                     return (
                                         <div key={member.userId} className="flex items-center gap-3">
-                                            <div className="w-32 truncate">
+                                            <div className="w-28 truncate">
                                                 <span className="text-xs font-bold text-slate-300 block truncate">{member.displayName}</span>
                                                 <span className="text-[9px] font-bold text-slate-600 uppercase">{member.teamRole}</span>
                                             </div>
@@ -192,9 +212,9 @@ export default function ControlTower() {
                                                     style={{ width: `${barWidth}%` }}
                                                 />
                                             </div>
-                                            <div className="w-20 text-right">
+                                            <div className="w-16 text-right">
                                                 <span className="text-xs font-black text-slate-300">{member.utilizationPercent}%</span>
-                                                <span className="text-[9px] text-slate-600 block">{member.activeTasks} tareas</span>
+                                                <span className="text-[9px] text-slate-600 block">{member.activeTasks}t</span>
                                             </div>
                                         </div>
                                     );
@@ -206,28 +226,14 @@ export default function ControlTower() {
 
                         {/* Team Summary */}
                         {teamUtilization && (
-                            <div className="mt-4 pt-3 border-t border-slate-800 grid grid-cols-4 gap-2">
-                                <MiniStat label="Total Capacidad" value={`${teamUtilization.totalCapacity}h`} />
+                            <div className="mt-4 pt-3 border-t border-slate-800 grid grid-cols-2 gap-2">
+                                <MiniStat label="Capacidad" value={`${teamUtilization.totalCapacity}h`} />
                                 <MiniStat label="Horas Log." value={`${teamUtilization.totalHoursLogged}h`} />
                                 <MiniStat label="Overtime" value={`${teamUtilization.totalOvertime}h`} />
-                                <MiniStat label="Prom. Utiliz." value={`${teamUtilization.avgUtilization}%`} />
+                                <MiniStat label="Utiliz." value={`${teamUtilization.avgUtilization}%`} />
                             </div>
                         )}
                     </div>
-                </div>
-
-                {/* RIGHT: AI Insights */}
-                <div>
-                    <AIInsightsPanel
-                        insights={insights}
-                        teamAnalysis={teamAnalysis}
-                        weeklyBrief={weeklyBrief}
-                        isGenerating={isAIGenerating}
-                        error={aiError}
-                        onGenerateAudit={handleAuditInsights}
-                        onGenerateTeam={handleTeamInsights}
-                        onGenerateBrief={handleWeeklyBrief}
-                    />
                 </div>
             </div>
         </div>

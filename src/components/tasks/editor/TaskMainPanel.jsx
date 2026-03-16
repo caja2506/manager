@@ -1,18 +1,21 @@
 import React from 'react';
-import { FileText } from 'lucide-react';
+import { FileText, BarChart2 } from 'lucide-react';
 import SubtaskList from '../SubtaskList';
 
 /**
  * TaskMainPanel — left column of the task editor.
- * Contains title input, description and subtasks (the primary working area).
+ * Contains title input, description, progress, and subtasks (unified).
  */
 export default function TaskMainPanel({
     form, setForm, isNew, task,
     subtasks, canEdit, onSubtaskProgressChange,
 }) {
+    const totalSubtasks = (subtasks || []).length;
+    const hasSubtasks = totalSubtasks > 0;
+
     return (
-        <div className="flex-1 p-4 lg:p-5 overflow-y-auto space-y-4 lg:border-r border-slate-800">
-            {/* Title input — primary task title */}
+        <div className="w-full lg:w-1/2 p-4 lg:p-5 overflow-y-auto space-y-4 lg:border-r border-slate-800">
+            {/* Title input */}
             <div>
                 <input
                     value={form.title}
@@ -42,7 +45,35 @@ export default function TaskMainPanel({
                 />
             </div>
 
-            {/* Subtasks — primary working section */}
+            {/* Manual progress slider — only when NO subtasks (otherwise SubtaskList handles it) */}
+            {!isNew && !hasSubtasks && (
+                <div className="border-t border-slate-700 pt-3">
+                    <div className="flex items-center gap-1.5 mb-2">
+                        <BarChart2 className="w-3 h-3 text-slate-500" />
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            Progreso
+                        </span>
+                        <span className="text-[9px] font-bold text-indigo-400 bg-indigo-500/15 px-1.5 py-0.5 rounded-full">
+                            {form.percentComplete || 0}%
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <input
+                            type="range" min={0} max={100} step={5}
+                            value={form.percentComplete}
+                            onChange={e => setForm(f => ({ ...f, percentComplete: Number(e.target.value) }))}
+                            className="flex-1 accent-indigo-500"
+                            disabled={!canEdit}
+                        />
+                        <span className="text-xs font-bold text-indigo-400 w-10 text-right">{form.percentComplete}%</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                        Progreso manual (agrega subtareas para cálculo automático)
+                    </p>
+                </div>
+            )}
+
+            {/* Subtasks — includes its own progress bar when subtasks exist */}
             {!isNew && (
                 <div className="border-t border-slate-700 pt-4">
                     <SubtaskList

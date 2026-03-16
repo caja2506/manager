@@ -14,6 +14,7 @@ import {
     createDelayDocument,
     createDelayCauseDocument
 } from '../models/schemas';
+import { updateTaskStatus, updateTask } from './taskService';
 import { calculateProjectRisk } from './riskService';
 
 // ============================================================
@@ -46,29 +47,48 @@ export async function createDelay(data, userId) {
     const ref = doc(collection(db, COLLECTIONS.DELAYS));
     await setDoc(ref, docData);
 
-    // Automatically flag task as blocked if a delay is registered and it's a task.
+    // Automatically flag task as blocked via the official workflow transition.
+    // NOTE: Uses Cloud Function — status writes are blocked from client.
     if (data.taskId) {
-        await updateDoc(doc(db, COLLECTIONS.TASKS, data.taskId), {
-            status: 'blocked',
+        // Set blockedReason first (non-protected field, direct write OK)
+        await updateTask(data.taskId, {
             blockedReason: docData.causeName || 'Retraso reportado',
-            updatedAt: new Date().toISOString()
         });
+        // Then transition status via Cloud Function
+        try {
+            await updateTaskStatus(data.taskId, 'blocked', data.projectId, true);
+        } catch (err) {
+            // Transition may fail if task is already blocked or in invalid state
+            console.warn('[delayService] Auto-block transition failed:', err.message);
+        }
     }
 
-    // Creating a delay triggers risk recalculation for the project
-    if (data.projectId) {
-        await calculateProjectRisk(data.projectId);
-    }
+    // Risk recalculation is handled by the CF transition above
+    // (transitionTaskStatus calls recalculateProjectRisk server-side)
 
     return ref.id;
 }
 
-export async function resolveDelay(delayId, projectId) {
+export async function resolveDelay(delayId, projectId, taskId) {
     const ref = doc(db, COLLECTIONS.DELAYS, delayId);
     await updateDoc(ref, {
         resolved: true,
         resolvedAt: new Date().toISOString()
     });
+
+    // Auto-transition task out of "blocked" → "in_progress"
+    if (taskId) {
+        try {
+            // Clear the blocked reason
+            await updateTask(taskId, { blockedReason: '' });
+            // Transition status via Cloud Function
+            await updateTaskStatus(taskId, 'in_progress', projectId, true);
+        } catch (err) {
+            // Task may already be unblocked or in different state
+            console.warn('[delayService] Auto-unblock transition failed:', err.message);
+        }
+    }
+
     if (projectId) {
         await calculateProjectRisk(projectId);
     }

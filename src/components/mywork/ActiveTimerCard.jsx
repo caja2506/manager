@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Square, Clock, Zap, ListTodo, FolderGit2, Play } from 'lucide-react';
 import { formatElapsed, getActiveTimer, stopTimer, startTimer } from '../../services/timeService';
 
-export default function ActiveTimerCard({ tasks, projects, userId, onTimerStop }) {
+export default function ActiveTimerCard({ tasks, allTasks, projects, userId, onTimerStop }) {
     const [activeTimer, setActiveTimer] = useState(() => getActiveTimer());
     const [elapsed, setElapsed] = useState('0:00:00');
     const [isStopping, setIsStopping] = useState(false);
@@ -51,6 +51,7 @@ export default function ActiveTimerCard({ tasks, projects, userId, onTimerStop }
         setIsStarting(true);
         try {
             const task = tasks.find(t => t.id === formTask);
+            const project = projects?.find(p => p.id === (formProject || task?.projectId));
             const timer = await startTimer({
                 taskId: formTask || null,
                 projectId: formProject || task?.projectId || null,
@@ -58,18 +59,24 @@ export default function ActiveTimerCard({ tasks, projects, userId, onTimerStop }
                 notes: '',
                 overtime: false,
             });
+            // Store display names for when task lookup fails
+            timer.taskTitle = task?.title || '';
+            timer.projectName = project?.name || '';
             setActiveTimer(timer);
+            // Persist updated timer with names
+            import('../../services/timeService').then(m => m.setActiveTimer(timer));
             setShowStartForm(false);
             setFormTask(''); setFormProject('');
         } catch (e) { console.error(e); }
         setIsStarting(false);
     }, [formTask, formProject, tasks, userId]);
 
+    const lookupTasks = allTasks || tasks;
     const activeTaskName = activeTimer?.taskId
-        ? (tasks?.find(t => t.id === activeTimer.taskId)?.title || 'Tarea')
+        ? (lookupTasks?.find(t => t.id === activeTimer.taskId)?.title || activeTimer?.taskTitle || 'Tarea desconocida')
         : null;
     const activeProjectName = activeTimer?.projectId
-        ? (projects?.find(p => p.id === activeTimer.projectId)?.name || 'Proyecto')
+        ? (projects?.find(p => p.id === activeTimer.projectId)?.name || activeTimer?.projectName || 'Proyecto')
         : null;
 
     return (
@@ -90,9 +97,8 @@ export default function ActiveTimerCard({ tasks, projects, userId, onTimerStop }
                     <div className={`space-y-4 ${elapsedHours >= 8 ? 'animate-pulse' : ''}`}>
                         {/* Big timer display */}
                         <div className="text-center">
-                            <span className={`text-4xl font-black tabular-nums tracking-tight ${
-                                elapsedHours >= 8 ? 'text-red-400' : 'text-indigo-400'
-                            }`}>
+                            <span className={`text-4xl font-black tabular-nums tracking-tight ${elapsedHours >= 8 ? 'text-red-400' : 'text-indigo-400'
+                                }`}>
                                 {elapsed}
                             </span>
                             {activeTimer.overtime && (

@@ -37,12 +37,17 @@ export default function TaskDetailModal({
         status: TASK_STATUS.BACKLOG,
         taskTypeId: '',
         dueDate: '',
+        plannedStartDate: '',
+        plannedEndDate: '',
         estimatedHours: '',
         blockedReason: '',
         percentComplete: 0,
     });
 
     const [isSaving, setIsSaving] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [deleteError, setDeleteError] = useState(null);
     const [dependencies, setDependencies] = useState([]);
     const [plannerItems, setPlannerItems] = useState([]);
 
@@ -59,6 +64,8 @@ export default function TaskDetailModal({
                 status: task.status || TASK_STATUS.BACKLOG,
                 taskTypeId: task.taskTypeId || '',
                 dueDate: toDate(task.dueDate),
+                plannedStartDate: toDate(task.plannedStartDate),
+                plannedEndDate: toDate(task.plannedEndDate),
                 estimatedHours: task.estimatedHours || '',
                 blockedReason: task.blockedReason || '',
                 percentComplete: task.percentComplete ?? 0,
@@ -68,6 +75,7 @@ export default function TaskDetailModal({
                 title: '', description: '', projectId: '', assignedBy: userId || '',
                 assignedTo: '', priority: TASK_PRIORITY.MEDIUM,
                 status: TASK_STATUS.BACKLOG, taskTypeId: '', dueDate: '',
+                plannedStartDate: '', plannedEndDate: '',
                 estimatedHours: '', blockedReason: '', percentComplete: 0,
             });
         }
@@ -134,6 +142,8 @@ export default function TaskDetailModal({
             const data = {
                 ...form,
                 dueDate: toISO(form.dueDate),
+                plannedStartDate: form.plannedStartDate || null,
+                plannedEndDate: form.plannedEndDate || null,
                 estimatedHours: form.estimatedHours ? Number(form.estimatedHours) : 0,
                 percentComplete: autoProgress !== null ? autoProgress : Number(form.percentComplete ?? 0),
             };
@@ -170,10 +180,26 @@ export default function TaskDetailModal({
         }
     };
 
-    const handleDelete = async () => {
-        if (!task || !confirm('¿Eliminar esta tarea y todas sus subtareas?')) return;
-        await deleteTask(task.id);
-        onClose();
+    const handleDelete = () => {
+        if (!task) return;
+        setDeleteError(null);
+        setShowDeleteConfirm(true);
+    };
+
+    const confirmDeleteTask = async () => {
+        if (!task) return;
+        setIsDeleting(true);
+        setDeleteError(null);
+        try {
+            await deleteTask(task.id);
+            setShowDeleteConfirm(false);
+            onClose();
+        } catch (err) {
+            console.error('Error deleting task:', err);
+            setDeleteError(err.message || 'Error al eliminar la tarea. Verifica tus permisos.');
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     const handleOpenDelayReport = () => {
@@ -186,10 +212,10 @@ export default function TaskDetailModal({
 
     return createPortal(
         <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-start justify-center p-4 pt-6 overflow-y-auto"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-start md:items-start justify-center md:p-4 md:pt-6 overflow-y-auto"
             onClick={e => { if (e.target === e.currentTarget) onClose(); }}
         >
-            <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-4xl animate-in zoom-in-95 duration-200 my-4 flex flex-col max-h-[90vh] ring-1 ring-slate-700 border border-slate-800">
+            <div className="relative bg-slate-900 shadow-2xl w-full md:max-w-4xl animate-in zoom-in-95 duration-200 flex flex-col min-h-screen md:min-h-0 md:max-h-[90vh] md:my-4 md:rounded-2xl md:ring-1 md:ring-slate-700 md:border md:border-slate-800">
 
                 {/* Header */}
                 <TaskHeader
@@ -269,6 +295,57 @@ export default function TaskDetailModal({
                     onSave={handleSave}
                     onClose={onClose}
                 />
+
+                {/* Custom Delete Confirmation Overlay */}
+                {showDeleteConfirm && (
+                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm rounded-2xl z-50 flex items-center justify-center p-6">
+                        <div className="bg-slate-800 rounded-2xl p-6 max-w-sm w-full border border-slate-700 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-red-500/15 flex items-center justify-center flex-shrink-0">
+                                    <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-bold text-white">Eliminar Tarea</h3>
+                                    <p className="text-xs text-slate-400 mt-0.5">Esta acción no se puede deshacer</p>
+                                </div>
+                            </div>
+                            <p className="text-sm text-slate-300">
+                                ¿Estás seguro de que deseas eliminar <span className="font-bold text-white">"{task?.title}"</span> y todas sus subtareas?
+                            </p>
+                            {deleteError && (
+                                <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2 text-xs text-red-400 font-medium">
+                                    ⚠️ {deleteError}
+                                </div>
+                            )}
+                            <div className="flex gap-3 pt-1">
+                                <button
+                                    onClick={() => { setShowDeleteConfirm(false); setDeleteError(null); }}
+                                    disabled={isDeleting}
+                                    className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-300 bg-slate-700 hover:bg-slate-600 border border-slate-600 transition-all disabled:opacity-50"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={confirmDeleteTask}
+                                    disabled={isDeleting}
+                                    className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-500 border border-red-500 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {isDeleting ? (
+                                        <>
+                                            <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                            </svg>
+                                            Eliminando…
+                                        </>
+                                    ) : 'Sí, Eliminar'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>,
         document.body

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Clock, Briefcase, Plus, GripVertical, MousePointerClick, Move, ArrowDownUp, HelpCircle, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Clock, Briefcase, Plus, GripVertical, MousePointerClick, Move, ArrowDownUp, HelpCircle, X, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
 
 /**
  * Unscheduled tasks panel for the Weekly Planner sidebar.
@@ -7,10 +7,11 @@ import { Search, Clock, Briefcase, Plus, GripVertical, MousePointerClick, Move, 
  *  - HTML5 drag onto the grid
  *  - "+" button enters placement mode — user clicks on the grid to place the task
  */
-export default function PlannerSidebar({ 
+export default function PlannerSidebar({
     unscheduledTasks,
     onDragStart,
     onStartPlacement,
+    onTaskEdit,
     placingTask,
     onCancelPlacement,
     searchQuery,
@@ -20,9 +21,9 @@ export default function PlannerSidebar({
 
     const priorityColors = {
         critical: 'bg-red-500/15 border-red-500/30 text-red-400',
-        high:     'bg-amber-500/15 border-amber-500/30 text-amber-400',
-        medium:   'bg-blue-500/15 border-blue-500/30 text-blue-400',
-        low:      'bg-slate-800 border-slate-700 text-slate-400',
+        high: 'bg-amber-500/15 border-amber-500/30 text-amber-400',
+        medium: 'bg-blue-500/15 border-blue-500/30 text-blue-400',
+        low: 'bg-slate-800 border-slate-700 text-slate-400',
     };
 
     const filtered = unscheduledTasks.filter(t =>
@@ -125,30 +126,46 @@ export default function PlannerSidebar({
                             <div className="flex items-start justify-between gap-2">
                                 <p className="font-bold text-sm leading-tight line-clamp-2 flex-1">{task.title}</p>
 
-                                {/* Placement "+" button */}
-                                {onStartPlacement && (
-                                    <button
-                                        onClick={e => {
-                                            e.stopPropagation();
-                                            if (isBeingPlaced) {
-                                                onCancelPlacement && onCancelPlacement();
-                                            } else {
-                                                onStartPlacement(task);
+                                <div className="flex items-center gap-1 shrink-0">
+                                    {/* Edit button */}
+                                    {onTaskEdit && (
+                                        <button
+                                            onClick={e => {
+                                                e.stopPropagation();
+                                                onTaskEdit(task);
+                                            }}
+                                            className="opacity-60 hover:opacity-100 bg-slate-800/50 hover:bg-slate-700 p-1.5 rounded-lg transition-all"
+                                            title="Editar tarea"
+                                        >
+                                            <Pencil className="w-3.5 h-3.5" />
+                                        </button>
+                                    )}
+
+                                    {/* Placement "+" button */}
+                                    {onStartPlacement && (
+                                        <button
+                                            onClick={e => {
+                                                e.stopPropagation();
+                                                if (isBeingPlaced) {
+                                                    onCancelPlacement && onCancelPlacement();
+                                                } else {
+                                                    onStartPlacement(task);
+                                                }
+                                            }}
+                                            className={`transition-all p-1.5 rounded-lg
+                                                ${isBeingPlaced
+                                                    ? 'bg-emerald-500/30 text-emerald-300 opacity-100 ring-1 ring-emerald-400'
+                                                    : 'opacity-60 hover:opacity-100 bg-slate-800/50 hover:bg-slate-700'
+                                                }`}
+                                            title={isBeingPlaced ? 'Cancelar colocación' : 'Colocar en la grilla — haz clic en el horario deseado'}
+                                        >
+                                            {isBeingPlaced
+                                                ? <X className="w-3.5 h-3.5" />
+                                                : <Plus className="w-3.5 h-3.5" />
                                             }
-                                        }}
-                                        className={`shrink-0 transition-all p-1.5 rounded-lg
-                                            ${isBeingPlaced
-                                                ? 'bg-emerald-500/30 text-emerald-300 opacity-100 ring-1 ring-emerald-400'
-                                                : 'opacity-60 hover:opacity-100 bg-slate-800/50 hover:bg-slate-700'
-                                            }`}
-                                        title={isBeingPlaced ? 'Cancelar colocación' : 'Colocar en la grilla — haz clic en el horario deseado'}
-                                    >
-                                        {isBeingPlaced
-                                            ? <X className="w-3.5 h-3.5" />
-                                            : <Plus className="w-3.5 h-3.5" />
-                                        }
-                                    </button>
-                                )}
+                                        </button>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="flex items-center justify-between mt-2 text-[10px] font-black uppercase opacity-80">

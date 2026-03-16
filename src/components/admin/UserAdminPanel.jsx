@@ -3,28 +3,54 @@ import { collection, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/fire
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRole } from '../../contexts/RoleContext';
+import { COLLECTIONS, TEAM_ROLES } from '../../models/schemas';
+import { updateUserProfile } from '../../services/userProfileService';
 import { Shield, Trash2, X, Search, Users, ShieldCheck } from 'lucide-react';
 
+// ── RBAC roles (admin/editor/viewer) — controls Firestore write permissions ──
 const ROLE_CONFIG = {
     admin: { label: 'Admin', color: 'emerald', desc: 'Control total' },
     editor: { label: 'Editor', color: 'amber', desc: 'Editar, no borrar' },
     viewer: { label: 'Viewer', color: 'slate', desc: 'Solo lectura' },
 };
 
+// ── Team roles (operational) — controls team function in dashboards/analytics ──
+const TEAM_ROLE_CONFIG = {
+    [TEAM_ROLES.MANAGER]: { label: 'Manager', color: 'indigo' },
+    [TEAM_ROLES.TEAM_LEAD]: { label: 'Team Lead', color: 'violet' },
+    [TEAM_ROLES.ENGINEER]: { label: 'Engineer', color: 'sky' },
+    [TEAM_ROLES.TECHNICIAN]: { label: 'Technician', color: 'teal' },
+};
+
 export default function UserAdminPanel({ onClose }) {
     const { user: currentUser } = useAuth();
     const { isSuperAdmin: currentIsSuperAdmin } = useRole();
-    const [users, setUsers] = useState([]);
+
+    // ── State: RBAC users from users_roles ──
+    const [rbacUsers, setRbacUsers] = useState([]);
+    // ── State: Operational profiles from users ──
+    const [profiles, setProfiles] = useState({});
     const [search, setSearch] = useState('');
     const [confirmAction, setConfirmAction] = useState(null);
 
+    // Subscribe to users_roles (RBAC)
     useEffect(() => {
         const unsub = onSnapshot(collection(db, 'users_roles'), (snap) => {
-            setUsers(
+            setRbacUsers(
                 snap.docs
                     .map((d) => ({ uid: d.id, ...d.data() }))
                     .sort((a, b) => (a.displayName || a.email || '').localeCompare(b.displayName || b.email || ''))
             );
+        });
+        return () => unsub();
+    }, []);
+
+    // Subscribe to users (operational profiles) — indexed by uid
+    useEffect(() => {
+        const unsub = onSnapshot(collection(db, COLLECTIONS.USERS), (snap) => {
+            const profileMap = {};
+            snap.docs.forEach(d => { profileMap[d.id] = d.data(); });
+            setProfiles(profileMap);
         });
         return () => unsub();
     }, []);
@@ -35,9 +61,9 @@ export default function UserAdminPanel({ onClose }) {
         return email && SUPER_ADMIN_EMAILS.map(e => e.toLowerCase()).includes(email.toLowerCase());
     };
 
+    // ── RBAC role change → writes to users_roles/{uid} ──
     const handleRoleChange = async (uid, newRole) => {
-        // Prevent changing super admin's role
-        const targetUser = users.find(u => u.uid === uid);
+        const targetUser = rbacUsers.find(u => u.uid === uid);
         if (targetUser && isUserSuperAdmin(targetUser.email)) {
             setConfirmAction({
                 title: '🔒 Super Admin Protegido',
@@ -60,6 +86,24 @@ export default function UserAdminPanel({ onClose }) {
         await updateDoc(doc(db, 'users_roles', uid), { role: newRole });
     };
 
+    // ── Team role change → writes to users/{uid} ──
+    const handleTeamRoleChange = async (uid, newTeamRole) => {
+        try {
+            await updateUserProfile(uid, { teamRole: newTeamRole || null });
+        } catch (err) {
+            console.error('Error updating team role:', err);
+        }
+    };
+
+    // ── Weekly capacity change → writes to users/{uid} ──
+    const handleCapacityChange = async (uid, newCapacity) => {
+        try {
+            await updateUserProfile(uid, { weeklyCapacityHours: Number(newCapacity) || 40 });
+        } catch (err) {
+            console.error('Error updating capacity:', err);
+        }
+    };
+
     const handleRemoveUser = (u) => {
         setConfirmAction({
             title: `¿Eliminar a ${u.displayName || u.email}?`,
@@ -71,13 +115,15 @@ export default function UserAdminPanel({ onClose }) {
         });
     };
 
-    const filtered = users.filter((u) => {
+    const filtered = rbacUsers.filter((u) => {
         const s = search.toLowerCase();
+        const profile = profiles[u.uid];
         return (
             !s ||
             (u.displayName || '').toLowerCase().includes(s) ||
             (u.email || '').toLowerCase().includes(s) ||
-            (u.role || '').toLowerCase().includes(s)
+            (u.role || '').toLowerCase().includes(s) ||
+            (profile?.teamRole || '').toLowerCase().includes(s)
         );
     });
 
@@ -109,7 +155,7 @@ export default function UserAdminPanel({ onClose }) {
                     </div>
                     <div>
                         <h2 className="font-black text-2xl text-white tracking-tight">Usuarios</h2>
-                        <p className="text-xs text-slate-400 font-bold">{users.length} usuarios registrados</p>
+                        <p className="text-xs text-slate-400 font-bold">{rbacUsers.length} usuarios registrados</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -128,11 +174,19 @@ export default function UserAdminPanel({ onClose }) {
 
             {/* Role Legend */}
             <div className="flex flex-wrap gap-3 px-1">
+                <span className="text-[10px] font-black text-slate-500 uppercase mr-1">RBAC:</span>
                 {Object.entries(ROLE_CONFIG).map(([key, config]) => (
                     <div key={key} className="flex items-center gap-2 text-xs">
                         <span className={`w-2.5 h-2.5 rounded-full bg-${config.color}-500`} />
                         <span className="font-bold text-slate-600">{config.label}</span>
-                        <span className="text-slate-400">— {config.desc}</span>
+                    </div>
+                ))}
+                <span className="mx-2 text-slate-700">|</span>
+                <span className="text-[10px] font-black text-slate-500 uppercase mr-1">EQUIPO:</span>
+                {Object.entries(TEAM_ROLE_CONFIG).map(([key, config]) => (
+                    <div key={key} className="flex items-center gap-2 text-xs">
+                        <span className={`w-2.5 h-2.5 rounded-full bg-${config.color}-500`} />
+                        <span className="font-bold text-slate-600">{config.label}</span>
                     </div>
                 ))}
             </div>
@@ -143,8 +197,9 @@ export default function UserAdminPanel({ onClose }) {
                     <thead className="bg-slate-800 border-b text-[10px] font-black text-slate-400 uppercase tracking-widest sticky top-0">
                         <tr>
                             <th className="p-5">Usuario</th>
-                            <th className="p-5 w-48">Rol</th>
-                            <th className="p-5 w-36 text-center">Registrado</th>
+                            <th className="p-5 w-44">Rol RBAC</th>
+                            <th className="p-5 w-36">Rol Equipo</th>
+                            <th className="p-5 w-24 text-center">Hrs/Sem</th>
                             <th className="p-5 w-20 text-center">Acción</th>
                         </tr>
                     </thead>
@@ -152,7 +207,7 @@ export default function UserAdminPanel({ onClose }) {
                         {filtered.map((u) => {
                             const isSelf = u.uid === currentUser.uid;
                             const userIsSuperAdmin = isUserSuperAdmin(u.email);
-                            const roleConfig = ROLE_CONFIG[u.role] || ROLE_CONFIG.viewer;
+                            const profile = profiles[u.uid] || {};
                             return (
                                 <tr key={u.uid} className="hover:bg-slate-800/50 transition-colors">
                                     <td className="p-5">
@@ -174,6 +229,7 @@ export default function UserAdminPanel({ onClose }) {
                                             </div>
                                         </div>
                                     </td>
+                                    {/* RBAC Role */}
                                     <td className="p-5">
                                         {userIsSuperAdmin ? (
                                             <div className="flex items-center gap-1.5 text-emerald-400 text-[10px] font-black">
@@ -197,11 +253,31 @@ export default function UserAdminPanel({ onClose }) {
                                             </div>
                                         )}
                                     </td>
-                                    <td className="p-5 text-center">
-                                        <span className="text-[11px] text-slate-400 font-bold">
-                                            {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}
-                                        </span>
+                                    {/* Team Role — writes to users/{uid} */}
+                                    <td className="p-5">
+                                        <select
+                                            value={profile.teamRole || ''}
+                                            onChange={(e) => handleTeamRoleChange(u.uid, e.target.value)}
+                                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 appearance-none"
+                                        >
+                                            <option value="">— Sin asignar —</option>
+                                            {Object.entries(TEAM_ROLE_CONFIG).map(([key, config]) => (
+                                                <option key={key} value={key}>{config.label}</option>
+                                            ))}
+                                        </select>
                                     </td>
+                                    {/* Weekly Capacity — writes to users/{uid} */}
+                                    <td className="p-5 text-center">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            max="168"
+                                            value={profile.weeklyCapacityHours ?? 40}
+                                            onChange={(e) => handleCapacityChange(u.uid, e.target.value)}
+                                            className="w-16 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white text-center focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500"
+                                        />
+                                    </td>
+                                    {/* Delete */}
                                     <td className="p-5 text-center">
                                         {!isSelf && !userIsSuperAdmin && (
                                             <button
@@ -218,7 +294,7 @@ export default function UserAdminPanel({ onClose }) {
                         })}
                         {filtered.length === 0 && (
                             <tr>
-                                <td colSpan={4} className="p-12 text-center text-slate-400 text-sm">
+                                <td colSpan={5} className="p-12 text-center text-slate-400 text-sm">
                                     No se encontraron usuarios
                                 </td>
                             </tr>

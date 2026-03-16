@@ -6,16 +6,16 @@ import { TASK_PRIORITY_CONFIG, TASK_STATUS_CONFIG } from '../../models/schemas';
 
 const PRIORITY_STYLES = {
     critical: 'bg-red-500/15 text-red-400 border-red-500/30',
-    high:     'bg-amber-500/15 text-amber-400 border-amber-500/30',
-    medium:   'bg-blue-500/15 text-blue-400 border-blue-500/30',
-    low:      'bg-slate-800 text-slate-300 border-slate-700',
+    high: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+    medium: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
+    low: 'bg-slate-800 text-slate-300 border-slate-700',
 };
 
 const PRIORITY_GLOW = {
     critical: 'shadow-red-500/20',
-    high:     'shadow-amber-500/20',
-    medium:   'shadow-indigo-500/20',
-    low:      'shadow-slate-800/40',
+    high: 'shadow-amber-500/20',
+    medium: 'shadow-indigo-500/20',
+    low: 'shadow-slate-800/40',
 };
 
 export default function FocusNowCard({ task, userId, engTasks, onOpenTask, onStatusChange }) {
@@ -51,7 +51,13 @@ export default function FocusNowCard({ task, userId, engTasks, onOpenTask, onSta
         if (!task || anyActiveTimer) return;
         setIsStarting(true);
         try {
-            const timer = await startTimer({ taskId: task.id, projectId: task.projectId, userId });
+            const timer = await startTimer({
+                taskId: task.id,
+                projectId: task.projectId,
+                userId,
+                taskTitle: task.title || '',
+                projectName: task.projectName || '',
+            });
             setActiveTimer(timer);
         } catch (e) { console.error(e); }
         setIsStarting(false);
@@ -92,7 +98,7 @@ export default function FocusNowCard({ task, userId, engTasks, onOpenTask, onSta
     const subtaskPct = subtasksTotal > 0 ? Math.round((subtasksDone / subtasksTotal) * 100) : 0;
 
     return (
-        <div className={`bg-gradient-to-br from-slate-900 to-slate-800/80 border border-slate-700 rounded-2xl p-6 shadow-xl ${priorityGlow} relative overflow-hidden`}>
+        <div className={`bg-gradient-to-br from-slate-900 to-slate-800/80 border border-slate-700 rounded-2xl p-4 md:p-6 shadow-xl ${priorityGlow} relative overflow-hidden`}>
             {/* Decorative glows */}
             <div className="absolute -top-8 -right-8 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
             <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl pointer-events-none" />
@@ -125,7 +131,7 @@ export default function FocusNowCard({ task, userId, engTasks, onOpenTask, onSta
                         {statusCfg.label || task.status}
                     </span>
                 </div>
-                <h2 className="text-xl font-black text-white leading-tight mb-3">{task.title}</h2>
+                <h2 className="text-lg md:text-xl font-black text-white leading-tight mb-3">{task.title}</h2>
 
                 {/* Hours bar */}
                 <div className="flex items-center gap-4 text-xs font-bold text-slate-500 mb-2">
@@ -138,9 +144,8 @@ export default function FocusNowCard({ task, userId, engTasks, onOpenTask, onSta
                         Real {(task.actualHours || 0).toFixed(1)}h
                     </span>
                     {task.dueDate && (
-                        <span className={`flex items-center gap-1 ${
-                            new Date(task.dueDate) < new Date() ? 'text-red-400 font-black' : 'text-slate-500'
-                        }`}>
+                        <span className={`flex items-center gap-1 ${new Date(task.dueDate) < new Date() ? 'text-red-400 font-black' : 'text-slate-500'
+                            }`}>
                             <Flag className="w-3.5 h-3.5" />
                             {format(parseISO(task.dueDate), 'dd MMM')}
                         </span>
@@ -165,12 +170,12 @@ export default function FocusNowCard({ task, userId, engTasks, onOpenTask, onSta
             </div>
 
             {/* Actions */}
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2">
                 {timerIsForThisTask ? (
                     <button
                         onClick={handleStopTimer}
                         disabled={isStopping}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-black text-sm shadow-lg shadow-red-500/30 active:scale-95 transition-all disabled:opacity-60"
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-black text-sm shadow-lg shadow-red-500/30 active:scale-95 transition-all disabled:opacity-60"
                     >
                         <Square className="w-4 h-4 fill-current" />
                         {isStopping ? 'Deteniendo...' : 'Detener Timer'}
@@ -180,7 +185,7 @@ export default function FocusNowCard({ task, userId, engTasks, onOpenTask, onSta
                         onClick={handleStartTimer}
                         disabled={isStarting || anyActiveTimer}
                         title={anyActiveTimer ? 'Tienes un timer activo en otra tarea' : ''}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-sm shadow-lg shadow-indigo-500/30 active:scale-95 transition-all disabled:opacity-50"
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-sm shadow-lg shadow-indigo-500/30 active:scale-95 transition-all disabled:opacity-50"
                     >
                         <Play className="w-4 h-4 fill-current" />
                         {isStarting ? 'Iniciando...' : 'Iniciar Timer'}
@@ -190,7 +195,7 @@ export default function FocusNowCard({ task, userId, engTasks, onOpenTask, onSta
                 {task.status !== 'in_progress' && (
                     <button
                         onClick={() => onStatusChange?.(task, 'in_progress')}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-slate-900/70 border border-slate-700 hover:border-amber-500/50 hover:text-amber-400 text-slate-400 rounded-xl font-bold text-sm transition-all active:scale-95"
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900/70 border border-slate-700 hover:border-amber-500/50 hover:text-amber-400 text-slate-400 rounded-xl font-bold text-sm transition-all active:scale-95"
                     >
                         <ChevronRight className="w-4 h-4" />
                         En Progreso
@@ -199,7 +204,7 @@ export default function FocusNowCard({ task, userId, engTasks, onOpenTask, onSta
 
                 <button
                     onClick={() => onOpenTask?.(task)}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-slate-900/70 border border-slate-700 hover:border-indigo-500/50 hover:text-indigo-400 text-slate-400 rounded-xl font-bold text-sm transition-all active:scale-95 ml-auto"
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900/70 border border-slate-700 hover:border-indigo-500/50 hover:text-indigo-400 text-slate-400 rounded-xl font-bold text-sm transition-all active:scale-95 col-span-2 md:col-span-1 md:ml-auto"
                 >
                     <ExternalLink className="w-4 h-4" />
                     Ver Tarea

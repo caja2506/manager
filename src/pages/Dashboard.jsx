@@ -1,5 +1,6 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAppData } from '../contexts/AppDataContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
 import {
     LayoutDashboard, AlertTriangle, Shield, CheckCircle, Clock, Zap, Target,
@@ -11,13 +12,21 @@ import { useNavigate } from 'react-router-dom';
 import { RISK_LEVEL_CONFIG, PROJECT_STATUS_CONFIG, TASK_STATUS_CONFIG } from '../models/schemas';
 import { useAuditData } from '../hooks/useAuditData';
 import ComplianceScoresPanel from '../components/audit/ComplianceScoresPanel';
+import TaskDetailModal from '../components/tasks/TaskDetailModal';
 
 export default function Dashboard() {
     const {
-        engProjects, engTasks, teamMembers, timeLogs, delays
+        engProjects, engTasks, engSubtasks, teamMembers, timeLogs, delays, taskTypes
     } = useAppData();
-    const { canEdit } = useRole();
+    const { user } = useAuth();
+    const { canEdit, canDelete } = useRole();
     const navigate = useNavigate();
+
+    // ── Task Detail Modal state ──
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedTask, setSelectedTask] = useState(null);
+    const openTask = (task) => { setSelectedTask(task); setIsModalOpen(true); };
+    const closeModal = () => { setIsModalOpen(false); setSelectedTask(null); };
 
     // ── Audit Data ──
     const { runClientAudit, scores, summary, isAuditing, auditResult } = useAuditData();
@@ -96,7 +105,7 @@ export default function Dashboard() {
                 desc: `La tarea "${t.title}" está bloqueada.`,
                 meta: project ? project.name : '',
                 time: t.updatedAt || t.createdAt,
-                action: () => navigate('/tasks')
+                action: () => openTask(t)
             });
         });
 
@@ -115,19 +124,21 @@ export default function Dashboard() {
         if (delays) {
             delays.filter(d => !d.resolved).forEach(d => {
                 const project = engProjects.find(p => p.id === d.projectId);
+                // Try to find the related task for this delay
+                const relatedTask = d.taskId ? engTasks.find(t => t.id === d.taskId) : null;
                 _alerts.push({
                     type: 'warning', icon: AlertTriangle, title: 'Retraso Activo',
                     desc: d.causeName,
                     meta: project ? project.name : '',
                     time: d.createdAt,
-                    action: () => navigate('/projects')
+                    action: relatedTask ? () => openTask(relatedTask) : () => navigate('/projects')
                 });
             });
         }
 
         // Sort by time descending (newest first)
         return _alerts.sort((a, b) => new Date(b.time) - new Date(a.time)).slice(0, 8);
-    }, [engTasks, engProjects, delays, navigate]);
+    }, [engTasks, engProjects, delays, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // --- Render Helpers ---
     const getLoadColor = (level) => {
@@ -141,6 +152,19 @@ export default function Dashboard() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-300">
+            {/* Task Detail Popup */}
+            <TaskDetailModal
+                isOpen={isModalOpen}
+                onClose={closeModal}
+                task={selectedTask}
+                projects={engProjects}
+                teamMembers={teamMembers}
+                subtasks={selectedTask ? engSubtasks.filter(s => s.taskId === selectedTask.id) : []}
+                taskTypes={taskTypes}
+                userId={user?.uid}
+                canEdit={canEdit}
+                canDelete={canDelete}
+            />
             {/* Header */}
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
@@ -238,8 +262,8 @@ export default function Dashboard() {
                                         <div className="flex sm:flex-col gap-2 sm:gap-1 items-end shrink-0">
                                             <span
                                                 className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full flex items-center gap-1 ${rLvl === 'high' ? 'text-red-400 bg-red-500/15 border border-red-500/30' :
-                                                        rLvl === 'medium' ? 'text-amber-400 bg-amber-500/15 border border-amber-500/30' :
-                                                            'text-emerald-400 bg-emerald-500/15 border border-emerald-500/30'
+                                                    rLvl === 'medium' ? 'text-amber-400 bg-amber-500/15 border border-amber-500/30' :
+                                                        'text-emerald-400 bg-emerald-500/15 border border-emerald-500/30'
                                                     }`}
                                             >
                                                 {rLvl === 'high' ? <Flame className="w-3 h-3" /> : rLvl === 'medium' ? <AlertTriangle className="w-3 h-3" /> : <CheckCircle className="w-3 h-3" />}
@@ -313,25 +337,25 @@ export default function Dashboard() {
                                     key={i}
                                     onClick={alert.action}
                                     className={`p-3 rounded-xl border-l-4 cursor-pointer transition-transform hover:translate-x-1 ${alert.type === 'danger' ? 'bg-rose-500/10 border-rose-500' :
-                                            alert.type === 'warning' ? 'bg-amber-500/10 border-amber-500' :
-                                                'bg-slate-800/50 border-slate-600'
+                                        alert.type === 'warning' ? 'bg-amber-500/10 border-amber-500' :
+                                            'bg-slate-800/50 border-slate-600'
                                         }`}
                                 >
                                     <div className="flex items-start gap-3">
                                         <alert.icon className={`w-5 h-5 shrink-0 mt-0.5 ${alert.type === 'danger' ? 'text-rose-400' :
-                                                alert.type === 'warning' ? 'text-amber-400' :
-                                                    'text-slate-400'
+                                            alert.type === 'warning' ? 'text-amber-400' :
+                                                'text-slate-400'
                                             }`} />
                                         <div>
                                             <p className={`text-sm font-black ${alert.type === 'danger' ? 'text-rose-300' :
-                                                    alert.type === 'warning' ? 'text-amber-300' :
-                                                        'text-slate-300'
+                                                alert.type === 'warning' ? 'text-amber-300' :
+                                                    'text-slate-300'
                                                 }`}>
                                                 {alert.title}
                                             </p>
                                             <p className={`text-xs mt-0.5 ${alert.type === 'danger' ? 'text-rose-400/80' :
-                                                    alert.type === 'warning' ? 'text-amber-400/80' :
-                                                        'text-slate-500'
+                                                alert.type === 'warning' ? 'text-amber-400/80' :
+                                                    'text-slate-500'
                                                 }`}>
                                                 {alert.desc}
                                             </p>

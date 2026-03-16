@@ -97,7 +97,7 @@ export default function MyWork() {
         const member = teamMembers.find(m => m.uid === user.uid);
 
         try {
-            const newId = await plannerService.createPlanItem({
+            const { id: newId } = await plannerService.createPlanItem({
                 taskId: task.id,
                 taskTitleSnapshot: task.title,
                 projectId: task.projectId,
@@ -119,7 +119,13 @@ export default function MyWork() {
                 id: newId, taskId: task.id, date: today, assignedTo: user.uid,
                 plannedHours: hours, weekStartDate: weekStartStr,
             }]);
-        } catch (e) { console.error('Quick plan error:', e); }
+        } catch (e) {
+            if (e.name === 'PlannerValidationError') {
+                alert(e.validationErrors?.join('\n') || e.message);
+            } else {
+                console.error('Quick plan error:', e);
+            }
+        }
     }, [user, weekStartStr, teamMembers]);
 
     // ── Unblock handler (changes status to in_progress) ──
@@ -150,20 +156,20 @@ export default function MyWork() {
     );
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="space-y-4 md:space-y-6 animate-in fade-in duration-300">
 
             {/* ══════════════════════════════════════════
                 HEADER — greeting + date
             ══════════════════════════════════════════ */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center">
+                    <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight flex items-center gap-2 md:gap-3">
+                        <div className="w-9 h-9 md:w-10 md:h-10 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
                             <User className="w-5 h-5 text-indigo-400" />
                         </div>
                         My Work
                     </h1>
-                    <p className="text-sm font-bold text-slate-400 mt-1 ml-1 capitalize">
+                    <p className="text-xs md:text-sm font-bold text-slate-400 mt-1 ml-1 capitalize">
                         {getGreeting()}, {userName} · {todayLabel}
                     </p>
                 </div>
@@ -216,6 +222,7 @@ export default function MyWork() {
                 <div className="flex flex-col gap-6">
                     <ActiveTimerCard
                         tasks={myActiveOpenTasks}
+                        allTasks={engTasks}
                         projects={engProjects}
                         userId={user?.uid}
                         onTimerStop={handleTimerStop}

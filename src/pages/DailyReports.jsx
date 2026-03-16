@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { useAppData } from '../contexts/AppDataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { generateDailyReport } from '../services/reportService';
@@ -11,18 +12,14 @@ export default function DailyReports() {
     const { user } = useAuth();
     const { timeLogs, engTasks, engProjects, delays, teamMembers } = useAppData();
 
-    // Default to today
+    // Get selectedUser from shared ReportsLayout via outlet context
+    const outletCtx = useOutletContext() || {};
+    const selectedUser = outletCtx.selectedUser || user.uid;
+
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-    const [selectedUser, setSelectedUser] = useState(user.uid);
 
-    // Filter engineers/technicians
-    const engineersAndTechs = teamMembers.filter(u => ['engineer', 'technician', 'team_lead', 'manager'].includes(u.teamRole) || !u.teamRole);
-
-    // Compute report when dependencies change
     const report = useMemo(() => {
         if (!timeLogs || !engTasks || !engProjects) return null;
-
-        // Pass the raw data down to the service for aggregation
         return generateDailyReport(
             selectedDate,
             selectedUser,
@@ -35,6 +32,7 @@ export default function DailyReports() {
 
     const handleExport = () => {
         if (!report) return;
+        const tUser = teamMembers.find(t => t.uid === selectedUser);
         exportDailyReport(report, tUser?.displayName || tUser?.email || 'Ingeniero');
     };
 
@@ -42,40 +40,17 @@ export default function DailyReports() {
         return <div className="p-8 text-center text-slate-400">Cargando datos del reporte...</div>;
     }
 
-    const tUser = teamMembers.find(t => t.uid === selectedUser);
     const dateObj = parseISO(selectedDate);
     const dayName = isToday(dateObj) ? 'Hoy' : isYesterday(dateObj) ? 'Ayer' : format(dateObj, 'EEEE', { locale: es });
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-300">
-            {/* Header & Controls */}
-            <div className="flex flex-col md:flex-row justify-between gap-4 bg-slate-900/70 backdrop-blur-sm p-6 rounded-2xl border border-slate-800 shadow-lg">
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-emerald-600/20 border border-emerald-500/30 rounded-2xl flex items-center justify-center">
-                        <FileText className="w-7 h-7 text-emerald-400" />
-                    </div>
-                    <div>
-                        <h2 className="font-black text-2xl text-white tracking-tight">Reporte Diario</h2>
-                        <p className="text-sm text-slate-400 font-bold capitalize mt-1">
-                            {format(dateObj, "dd 'de' MMMM, yyyy", { locale: es })} ({dayName})
-                        </p>
-                    </div>
+        <div className="space-y-6">
+            {/* Action bar (date picker + export — no duplicate banner) */}
+            <div className="flex items-center justify-between gap-3">
+                <div className="text-sm text-slate-400 font-bold capitalize">
+                    {format(dateObj, "dd 'de' MMMM, yyyy", { locale: es })} ({dayName})
                 </div>
-
-                <div className="flex flex-col sm:flex-row gap-3 items-end md:items-center">
-                    <div className="bg-slate-800 border border-slate-700 rounded-xl flex items-center p-1.5 w-full sm:w-auto">
-                        <Users className="w-5 h-5 text-slate-400 ml-2" />
-                        <select
-                            value={selectedUser}
-                            onChange={e => setSelectedUser(e.target.value)}
-                            className="bg-transparent border-none text-sm font-bold text-slate-200 py-1.5 px-3 focus:ring-0 cursor-pointer outline-none w-full"
-                        >
-                            {engineersAndTechs.map(m => (
-                                <option key={m.uid} value={m.uid}>{m.displayName || m.email}</option>
-                            ))}
-                        </select>
-                    </div>
-
+                <div className="flex gap-3 items-center">
                     <div className="bg-slate-800 border border-slate-700 rounded-xl flex items-center p-1 w-full sm:w-auto">
                         <CalendarIcon className="w-5 h-5 text-slate-400 ml-3" />
                         <input

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
     Clock, BarChart2, AlertTriangle,
     ChevronDown, ChevronRight, Settings2, User,
-    Link2, ShieldAlert, CalendarRange
+    Link2, ShieldAlert, CalendarRange, CalendarDays
 } from 'lucide-react';
 import {
     TASK_STATUS, TASK_STATUS_CONFIG,
@@ -94,7 +94,7 @@ export default function TaskControlPanel({
     const totalPlannedHours = taskPlannerItems.reduce((sum, p) => sum + (p.plannedHours || 0), 0);
 
     return (
-        <div className="w-full lg:w-72 flex flex-col flex-shrink-0 bg-slate-850 lg:bg-transparent overflow-y-auto">
+        <div className="w-full lg:w-1/2 flex flex-col bg-slate-850 lg:bg-transparent overflow-y-auto">
             <div className="p-4 lg:p-5 space-y-3">
 
                 {/* ─── QUICK ACTIONS ─── */}
@@ -190,6 +190,33 @@ export default function TaskControlPanel({
                             disabled={!canEdit}
                         />
                     </div>
+                    {/* Planned Start / End Dates */}
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                        <div>
+                            <span className="text-[9px] font-bold text-slate-500 flex items-center gap-1 mb-0.5">
+                                <CalendarDays className="w-2.5 h-2.5" /> Inicio plan
+                            </span>
+                            <input
+                                type="date"
+                                value={form.plannedStartDate}
+                                onChange={e => setForm({ ...form, plannedStartDate: e.target.value })}
+                                className="w-full px-2.5 py-1.5 border border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800 text-slate-200"
+                                disabled={!canEdit}
+                            />
+                        </div>
+                        <div>
+                            <span className="text-[9px] font-bold text-slate-500 flex items-center gap-1 mb-0.5">
+                                <CalendarDays className="w-2.5 h-2.5" /> Fin plan
+                            </span>
+                            <input
+                                type="date"
+                                value={form.plannedEndDate}
+                                onChange={e => setForm({ ...form, plannedEndDate: e.target.value })}
+                                className="w-full px-2.5 py-1.5 border border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800 text-slate-200"
+                                disabled={!canEdit}
+                            />
+                        </div>
+                    </div>
                 </Section>
 
                 {/* ─── PLANIFICACIÓN ─── */}
@@ -214,43 +241,7 @@ export default function TaskControlPanel({
                     </Section>
                 )}
 
-                {/* ─── PROGRESS ─── */}
-                {!isNew && (
-                    <Section
-                        title="Progreso"
-                        icon={BarChart2}
-                        defaultOpen={true}
-                        badge={`${displayProgress}%`}
-                    >
-                        {autoProgress !== null ? (
-                            <div className="space-y-1.5">
-                                <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                                    <div
-                                        className={`h-full rounded-full transition-all duration-500 ${displayProgress === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`}
-                                        style={{ width: `${displayProgress}%` }}
-                                    />
-                                </div>
-                                <p className="text-[10px] text-slate-500">
-                                    {completedSubtasks}/{totalSubtasks} subtareas completadas
-                                    <span className="text-slate-600 ml-1">• automático</span>
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="space-y-1">
-                                <input
-                                    type="range" min={0} max={100} step={5}
-                                    value={form.percentComplete}
-                                    onChange={e => setForm(f => ({ ...f, percentComplete: Number(e.target.value) }))}
-                                    className="w-full accent-indigo-500"
-                                    disabled={!canEdit}
-                                />
-                                <p className="text-[10px] text-slate-500">
-                                    Progreso manual (sin subtareas)
-                                </p>
-                            </div>
-                        )}
-                    </Section>
-                )}
+
 
                 {/* ─── DEPENDENCIAS ─── */}
                 {!isNew && (predecessors.length > 0 || successors.length > 0) && (

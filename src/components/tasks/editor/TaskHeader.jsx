@@ -33,7 +33,7 @@ export default function TaskHeader({
     const pillColor = STATUS_PILL_COLORS[currentStatusCfg.color] || STATUS_PILL_COLORS['#64748b'];
 
     return (
-        <div className="p-4 lg:p-5 border-b border-slate-800 flex-shrink-0 space-y-3">
+        <div className="p-3 md:p-4 lg:p-5 border-b border-slate-800 flex-shrink-0 space-y-2.5 md:space-y-3">
             {/* Row 1: Menu icon + Status pill + Task ID + Actions */}
             <div className="flex items-center gap-3">
                 <button className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded-lg transition-all flex-shrink-0">
@@ -52,7 +52,7 @@ export default function TaskHeader({
                 )}
 
                 {!isNew && (
-                    <span className="text-[11px] font-mono text-slate-500 tracking-wide">
+                    <span className="text-[10px] font-mono text-slate-500 tracking-wide hidden sm:inline">
                         {task.id.slice(0, 10)}
                     </span>
                 )}
@@ -79,7 +79,7 @@ export default function TaskHeader({
             </div>
 
             {/* Row 2: Compact inline selects */}
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2">
                 {/* Proyecto */}
                 <div className="flex items-center gap-1.5 bg-slate-800 rounded-lg px-2.5 py-1.5 border border-slate-700 hover:border-slate-600 transition-colors min-w-0">
                     <FolderGit2 className="w-3 h-3 text-slate-400 flex-shrink-0" />

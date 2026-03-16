@@ -47,14 +47,17 @@ export async function persistAuditResults(auditResult, userId = 'system') {
         if (findingsWritten >= 450) break;
     }
 
-    // 2. Write audit event (summary of this run)
+    // 2. Write audit event (official schema — run summary)
     const eventRef = doc(collection(db, COLLECTIONS.AUDIT_EVENTS));
     batch.set(eventRef, {
         eventType: 'audit_run',
+        entityType: 'system',
+        entityId: 'department',
         userId,
         timestamp: now,
+        source: 'client_audit',
+        correlationId: runId,
         details: {
-            runId,
             totalFindings: auditResult.summary?.totalFindings || 0,
             bySeverity: auditResult.summary?.bySeverity || {},
             scores: auditResult.scores || null,

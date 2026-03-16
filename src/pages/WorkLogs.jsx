@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
 import { useAppData } from '../contexts/AppDataContext';
@@ -7,13 +8,18 @@ import ManualTimeEntry from '../components/time/ManualTimeEntry';
 import { deleteTimeLog, formatDuration } from '../services/timeService';
 import {
     Clock, Plus, Trash2, Zap, Calendar, ListTodo, FolderGit2,
-    BarChart3, ChevronLeft, ChevronRight, FileText, AlertTriangle
+    BarChart3, ChevronLeft, ChevronRight, FileText, AlertTriangle,
+    User, MessageCircle
 } from 'lucide-react';
 
 export default function WorkLogs() {
     const { user } = useAuth();
     const { canEdit, canDelete } = useRole();
     const { engProjects, engTasks, timeLogs, teamMembers } = useAppData();
+
+    // Get selectedUser from shared ReportsLayout via outlet context
+    const outletCtx = useOutletContext() || {};
+    const selectedUser = outletCtx.selectedUser || user?.uid || '';
 
     const [showManual, setShowManual] = useState(false);
     const [weekOffset, setWeekOffset] = useState(0);
@@ -41,18 +47,19 @@ export default function WorkLogs() {
     const weekStart = weekDates[0];
     const weekEnd = weekDates[6];
 
-    // --- My Logs for current week ---
+    // --- Logs for selected user + current week ---
     const myWeekLogs = useMemo(() => {
-        if (!user) return [];
+        const uid = selectedUser || user?.uid;
+        if (!uid) return [];
         return timeLogs
             .filter(log => {
-                if (log.userId !== user.uid) return false;
+                if (log.userId !== uid) return false;
                 if (!log.startTime) return false;
                 const logDate = new Date(log.startTime);
                 return logDate >= weekStart && logDate <= new Date(weekEnd.getTime() + 86400000);
             })
             .sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
-    }, [timeLogs, user, weekStart, weekEnd]);
+    }, [timeLogs, selectedUser, user, weekStart, weekEnd]);
 
     // --- Aggregations ---
     const weekStats = useMemo(() => {
@@ -65,12 +72,10 @@ export default function WorkLogs() {
             totalHours += log.totalHours || 0;
             if (log.overtime) overtimeHours += log.overtimeHours || log.totalHours || 0;
 
-            // By project
             const pId = log.projectId || 'sin_proyecto';
             if (!byProject[pId]) byProject[pId] = 0;
             byProject[pId] += log.totalHours || 0;
 
-            // By day
             if (log.startTime) {
                 const dayKey = new Date(log.startTime).toLocaleDateString('es', { weekday: 'short' });
                 if (!byDay[dayKey]) byDay[dayKey] = 0;
@@ -84,6 +89,14 @@ export default function WorkLogs() {
     // --- Helpers ---
     const getTaskName = (taskId) => engTasks.find(t => t.id === taskId)?.title || '';
     const getProjectName = (projectId) => engProjects.find(p => p.id === projectId)?.name || '';
+    const getPersonName = (log) => {
+        const member = teamMembers?.find(m => m.uid === log.userId || m.id === log.userId);
+        if (member?.name) return member.name;
+        if (member?.displayName) return member.displayName;
+        if (log.displayName && log.displayName !== "Usuario") return log.displayName;
+        if (member?.email) return member.email.split("@")[0];
+        return '';
+    };
 
     const formatTime = (isoString) => {
         if (!isoString) return '--:--';
@@ -96,7 +109,7 @@ export default function WorkLogs() {
     };
 
     return (
-        <div className="space-y-5 animate-in fade-in duration-300">
+        <div className="space-y-5">
             <ManualTimeEntry
                 isOpen={showManual}
                 onClose={() => setShowManual(false)}
@@ -105,33 +118,24 @@ export default function WorkLogs() {
                 userId={user?.uid}
             />
 
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/70 backdrop-blur-sm p-5 rounded-2xl border border-slate-800 shadow-lg">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-emerald-600/20 border border-emerald-500/30 rounded-xl flex items-center justify-center">
-                        <Clock className="w-5 h-5 text-emerald-400" />
-                    </div>
-                    <div>
-                        <h2 className="font-black text-xl text-white tracking-tight">Registro de Horas</h2>
-                        <p className="text-[10px] text-slate-400 font-bold">{weekStats.logCount} registro{weekStats.logCount !== 1 ? 's' : ''} esta semana</p>
-                    </div>
-                </div>
-
+            {/* Action bar (smaller, no duplicate banner) */}
+            <div className="flex items-center justify-between gap-3">
                 {deleteError && (
-                    <div className="bg-red-500/15 text-red-400 text-xs font-bold px-3 py-1.5 rounded-lg ml-auto mr-4 border border-red-500/30 flex items-center">
+                    <div className="bg-red-500/15 text-red-400 text-xs font-bold px-3 py-1.5 rounded-lg border border-red-500/30 flex items-center">
                         <AlertTriangle className="w-3 h-3 mr-1" />
                         {deleteError}
                     </div>
                 )}
-
-                {canEdit && (
-                    <button
-                        onClick={() => setShowManual(true)}
-                        className="bg-emerald-600 text-white px-5 py-3 rounded-xl font-black shadow-lg shadow-emerald-500/20 flex items-center justify-center active:scale-95 transition-transform text-sm border border-emerald-500"
-                    >
-                        <Plus className="mr-2 w-4 h-4" /> Registro Manual
-                    </button>
-                )}
+                <div className="ml-auto flex gap-2">
+                    {canEdit && (
+                        <button
+                            onClick={() => setShowManual(true)}
+                            className="bg-emerald-600 text-white px-5 py-3 rounded-xl font-black shadow-lg shadow-emerald-500/20 flex items-center justify-center active:scale-95 transition-transform text-sm border border-emerald-500"
+                        >
+                            <Plus className="mr-2 w-4 h-4" /> Registro Manual
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="grid lg:grid-cols-3 gap-5">
@@ -251,7 +255,22 @@ export default function WorkLogs() {
                                                         <Zap className="w-3 h-3" /> EXTRA
                                                     </span>
                                                 )}
+                                                {log.source === 'telegram' && (
+                                                    <span className="text-[9px] font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                                                        <MessageCircle className="w-3 h-3" /> Telegram
+                                                    </span>
+                                                )}
                                             </div>
+
+                                            {/* Person name */}
+                                            {getPersonName(log) && (
+                                                <div className="flex items-center gap-1 mb-1">
+                                                    <User className="w-3 h-3 text-emerald-400" />
+                                                    <span className="text-[11px] font-bold text-emerald-400">
+                                                        {getPersonName(log)}
+                                                    </span>
+                                                </div>
+                                            )}
 
                                             {/* Time range + Date */}
                                             <div className="flex items-center gap-3 text-[11px] text-slate-400 font-medium">
@@ -280,7 +299,7 @@ export default function WorkLogs() {
                                             {(canDelete || log.userId === user?.uid) && (
                                                 <button
                                                     onClick={async () => {
-                                                        if (deletingId) return; // Prevent double click
+                                                        if (deletingId) return;
                                                         setDeletingId(log.id);
                                                         setDeleteError('');
                                                         try {
