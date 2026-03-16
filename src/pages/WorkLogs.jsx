@@ -6,6 +6,8 @@ import { useAppData } from '../contexts/AppDataContext';
 import ActiveTimer from '../components/time/ActiveTimer';
 import ManualTimeEntry from '../components/time/ManualTimeEntry';
 import { deleteTimeLog, formatDuration } from '../services/timeService';
+import { db } from '../firebase';
+import { updateDoc, doc } from 'firebase/firestore';
 import {
     Clock, Plus, Trash2, Zap, Calendar, ListTodo, FolderGit2,
     BarChart3, ChevronLeft, ChevronRight, FileText, AlertTriangle,
@@ -230,105 +232,155 @@ export default function WorkLogs() {
                         </div>
                     ) : (
                         <div className="space-y-2">
-                            {myWeekLogs.map(log => (
-                                <div
-                                    key={log.id}
-                                    className={`bg-slate-900/60 rounded-xl border p-4 transition-all hover:shadow-lg group ${log.overtime ? 'border-amber-500/30' : 'border-slate-800'
-                                        }`}
-                                >
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="flex-1 min-w-0">
-                                            {/* Task + Project */}
-                                            <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                                                {log.taskId && (
-                                                    <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg flex items-center gap-1 truncate max-w-[200px]">
-                                                        <ListTodo className="w-3 h-3 flex-shrink-0" /> {getTaskName(log.taskId)}
-                                                    </span>
-                                                )}
-                                                {log.projectId && (
-                                                    <span className="text-[10px] font-bold text-purple-500 bg-purple-50 px-2 py-0.5 rounded-lg flex items-center gap-1 truncate max-w-[150px]">
-                                                        <FolderGit2 className="w-3 h-3 flex-shrink-0" /> {getProjectName(log.projectId)}
-                                                    </span>
-                                                )}
-                                                {log.overtime && (
-                                                    <span className="text-[9px] font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                                                        <Zap className="w-3 h-3" /> EXTRA
-                                                    </span>
-                                                )}
-                                                {log.source === 'telegram' && (
-                                                    <span className="text-[9px] font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                                                        <MessageCircle className="w-3 h-3" /> Telegram
-                                                    </span>
-                                                )}
-                                            </div>
+                            {myWeekLogs.map(log => {
+                                const isRunning = !log.endTime;
+                                return (
+                                    <div
+                                        key={log.id}
+                                        className={`bg-slate-900/60 rounded-xl border p-4 transition-all hover:shadow-lg group ${isRunning ? 'border-green-500/50 ring-1 ring-green-500/20' :
+                                            log.overtime ? 'border-amber-500/30' : 'border-slate-800'
+                                            }`}
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="flex-1 min-w-0">
+                                                {/* Task + Project */}
+                                                <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                                                    {isRunning && (
+                                                        <span className="text-[9px] font-bold text-green-400 bg-green-500/15 px-2 py-0.5 rounded-full flex items-center gap-1 border border-green-500/30">
+                                                            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" /> EN CURSO
+                                                        </span>
+                                                    )}
+                                                    {log.taskId && (
+                                                        <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg flex items-center gap-1 truncate max-w-[200px]">
+                                                            <ListTodo className="w-3 h-3 flex-shrink-0" /> {getTaskName(log.taskId)}
+                                                        </span>
+                                                    )}
+                                                    {!log.taskId && !isRunning && (
+                                                        <span className="text-[10px] font-bold text-slate-500 bg-slate-800 px-2 py-0.5 rounded-lg">Sin tarea</span>
+                                                    )}
+                                                    {log.projectId && (
+                                                        <span className="text-[10px] font-bold text-purple-500 bg-purple-50 px-2 py-0.5 rounded-lg flex items-center gap-1 truncate max-w-[150px]">
+                                                            <FolderGit2 className="w-3 h-3 flex-shrink-0" /> {getProjectName(log.projectId)}
+                                                        </span>
+                                                    )}
+                                                    {log.overtime && (
+                                                        <span className="text-[9px] font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                                                            <Zap className="w-3 h-3" /> EXTRA
+                                                        </span>
+                                                    )}
+                                                    {log.source === 'telegram' && (
+                                                        <span className="text-[9px] font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                                                            <MessageCircle className="w-3 h-3" /> Telegram
+                                                        </span>
+                                                    )}
+                                                </div>
 
-                                            {/* Person name */}
-                                            {getPersonName(log) && (
-                                                <div className="flex items-center gap-1 mb-1">
-                                                    <User className="w-3 h-3 text-emerald-400" />
-                                                    <span className="text-[11px] font-bold text-emerald-400">
-                                                        {getPersonName(log)}
+                                                {/* Person name */}
+                                                {getPersonName(log) && (
+                                                    <div className="flex items-center gap-1 mb-1">
+                                                        <User className="w-3 h-3 text-emerald-400" />
+                                                        <span className="text-[11px] font-bold text-emerald-400">
+                                                            {getPersonName(log)}
+                                                        </span>
+                                                    </div>
+                                                )}
+
+                                                {/* Time range + Date */}
+                                                <div className="flex items-center gap-3 text-[11px] text-slate-400 font-medium">
+                                                    <span className="flex items-center gap-1">
+                                                        <Calendar className="w-3 h-3" /> {formatDate(log.startTime)}
+                                                    </span>
+                                                    <span>
+                                                        {formatTime(log.startTime)} – {isRunning ? <span className="text-green-400 font-bold">En curso...</span> : formatTime(log.endTime)}
                                                     </span>
                                                 </div>
-                                            )}
 
-                                            {/* Time range + Date */}
-                                            <div className="flex items-center gap-3 text-[11px] text-slate-400 font-medium">
-                                                <span className="flex items-center gap-1">
-                                                    <Calendar className="w-3 h-3" /> {formatDate(log.startTime)}
-                                                </span>
-                                                <span>
-                                                    {formatTime(log.startTime)} – {formatTime(log.endTime) || 'En curso...'}
-                                                </span>
+                                                {/* Notes */}
+                                                {log.notes && (
+                                                    <p className="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1">
+                                                        <FileText className="w-3 h-3 flex-shrink-0" /> {log.notes}
+                                                    </p>
+                                                )}
                                             </div>
 
-                                            {/* Notes */}
-                                            {log.notes && (
-                                                <p className="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1">
-                                                    <FileText className="w-3 h-3 flex-shrink-0" /> {log.notes}
-                                                </p>
-                                            )}
-                                        </div>
+                                            {/* Hours + Actions */}
+                                            <div className="flex items-center gap-2 flex-shrink-0">
+                                                <span className={`text-lg font-black tabular-nums ${isRunning ? 'text-green-400' :
+                                                    log.overtime ? 'text-amber-500' : 'text-indigo-600'
+                                                    }`}>
+                                                    {isRunning ? '⏱' : formatDuration(log.totalHours)}
+                                                </span>
 
-                                        {/* Hours + Delete */}
-                                        <div className="flex items-center gap-2 flex-shrink-0">
-                                            <span className={`text-lg font-black tabular-nums ${log.overtime ? 'text-amber-500' : 'text-indigo-600'
-                                                }`}>
-                                                {formatDuration(log.totalHours)}
-                                            </span>
-                                            {(canDelete || log.userId === user?.uid) && (
-                                                <button
-                                                    onClick={async () => {
-                                                        if (deletingId) return;
-                                                        setDeletingId(log.id);
-                                                        setDeleteError('');
-                                                        try {
-                                                            await deleteTimeLog(log.id, log.taskId, log.projectId);
-                                                        } catch (err) {
-                                                            console.error("Delete Error:", err);
-                                                            setDeleteError(err.message || "Error eliminando el registro");
-                                                        } finally {
-                                                            setDeletingId(null);
-                                                        }
-                                                    }}
-                                                    disabled={deletingId === log.id}
-                                                    className={`p-1.5 rounded-lg transition-all ${deletingId === log.id
-                                                        ? 'text-slate-400 cursor-not-allowed bg-slate-100 opacity-100'
-                                                        : 'text-red-400 opacity-0 group-hover:opacity-100 hover:bg-red-50'
-                                                        }`}
-                                                    title="Eliminar registro"
-                                                >
-                                                    {deletingId === log.id ? (
-                                                        <Clock className="w-4 h-4 animate-spin" />
-                                                    ) : (
-                                                        <Trash2 className="w-4 h-4" />
-                                                    )}
-                                                </button>
-                                            )}
+                                                {/* Stop button for running logs */}
+                                                {isRunning && (canEdit || log.userId === user?.uid) && (
+                                                    <button
+                                                        onClick={async () => {
+                                                            if (deletingId) return;
+                                                            setDeletingId(log.id);
+                                                            setDeleteError('');
+                                                            try {
+                                                                const now = new Date();
+                                                                const startTime = new Date(log.startTime);
+                                                                const totalMs = now - startTime;
+                                                                let totalHours = parseFloat((totalMs / 3600000).toFixed(6));
+                                                                if (totalHours < 0.016666) totalHours = 0.016666;
+                                                                await updateDoc(doc(db, 'timeLogs', log.id), {
+                                                                    endTime: now.toISOString(),
+                                                                    totalHours,
+                                                                    overtimeHours: log.overtime ? totalHours : 0,
+                                                                });
+                                                            } catch (err) {
+                                                                console.error("Stop Error:", err);
+                                                                setDeleteError(err.message || "Error deteniendo el timer");
+                                                            } finally {
+                                                                setDeletingId(null);
+                                                            }
+                                                        }}
+                                                        disabled={deletingId === log.id}
+                                                        className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-lg transition-all disabled:bg-slate-500"
+                                                        title="Detener timer"
+                                                    >
+                                                        {deletingId === log.id ? '...' : '⏹ Detener'}
+                                                    </button>
+                                                )}
+
+                                                {/* Delete button — always visible for running, hover for others */}
+                                                {(canDelete || log.userId === user?.uid) && (
+                                                    <button
+                                                        onClick={async () => {
+                                                            if (deletingId) return;
+                                                            setDeletingId(log.id);
+                                                            setDeleteError('');
+                                                            try {
+                                                                await deleteTimeLog(log.id, log.taskId, log.projectId);
+                                                            } catch (err) {
+                                                                console.error("Delete Error:", err);
+                                                                setDeleteError(err.message || "Error eliminando el registro");
+                                                            } finally {
+                                                                setDeletingId(null);
+                                                            }
+                                                        }}
+                                                        disabled={deletingId === log.id}
+                                                        className={`p-1.5 rounded-lg transition-all ${deletingId === log.id
+                                                            ? 'text-slate-400 cursor-not-allowed bg-slate-100 opacity-100'
+                                                            : isRunning
+                                                                ? 'text-red-400 opacity-100 hover:bg-red-50'
+                                                                : 'text-red-400 opacity-0 group-hover:opacity-100 hover:bg-red-50'
+                                                            }`}
+                                                        title="Eliminar registro"
+                                                    >
+                                                        {deletingId === log.id ? (
+                                                            <Clock className="w-4 h-4 animate-spin" />
+                                                        ) : (
+                                                            <Trash2 className="w-4 h-4" />
+                                                        )}
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>
