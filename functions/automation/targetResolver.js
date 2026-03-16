@@ -37,7 +37,7 @@ async function resolveTargetsByRole(adminDb, roles, channel = "telegram") {
 
         targets.push({
             uid: doc.id,
-            name: u.name || u.email || doc.id,
+            name: u.displayName || u.name || u.email || doc.id,
             email: u.email || "",
             operationalRole: u.operationalRole,
             chatId: String(chatId),
@@ -60,7 +60,7 @@ async function resolveTargetById(adminDb, userId, channel = "telegram") {
 
     return {
         uid: doc.id,
-        name: u.name || u.email || doc.id,
+        name: u.displayName || u.name || u.email || doc.id,
         email: u.email || "",
         operationalRole: u.operationalRole || null,
         chatId: String(chatId),
@@ -85,7 +85,7 @@ async function resolveAllParticipants(adminDb, channel = "telegram") {
 
         targets.push({
             uid: doc.id,
-            name: u.name || u.email || doc.id,
+            name: u.displayName || u.name || u.email || doc.id,
             email: u.email || "",
             operationalRole: u.operationalRole || null,
             chatId: String(chatId),

@@ -101,7 +101,7 @@ export function evaluateUser(userId, context = {}) {
     const underUtil = evaluateUserUnderutilized(userId, userSlots, userProfile);
     if (underUtil) findings.push(underUtil);
 
-    const incompWeek = evaluatePlannerIncompleteWeek(userId, userSlots);
+    const incompWeek = evaluatePlannerIncompleteWeek(userId, userSlots, userProfile);
     if (incompWeek) findings.push(incompWeek);
 
     // Critical tasks not planned

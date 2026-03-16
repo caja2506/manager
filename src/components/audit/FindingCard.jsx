@@ -61,7 +61,7 @@ export function EntityTypeBadge({ entityType }) {
 // FINDING CARD
 // ============================================================
 
-export function FindingCard({ finding, showEntityLink = true }) {
+export function FindingCard({ finding, showEntityLink = true, onOpenTask }) {
     const navigate = useNavigate();
 
     const getEntityRoute = () => {
@@ -79,8 +79,19 @@ export function FindingCard({ finding, showEntityLink = true }) {
         info: 'border-l-blue-500 hover:border-blue-500/40',
     };
 
+    const isTaskFinding = finding.entityType === 'task' && finding.entityId;
+
+    const handleClick = () => {
+        if (isTaskFinding && onOpenTask) {
+            onOpenTask(finding.entityId);
+        }
+    };
+
     return (
-        <div className={`p-4 rounded-xl border-l-4 border border-slate-800 bg-slate-800/40 backdrop-blur-sm transition-all hover:bg-slate-800/60 ${borderColor[finding.severity] || borderColor.info}`}>
+        <div
+            className={`p-4 rounded-xl border-l-4 border border-slate-800 bg-slate-800/40 backdrop-blur-sm transition-all hover:bg-slate-800/60 ${borderColor[finding.severity] || borderColor.info} ${isTaskFinding && onOpenTask ? 'cursor-pointer' : ''}`}
+            onClick={handleClick}
+        >
             <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                     {/* Header: severity + entity */}
@@ -108,9 +119,16 @@ export function FindingCard({ finding, showEntityLink = true }) {
                 {/* Navigate to entity */}
                 {showEntityLink && getEntityRoute() && (
                     <button
-                        onClick={() => navigate(getEntityRoute())}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (isTaskFinding && onOpenTask) {
+                                onOpenTask(finding.entityId);
+                            } else {
+                                navigate(getEntityRoute());
+                            }
+                        }}
                         className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors shrink-0"
-                        title="Ver entidad"
+                        title={isTaskFinding ? 'Abrir tarea' : 'Ver entidad'}
                     >
                         <ExternalLink className="w-4 h-4" />
                     </button>
@@ -133,7 +151,7 @@ export function FindingCard({ finding, showEntityLink = true }) {
 // FINDING CARD LIST (simple wrapper)
 // ============================================================
 
-export function FindingCardList({ findings, emptyMessage = 'Sin hallazgos', maxItems = 50 }) {
+export function FindingCardList({ findings, emptyMessage = 'Sin hallazgos', maxItems = 50, onOpenTask }) {
     if (!findings || findings.length === 0) {
         return (
             <div className="text-center py-8 border border-dashed border-slate-700 rounded-xl">
@@ -146,7 +164,7 @@ export function FindingCardList({ findings, emptyMessage = 'Sin hallazgos', maxI
     return (
         <div className="space-y-3">
             {findings.slice(0, maxItems).map((finding, index) => (
-                <FindingCard key={`${finding.ruleId}-${finding.entityId}-${index}`} finding={finding} />
+                <FindingCard key={`${finding.ruleId}-${finding.entityId}-${index}`} finding={finding} onOpenTask={onOpenTask} />
             ))}
             {findings.length > maxItems && (
                 <p className="text-center text-xs font-bold text-slate-500 py-2">

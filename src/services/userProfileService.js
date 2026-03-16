@@ -50,14 +50,31 @@ export async function ensureUserProfile(authUser, rbacRole) {
     const profileRef = doc(db, COLLECTIONS.USERS, authUser.uid);
     const profileSnap = await getDoc(profileRef);
 
+    // Also read users_roles to get the canonical displayName
+    const rbacRef = doc(db, 'users_roles', authUser.uid);
+    const rbacSnap = await getDoc(rbacRef);
+    const rbacName = rbacSnap.exists() ? (rbacSnap.data().displayName || '') : '';
+
+    // Determine best available name: users_roles > authUser > existing profile
+    const bestName = rbacName || authUser.displayName || '';
+
     if (profileSnap.exists()) {
-        // Profile exists — return as-is, do NOT overwrite operational fields
-        return { uid: authUser.uid, ...profileSnap.data() };
+        const existing = profileSnap.data();
+        // Sync displayName if users_roles has a better name
+        if (bestName && bestName !== (existing.displayName || '')) {
+            await updateDoc(profileRef, {
+                displayName: bestName,
+                updatedAt: new Date().toISOString(),
+            });
+            console.log(`[userProfileService] Synced displayName for ${authUser.email}: "${bestName}"`);
+            return { uid: authUser.uid, ...existing, displayName: bestName };
+        }
+        return { uid: authUser.uid, ...existing };
     }
 
     // Profile missing — bootstrap from auth + RBAC data
     const newProfile = {
-        displayName: authUser.displayName || '',
+        displayName: bestName,
         email: authUser.email || '',
         photoURL: authUser.photoURL || '',
         teamRole: null,             // Admin sets this manually

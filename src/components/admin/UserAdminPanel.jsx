@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRole } from '../../contexts/RoleContext';
 import { COLLECTIONS, TEAM_ROLES } from '../../models/schemas';
 import { updateUserProfile } from '../../services/userProfileService';
-import { Shield, Trash2, X, Search, Users, ShieldCheck } from 'lucide-react';
+import { Shield, Trash2, X, Search, Users, ShieldCheck, Pencil, Check } from 'lucide-react';
 
 // ── RBAC roles (admin/editor/viewer) — controls Firestore write permissions ──
 const ROLE_CONFIG = {
@@ -32,6 +32,8 @@ export default function UserAdminPanel({ onClose }) {
     const [profiles, setProfiles] = useState({});
     const [search, setSearch] = useState('');
     const [confirmAction, setConfirmAction] = useState(null);
+    const [editingNameUid, setEditingNameUid] = useState(null);
+    const [editingNameValue, setEditingNameValue] = useState('');
 
     // Subscribe to users_roles (RBAC)
     useEffect(() => {
@@ -54,6 +56,34 @@ export default function UserAdminPanel({ onClose }) {
         });
         return () => unsub();
     }, []);
+
+    // ── Auto-sync displayName from users_roles → users ──
+    // Runs once when both datasets are loaded. Fixes any mismatches.
+    useEffect(() => {
+        if (rbacUsers.length === 0) return;
+        const syncNames = async () => {
+            for (const rbacUser of rbacUsers) {
+                const profile = profiles[rbacUser.uid];
+                const rbacName = rbacUser.displayName || '';
+                const profileName = profile?.displayName || '';
+                // If users_roles has a name but users doesn't, sync it
+                if (rbacName && rbacName !== profileName) {
+                    try {
+                        const ref = doc(db, COLLECTIONS.USERS, rbacUser.uid);
+                        await setDoc(ref, {
+                            displayName: rbacName,
+                            email: rbacUser.email || '',
+                            updatedAt: new Date().toISOString()
+                        }, { merge: true });
+                        console.log(`[Sync] displayName synced for ${rbacUser.email}: "${rbacName}"`);
+                    } catch (err) {
+                        console.warn(`[Sync] Failed for ${rbacUser.email}:`, err.message);
+                    }
+                }
+            }
+        };
+        syncNames();
+    }, [rbacUsers, profiles]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Check if a user email is in the super admin list
     const isUserSuperAdmin = (email) => {
@@ -102,6 +132,21 @@ export default function UserAdminPanel({ onClose }) {
         } catch (err) {
             console.error('Error updating capacity:', err);
         }
+    };
+
+    // ── Display name change → writes to both users/{uid} AND users_roles/{uid} ──
+    const handleNameSave = async (uid) => {
+        const trimmed = editingNameValue.trim();
+        if (!trimmed) { setEditingNameUid(null); return; }
+        try {
+            // Use setDoc with merge to handle docs that may not exist
+            const usersRef = doc(db, COLLECTIONS.USERS, uid);
+            await setDoc(usersRef, { displayName: trimmed, updatedAt: new Date().toISOString() }, { merge: true });
+            await updateDoc(doc(db, 'users_roles', uid), { displayName: trimmed });
+        } catch (err) {
+            console.error('Error updating display name:', err);
+        }
+        setEditingNameUid(null);
     };
 
     const handleRemoveUser = (u) => {
@@ -215,16 +260,43 @@ export default function UserAdminPanel({ onClose }) {
                                             <div className="w-9 h-9 rounded-full bg-indigo-600/20 flex items-center justify-center text-indigo-400 text-sm font-bold flex-shrink-0">
                                                 {(u.displayName || u.email || '?')[0].toUpperCase()}
                                             </div>
-                                            <div className="min-w-0">
-                                                <div className="font-bold text-white text-sm truncate">
-                                                    {u.displayName || 'Sin nombre'}
-                                                    {isSelf && <span className="ml-2 text-[10px] bg-indigo-600/20 text-indigo-400 px-2 py-0.5 rounded-full font-black">TÚ</span>}
-                                                    {userIsSuperAdmin && (
-                                                        <span className="ml-2 text-[10px] bg-emerald-600/20 text-emerald-400 px-2 py-0.5 rounded-full font-black inline-flex items-center gap-0.5">
-                                                            <ShieldCheck className="w-3 h-3" /> SUPER
-                                                        </span>
-                                                    )}
-                                                </div>
+                                            <div className="min-w-0 flex-1">
+                                                {editingNameUid === u.uid ? (
+                                                    <div className="flex items-center gap-1">
+                                                        <input
+                                                            autoFocus
+                                                            type="text"
+                                                            value={editingNameValue}
+                                                            onChange={(e) => setEditingNameValue(e.target.value)}
+                                                            onKeyDown={(e) => { if (e.key === 'Enter') handleNameSave(u.uid); if (e.key === 'Escape') setEditingNameUid(null); }}
+                                                            onBlur={() => handleNameSave(u.uid)}
+                                                            className="bg-slate-800 border border-indigo-500 rounded-lg px-2 py-1 text-sm text-white w-full focus:ring-2 focus:ring-indigo-500/40 focus:outline-none"
+                                                            placeholder="Nombre completo"
+                                                        />
+                                                        <button onClick={() => handleNameSave(u.uid)} className="p-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40">
+                                                            <Check className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-1.5 group/name">
+                                                        <div className="font-bold text-white text-sm truncate">
+                                                            {u.displayName || <span className="text-amber-400 italic">Sin nombre</span>}
+                                                            {isSelf && <span className="ml-2 text-[10px] bg-indigo-600/20 text-indigo-400 px-2 py-0.5 rounded-full font-black">TÚ</span>}
+                                                            {userIsSuperAdmin && (
+                                                                <span className="ml-2 text-[10px] bg-emerald-600/20 text-emerald-400 px-2 py-0.5 rounded-full font-black inline-flex items-center gap-0.5">
+                                                                    <ShieldCheck className="w-3 h-3" /> SUPER
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <button
+                                                            onClick={() => { setEditingNameUid(u.uid); setEditingNameValue(u.displayName || ''); }}
+                                                            className="p-1 rounded-lg text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 transition-all"
+                                                            title="Editar nombre"
+                                                        >
+                                                            <Pencil className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                )}
                                                 <div className="text-[11px] text-slate-400 truncate">{u.email}</div>
                                             </div>
                                         </div>

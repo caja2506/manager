@@ -99,7 +99,7 @@ async function loadAllUsers(adminDb) {
         const snap = await adminDb.collection(paths.USERS).get();
         return snap.docs.map(d => ({
             id: d.id,
-            name: d.data().name || "Unknown",
+            name: d.data().displayName || d.data().name || "Unknown",
             email: d.data().email,
             operationalRole: d.data().operationalRole || d.data().teamRole || "unassigned",
             telegramChatId: d.data().telegramChatId || null,

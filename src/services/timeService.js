@@ -63,11 +63,23 @@ export async function startTimer({ taskId, projectId, userId, notes = '', overti
 
 /**
  * Stop the active timer. Updates the Firestore time log with endTime and totalHours.
+ * Always clears localStorage to prevent stuck timers, even if Firestore update fails.
  */
 export async function stopTimer(logId, { notes = '', overtime = false } = {}) {
     const now = new Date();
     const timer = getActiveTimer();
-    if (!timer || timer.logId !== logId) return null;
+    if (!timer) {
+        // No timer in localStorage — clear anyway
+        setActiveTimer(null);
+        return null;
+    }
+
+    // Use the logId from localStorage if passed logId doesn't match
+    const effectiveLogId = logId || timer.logId;
+    if (!effectiveLogId) {
+        setActiveTimer(null);
+        return null;
+    }
 
     const startTime = new Date(timer.startTime);
     const totalMs = now - startTime;
@@ -80,25 +92,88 @@ export async function stopTimer(logId, { notes = '', overtime = false } = {}) {
 
     const overtimeHours = overtime ? totalHours : 0;
 
-    await updateDoc(doc(db, COLLECTIONS.TIME_LOGS, logId), {
-        endTime: now.toISOString(),
-        totalHours,
-        overtime,
-        overtimeHours,
-        notes: notes || timer.notes || '',
-    });
+    try {
+        await updateDoc(doc(db, COLLECTIONS.TIME_LOGS, effectiveLogId), {
+            endTime: now.toISOString(),
+            totalHours,
+            overtime,
+            overtimeHours,
+            notes: notes || timer.notes || '',
+        });
 
-    // Update task's actualHours
-    if (timer.taskId) {
-        await recalculateTaskHours(timer.taskId);
+        // Update task's actualHours
+        if (timer.taskId) {
+            await recalculateTaskHours(timer.taskId);
+        }
+
+        if (timer.projectId && (overtime || overtimeHours > 0)) {
+            await calculateProjectRisk(timer.projectId);
+        }
+    } catch (err) {
+        console.warn('[timeService] Firestore update failed during stop, clearing timer anyway:', err.message);
     }
 
-    if (timer.projectId && (overtime || overtimeHours > 0)) {
-        await calculateProjectRisk(timer.projectId);
-    }
-
+    // ALWAYS clear localStorage, even if Firestore update failed
     setActiveTimer(null);
     return { totalHours, overtimeHours, taskId: timer.taskId };
+}
+
+/**
+ * Force-stop: unconditionally clears the active timer from localStorage.
+ * Use when the normal stop fails (e.g., orphaned timer, Firestore doc missing).
+ */
+export function forceStopTimer() {
+    const timer = getActiveTimer();
+    setActiveTimer(null);
+    console.warn('[timeService] Timer force-stopped:', timer?.logId);
+    return timer;
+}
+
+/** Maximum hours before a timer is considered stale and auto-stopped */
+const MAX_TIMER_HOURS = 10;
+
+/**
+ * Validate the active timer on app startup.
+ * - If the Firestore time log document no longer exists → clear the timer
+ * - If the timer has been running for more than MAX_TIMER_HOURS → auto-stop it
+ * Call this once on app mount (e.g., in MyWork or App).
+ * 
+ * @returns {{ valid: boolean, autoStopped?: boolean, orphaned?: boolean, hours?: number }}
+ */
+export async function validateActiveTimer() {
+    const timer = getActiveTimer();
+    if (!timer) return { valid: true };
+
+    // Check elapsed hours
+    const hours = (Date.now() - new Date(timer.startTime).getTime()) / 3600000;
+
+    // Check if Firestore doc still exists
+    if (timer.logId) {
+        try {
+            const snap = await getDoc(doc(db, COLLECTIONS.TIME_LOGS, timer.logId));
+            if (!snap.exists()) {
+                console.warn(`[timeService] Orphaned timer: Firestore doc ${timer.logId} not found. Clearing.`);
+                setActiveTimer(null);
+                return { valid: false, orphaned: true, hours };
+            }
+        } catch (err) {
+            console.warn('[timeService] Could not validate timer doc:', err.message);
+            // Don't clear on network errors — might just be offline
+        }
+    }
+
+    // Auto-stop if running too long
+    if (hours > MAX_TIMER_HOURS) {
+        console.warn(`[timeService] Timer running ${hours.toFixed(1)}h (>${MAX_TIMER_HOURS}h). Auto-stopping.`);
+        try {
+            await stopTimer(timer.logId);
+        } catch {
+            setActiveTimer(null);
+        }
+        return { valid: false, autoStopped: true, hours };
+    }
+
+    return { valid: true, hours };
 }
 
 // ============================================================

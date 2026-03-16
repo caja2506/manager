@@ -46,7 +46,7 @@ async function generateLinkCode(adminDb, userId) {
     await adminDb.collection("telegramLinkCodes").add({
         code,
         userId,
-        userName: userData.name || userData.email || userId,
+        userName: userData.displayName || userData.name || userData.email || userId,
         userEmail: userData.email || "",
         createdAt: now.toISOString(),
         expiresAt: expiresAt.toISOString(),
@@ -58,7 +58,7 @@ async function generateLinkCode(adminDb, userId) {
     return {
         code,
         expiresAt: expiresAt.toISOString(),
-        userName: userData.name || userData.email,
+        userName: userData.displayName || userData.name || userData.email,
     };
 }
 
@@ -154,7 +154,7 @@ async function validateAndConsumeLinkCode(adminDb, code, chatId) {
     return {
         valid: true,
         userId: codeData.userId,
-        userName: userData.name || userData.email || codeData.userId,
+        userName: userData.displayName || userData.name || userData.email || codeData.userId,
         userRole: userData.operationalRole || "Sin rol asignado",
     };
 }
@@ -260,7 +260,8 @@ async function getTeamMembers(adminDb) {
         if (!usersMap[doc.id]) {
             // User exists in RBAC but not in operational users — create entry
             const newUserData = {
-                name: rd.name || rd.email || doc.id,
+                displayName: rd.displayName || rd.name || rd.email || doc.id,
+                name: rd.displayName || rd.name || rd.email || doc.id,
                 email: rd.email || "",
                 active: true,
                 isAutomationParticipant: false,
@@ -270,9 +271,13 @@ async function getTeamMembers(adminDb) {
             await adminDb.collection(paths.USERS).doc(doc.id).set(newUserData);
             usersMap[doc.id] = { id: doc.id, ...newUserData };
         } else {
-            // Merge: ensure name & email are up to date from RBAC
+            // Merge: ensure displayName & email are up to date from RBAC
             const u = usersMap[doc.id];
-            if (!u.name && rd.name) usersMap[doc.id].name = rd.name;
+            const rbacName = rd.displayName || rd.name || '';
+            if (rbacName && !u.displayName) {
+                usersMap[doc.id].displayName = rbacName;
+                usersMap[doc.id].name = rbacName;
+            }
             if (!u.email && rd.email) usersMap[doc.id].email = rd.email;
         }
         // Attach RBAC role for reference
@@ -282,7 +287,8 @@ async function getTeamMembers(adminDb) {
     // 3. Build members array
     const members = Object.values(usersMap).map(d => ({
         id: d.id,
-        name: d.name || d.email || d.id,
+        name: d.displayName || d.name || d.email || d.id,
+        displayName: d.displayName || d.name || d.email || d.id,
         email: d.email || "",
         operationalRole: d.operationalRole || null,
         rbacRole: d.rbacRole || null,

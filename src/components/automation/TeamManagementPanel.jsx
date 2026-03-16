@@ -5,6 +5,8 @@ import {
     ChevronDown, Clock, Smartphone
 } from 'lucide-react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db } from '../../firebase';
 
 const functions = getFunctions();
 
@@ -43,8 +45,22 @@ export default function TeamManagementPanel() {
     const [error, setError] = useState(null);
     const [successMsg, setSuccessMsg] = useState(null);
     const [confirmUnlink, setConfirmUnlink] = useState(null);
+    const [nameMap, setNameMap] = useState({});
 
-    // Load team data
+    // Subscribe to users_roles for correct display names (client-side source of truth)
+    useEffect(() => {
+        const unsub = onSnapshot(collection(db, 'users_roles'), (snap) => {
+            const map = {};
+            snap.docs.forEach(d => {
+                const data = d.data();
+                if (data.displayName) map[d.id] = data.displayName;
+            });
+            setNameMap(map);
+        });
+        return () => unsub();
+    }, []);
+
+    // Load team data from Cloud Function
     const loadTeam = useCallback(async () => {
         setLoading(true);
         setError(null);
@@ -61,6 +77,9 @@ export default function TeamManagementPanel() {
     }, []);
 
     useEffect(() => { loadTeam(); }, [loadTeam]);
+
+    // Resolve name: users_roles displayName > CF displayName > CF name > email
+    const resolveName = (member) => nameMap[member.id] || member.displayName || member.name || member.email;
 
     // Generate link code
     const handleGenerateCode = async (userId) => {
@@ -84,10 +103,8 @@ export default function TeamManagementPanel() {
     // Unlink user — step 1: show confirm, step 2: execute
     const handleUnlinkClick = (userId) => {
         if (confirmUnlink === userId) {
-            // Second click — execute
             handleUnlinkConfirmed(userId);
         } else {
-            // First click — ask confirm
             setConfirmUnlink(userId);
             setTimeout(() => setConfirmUnlink(prev => prev === userId ? null : prev), 3000);
         }
@@ -246,7 +263,7 @@ export default function TeamManagementPanel() {
                                 {/* Name & email */}
                                 <div>
                                     <div className="text-sm font-medium text-white flex items-center gap-2">
-                                        {member.name}
+                                        {resolveName(member)}
                                         {member.isAutomationParticipant && (
                                             <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" title="Participant" />
                                         )}
@@ -312,8 +329,8 @@ export default function TeamManagementPanel() {
                                         <button
                                             onClick={() => handleUnlinkClick(member.id)}
                                             className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium transition-colors border ${confirmUnlink === member.id
-                                                    ? 'bg-red-500/30 hover:bg-red-500/40 text-white border-red-500/50 animate-pulse'
-                                                    : 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20'
+                                                ? 'bg-red-500/30 hover:bg-red-500/40 text-white border-red-500/50 animate-pulse'
+                                                : 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20'
                                                 }`}
                                             title={confirmUnlink === member.id ? 'Clic para confirmar' : 'Desvincular Telegram'}
                                         >

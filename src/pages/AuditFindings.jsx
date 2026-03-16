@@ -1,9 +1,11 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Shield, Filter, Download, RefreshCw, Search, ChevronDown } from 'lucide-react';
 import { useAuditData } from '../hooks/useAuditData';
+import { useAppData } from '../contexts/AppDataContext';
 import ComplianceScoresPanel from '../components/audit/ComplianceScoresPanel';
 import { FindingCardList, FindingSeverityBadge } from '../components/audit/FindingCard';
 import { RULE_CATALOG, RULE_CATEGORY, getRulesByCategory } from '../core/rules/ruleCatalog';
+import TaskDetailModal from '../components/tasks/TaskDetailModal';
 
 // ============================================================
 // FILTER OPTIONS
@@ -45,6 +47,21 @@ export default function AuditFindings() {
         findingsBySeverity,
         findingsByEntity,
     } = useAuditData();
+
+    const { engTasks = [], engProjects = [], engSubtasks = [], taskTypes = [], teamMembers = [] } = useAppData();
+
+    // Task modal state
+    const [selectedTask, setSelectedTask] = useState(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const closeModal = () => { setIsModalOpen(false); setSelectedTask(null); };
+
+    const handleOpenTask = useCallback((taskId) => {
+        const task = engTasks.find(t => t.id === taskId);
+        if (task) {
+            setSelectedTask(task);
+            setIsModalOpen(true);
+        }
+    }, [engTasks]);
 
     // Filters
     const [severityFilter, setSeverityFilter] = useState('all');
@@ -248,6 +265,18 @@ export default function AuditFindings() {
                 findings={filteredFindings}
                 emptyMessage={auditResult ? 'No se encontraron hallazgos con los filtros seleccionados' : 'Ejecuta una auditoría para ver hallazgos'}
                 maxItems={100}
+                onOpenTask={handleOpenTask}
+            />
+
+            {/* Task Detail Modal */}
+            <TaskDetailModal
+                isOpen={isModalOpen}
+                onClose={closeModal}
+                task={selectedTask}
+                projects={engProjects}
+                teamMembers={teamMembers}
+                subtasks={selectedTask ? engSubtasks.filter(s => s.taskId === selectedTask.id) : []}
+                taskTypes={taskTypes}
             />
 
             {/* Data Snapshot Footer */}

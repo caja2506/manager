@@ -108,7 +108,7 @@ export default function ManualActionPanel({ routines = [], teamMembers = [], onE
                         <option value="">Seleccionar usuario...</option>
                         {linkedUsers.map(m => (
                             <option key={m.id || m.uid} value={m.id || m.uid}>
-                                {m.name || m.email} {m.operationalRole ? `(${m.operationalRole})` : ''}
+                                {m.displayName || m.name || m.email} {m.operationalRole ? `(${m.operationalRole})` : ''}
                             </option>
                         ))}
                         {linkedUsers.length === 0 && (

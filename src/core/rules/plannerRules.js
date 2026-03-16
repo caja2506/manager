@@ -24,6 +24,7 @@ import { AUDIT_FINDING_SEVERITY } from '../../models/schemas';
 export function evaluateUserOverCapacity(userId, plannerSlots, userProfile) {
     const capacity = userProfile?.weeklyCapacityHours || 40;
     const totalPlanned = plannerSlots.reduce((sum, slot) => sum + (slot.plannedHours || 0), 0);
+    const userName = userProfile?.displayName || userProfile?.name || userId;
 
     if (totalPlanned > capacity) {
         const excessHours = (totalPlanned - capacity).toFixed(1);
@@ -34,11 +35,11 @@ export function evaluateUserOverCapacity(userId, plannerSlots, userProfile) {
             severity: totalPlanned > capacity * 1.3
                 ? AUDIT_FINDING_SEVERITY.CRITICAL
                 : AUDIT_FINDING_SEVERITY.WARNING,
-            title: 'Usuario sobrecargado',
+            title: `Usuario sobrecargado — ${userName}`,
             message: `Capacidad semanal excedida por ${excessHours}h (planificado: ${totalPlanned.toFixed(1)}h, capacidad: ${capacity}h)`,
             recommendedAction: 'Redistribuir carga o priorizar tareas',
             scoreImpact: -10,
-            metadata: { totalPlanned, capacity, excessHours: Number(excessHours) },
+            metadata: { totalPlanned, capacity, excessHours: Number(excessHours), userName },
         };
     }
     return null;
@@ -52,6 +53,7 @@ export function evaluateUserUnderutilized(userId, plannerSlots, userProfile) {
     const capacity = userProfile?.weeklyCapacityHours || 40;
     const totalPlanned = plannerSlots.reduce((sum, slot) => sum + (slot.plannedHours || 0), 0);
     const threshold = capacity * 0.6;
+    const userName = userProfile?.displayName || userProfile?.name || userId;
 
     if (totalPlanned < threshold && totalPlanned > 0) {
         const utilizationPct = ((totalPlanned / capacity) * 100).toFixed(0);
@@ -60,11 +62,11 @@ export function evaluateUserUnderutilized(userId, plannerSlots, userProfile) {
             entityType: 'user',
             entityId: userId,
             severity: AUDIT_FINDING_SEVERITY.INFO,
-            title: 'Usuario subutilizado',
+            title: `Usuario subutilizado — ${userName}`,
             message: `Utilización semanal al ${utilizationPct}% (planificado: ${totalPlanned.toFixed(1)}h de ${capacity}h)`,
             recommendedAction: 'Asignar más tareas o revisar la planificación',
             scoreImpact: -3,
-            metadata: { totalPlanned, capacity, utilizationPct: Number(utilizationPct) },
+            metadata: { totalPlanned, capacity, utilizationPct: Number(utilizationPct), userName },
         };
     }
     return null;
@@ -101,8 +103,9 @@ export function evaluateCriticalTaskNotPlanned(task, plannerSlots) {
  * PLANNER_INCOMPLETE_WEEK
  * User has fewer than 3 days with planned work in the current week.
  */
-export function evaluatePlannerIncompleteWeek(userId, plannerSlots) {
-    if (plannerSlots.length === 0) return null; // No data = no warning
+export function evaluatePlannerIncompleteWeek(userId, plannerSlots, userProfile) {
+    if (plannerSlots.length === 0) return null;
+    const userName = userProfile?.displayName || userProfile?.name || userId;
 
     const uniqueDays = new Set(plannerSlots.map(slot => slot.date || slot.dayOfWeek));
 
@@ -112,11 +115,11 @@ export function evaluatePlannerIncompleteWeek(userId, plannerSlots) {
             entityType: 'user',
             entityId: userId,
             severity: AUDIT_FINDING_SEVERITY.INFO,
-            title: 'Planner incompleto',
+            title: `Planner incompleto — ${userName}`,
             message: `Solo ${uniqueDays.size} día(s) con trabajo planificado esta semana`,
             recommendedAction: 'Completar la planificación semanal (mínimo 3 días)',
             scoreImpact: -3,
-            metadata: { daysPlanned: uniqueDays.size },
+            metadata: { daysPlanned: uniqueDays.size, userName },
         };
     }
     return null;
