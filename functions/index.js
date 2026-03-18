@@ -1513,49 +1513,100 @@ exports.onDelayCreated = onDocumentCreated(
 );
 
 // ============================================================
-// QUICK REPORT MINI APP — API Endpoints
+// QUICK REPORT MINI APP — API Endpoints (onRequest + CORS)
 // ============================================================
 
 /**
- * getQuickReportData — called by Telegram Mini App to load tasks + subtasks.
+ * quickReportApi — HTTP endpoint for the Telegram Mini App.
+ * Handles GET (load tasks) and POST (submit report).
+ * Uses onRequest instead of onCall because the Mini App is standalone HTML
+ * without the Firebase JS SDK.
  */
-exports.getQuickReportData = onCall(
-    { timeoutSeconds: 30 },
-    async (request) => {
-        const { chatId } = request.data;
-        if (!chatId) {
-            throw new HttpsError("invalid-argument", "chatId is required.");
+exports.quickReportApi = onRequest(
+    {
+        cors: true,
+        timeoutSeconds: 30,
+    },
+    async (req, res) => {
+        // CORS preflight
+        res.set("Access-Control-Allow-Origin", "*");
+        res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        res.set("Access-Control-Allow-Headers", "Content-Type");
+
+        if (req.method === "OPTIONS") {
+            res.status(204).send("");
+            return;
         }
 
-        const { getQuickReportData } = require("./handlers/quickReportHandler");
-        const result = await getQuickReportData(adminDb, chatId);
+        const { getQuickReportData, submitQuickReport } = require("./handlers/quickReportHandler");
 
-        if (result.error) {
-            throw new HttpsError("not-found", result.error);
+        try {
+            if (req.method === "GET") {
+                // GET /quickReportApi?chatId=123
+                const chatId = req.query.chatId;
+                if (!chatId) {
+                    res.status(400).json({ error: "chatId is required" });
+                    return;
+                }
+                const result = await getQuickReportData(adminDb, chatId);
+                res.status(200).json(result);
+                return;
+            }
+
+            if (req.method === "POST") {
+                // POST /quickReportApi  body: { chatId, tasks, note }
+                const reportData = req.body;
+                if (!reportData || !reportData.chatId) {
+                    res.status(400).json({ error: "chatId is required in body" });
+                    return;
+                }
+                const result = await submitQuickReport(adminDb, reportData);
+                res.status(200).json(result);
+                return;
+            }
+
+            res.status(405).json({ error: "Method not allowed" });
+        } catch (err) {
+            console.error("[quickReportApi] Error:", err);
+            res.status(500).json({ error: err.message || "Internal error" });
         }
-
-        return result;
     }
 );
 
 /**
- * submitQuickReport — called by Telegram Mini App to save progress report.
+ * setupQuickReportMenuButton — one-time setup to register the web_app
+ * URL as the bot's menu button via Telegram Bot API.
  */
-exports.submitQuickReport = onCall(
-    { timeoutSeconds: 30 },
-    async (request) => {
-        const reportData = request.data;
-        if (!reportData || !reportData.chatId) {
-            throw new HttpsError("invalid-argument", "Report data with chatId is required.");
+exports.setupQuickReportMenuButton = onRequest(
+    {
+        secrets: [telegramBotToken],
+        cors: false,
+    },
+    async (req, res) => {
+        const token = telegramBotToken.value().trim();
+        const WEBAPP_URL = "https://bom-ame-cr.web.app/tg-report";
+
+        try {
+            // Set the default menu button for all users
+            const response = await fetch(
+                `https://api.telegram.org/bot${token}/setChatMenuButton`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        menu_button: {
+                            type: "web_app",
+                            text: "⚡ Quick Report",
+                            web_app: { url: WEBAPP_URL },
+                        },
+                    }),
+                }
+            );
+            const data = await response.json();
+            res.status(200).json({ ok: data.ok, result: data.result, description: data.description });
+        } catch (err) {
+            console.error("[setupMenuButton] Error:", err);
+            res.status(500).json({ error: err.message });
         }
-
-        const { submitQuickReport } = require("./handlers/quickReportHandler");
-        const result = await submitQuickReport(adminDb, reportData);
-
-        if (!result.success) {
-            throw new HttpsError("internal", result.error || "Failed to submit report");
-        }
-
-        return result;
     }
 );

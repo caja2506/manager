@@ -509,23 +509,30 @@
             loadTasks();
         });
 
-        async function callFunction(name, data) {
-            const res = await fetch(`${FUNCTIONS_BASE}/${name}`, {
+        // Unified API endpoint (onRequest with CORS)
+        const API_URL = `${FUNCTIONS_BASE}/quickReportApi`;
+
+        async function apiGet(chatId) {
+            const res = await fetch(`${API_URL}?chatId=${encodeURIComponent(chatId)}`);
+            const json = await res.json();
+            if (json.error) throw new Error(json.error);
+            return json;
+        }
+
+        async function apiPost(data) {
+            const res = await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ data }),
+                body: JSON.stringify(data),
             });
             const json = await res.json();
-            if (json.error) {
-                const msg = json.error?.message || json.error?.status || JSON.stringify(json.error);
-                throw new Error(msg);
-            }
-            return json.result;
+            if (json.error) throw new Error(json.error);
+            return json;
         }
 
         async function loadTasks() {
             try {
-                const result = await callFunction('getQuickReportData', { chatId: String(chatId) });
+                const result = await apiGet(String(chatId));
 
                 document.getElementById('loadingView').style.display = 'none';
                 document.getElementById('userName').textContent = result.userName || '';
@@ -715,7 +722,7 @@
                     note: document.getElementById('globalNote').value || '',
                 };
 
-                const result = await callFunction('submitQuickReport', payload);
+                const result = await apiPost(payload);
 
                 // Show success
                 document.getElementById('tasksContainer').style.display = 'none';
