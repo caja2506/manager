@@ -449,17 +449,6 @@
 
         // ── Init ──
         document.addEventListener('DOMContentLoaded', () => {
-            if (tg) {
-                tg.ready();
-                tg.expand();
-                chatId = tg.initDataUnsafe?.user?.id || null;
-                
-                // Apply Telegram theme
-                if (tg.themeParams?.bg_color) {
-                    document.documentElement.style.setProperty('--bg', tg.themeParams.bg_color);
-                }
-            }
-
             // Set date
             const now = new Date();
             const days = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
@@ -467,14 +456,53 @@
             document.getElementById('dateStr').textContent = 
                 `${days[now.getDay()]}, ${now.getDate()} de ${months[now.getMonth()]} ${now.getFullYear()}`;
 
-            // For testing outside Telegram
+            if (tg) {
+                tg.ready();
+                tg.expand();
+
+                // Try multiple methods to get user ID
+                chatId = tg.initDataUnsafe?.user?.id || null;
+
+                // Fallback: parse initData manually
+                if (!chatId && tg.initData) {
+                    try {
+                        const params = new URLSearchParams(tg.initData);
+                        const userStr = params.get('user');
+                        if (userStr) {
+                            const userData = JSON.parse(userStr);
+                            chatId = userData.id || null;
+                        }
+                    } catch (e) {
+                        console.warn('Could not parse initData:', e);
+                    }
+                }
+
+                // Fallback: start_param (we can pass chatId as start param)
+                if (!chatId && tg.initDataUnsafe?.start_param) {
+                    chatId = tg.initDataUnsafe.start_param;
+                }
+
+                // Apply Telegram theme
+                if (tg.themeParams?.bg_color) {
+                    document.documentElement.style.setProperty('--bg', tg.themeParams.bg_color);
+                }
+            }
+
+            // Fallback: URL params (for browser testing)
             if (!chatId) {
                 const params = new URLSearchParams(window.location.search);
                 chatId = params.get('chatId') || params.get('uid');
             }
 
             if (!chatId) {
-                showError('No se pudo identificar tu cuenta de Telegram. Abre este enlace desde el bot.');
+                // Show debug info to help diagnose
+                let debugInfo = 'Telegram WebApp: ' + (tg ? 'Loaded' : 'Not available') + '\n';
+                if (tg) {
+                    debugInfo += 'initData: ' + (tg.initData ? tg.initData.substring(0, 100) + '...' : 'EMPTY') + '\n';
+                    debugInfo += 'initDataUnsafe: ' + JSON.stringify(tg.initDataUnsafe || {}) + '\n';
+                    debugInfo += 'version: ' + (tg.version || 'unknown');
+                }
+                showError('No se pudo identificar tu cuenta.\n\n' + debugInfo);
                 return;
             }
 
@@ -488,7 +516,10 @@
                 body: JSON.stringify({ data }),
             });
             const json = await res.json();
-            if (json.error) throw new Error(json.error.message || json.error);
+            if (json.error) {
+                const msg = json.error?.message || json.error?.status || JSON.stringify(json.error);
+                throw new Error(msg);
+            }
             return json.result;
         }
 
