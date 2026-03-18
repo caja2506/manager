@@ -1511,3 +1511,51 @@ exports.onDelayCreated = onDocumentCreated(
         }
     }
 );
+
+// ============================================================
+// QUICK REPORT MINI APP — API Endpoints
+// ============================================================
+
+/**
+ * getQuickReportData — called by Telegram Mini App to load tasks + subtasks.
+ */
+exports.getQuickReportData = onCall(
+    { timeoutSeconds: 30 },
+    async (request) => {
+        const { chatId } = request.data;
+        if (!chatId) {
+            throw new HttpsError("invalid-argument", "chatId is required.");
+        }
+
+        const { getQuickReportData } = require("./handlers/quickReportHandler");
+        const result = await getQuickReportData(adminDb, chatId);
+
+        if (result.error) {
+            throw new HttpsError("not-found", result.error);
+        }
+
+        return result;
+    }
+);
+
+/**
+ * submitQuickReport — called by Telegram Mini App to save progress report.
+ */
+exports.submitQuickReport = onCall(
+    { timeoutSeconds: 30 },
+    async (request) => {
+        const reportData = request.data;
+        if (!reportData || !reportData.chatId) {
+            throw new HttpsError("invalid-argument", "Report data with chatId is required.");
+        }
+
+        const { submitQuickReport } = require("./handlers/quickReportHandler");
+        const result = await submitQuickReport(adminDb, reportData);
+
+        if (!result.success) {
+            throw new HttpsError("internal", result.error || "Failed to submit report");
+        }
+
+        return result;
+    }
+);

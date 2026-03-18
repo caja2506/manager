@@ -97,7 +97,29 @@ async function execute(adminDb, token, targets, context) {
         return fallbackBriefing(target.operationalRole, data);
     };
 
-    return sendToTargets(adminDb, token, targets, messageBuilder, context);
+    const result = await sendToTargets(adminDb, token, targets, messageBuilder, context);
+
+    // ── Send Quick Report button to technicians (follow-up message) ──
+    if (!context.dryRun) {
+        const { sendMessageWithKeyboard } = require("../telegram/telegramClient");
+        const WEBAPP_URL = "https://bom-ame-cr.web.app/tg-report";
+
+        for (const target of targets) {
+            if (target.operationalRole !== OPERATIONAL_ROLES.TECHNICIAN) continue;
+            if (!target.chatId) continue;
+
+            try {
+                await sendMessageWithKeyboard(token, target.chatId,
+                    "⚡ Reporta tu avance rápidamente:",
+                    [[{ text: "📝 Quick Report", web_app: { url: WEBAPP_URL } }]]
+                );
+            } catch (err) {
+                console.warn(`[morningDigest] Quick Report button failed for ${target.name}:`, err.message);
+            }
+        }
+    }
+
+    return result;
 }
 
 module.exports = { execute };
