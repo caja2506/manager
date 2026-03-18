@@ -139,10 +139,12 @@ async function getWebhookInfo(token) {
 /**
  * Persistent reply keyboard for main menu.
  */
+const WEBAPP_URL = "https://bom-ame-cr.web.app/tg-report";
+
 const MAIN_MENU_KEYBOARD = {
     keyboard: [
-        [{ text: "📝 Reportar" }, { text: "📊 Status" }],
-        [{ text: "❓ Ayuda" }, { text: "🔄 Reiniciar" }],
+        [{ text: "⚡ Quick Report", web_app: { url: WEBAPP_URL } }, { text: "📝 Reportar" }],
+        [{ text: "📊 Status" }, { text: "❓ Ayuda" }],
     ],
     resize_keyboard: true,
     one_time_keyboard: false,
