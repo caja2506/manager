@@ -73,6 +73,7 @@ async function routeInboundMessage(adminDb, token, chatId, text, rawMessage, ext
             "📊 Status": "/status",
             "❓ Ayuda": "/help",
             "🔄 Reiniciar": "/reset",
+            "⚡ Quick Report": "/quickreport",
         };
         const mappedText = buttonMap[text.trim()] || text;
 
@@ -279,6 +280,17 @@ async function handleCommand(adminDb, token, chatId, userId, cmd, session) {
                 console.error("[router] /link error:", err);
                 await sendMessage(token, chatId, "❌ Error al vincular. Intenta de nuevo o contacta al administrador.");
             }
+            break;
+        }
+
+        case "quickreport": {
+            // Send inline button with URL containing chatId
+            const WEBAPP_URL = "https://bom-ame-cr.web.app/tg-report";
+            const reportUrl = `${WEBAPP_URL}?chatId=${chatId}`;
+            await sendMessageWithKeyboard(token, chatId,
+                "⚡ <b>Quick Report</b>\n\nToca el botón para reportar tu avance:",
+                [[{ text: "📝 Abrir Quick Report", url: reportUrl }]]
+            );
             break;
         }
 
