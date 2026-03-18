@@ -284,12 +284,12 @@ async function handleCommand(adminDb, token, chatId, userId, cmd, session) {
         }
 
         case "quickreport": {
-            // Send inline button with URL containing chatId
+            // Send inline button that opens as Mini App inside Telegram
             const WEBAPP_URL = "https://bom-ame-cr.web.app/tg-report";
             const reportUrl = `${WEBAPP_URL}?chatId=${chatId}`;
             await sendMessageWithKeyboard(token, chatId,
                 "⚡ <b>Quick Report</b>\n\nToca el botón para reportar tu avance:",
-                [[{ text: "📝 Abrir Quick Report", url: reportUrl }]]
+                [[{ text: "📝 Abrir Quick Report", web_app: { url: reportUrl } }]]
             );
             break;
         }
