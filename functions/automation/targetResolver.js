@@ -9,6 +9,16 @@ const paths = require("./firestorePaths");
 const { OPERATIONAL_ROLES } = require("./constants");
 
 /**
+ * V5 (O3): Resolve the team role from user data.
+ * Reads `teamRole` (V5 standard) first, falls back to `operationalRole` (legacy).
+ * @param {Object} userData - Firestore user document data
+ * @returns {string|null}
+ */
+function resolveTeamRole(userData) {
+    return userData.teamRole || userData.operationalRole || null;
+}
+
+/**
  * Resolve targets by operational role(s).
  * Returns users who:
  *  - have isAutomationParticipant === true
@@ -30,7 +40,8 @@ async function resolveTargetsByRole(adminDb, roles, channel = "telegram") {
     for (const doc of usersSnap.docs) {
         const u = doc.data();
         if (u.active === false) continue;
-        if (!roles.includes(u.operationalRole)) continue;
+        const role = resolveTeamRole(u); // V5 (O3)
+        if (!roles.includes(role)) continue;
 
         const chatId = u.providerLinks?.[channel]?.chatId || u.telegramChatId;
         if (!chatId) continue;
@@ -39,7 +50,8 @@ async function resolveTargetsByRole(adminDb, roles, channel = "telegram") {
             uid: doc.id,
             name: u.displayName || u.name || u.email || doc.id,
             email: u.email || "",
-            operationalRole: u.operationalRole,
+            teamRole: role,                   // V5 name
+            operationalRole: role,            // backward compat alias
             chatId: String(chatId),
             reportsTo: u.reportsTo || null,
         });
@@ -62,7 +74,8 @@ async function resolveTargetById(adminDb, userId, channel = "telegram") {
         uid: doc.id,
         name: u.displayName || u.name || u.email || doc.id,
         email: u.email || "",
-        operationalRole: u.operationalRole || null,
+        teamRole: resolveTeamRole(u),          // V5 name
+        operationalRole: resolveTeamRole(u),   // backward compat alias
         chatId: String(chatId),
         reportsTo: u.reportsTo || null,
     };
@@ -87,7 +100,8 @@ async function resolveAllParticipants(adminDb, channel = "telegram") {
             uid: doc.id,
             name: u.displayName || u.name || u.email || doc.id,
             email: u.email || "",
-            operationalRole: u.operationalRole || null,
+            teamRole: resolveTeamRole(u),          // V5 name
+            operationalRole: resolveTeamRole(u),   // backward compat alias
             chatId: String(chatId),
             reportsTo: u.reportsTo || null,
         });
@@ -116,7 +130,7 @@ async function resolveSupervisor(adminDb, userId, channel = "telegram") {
         [OPERATIONAL_ROLES.ENGINEER]: OPERATIONAL_ROLES.TEAM_LEAD,
         [OPERATIONAL_ROLES.TEAM_LEAD]: OPERATIONAL_ROLES.MANAGER,
     };
-    const targetRole = roleChain[user.operationalRole];
+    const targetRole = roleChain[resolveTeamRole(user)]; // V5 (O3)
     if (!targetRole) return null;
 
     const supervisors = await resolveTargetsByRole(adminDb, [targetRole], channel);

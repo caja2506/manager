@@ -1,9 +1,14 @@
 /**
- * Firestore Collection Schemas
- * ============================
+ * Firestore Collection Schemas — V5 Foundation
+ * =============================================
  * 
  * This file defines the data model for all Firestore collections
  * used by the Engineering Management Platform.
+ * 
+ * V5 ENTITY CONTRACT:
+ * Every new entity MUST include: createdAt, createdBy, updatedAt, updatedBy.
+ * Timestamps are always ISO-8601 strings.
+ * References are string IDs with pattern {entityName}Id.
  * 
  * Each schema exports:
  * - COLLECTION_NAME: string constant for the collection path
@@ -20,50 +25,77 @@
 // ============================================================
 
 export const COLLECTIONS = {
-    // --- Existing Collections (preserved) ---
-    USERS_ROLES: 'users_roles',
-    PROYECTOS_BOM: 'proyectos_bom',
-    CATALOGO_MAESTRO: 'catalogo_maestro',
-    ITEMS_BOM: 'items_bom',
-    MARCAS: 'marcas',
-    CATEGORIAS: 'categorias',
-    PROVEEDORES: 'proveedores',
+    // ── BOM Module (@classification: core, legacy naming preserved) ──
+    USERS_ROLES: 'users_roles',         // @deprecated @transitional — freeze after M8
+    PROYECTOS_BOM: 'proyectos_bom',     // @classification: core
+    CATALOGO_MAESTRO: 'catalogo_maestro', // @classification: core
+    ITEMS_BOM: 'items_bom',             // @classification: core
+    MARCAS: 'marcas',                   // @classification: core
+    CATEGORIAS: 'categorias',           // @classification: core
+    PROVEEDORES: 'proveedores',         // @classification: core
 
-    // --- New Collections (Phase 2+) ---
-    USERS: 'users',
-    PROJECTS: 'projects',
-    TASKS: 'tasks',
-    SUBTASKS: 'subtasks',
-    TIME_LOGS: 'timeLogs',
-    DELAY_CAUSES: 'delayCauses',
-    DELAYS: 'delays',
-    RISKS: 'risks',
-    DAILY_REPORTS: 'dailyReports',
-    NOTIFICATIONS: 'notifications',
-    TASK_TYPES: 'taskTypes',
-    SETTINGS: 'settings',
-    // AUDIT_LOGS: deprecated — use AUDIT_EVENTS instead
-    WEEKLY_PLAN_ITEMS: 'weeklyPlanItems',
-    TASK_DEPENDENCIES: 'taskDependencies',
-    TASK_TYPE_CATEGORIES: 'taskTypeCategories',
+    // ── Core Engineering Data (@classification: core) ──
+    USERS: 'users',                     // @classification: core — SINGLE user SoT
+    PROJECTS: 'projects',               // @classification: core
+    TASKS: 'tasks',                     // @classification: core
+    SUBTASKS: 'subtasks',               // @classification: core
+    TIME_LOGS: 'timeLogs',              // @classification: core
+    DELAY_CAUSES: 'delayCauses',        // @classification: core (catalog)
+    DELAYS: 'delays',                   // @classification: core
+    RISKS: 'risks',                     // @classification: core
+    DAILY_REPORTS: 'dailyReports',      // @classification: core
+    NOTIFICATIONS: 'notifications',     // @classification: core
+    TASK_TYPES: 'taskTypes',            // @classification: core (catalog)
+    WORK_AREA_TYPES: 'workAreaTypes',   // @classification: core (catalog) — global catalog of work area names
+    MILESTONE_TYPES: 'milestoneTypes',   // @classification: core (catalog) — dynamic milestone types
+    SETTINGS: 'settings',              // @classification: config
+    WEEKLY_PLAN_ITEMS: 'weeklyPlanItems', // @classification: core (snapshot fields @transitional)
+    TASK_DEPENDENCIES: 'taskDependencies', // @classification: core
+    TASK_TYPE_CATEGORIES: 'taskTypeCategories', // @classification: core (catalog)
 
-    // --- Management Intelligence Collections (Phase 2+) ---
-    AUDIT_FINDINGS: 'auditFindings',
-    AUDIT_EVENTS: 'auditEvents',
-    ANALYTICS_SNAPSHOTS: 'analyticsSnapshots',
-    AI_INSIGHTS: 'aiInsights',
-    MANAGEMENT_BRIEFS: 'managementBriefs',
+    // ── Management Intelligence (@classification: derived) ──
+    AUDIT_FINDINGS: 'auditFindings',    // @classification: derived
+    AUDIT_EVENTS: 'auditEvents',        // @classification: derived — migrate to AUDIT_TRAIL
+    AUDIT_LOGS: 'auditLogs',            // @deprecated — alias for AUDIT_EVENTS
+    ANALYTICS_SNAPSHOTS: 'analyticsSnapshots', // @classification: derived
+    AI_INSIGHTS: 'aiInsights',          // @classification: derived
+    MANAGEMENT_BRIEFS: 'managementBriefs', // @classification: derived
 
-    // --- Automation Operations & Accountability Foundation ---
-    AUTOMATION_ROUTINES: 'automationRoutines',
-    AUTOMATION_RUNS: 'automationRuns',
-    AUTOMATION_METRICS_DAILY: 'automationMetricsDaily',
-    OPERATION_INCIDENTS: 'operationIncidents',
-    TELEGRAM_SESSIONS: 'telegramSessions',
-    TELEGRAM_REPORTS: 'telegramReports',
-    TELEGRAM_ESCALATIONS: 'telegramEscalations',
-    TELEGRAM_BOT_LOGS: 'telegramBotLogs',
-    TELEGRAM_DELIVERIES: 'telegramDeliveries',
+    // ── Automation Operations (@classification: core) ──
+    AUTOMATION_ROUTINES: 'automationRoutines', // @classification: config
+    AUTOMATION_RUNS: 'automationRuns',         // @classification: log
+    AUTOMATION_METRICS_DAILY: 'automationMetricsDaily', // @classification: derived
+    OPERATION_INCIDENTS: 'operationIncidents', // @classification: log
+    TELEGRAM_SESSIONS: 'telegramSessions',     // @classification: core
+    TELEGRAM_REPORTS: 'telegramReports',       // @classification: log
+    TELEGRAM_ESCALATIONS: 'telegramEscalations', // @classification: log
+    TELEGRAM_BOT_LOGS: 'telegramBotLogs',      // @classification: log
+    TELEGRAM_DELIVERIES: 'telegramDeliveries', // @classification: log
+    TELEGRAM_LINK_CODES: 'telegramLinkCodes',  // @classification: transitional
+
+    // ── Analytics Engine (@classification: derived) ──
+    OPERATIONAL_KPI_SNAPSHOTS: 'operationalKpiSnapshots', // @classification: derived
+    USER_OPERATIONAL_SCORES: 'userOperationalScores',     // @classification: derived
+    ROUTINE_OPERATIONAL_SCORES: 'routineOperationalScores', // @classification: derived
+    TEAM_OPERATIONAL_SUMMARIES: 'teamOperationalSummaries', // @classification: derived
+    OPERATIONAL_RISK_FLAGS: 'operationalRiskFlags',       // @classification: derived
+    OPERATIONAL_RECOMMENDATIONS: 'operationalRecommendations', // @classification: derived
+    ANALYTICS_REFRESH_LOGS: 'analyticsRefreshLogs',       // @classification: log
+    AI_EXECUTIONS: 'aiExecutions',                        // @classification: log
+
+    // ── Optimization Engine (@classification: derived) ──
+    OPTIMIZATION_OPPORTUNITIES: 'optimizationOpportunities', // @classification: derived
+    OPTIMIZATION_SIMULATIONS: 'optimizationSimulations',     // @classification: log
+    OPERATIONAL_PLANS: 'operationalPlans',                   // @classification: derived
+    APPLIED_RECOMMENDATIONS: 'appliedRecommendations',       // @classification: log
+    OPTIMIZATION_HISTORY: 'optimizationHistory',             // @classification: log
+
+    // ── V5 Foundation (@classification: core) ──
+    MILESTONES: 'milestones',           // @classification: core
+    WORK_AREAS: 'workAreas',            // @classification: core
+    AUDIT_TRAIL: 'auditTrail',          // @classification: core (append-only, immutable)
+    AI_GOVERNANCE: 'aiGovernance',      // @classification: config
+    SCORE_SNAPSHOTS: 'scoreSnapshots',  // @classification: derived (V5: score history)
 };
 
 
@@ -330,55 +362,288 @@ export const AI_INSIGHT_TYPE = {
     WEEKLY_SUMMARY: 'weekly_summary',
 };
 
+// ── V5 Foundation Enums ──
+
+/**
+ * Milestone statuses
+ */
+export const MILESTONE_STATUS = {
+    PLANNING: 'planning',
+    ACTIVE: 'active',
+    COMPLETED: 'completed',
+    ON_HOLD: 'on_hold',
+};
+
+/**
+ * Milestone types
+ */
+export const MILESTONE_TYPE = {
+    SETUP: 'setup',
+    COMMISSIONING: 'commissioning',
+    VALIDATION: 'validation',
+    CUSTOM: 'custom',
+};
+
+/**
+ * Traffic light values + score locks (anti-false-greens)
+ */
+export const TRAFFIC_LIGHT = {
+    GREEN: 'green',
+    YELLOW: 'yellow',
+    RED: 'red',
+};
+
+/**
+ * Score lock reasons — conditions that override computed traffic light
+ */
+export const SCORE_LOCK_REASON = {
+    CRITICAL_OVERDUE: 'critical_task_overdue_3d',        // → Lock RED
+    UNRESOLVED_BLOCKER_48H: 'unresolved_blocker_48h',    // → Lock YELLOW min
+    STALE_AREA_5D: 'stale_area_no_update_5d',            // → Lock YELLOW min
+    UNOWNED_CRITICAL: 'unowned_critical_tasks',          // → Lock RED
+};
+
+/**
+ * Audit trail event types (V5)
+ */
+export const AUDIT_TRAIL_EVENT_TYPE = {
+    TASK_TRANSITION: 'task_transition',
+    ENTITY_CHANGE: 'entity_change',
+    OVERRIDE: 'override',
+    AI_ACTION: 'ai_action',
+    ADMIN_ACTION: 'admin_action',
+};
+
+export const AUDIT_TRAIL_ACTOR_TYPE = {
+    USER: 'user',
+    SYSTEM: 'system',
+    AI: 'ai',
+    AUTOMATION: 'automation',
+};
+
+/**
+ * AI Governance capability types
+ */
+export const AI_GOVERNANCE_TYPE = {
+    RECOMMENDER: 'recommender',
+    EXECUTOR_CONTROLLED: 'executor_controlled',
+    EXECUTOR_AUTONOMOUS: 'executor_autonomous',
+};
+
+// ── Phase 2E: Catalog Enums ──
+
+/**
+ * Work area types — configurable per project
+ */
+export const WORK_AREA_TYPE = {
+    ENGINEERING: 'engineering',
+    PROCUREMENT: 'procurement',
+    COMMISSIONING: 'commissioning',
+    DOCUMENTATION: 'documentation',
+    QUALITY: 'quality',
+    CUSTOM: 'custom',
+};
+
+export const WORK_AREA_TYPE_CONFIG = {
+    [WORK_AREA_TYPE.ENGINEERING]: { label: 'Ingeniería', icon: 'Wrench', color: '#3b82f6' },
+    [WORK_AREA_TYPE.PROCUREMENT]: { label: 'Procura', icon: 'ShoppingCart', color: '#f59e0b' },
+    [WORK_AREA_TYPE.COMMISSIONING]: { label: 'Comisionamiento', icon: 'Zap', color: '#ef4444' },
+    [WORK_AREA_TYPE.DOCUMENTATION]: { label: 'Documentación', icon: 'FileText', color: '#8b5cf6' },
+    [WORK_AREA_TYPE.QUALITY]: { label: 'Calidad', icon: 'Shield', color: '#22c55e' },
+    [WORK_AREA_TYPE.CUSTOM]: { label: 'Personalizada', icon: 'Settings', color: '#6b7280' },
+};
+
+/**
+ * Override reason types — required when manually overriding traffic lights
+ */
+export const OVERRIDE_REASON_TYPE = {
+    MANAGEMENT_DECISION: 'management_decision',
+    EXTERNAL_DEPENDENCY: 'external_dependency',
+    CLIENT_CHANGE: 'client_change',
+    EMERGENCY: 'emergency',
+    AWAITING_INFO: 'awaiting_info',
+    OTHER: 'other',
+};
+
+export const OVERRIDE_REASON_TYPE_CONFIG = {
+    [OVERRIDE_REASON_TYPE.MANAGEMENT_DECISION]: { label: 'Decisión gerencial' },
+    [OVERRIDE_REASON_TYPE.EXTERNAL_DEPENDENCY]: { label: 'Dependencia externa' },
+    [OVERRIDE_REASON_TYPE.CLIENT_CHANGE]: { label: 'Cambio del cliente' },
+    [OVERRIDE_REASON_TYPE.EMERGENCY]: { label: 'Emergencia' },
+    [OVERRIDE_REASON_TYPE.AWAITING_INFO]: { label: 'En espera de información' },
+    [OVERRIDE_REASON_TYPE.OTHER]: { label: 'Otro' },
+};
+
+/**
+ * Delay cause types — structured categories for delays
+ */
+export const DELAY_CAUSE_TYPE = {
+    RESOURCE: 'resource',
+    TECHNICAL: 'technical',
+    EXTERNAL: 'external',
+    PLANNING: 'planning',
+    APPROVAL: 'approval',
+    SUPPLIER: 'supplier',
+    OTHER: 'other',
+};
+
+export const DELAY_CAUSE_TYPE_CONFIG = {
+    [DELAY_CAUSE_TYPE.RESOURCE]: { label: 'Recurso', icon: 'Users', color: '#3b82f6' },
+    [DELAY_CAUSE_TYPE.TECHNICAL]: { label: 'Técnico', icon: 'Wrench', color: '#f59e0b' },
+    [DELAY_CAUSE_TYPE.EXTERNAL]: { label: 'Externo', icon: 'Globe', color: '#ef4444' },
+    [DELAY_CAUSE_TYPE.PLANNING]: { label: 'Planificación', icon: 'Calendar', color: '#8b5cf6' },
+    [DELAY_CAUSE_TYPE.APPROVAL]: { label: 'Aprobación', icon: 'CheckCircle', color: '#22c55e' },
+    [DELAY_CAUSE_TYPE.SUPPLIER]: { label: 'Proveedor', icon: 'Truck', color: '#6366f1' },
+    [DELAY_CAUSE_TYPE.OTHER]: { label: 'Otro', icon: 'HelpCircle', color: '#6b7280' },
+};
+
+/**
+ * Risk types — structured risk categories
+ */
+export const RISK_TYPE = {
+    SCHEDULE: 'schedule',
+    RESOURCE: 'resource',
+    TECHNICAL: 'technical',
+    EXTERNAL: 'external',
+    QUALITY: 'quality',
+    SCOPE: 'scope',
+};
+
+export const RISK_TYPE_CONFIG = {
+    [RISK_TYPE.SCHEDULE]: { label: 'Cronograma', color: '#ef4444' },
+    [RISK_TYPE.RESOURCE]: { label: 'Recurso', color: '#f59e0b' },
+    [RISK_TYPE.TECHNICAL]: { label: 'Técnico', color: '#3b82f6' },
+    [RISK_TYPE.EXTERNAL]: { label: 'Externo', color: '#8b5cf6' },
+    [RISK_TYPE.QUALITY]: { label: 'Calidad', color: '#22c55e' },
+    [RISK_TYPE.SCOPE]: { label: 'Alcance', color: '#6366f1' },
+};
+
+/**
+ * AI event types — what kind of AI action was performed
+ */
+export const AI_EVENT_TYPE = {
+    BRIEFING: 'briefing',
+    EXTRACTION: 'extraction',
+    RECOMMENDATION: 'recommendation',
+    ESCALATION_HINT: 'escalation_hint',
+    TRANSCRIPTION: 'transcription',
+    ANALYSIS: 'analysis',
+};
+
+
+// ============================================================
+// LEGACY FIELDS REGISTRY (Phase 2D)
+// ============================================================
+
+/**
+ * Documents every legacy field with its replacement and retirement phase.
+ * Used by migration utilities to verify transition progress.
+ */
+export const LEGACY_FIELDS = {
+    users: [
+        { field: 'operationalRole', replacement: 'teamRole', retirePhase: 'M8' },
+        { field: 'isAutomationParticipant', replacement: 'automation.isParticipant', retirePhase: 'M8' },
+        { field: 'telegramChatId', replacement: 'channels.telegram.chatId', retirePhase: 'M8' },
+        { field: 'name', replacement: 'displayName', retirePhase: 'M8' },
+        { field: 'providerLinks', replacement: 'channels', retirePhase: 'M9' },
+        { field: 'role', replacement: 'rbacRole', retirePhase: 'M8' },
+    ],
+    weeklyPlanItems: [
+        { field: 'taskTitleSnapshot', replacement: 'enrichment via tasks collection', retirePhase: 'M9' },
+        { field: 'projectNameSnapshot', replacement: 'enrichment via projects collection', retirePhase: 'M9' },
+        { field: 'assignedToName', replacement: 'enrichment via users collection', retirePhase: 'M9' },
+        { field: 'statusSnapshot', replacement: 'enrichment via tasks collection', retirePhase: 'M9' },
+        { field: 'colorKey', replacement: 'enrichment via task type config', retirePhase: 'M9' },
+    ],
+    collections: [
+        { field: 'users_roles', replacement: 'users (with rbacRole)', retirePhase: 'M8', action: 'freeze' },
+        { field: 'auditEvents', replacement: 'auditTrail', retirePhase: 'M10', action: 'migrate' },
+        { field: 'auditLogs', replacement: 'auditTrail', retirePhase: 'M10', action: 'migrate' },
+    ],
+};
+
 
 // ============================================================
 // DOCUMENT FACTORY FUNCTIONS
 // ============================================================
 
 /**
- * Users Collection
- * Extended user profiles for the engineering platform.
- * Separate from users_roles to preserve backward compatibility.
+ * Users Collection — V5 SINGLE SOURCE OF TRUTH
+ * =============================================
+ * Consolidated user identity for the entire platform.
+ * `users_roles` is maintained as read-only backup during migration.
+ *
+ * V5 changes:
+ *  - `rbacRole` replaces synced `role` field (source of truth for RBAC)
+ *  - `displayName` replaces inconsistent `name` field
+ *  - `operationalRole` removed (redundant with `teamRole`)
+ *  - `channels` embeds provider connections (Telegram, etc.)
+ *  - `automation` embeds automation settings
  *
  * Document ID: Firebase Auth UID
  */
 export function createUserDocument({
-    name = '',
+    displayName = '',
     email = '',
     photoURL = '',
-    role = RBAC_ROLES.VIEWER,       // RBAC role (admin/editor/viewer) — synced from users_roles
+    // ── Access Control ──
+    rbacRole = RBAC_ROLES.VIEWER,   // V5: Source of truth for RBAC
+    role = RBAC_ROLES.VIEWER,       // @deprecated — kept for backward compat, use rbacRole
     teamRole = null,                // Engineering role (manager/team_lead/engineer/technician)
+    // ── Operational Profile ──
     department = 'Engineering',
-    weeklyCapacityHours = 40,       // Standard weekly hours
+    weeklyCapacityHours = 40,
     active = true,
-    // --- Automation Operations hierarchy fields ---
-    operationalRole = null,         // 'manager' | 'team_lead' | 'engineer' | 'technician'
-    providerLinks = {},             // { telegram: { chatId, username, linkedAt } }
     reportsTo = null,               // UID of direct supervisor
-    isAutomationParticipant = false, // Enrolled in automation flows
-    escalationTargetUserId = null,  // UID of escalation target (override chain)
-    activeShift = null,             // e.g. 'morning' | 'afternoon' | null
-    workSchedule = null,            // e.g. { start: '08:00', end: '17:00' }
+    // ── Channels (embedded) ──
+    channels = {
+        telegram: { chatId: null, linkedAt: null, active: false },
+    },
+    // ── Automation (embedded) ──
+    automation = {
+        isParticipant: false,
+        shift: null,                // 'morning' | 'afternoon' | null
+        schedule: { start: '08:00', end: '17:00' },
+    },
+    // ── V5 Metadata ──
+    createdBy = 'system',
+    // --- @deprecated fields — kept for backward compat ---
+    name = '',                      // @deprecated: use displayName
+    operationalRole = null,         // @deprecated: use teamRole
+    providerLinks = {},             // @deprecated: use channels
+    isAutomationParticipant = false, // @deprecated: use automation.isParticipant
+    escalationTargetUserId = null,  // @deprecated
+    activeShift = null,             // @deprecated: use automation.shift
+    workSchedule = null,            // @deprecated: use automation.schedule
 } = {}) {
+    const now = new Date().toISOString();
     return {
-        name,
+        // V5 canonical fields
+        displayName: displayName || name,
         email,
         photoURL,
-        role,
+        rbacRole,
+        role: rbacRole,             // Backward compat alias
         teamRole,
         department,
         weeklyCapacityHours,
         active,
-        // Automation hierarchy
+        reportsTo,
+        channels,
+        automation,
+        // @deprecated fields (backward compat)
+        name: displayName || name,
         operationalRole,
         providerLinks,
-        reportsTo,
-        isAutomationParticipant,
+        isAutomationParticipant: isAutomationParticipant || automation.isParticipant,
         escalationTargetUserId,
-        activeShift,
-        workSchedule,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        activeShift: activeShift || automation.shift,
+        workSchedule: workSchedule || automation.schedule,
+        // V5 Metadata
+        createdBy,
+        updatedBy: createdBy,
+        createdAt: now,
+        updatedAt: now,
     };
 }
 
@@ -464,6 +729,10 @@ export function createTaskDocument({
     status = TASK_STATUS.BACKLOG,
     priority = TASK_PRIORITY.MEDIUM,
     taskTypeId = null,              // Reference to taskTypes document
+    // ── V5 Milestone/Area linkage ──
+    milestoneId = null,             // Reference to milestones document
+    areaId = null,                  // Reference to workAreas document (AUTO-SET via mapping)
+    countsForScore = false,         // true when milestoneId is set
     assignedBy = null,              // Creator / Assigner of the task
     assignedTo = null,              // Who must complete this task
     estimatedHours = 0,
@@ -492,6 +761,10 @@ export function createTaskDocument({
         status,
         priority,
         taskTypeId,
+        // V5 Milestone/Area
+        milestoneId,
+        areaId,
+        countsForScore: milestoneId ? true : countsForScore,
         assignedBy,
         assignedTo,
         estimatedHours,
@@ -527,13 +800,18 @@ export function createSubtaskDocument({
     title = '',
     completed = false,
     order = 0,
+    createdBy = null,
 } = {}) {
+    const now = new Date().toISOString();
     return {
         taskId,
         title,
         completed,
         order,
-        createdAt: new Date().toISOString(),
+        createdBy,
+        updatedBy: createdBy,
+        createdAt: now,
+        updatedAt: now,
     };
 }
 
@@ -553,7 +831,9 @@ export function createTimeLogDocument({
     overtime = false,               // Manually indicated by user
     overtimeHours = 0,              // Hours classified as overtime
     notes = '',
+    createdBy = null,
 } = {}) {
+    const now = new Date().toISOString();
     return {
         taskId,
         projectId,
@@ -564,7 +844,10 @@ export function createTimeLogDocument({
         overtime,
         overtimeHours,
         notes,
-        createdAt: new Date().toISOString(),
+        createdBy: createdBy || userId,
+        updatedBy: createdBy || userId,
+        createdAt: now,
+        updatedAt: now,
     };
 }
 
@@ -579,13 +862,18 @@ export function createDelayCauseDocument({
     description = '',
     active = true,
     order = 0,
+    createdBy = null,
 } = {}) {
+    const now = new Date().toISOString();
     return {
         name,
         description,
         active,
         order,
-        createdAt: new Date().toISOString(),
+        createdBy,
+        updatedBy: createdBy,
+        createdAt: now,
+        updatedAt: now,
     };
 }
 
@@ -670,13 +958,20 @@ export function createDailyReportDocument({
         delaysReported: 0,
         notesSummary: '',
     },
+    createdBy = 'system',
+    source = 'system',
 } = {}) {
+    const now = new Date().toISOString();
     return {
         date,
         userId,
         userName,
         data,
-        createdAt: new Date().toISOString(),
+        source,
+        createdBy,
+        updatedBy: createdBy,
+        createdAt: now,
+        updatedAt: now,
     };
 }
 
@@ -694,7 +989,9 @@ export function createNotificationDocument({
     actionUrl = null,               // Optional deep link
     relatedId = null,               // Related document ID (task, project, etc.)
     relatedCollection = null,       // Which collection the relatedId belongs to
+    createdBy = 'system',
 } = {}) {
+    const now = new Date().toISOString();
     return {
         userId,
         type,
@@ -704,7 +1001,9 @@ export function createNotificationDocument({
         actionUrl,
         relatedId,
         relatedCollection,
-        createdAt: new Date().toISOString(),
+        createdBy,
+        createdAt: now,
+        updatedAt: now,
     };
 }
 
@@ -720,14 +1019,19 @@ export function createTaskTypeDocument({
     color = 'indigo',              // Tailwind color name
     active = true,
     order = 0,
+    createdBy = null,
 } = {}) {
+    const now = new Date().toISOString();
     return {
         name,
         icon,
         color,
         active,
         order,
-        createdAt: new Date().toISOString(),
+        createdBy,
+        updatedBy: createdBy,
+        createdAt: now,
+        updatedAt: now,
     };
 }
 
@@ -901,14 +1205,19 @@ export function createTaskTypeCategoryDocument({
     icon = 'Layers',               // lucide-react icon name
     order = 0,
     active = true,
+    createdBy = null,
 } = {}) {
+    const now = new Date().toISOString();
     return {
         name,
         color,
         icon,
         order,
         active,
-        createdAt: new Date().toISOString(),
+        createdBy,
+        updatedBy: createdBy,
+        createdAt: now,
+        updatedAt: now,
     };
 }
 
@@ -1109,6 +1418,596 @@ export function createManagementBriefDocument({
         generatedBy,
         metadata,
         generatedAt: new Date().toISOString(),
+    };
+}
+
+
+// ============================================================
+// V5 FOUNDATION — DOCUMENT FACTORIES
+// ============================================================
+
+/**
+ * Milestones Collection — V5
+ * Critical project milestones with areas, scoring, and traffic lights.
+ * Supports: setup, commissioning, validation, and custom milestones.
+ *
+ * Score model:
+ *   scoreGeneral = avg(workArea scores)
+ *   trafficLight = computed from score + LOCK checks
+ *   Locks override score-based traffic light (anti-false-greens)
+ *
+ * Document ID: auto-generated
+ */
+export function createMilestoneDocument({
+    projectId = null,
+    type = MILESTONE_TYPE.CUSTOM,
+    name = '',
+    description = '',
+    status = MILESTONE_STATUS.PLANNING,
+    startDate = null,
+    dueDate = null,
+    completedDate = null,
+    ownerId = null,
+    teamMemberIds = [],
+    // ── Score System (computed — do NOT set manually) ──
+    scoreGeneral = 0,
+    trafficLight = TRAFFIC_LIGHT.GREEN,
+    scoreLocks = [],                    // Active SCORE_LOCK_REASON values
+    trafficLightOverride = null,        // Admin manual override
+    trafficLightOverrideReason = '',    // Required if override is set
+    trafficLightOverrideBy = null,      // UID — auditable
+    trafficLightOverrideAt = null,      // ISO — auditable
+    trafficLightOverrideExpires = null, // ISO — auto-reverts after 7 days
+    trend = 'stable',                   // 'improving' | 'stable' | 'declining'
+    // ── Score Penalties (computed) ──
+    penalties = {
+        criticalOverdue: 0,             // Count of critical tasks overdue > 3 days
+        unresolvedBlockers: 0,          // Count of blockers unresolved > 48h
+        staleAreas: 0,                  // Count of areas without updates > 5 days
+        unownedCritical: 0,             // Count of critical tasks without owner
+        totalPenalty: 0,                // Sum of penalty point deductions
+    },
+    // ── V5 Metadata ──
+    createdBy = null,
+} = {}) {
+    const now = new Date().toISOString();
+    return {
+        projectId,
+        type,
+        name,
+        description,
+        status,
+        startDate,
+        dueDate,
+        completedDate,
+        ownerId,
+        teamMemberIds,
+        scoreGeneral,
+        trafficLight,
+        scoreLocks,
+        trafficLightOverride,
+        trafficLightOverrideReason,
+        trafficLightOverrideBy,
+        trafficLightOverrideAt,
+        trafficLightOverrideExpires,
+        trend,
+        penalties,
+        createdBy,
+        updatedBy: createdBy,
+        createdAt: now,
+        updatedAt: now,
+    };
+}
+
+/**
+ * WorkAreas Collection — V5
+ * Sub-areas within a milestone, each with its own score.
+ * Tasks are linked via tag or type filters.
+ *
+ * Document ID: auto-generated
+ */
+export function createWorkAreaDocument({
+    milestoneId = null,
+    projectId = null,                   // Denormalized for queries
+    name = '',
+    order = 0,
+    responsibleId = null,               // Area lead UID
+    // ── Score (computed) ──
+    score = 0,
+    trend = 'stable',
+    trafficLight = TRAFFIC_LIGHT.GREEN,
+    // ── V5 Task Type Mapping ──
+    taskTypeIds = [],                   // V5: explicit type→area mapping (persisted)
+    // ── Legacy Task Filter Config (kept for backward compat) ──
+    taskFilter = {
+        tagMatch: null,
+        typeMatch: null,
+    },
+    // ── V5 Metadata ──
+    createdBy = null,
+} = {}) {
+    const now = new Date().toISOString();
+    return {
+        milestoneId,
+        projectId,
+        name,
+        order,
+        responsibleId,
+        score,
+        trend,
+        trafficLight,
+        taskTypeIds,
+        taskFilter,
+        createdBy,
+        updatedBy: createdBy,
+        createdAt: now,
+        updatedAt: now,
+    };
+}
+
+/**
+ * AuditTrail Collection — V5
+ * Immutable, append-only system audit trail.
+ * Replaces and unifies: auditEvents + auditLogs
+ *
+ * IMPORTANT: This collection is APPEND-ONLY.
+ * No updates, no deletes — ever.
+ *
+ * Document ID: auto-generated
+ */
+export function createAuditTrailDocument({
+    eventType = AUDIT_TRAIL_EVENT_TYPE.ENTITY_CHANGE,
+    entityType = '',                    // 'task' | 'project' | 'milestone' | 'workArea' | 'user' | 'system'
+    entityId = '',
+    action = '',                        // 'create' | 'update' | 'delete' | 'transition' | 'override'
+    actorId = null,                     // UID | 'system' | 'ai:gemini'
+    actorType = AUDIT_TRAIL_ACTOR_TYPE.USER,
+    changes = {},                       // { field: { before, after } }
+    reason = null,                      // REQUIRED for overrides
+    source = 'client',                  // 'client' | 'cloud_function' | 'automation' | 'ai' | 'scheduled'
+    correlationId = null,               // Groups related events
+    metadata = {},
+} = {}) {
+    return {
+        eventType,
+        entityType,
+        entityId,
+        action,
+        actorId,
+        actorType,
+        changes,
+        reason,
+        source,
+        correlationId,
+        metadata,
+        timestamp: new Date().toISOString(),
+        // NO updatedAt, NO updatedBy — immutable
+    };
+}
+
+/**
+ * AI Governance Collection — V5
+ * Dedicated collection for AI capability control.
+ * Each document defines one AI capability with permissions and limits.
+ *
+ * Admin controls ALL capabilities from Settings UI.
+ * Hardcoded prohibitions (see AI_PROHIBITED_ACTIONS) cannot be overridden.
+ *
+ * Document ID: capability key (e.g., 'pdf_extraction')
+ */
+export function createAiGovernanceDocument({
+    name = '',
+    type = AI_GOVERNANCE_TYPE.RECOMMENDER,
+    description = '',
+    module = '',                        // 'bom' | 'automation' | 'intelligence' | 'optimization'
+    // ── Permissions ──
+    canRecommend = true,
+    canExecute = false,
+    canModifyData = false,
+    requiresHumanApproval = true,
+    // ── Admin Control ──
+    enabled = true,
+    maxExecutionsPerDay = 50,
+    // ── Tracking ──
+    totalExecutions = 0,
+    lastExecutionAt = null,
+    // ── V5 Metadata ──
+    createdBy = null,
+} = {}) {
+    const now = new Date().toISOString();
+    return {
+        name,
+        type,
+        description,
+        module,
+        canRecommend,
+        canExecute,
+        canModifyData,
+        requiresHumanApproval,
+        enabled,
+        maxExecutionsPerDay,
+        totalExecutions,
+        lastExecutionAt,
+        createdBy,
+        updatedBy: createdBy,
+        createdAt: now,
+        updatedAt: now,
+    };
+}
+
+/**
+ * Actions that AI is NEVER allowed to perform.
+ * These are hardcoded and cannot be overridden by admin configuration.
+ */
+export const AI_PROHIBITED_ACTIONS = [
+    'change_task_dates',
+    'change_task_owner',
+    'change_user_roles',
+    'close_complete_tasks',
+    'approve_deliverables',
+    'execute_workflow_transitions',
+    'modify_financial_data',
+];
+
+/**
+ * OperationalKpiSnapshots Factory — V5 (Phase 4 documentation)
+ * Periodic KPI snapshots written by scheduledAnalyticsRefresh CF.
+ *
+ * Document ID: `{periodStart}_{periodEnd}_{periodType}_{entityId}`
+ */
+export function createOperationalKpiSnapshotDocument({
+    periodType = 'daily',               // 'daily' | 'weekly' | 'monthly'
+    periodStart = '',                   // YYYY-MM-DD
+    periodEnd = '',                     // YYYY-MM-DD
+    entityType = 'global',              // 'global' | 'user' | 'routine' | 'role'
+    entityId = 'global',
+    metrics = {},                       // { [kpiName]: { value, numerator, denominator, source } }
+    dataCounts = {},
+    engineVersion = '4.4',
+} = {}) {
+    return {
+        periodType,
+        periodStart,
+        periodEnd,
+        entityType,
+        entityId,
+        metrics,
+        dataCounts,
+        engineVersion,
+        generatedAt: new Date().toISOString(),
+        generatedBy: 'system',
+    };
+}
+
+/**
+ * OptimizationOpportunities Factory — V5 (Phase 5 documentation)
+ * Opportunities detected by the optimization engine.
+ *
+ * Document ID: auto-generated
+ */
+export function createOptimizationOpportunityDocument({
+    type = '',                          // OPPORTUNITY_TYPE value
+    category = '',
+    description = '',
+    impact = '',
+    estimatedGain = '',
+    priority = 'medium',
+    periodStart = '',
+} = {}) {
+    return {
+        type,
+        category,
+        description,
+        impact,
+        estimatedGain,
+        priority,
+        periodStart,
+        generatedAt: new Date().toISOString(),
+        generatedBy: 'system',
+    };
+}
+
+
+// ============================================================
+// ANALYTICS & OPTIMIZATION — MISSING FACTORIES (O8)
+// ============================================================
+
+/**
+ * UserOperationalScores Factory
+ * Per-user KPI scores computed by the analytics engine.
+ * Document ID: `{periodStart}_{userId}`
+ */
+export function createUserOperationalScoreDocument({
+    userId = '',
+    periodType = 'daily',
+    periodStart = '',
+    periodEnd = '',
+    metrics = {},
+    overallScore = 0,
+    trend = 'stable',
+    engineVersion = '4.4',
+} = {}) {
+    return {
+        userId, periodType, periodStart, periodEnd,
+        metrics, overallScore, trend, engineVersion,
+        generatedAt: new Date().toISOString(),
+        generatedBy: 'system',
+    };
+}
+
+/**
+ * RoutineOperationalScores Factory
+ * Per-routine execution scores computed by the analytics engine.
+ * Document ID: `{periodStart}_{routineKey}`
+ */
+export function createRoutineOperationalScoreDocument({
+    routineKey = '',
+    periodType = 'daily',
+    periodStart = '',
+    periodEnd = '',
+    metrics = {},
+    overallScore = 0,
+    trend = 'stable',
+    engineVersion = '4.4',
+} = {}) {
+    return {
+        routineKey, periodType, periodStart, periodEnd,
+        metrics, overallScore, trend, engineVersion,
+        generatedAt: new Date().toISOString(),
+        generatedBy: 'system',
+    };
+}
+
+/**
+ * TeamOperationalSummaries Factory
+ * Team/role-level aggregated summaries.
+ * Document ID: `{periodStart}_{role}`
+ */
+export function createTeamOperationalSummaryDocument({
+    role = '',
+    periodType = 'daily',
+    periodStart = '',
+    periodEnd = '',
+    memberCount = 0,
+    metrics = {},
+    highlights = [],
+    engineVersion = '4.4',
+} = {}) {
+    return {
+        role, periodType, periodStart, periodEnd,
+        memberCount, metrics, highlights, engineVersion,
+        generatedAt: new Date().toISOString(),
+        generatedBy: 'system',
+    };
+}
+
+/**
+ * OperationalRiskFlags Factory
+ * Active risk flags detected by the analytics engine.
+ * Document ID: auto-generated
+ */
+export function createOperationalRiskFlagDocument({
+    type = '',
+    severity = 'medium',
+    entityType = '',
+    entityId = '',
+    description = '',
+    suggestedAction = '',
+    periodStart = '',
+    resolved = false,
+    resolvedAt = null,
+} = {}) {
+    return {
+        type, severity, entityType, entityId,
+        description, suggestedAction, periodStart,
+        resolved, resolvedAt,
+        generatedAt: new Date().toISOString(),
+        generatedBy: 'system',
+    };
+}
+
+/**
+ * OperationalRecommendations Factory
+ * Actionable recommendations from the analytics engine.
+ * Document ID: auto-generated
+ */
+export function createOperationalRecommendationDocument({
+    type = '',
+    category = '',
+    priority = 'medium',
+    description = '',
+    expectedImpact = '',
+    targetEntityType = '',
+    targetEntityId = '',
+    periodStart = '',
+    status = 'pending',
+    appliedAt = null,
+} = {}) {
+    return {
+        type, category, priority, description,
+        expectedImpact, targetEntityType, targetEntityId,
+        periodStart, status, appliedAt,
+        generatedAt: new Date().toISOString(),
+        generatedBy: 'system',
+    };
+}
+
+/**
+ * AnalyticsRefreshLogs Factory
+ * Audit log for each analytics refresh execution.
+ * Document ID: auto-generated
+ */
+export function createAnalyticsRefreshLogDocument({
+    periodType = 'daily',
+    periodStart = '',
+    periodEnd = '',
+    engineVersion = '4.4',
+    durationMs = 0,
+    collectionsWritten = [],
+    errors = [],
+    status = 'success',
+} = {}) {
+    return {
+        periodType, periodStart, periodEnd,
+        engineVersion, durationMs, collectionsWritten,
+        errors, status,
+        executedAt: new Date().toISOString(),
+        executedBy: 'system',
+    };
+}
+
+/**
+ * AIExecutions Factory
+ * Audit trail for AI executions (Gemini calls).
+ * Document ID: auto-generated
+ */
+export function createAiExecutionDocument({
+    routineKey = '',
+    capability = '',
+    targetUserId = null,
+    model = '',
+    inputTokens = 0,
+    outputTokens = 0,
+    durationMs = 0,
+    status = 'success',
+    errorMessage = null,
+    metadata = {},
+} = {}) {
+    return {
+        routineKey, capability, targetUserId,
+        model, inputTokens, outputTokens, durationMs,
+        status, errorMessage, metadata,
+        executedAt: new Date().toISOString(),
+        executedBy: 'system',
+    };
+}
+
+/**
+ * OptimizationSimulations Factory
+ * What-if simulation results.
+ * Document ID: auto-generated
+ */
+export function createOptimizationSimulationDocument({
+    opportunityId = null,
+    scenarioType = '',
+    parameters = {},
+    baselineMetrics = {},
+    projectedMetrics = {},
+    estimatedGain = '',
+    confidence = 0,
+    periodStart = '',
+} = {}) {
+    return {
+        opportunityId, scenarioType, parameters,
+        baselineMetrics, projectedMetrics,
+        estimatedGain, confidence, periodStart,
+        generatedAt: new Date().toISOString(),
+        generatedBy: 'system',
+    };
+}
+
+/**
+ * OperationalPlans Factory
+ * Daily/weekly operational plans generated by optimization engine.
+ * Document ID: `{periodStart}_{periodType}`
+ */
+export function createOperationalPlanDocument({
+    periodType = 'daily',
+    periodStart = '',
+    periodEnd = '',
+    recommendations = [],
+    assignedTasks = [],
+    expectedOutcomes = {},
+    status = 'draft',
+} = {}) {
+    return {
+        periodType, periodStart, periodEnd,
+        recommendations, assignedTasks, expectedOutcomes,
+        status,
+        generatedAt: new Date().toISOString(),
+        generatedBy: 'system',
+    };
+}
+
+/**
+ * AppliedRecommendations Factory
+ * Tracking for recommendations that were applied (before/after).
+ * Document ID: auto-generated
+ */
+export function createAppliedRecommendationDocument({
+    recommendationId = '',
+    opportunityId = null,
+    type = '',
+    description = '',
+    appliedBy = null,
+    beforeMetrics = {},
+    afterMetrics = {},
+    actualGain = '',
+    status = 'applied',
+} = {}) {
+    return {
+        recommendationId, opportunityId, type,
+        description, appliedBy,
+        beforeMetrics, afterMetrics, actualGain,
+        status,
+        appliedAt: new Date().toISOString(),
+    };
+}
+
+/**
+ * OptimizationHistory Factory
+ * Audit trail for optimization engine runs.
+ * Document ID: auto-generated
+ */
+export function createOptimizationHistoryDocument({
+    periodType = 'daily',
+    periodStart = '',
+    engineVersion = '4.4',
+    opportunitiesFound = 0,
+    simulationsRun = 0,
+    recommendationsGenerated = 0,
+    durationMs = 0,
+    status = 'success',
+    errors = [],
+} = {}) {
+    return {
+        periodType, periodStart, engineVersion,
+        opportunitiesFound, simulationsRun,
+        recommendationsGenerated, durationMs,
+        status, errors,
+        executedAt: new Date().toISOString(),
+        executedBy: 'system',
+    };
+}
+
+
+// ============================================================
+// V5 SCORE SNAPSHOTS (Phase 2F)
+// ============================================================
+
+/**
+ * ScoreSnapshots Factory
+ * Point-in-time capture of milestone/area scores for trend analysis.
+ * Document ID: `{milestoneId}_{timestamp}`
+ */
+export function createScoreSnapshotDocument({
+    milestoneId = '',
+    projectId = '',
+    snapshotType = 'scheduled',  // 'scheduled' | 'manual' | 'event_triggered'
+    milestoneScore = 0,
+    milestoneTrafficLight = 'green',
+    milestoneStatus = 'active',
+    areaScores = [],             // [{ areaId, name, score, trafficLight, trend }]
+    activeLocks = [],
+    activePenalties = {},
+    triggeredBy = 'system',
+} = {}) {
+    return {
+        milestoneId, projectId, snapshotType,
+        milestoneScore, milestoneTrafficLight, milestoneStatus,
+        areaScores, activeLocks, activePenalties,
+        triggeredBy,
+        capturedAt: new Date().toISOString(),
     };
 }
 

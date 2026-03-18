@@ -102,8 +102,8 @@ export default function ActiveTimer({
             {/* Active Timer Display */}
             {activeTimer ? (
                 <div className={`rounded-3xl border-2 p-5 shadow-lg transition-all ${elapsedHours >= 8
-                        ? 'bg-red-500/15 border-red-500/30 animate-pulse'
-                        : 'bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-500/30'
+                    ? 'bg-red-500/15 border-red-500/30 animate-pulse'
+                    : 'bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-500/30'
                     }`}>
                     <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
@@ -172,7 +172,24 @@ export default function ActiveTimer({
                                 </button>
                             </div>
 
-                            {/* Task Selector */}
+                            {/* Project Selector (FIRST) */}
+                            <div>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">
+                                    <FolderGit2 className="w-3 h-3 inline mr-1" />Proyecto
+                                </span>
+                                <select
+                                    value={formProject}
+                                    onChange={e => { setFormProject(e.target.value); setFormTask(''); }}
+                                    className="w-full px-3 py-2.5 border border-slate-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800"
+                                >
+                                    <option value="">Sin proyecto</option>
+                                    {projects.map(p => (
+                                        <option key={p.id} value={p.id}>{p.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Task Selector (filtered by project) */}
                             <div>
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">
                                     <ListTodo className="w-3 h-3 inline mr-1" />Tarea (opcional)
@@ -182,33 +199,20 @@ export default function ActiveTimer({
                                     onChange={e => {
                                         setFormTask(e.target.value);
                                         const t = tasks.find(t => t.id === e.target.value);
-                                        if (t?.projectId) setFormProject(t.projectId);
+                                        if (t?.projectId && !formProject) setFormProject(t.projectId);
                                     }}
                                     className="w-full px-3 py-2.5 border border-slate-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800"
                                 >
                                     <option value="">Sin tarea específica</option>
                                     {tasks
                                         .filter(t => t.status !== 'completed' && t.status !== 'cancelled')
+                                        .filter(t => {
+                                            if (!formProject) return !t.projectId;
+                                            return t.projectId === formProject;
+                                        })
                                         .map(t => (
                                             <option key={t.id} value={t.id}>{t.title}</option>
                                         ))}
-                                </select>
-                            </div>
-
-                            {/* Project Selector */}
-                            <div>
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">
-                                    <FolderGit2 className="w-3 h-3 inline mr-1" />Proyecto
-                                </span>
-                                <select
-                                    value={formProject}
-                                    onChange={e => setFormProject(e.target.value)}
-                                    className="w-full px-3 py-2.5 border border-slate-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800"
-                                >
-                                    <option value="">Sin proyecto</option>
-                                    {projects.map(p => (
-                                        <option key={p.id} value={p.id}>{p.name}</option>
-                                    ))}
                                 </select>
                             </div>
 
@@ -243,7 +247,7 @@ export default function ActiveTimer({
                             <button
                                 onClick={handleStart}
                                 disabled={isStarting || (!formTask && !formProject)}
-                                className="w-full py-3.5 bg-green-500 hover:bg-green-600 text-white rounded-2xl font-black shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all disabled:bg-slate-300"
+                                className="w-full py-3.5 bg-green-500 hover:bg-green-600 text-white rounded-2xl font-black shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all disabled:bg-slate-700 disabled:text-slate-500 disabled:shadow-none"
                             >
                                 <Play className="w-5 h-5 fill-current" />
                                 {isStarting ? 'Iniciando...' : 'Iniciar'}

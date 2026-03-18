@@ -1,19 +1,20 @@
 import React, { useState, useMemo } from 'react';
 import {
     HeartPulse, CheckCircle2, AlertCircle, ChevronDown, ChevronUp,
-    ListChecks, Clock, User, CalendarDays, Link2, Layers
+    ListChecks, Clock, User, CalendarDays, Link2, Layers, Target
 } from 'lucide-react';
 
 /**
  * TaskHealthScore — expert-level quality indicator for task definition.
  *
  * Calculates a 0-100 "Health Score" based on how well-defined the task is:
- *   - Subtareas definidas      (20 pts) — at least 1 subtask
+ *   - Subtareas definidas      (15 pts) — at least 1 subtask
  *   - Estimación de horas      (20 pts) — estimatedHours > 0
  *   - Responsable asignado     (20 pts) — assignedTo is set
  *   - Fecha límite             (15 pts) — dueDate is set
  *   - Tipo de tarea definido   (10 pts) — taskTypeId is set
- *   - Descripción completa     (15 pts) — description has 10+ chars
+ *   - Descripción completa     (10 pts) — description has 10+ chars
+ *   - Milestone asignado       (10 pts) — milestoneId is set (SOLO tareas críticas)
  *
  * Shows a radial/linear visual + expandable checklist of what's missing.
  */
@@ -23,7 +24,7 @@ const CRITERIA = [
         key: 'subtasks',
         label: 'Subtareas definidas',
         icon: ListChecks,
-        weight: 20,
+        weight: 15,
         check: (ctx) => ctx.subtaskCount > 0,
         hint: 'Agrega al menos una subtarea para desglosar el trabajo',
     },
@@ -55,7 +56,7 @@ const CRITERIA = [
         key: 'description',
         label: 'Descripción completa',
         icon: Layers,
-        weight: 15,
+        weight: 10,
         check: (ctx) => (ctx.form.description || '').trim().length >= 10,
         hint: 'Agrega una descripción detallada (mín. 10 caracteres)',
     },
@@ -66,6 +67,16 @@ const CRITERIA = [
         weight: 10,
         check: (ctx) => !!ctx.form.taskTypeId,
         hint: 'Selecciona el tipo de tarea',
+    },
+    {
+        key: 'milestone',
+        label: 'Milestone asignado',
+        icon: Target,
+        weight: 10,
+        // Solo aplica a tareas críticas — si no es crítica, pasa automáticamente
+        check: (ctx) => ctx.form.priority !== 'critical' || !!ctx.form.milestoneId,
+        hint: '⚠ Esta tarea es crítica. Asígnala a un milestone para seguimiento de score',
+        criticalOnly: true,
     },
 ];
 
@@ -123,7 +134,8 @@ export default function TaskHealthScore({ form, subtaskCount = 0 }) {
         return { score: total, results: res };
     }, [
         form.assignedTo, form.estimatedHours, form.dueDate,
-        form.taskTypeId, form.description, subtaskCount,
+        form.taskTypeId, form.description, form.milestoneId, form.priority,
+        subtaskCount,
     ]);
 
     const theme = getScoreTheme(score);

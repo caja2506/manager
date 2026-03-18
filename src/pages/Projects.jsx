@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
 import { useAppData } from '../contexts/AppDataContext';
@@ -15,6 +16,7 @@ export default function Projects() {
     const { user } = useAuth();
     const { canEdit, canDelete, isAdmin } = useRole();
     const { engProjects, engTasks, teamMembers, setConfirmDelete } = useAppData();
+    const navigate = useNavigate();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProject, setEditingProject] = useState(null);
@@ -68,7 +70,7 @@ export default function Projects() {
                                 <div
                                     key={project.id}
                                     className="bg-slate-900/70 rounded-2xl border border-slate-800 hover:border-indigo-500/50 shadow-lg transition-all group cursor-pointer overflow-hidden backdrop-blur-sm"
-                                    onClick={() => openEdit(project)}
+                                    onClick={() => navigate(`/projects/${project.id}`)}
                                 >
                                     {/* Status bar */}
                                     <div className="h-1.5" style={{ backgroundColor: statusCfg.color || '#e2e8f0' }} />

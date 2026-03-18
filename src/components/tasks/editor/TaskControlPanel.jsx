@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
     Clock, BarChart2, AlertTriangle,
     ChevronDown, ChevronRight, Settings2, User,
-    Link2, ShieldAlert, CalendarRange, CalendarDays
+    Link2, ShieldAlert, CalendarRange, CalendarDays, Target, MapPin
 } from 'lucide-react';
 import {
     TASK_STATUS, TASK_STATUS_CONFIG,
@@ -51,6 +51,7 @@ export default function TaskControlPanel({
     form, setForm, isNew, task,
     canEdit, subtasks, teamMembers, taskTypes,
     timeLogs = [], allTasks = [], delays = [], dependencies = [], plannerItems = [],
+    projectMilestones = [], milestoneWorkAreas = [],
     onStatusChange, onOpenDelayReport, onOpenListManager,
 }) {
     // ── Subtask-based auto progress ──
@@ -151,6 +152,66 @@ export default function TaskControlPanel({
                         )}
                     </div>
                 )}
+
+                {/* ─── V5: MILESTONE / AREA ─── */}
+                <Section title="Milestone / Área" icon={Target} defaultOpen={true}>
+                    {/* Milestone selector */}
+                    <div>
+                        <span className="text-[9px] font-bold text-slate-500 flex items-center gap-1 mb-0.5">
+                            <Target className="w-2.5 h-2.5" /> Milestone
+                        </span>
+                        <select
+                            value={form.milestoneId}
+                            onChange={e => setForm({ ...form, milestoneId: e.target.value })}
+                            className="w-full px-2.5 py-1.5 border border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800 text-slate-200"
+                            disabled={!canEdit || !form.projectId}
+                        >
+                            <option value="">Sin milestone</option>
+                            {projectMilestones.map(ms => (
+                                <option key={ms.id} value={ms.id}>{ms.name || ms.title || ms.id}</option>
+                            ))}
+                        </select>
+                        {!form.projectId && (
+                            <p className="text-[9px] text-amber-400/70 mt-0.5 italic">Selecciona un proyecto primero</p>
+                        )}
+                    </div>
+
+                    {/* Area — read-only auto-resolved */}
+                    {form.milestoneId && (
+                        <div>
+                            <span className="text-[9px] font-bold text-slate-500 flex items-center gap-1 mb-0.5">
+                                <MapPin className="w-2.5 h-2.5" /> Área (auto-asignada)
+                            </span>
+                            {(() => {
+                                // Find resolved area from milestoneWorkAreas by taskTypeId
+                                const resolvedArea = milestoneWorkAreas.find(area => {
+                                    const types = [...(area.taskTypeIds || []), ...(area.taskFilter?.typeMatch || [])];
+                                    return types.includes(form.taskTypeId);
+                                });
+                                return resolvedArea ? (
+                                    <div className="px-2.5 py-1.5 border border-teal-500/30 rounded-lg text-xs bg-teal-500/10 text-teal-300 font-bold flex items-center gap-1.5">
+                                        <div className="w-2 h-2 rounded-full bg-teal-400 flex-shrink-0" />
+                                        {resolvedArea.name}
+                                    </div>
+                                ) : (
+                                    <div className="px-2.5 py-1.5 border border-amber-500/30 rounded-lg text-xs bg-amber-500/10 text-amber-300 font-medium">
+                                        ⚠ Sin área mapeada para este tipo de tarea
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    )}
+
+                    {/* Critical task warning */}
+                    {!form.milestoneId && form.priority === 'critical' && (
+                        <div className="px-2.5 py-2 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2">
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+                            <p className="text-[10px] text-amber-300 leading-snug">
+                                Esta tarea es <strong>crítica</strong>. Considere asignarla a un milestone para seguimiento de score.
+                            </p>
+                        </div>
+                    )}
+                </Section>
 
                 {/* ─── TIME ─── */}
                 <Section title="Tiempo" icon={Clock} defaultOpen={true}>

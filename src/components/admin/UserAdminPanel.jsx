@@ -57,33 +57,11 @@ export default function UserAdminPanel({ onClose }) {
         return () => unsub();
     }, []);
 
-    // ── Auto-sync displayName from users_roles → users ──
-    // Runs once when both datasets are loaded. Fixes any mismatches.
-    useEffect(() => {
-        if (rbacUsers.length === 0) return;
-        const syncNames = async () => {
-            for (const rbacUser of rbacUsers) {
-                const profile = profiles[rbacUser.uid];
-                const rbacName = rbacUser.displayName || '';
-                const profileName = profile?.displayName || '';
-                // If users_roles has a name but users doesn't, sync it
-                if (rbacName && rbacName !== profileName) {
-                    try {
-                        const ref = doc(db, COLLECTIONS.USERS, rbacUser.uid);
-                        await setDoc(ref, {
-                            displayName: rbacName,
-                            email: rbacUser.email || '',
-                            updatedAt: new Date().toISOString()
-                        }, { merge: true });
-                        console.log(`[Sync] displayName synced for ${rbacUser.email}: "${rbacName}"`);
-                    } catch (err) {
-                        console.warn(`[Sync] Failed for ${rbacUser.email}:`, err.message);
-                    }
-                }
-            }
-        };
-        syncNames();
-    }, [rbacUsers, profiles]); // eslint-disable-line react-hooks/exhaustive-deps
+    // ── V5: Auto-sync REMOVED (O4) ──
+    // displayName sync is now handled exclusively by:
+    //   - userProfileService.ensureUserProfile() on login
+    //   - handleNameSave() on explicit admin edit
+    // This eliminates the hidden write side-effect during read operations.
 
     // Check if a user email is in the super admin list
     const isUserSuperAdmin = (email) => {

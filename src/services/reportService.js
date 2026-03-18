@@ -19,7 +19,8 @@ import { TASK_STATUS } from '../models/schemas';
  * @returns {Object} Report data
  */
 export function generateDailyReport(date, userId, timeLogs, tasks, projects, delays) {
-    const targetDate = new Date(date);
+    // Append time to force LOCAL timezone parsing (avoids UTC midnight shift)
+    const targetDate = typeof date === 'string' && !date.includes('T') ? new Date(date + 'T00:00:00') : new Date(date);
     const start = startOfDay(targetDate);
     const end = endOfDay(targetDate);
 
@@ -49,17 +50,35 @@ export function generateDailyReport(date, userId, timeLogs, tasks, projects, del
         if (log.taskId) {
             if (!tasksWorkedMap.has(log.taskId)) {
                 const task = tasks.find(t => t.id === log.taskId);
-                const project = projects.find(p => p.id === log.projectId) || (task && projects.find(p => p.id === task.projectId));
+                // Relational lookup: use task's current projectId first, then log's projectId as fallback
+                const projectId = task?.projectId || log.projectId;
+                const project = projectId ? projects.find(p => p.id === projectId) : null;
 
                 tasksWorkedMap.set(log.taskId, {
                     taskId: log.taskId,
-                    taskTitle: task ? task.title : 'Tarea eliminada/desconocida',
-                    projectName: project ? project.name : 'Proyecto general',
+                    taskTitle: task ? task.title : (log.notes || 'Registro de tiempo'),
+                    projectName: project ? project.name : 'Sin proyecto',
                     hours: 0,
                     logCount: 0
                 });
             }
             const tData = tasksWorkedMap.get(log.taskId);
+            tData.hours += (log.totalHours || 0);
+            tData.logCount += 1;
+        } else {
+            // Logs without a task — group by projectId
+            const groupKey = `_no_task_${log.projectId || 'none'}`;
+            if (!tasksWorkedMap.has(groupKey)) {
+                const project = log.projectId ? projects.find(p => p.id === log.projectId) : null;
+                tasksWorkedMap.set(groupKey, {
+                    taskId: null,
+                    taskTitle: 'Tiempo general',
+                    projectName: project ? project.name : 'Sin proyecto',
+                    hours: 0,
+                    logCount: 0
+                });
+            }
+            const tData = tasksWorkedMap.get(groupKey);
             tData.hours += (log.totalHours || 0);
             tData.logCount += 1;
         }
@@ -100,7 +119,7 @@ export function generateDailyReport(date, userId, timeLogs, tasks, projects, del
  * Generate a weekly summary spanning multiple days for a user.
  */
 export function generateWeeklyReport(baseDate, userId, timeLogs, tasks, projects, delays) {
-    const targetDate = new Date(baseDate);
+    const targetDate = typeof baseDate === 'string' && !baseDate.includes('T') ? new Date(baseDate + 'T00:00:00') : new Date(baseDate);
     const start = startOfWeek(targetDate, { weekStartsOn: 1 }); // Monday start
     const end = endOfWeek(targetDate, { weekStartsOn: 1 });
 

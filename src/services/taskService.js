@@ -21,6 +21,7 @@ import {
     createTaskDocument,
     createSubtaskDocument,
 } from '../models/schemas';
+import { resolveAreaForTask, validateTaskAreaConsistency } from './mappingService';
 
 // ── Cloud Function reference for workflow transitions ──
 const transitionTaskStatusFn = httpsCallable(functions, 'transitionTaskStatus');
@@ -74,7 +75,30 @@ export async function deleteProject(projectId) {
 // ============================================================
 
 export async function createTask(data, userId) {
-    const taskData = createTaskDocument({ ...data, createdBy: userId });
+    // V5: Auto-resolve areaId via milestone mapping
+    let resolvedAreaId = data.areaId || null;
+    let countsForScore = data.countsForScore || false;
+
+    if (data.milestoneId && data.taskTypeId && !resolvedAreaId) {
+        resolvedAreaId = await resolveAreaForTask(data.milestoneId, data.taskTypeId);
+        countsForScore = true;
+    } else if (data.milestoneId) {
+        countsForScore = true;
+    }
+
+    const taskData = createTaskDocument({
+        ...data,
+        areaId: resolvedAreaId,
+        countsForScore,
+        createdBy: userId,
+    });
+
+    // Validate consistency (warn, don't block)
+    const validation = validateTaskAreaConsistency(taskData);
+    if (!validation.valid) {
+        console.warn('[taskService] Area consistency warning:', validation.error);
+    }
+
     const ref = doc(collection(db, COLLECTIONS.TASKS));
     await setDoc(ref, taskData);
     return ref.id;
@@ -92,10 +116,45 @@ export async function updateTask(taskId, updates) {
         delete safeUpdates[field];
     }
 
+    // V5: Recalculate areaId when taskTypeId or milestoneId changes
+    const milestoneId = safeUpdates.milestoneId;
+    const taskTypeId = safeUpdates.taskTypeId;
+    if ((taskTypeId || milestoneId) && milestoneId !== undefined) {
+        if (milestoneId && taskTypeId) {
+            const resolvedAreaId = await resolveAreaForTask(milestoneId, taskTypeId);
+            safeUpdates.areaId = resolvedAreaId;
+            safeUpdates.countsForScore = true;
+        } else if (!milestoneId) {
+            // Removing milestone → clear area linkage
+            safeUpdates.milestoneId = null;
+            safeUpdates.areaId = null;
+            safeUpdates.countsForScore = false;
+        }
+    }
+
     await updateDoc(doc(db, COLLECTIONS.TASKS, taskId), {
         ...safeUpdates,
         updatedAt: new Date().toISOString(),
     });
+
+    // Cascade projectId changes to time logs
+    if ('projectId' in safeUpdates) {
+        try {
+            const logsSnap = await getDocs(
+                query(collection(db, COLLECTIONS.TIME_LOGS), where('taskId', '==', taskId))
+            );
+            if (!logsSnap.empty) {
+                const batch = writeBatch(db);
+                logsSnap.docs.forEach(logDoc => {
+                    batch.update(logDoc.ref, { projectId: safeUpdates.projectId || null });
+                });
+                await batch.commit();
+                console.log(`[taskService] Synced projectId on ${logsSnap.size} time logs for task ${taskId}`);
+            }
+        } catch (err) {
+            console.warn('[taskService] Failed to sync projectId on time logs:', err.message);
+        }
+    }
 }
 
 /**

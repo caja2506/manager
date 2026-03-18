@@ -46,49 +46,57 @@ export function RoleProvider({ children }) {
         }
 
         setRoleLoading(true);
-        const userRoleRef = doc(db, 'users_roles', user.uid);
 
-        const unsubscribe = onSnapshot(userRoleRef, async (snap) => {
-            let resolvedRole;
+        // ── V5 (M7): Read rbacRole from users/{uid} as primary source ──
+        const userDocRef = doc(db, 'users', user.uid);
+        const legacyRoleRef = doc(db, 'users_roles', user.uid);
 
-            if (snap.exists()) {
-                const storedRole = snap.data().role || 'viewer';
+        const unsubscribe = onSnapshot(userDocRef, async (userSnap) => {
+            let resolvedRole = null;
 
-                // ── Super Admin Auto-Recovery ──
-                // If a super admin has been downgraded, auto-repair to 'admin'
-                if (isSuperAdmin && storedRole !== 'admin') {
-                    console.warn(
-                        `🔒 Super Admin auto-recovery: role was "${storedRole}", restoring to "admin" for ${user.email}`
-                    );
-                    await updateDoc(userRoleRef, { role: 'admin' });
-                    resolvedRole = 'admin';
-                } else {
-                    resolvedRole = storedRole;
+            // 1. Try V5 source: users/{uid}.rbacRole
+            if (userSnap.exists() && userSnap.data().rbacRole) {
+                resolvedRole = userSnap.data().rbacRole;
+            }
+
+            // 2. Fallback: legacy users_roles/{uid}.role
+            if (!resolvedRole) {
+                try {
+                    const { getDoc: getDocFn } = await import('firebase/firestore');
+                    const legacySnap = await getDocFn(legacyRoleRef);
+                    if (legacySnap.exists()) {
+                        resolvedRole = legacySnap.data().role || 'viewer';
+                    }
+                } catch (err) {
+                    console.warn('[RoleContext] Legacy fallback failed:', err);
                 }
-            } else {
-                // New user — super admins get 'admin', others get 'viewer'
-                const defaultRole = isSuperAdmin ? 'admin' : 'viewer';
-                await setDoc(userRoleRef, {
-                    email: user.email,
-                    displayName: user.displayName || '',
-                    photoURL: user.photoURL || '',
-                    role: defaultRole,
-                    createdAt: new Date().toISOString(),
-                });
-                resolvedRole = defaultRole;
+            }
+
+            // 3. Default for new users
+            if (!resolvedRole) {
+                resolvedRole = isSuperAdmin ? 'admin' : 'viewer';
+            }
+
+            // ── Super Admin Auto-Recovery ──
+            if (isSuperAdmin && resolvedRole !== 'admin') {
+                console.warn(
+                    `🔒 Super Admin auto-recovery: role was "${resolvedRole}", restoring to "admin" for ${user.email}`
+                );
+                resolvedRole = 'admin';
+                // Write to both sources for consistency
+                try {
+                    await updateDoc(legacyRoleRef, { role: 'admin' });
+                } catch { /* legacy doc may not exist */ }
             }
 
             setRole(resolvedRole);
 
             // ── Bootstrap users/{uid} operational profile ──
-            // Ensures the document always exists for dashboards,
-            // analytics, and planner to read from.
             try {
                 const profile = await ensureUserProfile(user, resolvedRole);
                 setUserProfile(profile);
             } catch (err) {
                 console.error('[RoleContext] Failed to bootstrap user profile:', err);
-                // Non-blocking: RBAC still works, profile will be null
             }
 
             setRoleLoading(false);

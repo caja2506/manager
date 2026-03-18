@@ -5,6 +5,7 @@ import {
 } from '../../models/schemas';
 import { createTask, updateTask, updateTaskStatus, deleteTask } from '../../services/taskService';
 import { startTimer, stopTimer, getActiveTimer } from '../../services/timeService';
+import { resolveAreaSync } from '../../services/mappingService';
 import { useAppData } from '../../contexts/AppDataContext';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -36,6 +37,7 @@ export default function TaskDetailModal({
         priority: TASK_PRIORITY.MEDIUM,
         status: TASK_STATUS.BACKLOG,
         taskTypeId: '',
+        milestoneId: '',
         dueDate: '',
         plannedStartDate: '',
         plannedEndDate: '',
@@ -50,6 +52,9 @@ export default function TaskDetailModal({
     const [deleteError, setDeleteError] = useState(null);
     const [dependencies, setDependencies] = useState([]);
     const [plannerItems, setPlannerItems] = useState([]);
+    // V5: Milestones and work areas for current project
+    const [projectMilestones, setProjectMilestones] = useState([]);
+    const [milestoneWorkAreas, setMilestoneWorkAreas] = useState([]);
 
     useEffect(() => {
         const toDate = (iso) => iso ? iso.substring(0, 10) : '';
@@ -63,6 +68,7 @@ export default function TaskDetailModal({
                 priority: task.priority || TASK_PRIORITY.MEDIUM,
                 status: task.status || TASK_STATUS.BACKLOG,
                 taskTypeId: task.taskTypeId || '',
+                milestoneId: task.milestoneId || '',
                 dueDate: toDate(task.dueDate),
                 plannedStartDate: toDate(task.plannedStartDate),
                 plannedEndDate: toDate(task.plannedEndDate),
@@ -74,12 +80,60 @@ export default function TaskDetailModal({
             setForm({
                 title: '', description: '', projectId: '', assignedBy: userId || '',
                 assignedTo: '', priority: TASK_PRIORITY.MEDIUM,
-                status: TASK_STATUS.BACKLOG, taskTypeId: '', dueDate: '',
+                status: TASK_STATUS.BACKLOG, taskTypeId: '', milestoneId: '',
+                dueDate: '',
                 plannedStartDate: '', plannedEndDate: '',
                 estimatedHours: '', blockedReason: '', percentComplete: 0,
             });
         }
     }, [task]);
+
+    // V5: Fetch milestones for the current project
+    useEffect(() => {
+        const projectId = form.projectId;
+        if (!projectId) {
+            setProjectMilestones([]);
+            setMilestoneWorkAreas([]);
+            return;
+        }
+        let cancelled = false;
+        const fetchMilestones = async () => {
+            try {
+                const msQ = query(collection(db, COLLECTIONS.MILESTONES), where('projectId', '==', projectId));
+                const msSnap = await getDocs(msQ);
+                if (!cancelled) {
+                    setProjectMilestones(msSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+                }
+            } catch (err) {
+                console.warn('TaskDetailModal: error fetching milestones:', err);
+            }
+        };
+        fetchMilestones();
+        return () => { cancelled = true; };
+    }, [form.projectId]);
+
+    // V5: Fetch work areas when milestone changes
+    useEffect(() => {
+        const milestoneId = form.milestoneId;
+        if (!milestoneId) {
+            setMilestoneWorkAreas([]);
+            return;
+        }
+        let cancelled = false;
+        const fetchAreas = async () => {
+            try {
+                const arQ = query(collection(db, COLLECTIONS.WORK_AREAS), where('milestoneId', '==', milestoneId));
+                const arSnap = await getDocs(arQ);
+                if (!cancelled) {
+                    setMilestoneWorkAreas(arSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+                }
+            } catch (err) {
+                console.warn('TaskDetailModal: error fetching work areas:', err);
+            }
+        };
+        fetchAreas();
+        return () => { cancelled = true; };
+    }, [form.milestoneId]);
 
     // Fetch dependencies & planner items for this task
     useEffect(() => {
@@ -139,8 +193,16 @@ export default function TaskDetailModal({
                 ? Math.round((taskSubtasks.filter(s => s.completed).length / taskSubtasks.length) * 100)
                 : null;
 
+            // V5: Resolve areaId from milestone work areas
+            const resolvedAreaId = form.milestoneId
+                ? resolveAreaSync(form.taskTypeId, milestoneWorkAreas)
+                : null;
+
             const data = {
                 ...form,
+                milestoneId: form.milestoneId || null,
+                areaId: resolvedAreaId,
+                countsForScore: !!form.milestoneId,
                 dueDate: toISO(form.dueDate),
                 plannedStartDate: form.plannedStartDate || null,
                 plannedEndDate: form.plannedEndDate || null,
@@ -280,6 +342,8 @@ export default function TaskDetailModal({
                         delays={delays}
                         dependencies={dependencies}
                         plannerItems={plannerItems}
+                        projectMilestones={projectMilestones}
+                        milestoneWorkAreas={milestoneWorkAreas}
                         onStatusChange={handleStatusChange}
                         onOpenDelayReport={handleOpenDelayReport}
                         onOpenListManager={setListManager}

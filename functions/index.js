@@ -4,6 +4,7 @@ const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
+const { requireAdmin, requireEditor, getUserRbacRole } = require("./middleware/authGuard");
 
 initializeApp();
 const adminDb = getFirestore();
@@ -954,15 +955,8 @@ exports.executeRoutineManually = onCall(
         timeoutSeconds: 120,
     },
     async (request) => {
-        if (!request.auth) {
-            throw new HttpsError("unauthenticated", "User must be authenticated.");
-        }
-
-        // Admin check
-        const roleDoc = await adminDb.collection("users_roles").doc(request.auth.uid).get();
-        if (!roleDoc.exists || roleDoc.data().role !== "admin") {
-            throw new HttpsError("permission-denied", "Admin access required.");
-        }
+        // V5: Centralized admin check (O2)
+        await requireAdmin(adminDb, request);
 
         const { routineKey } = request.data;
         if (!routineKey) {
@@ -1489,11 +1483,14 @@ exports.onDelayCreated = onDocumentCreated(
                 if (!uid) continue;
 
                 // Check if user is a manager/team lead/admin
-                const roleDoc = await adminDb.collection("users_roles").doc(uid).get();
-                const userRole = roleDoc.exists ? roleDoc.data() : {};
-                const isManagerOrLead = userRole.role === "admin" ||
-                    userRole.teamRole === "manager" ||
-                    userRole.teamRole === "team_lead";
+                // V5: Centralized role check (O2)
+                const userRbacRole = await getUserRbacRole(adminDb, uid);
+                const userDoc = await adminDb.collection("users").doc(uid).get();
+                const userData = userDoc.exists ? userDoc.data() : {};
+                const teamRole = userData.teamRole || userData.operationalRole;
+                const isManagerOrLead = userRbacRole === "admin" ||
+                    teamRole === "manager" ||
+                    teamRole === "team_lead";
 
                 if (isManagerOrLead) {
                     try {

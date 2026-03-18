@@ -60,14 +60,24 @@ export async function ensureUserProfile(authUser, rbacRole) {
 
     if (profileSnap.exists()) {
         const existing = profileSnap.data();
+        const updates = {};
+
+        // V5 (O6): Sync rbacRole into users/{uid} — makes users the SoT
+        if (rbacRole && rbacRole !== (existing.rbacRole || '')) {
+            updates.rbacRole = rbacRole;
+        }
+
         // Sync displayName if users_roles has a better name
         if (bestName && bestName !== (existing.displayName || '')) {
-            await updateDoc(profileRef, {
-                displayName: bestName,
-                updatedAt: new Date().toISOString(),
-            });
-            console.log(`[userProfileService] Synced displayName for ${authUser.email}: "${bestName}"`);
-            return { uid: authUser.uid, ...existing, displayName: bestName };
+            updates.displayName = bestName;
+        }
+
+        // Only write if there are actual changes
+        if (Object.keys(updates).length > 0) {
+            updates.updatedAt = new Date().toISOString();
+            await updateDoc(profileRef, updates);
+            console.log(`[userProfileService] Synced for ${authUser.email}:`, Object.keys(updates).join(', '));
+            return { uid: authUser.uid, ...existing, ...updates };
         }
         return { uid: authUser.uid, ...existing };
     }
@@ -77,16 +87,19 @@ export async function ensureUserProfile(authUser, rbacRole) {
         displayName: bestName,
         email: authUser.email || '',
         photoURL: authUser.photoURL || '',
+        rbacRole: rbacRole || 'viewer',  // V5 (O7): Write rbacRole on creation
         teamRole: null,             // Admin sets this manually
         department: 'Engineering',
         weeklyCapacityHours: 40,    // Default: standard 40h week
         active: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        createdBy: authUser.uid,
+        updatedBy: authUser.uid,
     };
 
     await setDoc(profileRef, newProfile);
-    console.log(`[userProfileService] Created profile for ${authUser.email}`);
+    console.log(`[userProfileService] Created profile for ${authUser.email} with rbacRole=${rbacRole}`);
 
     return { uid: authUser.uid, ...newProfile };
 }

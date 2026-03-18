@@ -57,6 +57,8 @@ export function AppDataProvider({ children }) {
     const [engTasks, setEngTasks] = useState([]);
     const [engSubtasks, setEngSubtasks] = useState([]);
     const [taskTypes, setTaskTypes] = useState([]);
+    const [workAreaTypes, setWorkAreaTypes] = useState([]);
+    const [milestoneTypes, setMilestoneTypes] = useState([]);
     const [teamMembers, setTeamMembers] = useState([]);
     const [timeLogs, setTimeLogs] = useState([]);
     const [delayCauses, setDelayCauses] = useState([]);
@@ -135,6 +137,12 @@ export function AppDataProvider({ children }) {
         const unsubTaskTypes = onSnapshot(collection(db, COLLECTIONS.TASK_TYPES), s =>
             setTaskTypes(s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => safeLocaleCompare(a, b, 'name')))
         );
+        const unsubWorkAreaTypes = onSnapshot(collection(db, COLLECTIONS.WORK_AREA_TYPES), s =>
+            setWorkAreaTypes(s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => safeLocaleCompare(a, b, 'name')))
+        );
+        const unsubMilestoneTypes = onSnapshot(collection(db, COLLECTIONS.MILESTONE_TYPES), s =>
+            setMilestoneTypes(s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => safeLocaleCompare(a, b, 'name')))
+        );
         // ── Team Members ──
         // IMPORTANT: Loads from `users` collection (operational profiles),
         // NOT from `users_roles` (RBAC only). This ensures teamRole and
@@ -157,7 +165,7 @@ export function AppDataProvider({ children }) {
             unsubProyectos(); unsubCatalogo(); unsubBom();
             unsubCategories(); unsubProviders(); unsubBrands();
             unsubEngProjects(); unsubEngTasks(); unsubEngSubtasks();
-            unsubTaskTypes(); unsubTeamMembers(); unsubTimeLogs();
+            unsubTaskTypes(); unsubWorkAreaTypes(); unsubMilestoneTypes(); unsubTeamMembers(); unsubTimeLogs();
             unsubDelayCauses(); unsubDelays();
         };
     }, []);
@@ -515,6 +523,46 @@ export function AppDataProvider({ children }) {
             return;
         }
 
+        // ── Work Area Types: same pattern as task types ──
+        if (type === 'workAreaType') {
+            const snap = await getDocs(collection(db, COLLECTIONS.WORK_AREA_TYPES));
+            const existing = snap.docs.map(d => ({ id: d.id, name: d.data()?.name })).filter(d => d.name);
+            deleted.forEach(name => {
+                const found = existing.find(d => d.name === name);
+                if (found) batch.delete(doc(db, COLLECTIONS.WORK_AREA_TYPES, found.id));
+            });
+            renames.forEach(({ oldName, newName }) => {
+                const found = existing.find(d => d.name === oldName);
+                if (found) batch.update(doc(db, COLLECTIONS.WORK_AREA_TYPES, found.id), { name: newName });
+            });
+            added.forEach(name => {
+                if (!existing.some(d => d.name.toLowerCase() === name.toLowerCase()))
+                    batch.set(doc(collection(db, COLLECTIONS.WORK_AREA_TYPES)), { name });
+            });
+            await batch.commit();
+            return;
+        }
+
+        // ── Milestone Types: same pattern ──
+        if (type === 'milestoneType') {
+            const snap = await getDocs(collection(db, COLLECTIONS.MILESTONE_TYPES));
+            const existing = snap.docs.map(d => ({ id: d.id, name: d.data()?.name })).filter(d => d.name);
+            deleted.forEach(name => {
+                const found = existing.find(d => d.name === name);
+                if (found) batch.delete(doc(db, COLLECTIONS.MILESTONE_TYPES, found.id));
+            });
+            renames.forEach(({ oldName, newName }) => {
+                const found = existing.find(d => d.name === oldName);
+                if (found) batch.update(doc(db, COLLECTIONS.MILESTONE_TYPES, found.id), { name: newName });
+            });
+            added.forEach(name => {
+                if (!existing.some(d => d.name.toLowerCase() === name.toLowerCase()))
+                    batch.set(doc(collection(db, COLLECTIONS.MILESTONE_TYPES)), { name });
+            });
+            await batch.commit();
+            return;
+        }
+
         const masterCatalogRef = collection(db, 'catalogo_maestro');
         let collectionName = '', fieldName = '';
         if (type === 'category') { collectionName = 'categorias'; fieldName = 'category'; }
@@ -665,6 +713,8 @@ export function AppDataProvider({ children }) {
         handleExcelUpload,
         handleSaveProject,
         saveMasterRecord,
+        workAreaTypes,
+        milestoneTypes,
         handleSaveManagedList,
         handleUpdateBomItem,
         handleAddFromCatalog,

@@ -34,6 +34,10 @@ import AuditFindings from './pages/AuditFindings';
 import ControlTower from './pages/ControlTower';
 import ManagedListsPage from './pages/ManagedListsPage';
 import AutomationControlCenter from './pages/AutomationControlCenter';
+import MilestoneDetailPage from './pages/MilestoneDetailPage';
+import MilestoneHistoryPage from './pages/MilestoneHistoryPage';
+import AIMonitoringPage from './pages/AIMonitoringPage';
+import ProjectDetailPage from './pages/ProjectDetailPage';
 
 
 // ========================================================
@@ -79,8 +83,19 @@ export default function App() {
 
           {/* Engineering */}
           <Route path="/projects" element={<ErrorBoundary module="Proyectos"><Projects /></ErrorBoundary>} />
+          <Route path="/projects/:projectId" element={<ErrorBoundary module="Proyecto Detalle"><ProjectDetailPage /></ErrorBoundary>} />
           <Route path="/tasks" element={<ErrorBoundary module="Tareas"><TaskManager /></ErrorBoundary>} />
           <Route path="/main-table" element={<ErrorBoundary module="Tabla Principal"><MainTable /></ErrorBoundary>} />
+
+          {/* Milestones — project-scoped routes (primary) */}
+          <Route path="/projects/:projectId/milestones/:milestoneId" element={<ErrorBoundary module="Milestone Detalle"><MilestoneDetailPage /></ErrorBoundary>} />
+          <Route path="/projects/:projectId/milestones/:milestoneId/history" element={<ErrorBoundary module="Milestone Historial"><MilestoneHistoryPage /></ErrorBoundary>} />
+          <Route path="/projects/:projectId/milestones/:milestoneId/ai-monitoring" element={<ErrorBoundary module="AI Monitoring"><AIMonitoringPage /></ErrorBoundary>} />
+
+          {/* Milestones — standalone routes (backward compat) */}
+          <Route path="/milestones/:milestoneId" element={<ErrorBoundary module="Milestone Detalle"><MilestoneDetailPage /></ErrorBoundary>} />
+          <Route path="/milestones/:milestoneId/history" element={<ErrorBoundary module="Milestone Historial"><MilestoneHistoryPage /></ErrorBoundary>} />
+          <Route path="/milestones/:milestoneId/ai-monitoring" element={<ErrorBoundary module="AI Monitoring"><AIMonitoringPage /></ErrorBoundary>} />
 
           {/* Reports & Analytics — shared layout with tabs */}
           <Route element={<ReportsLayout />}>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRole } from '../../contexts/RoleContext';
@@ -7,13 +7,16 @@ import {
     BrainCircuit, Activity, LayoutDashboard, User, FolderGit2,
     ListTodo, Database, Clock, FileText, BarChart3, Users,
     Bell, Settings, LogOut, Shield, LayoutList, Briefcase, LineChart, CalendarDays, GanttChartSquare, Radar, Zap,
-    ChevronDown, ChevronRight
+    ChevronRight, X, Target
 } from 'lucide-react';
 
+// ─── Section Definitions ───
 const SECTIONS = [
     {
         key: 'main',
-        label: null,
+        label: 'Principal',
+        icon: LayoutDashboard,
+        directNav: true, // sections with 1-2 items navigate directly
         items: [
             { to: '/', label: 'Dashboard', icon: LayoutDashboard },
             { to: '/my-work', label: 'Mi Trabajo', icon: User },
@@ -22,6 +25,7 @@ const SECTIONS = [
     {
         key: 'bom',
         label: 'AutoBOM',
+        icon: Database,
         items: [
             { to: '/bom/projects', label: 'Proyectos BOM', icon: FolderGit2, countKey: 'proyectos' },
             { to: '/catalog', label: 'Catálogo', icon: Database, countKey: 'catalogo' },
@@ -30,6 +34,7 @@ const SECTIONS = [
     {
         key: 'engineering',
         label: 'Ingeniería',
+        icon: Briefcase,
         items: [
             { to: '/projects', label: 'Proyectos', icon: Briefcase, countKey: 'engProjects' },
             { to: '/tasks', label: 'Tareas', icon: ListTodo, countKey: 'engTasks' },
@@ -40,6 +45,7 @@ const SECTIONS = [
     {
         key: 'intelligence',
         label: 'Intelligence',
+        icon: Radar,
         items: [
             { to: '/control-tower', label: 'Control Tower', icon: Radar },
             { to: '/audit', label: 'Auditoría', icon: Shield },
@@ -47,7 +53,8 @@ const SECTIONS = [
     },
     {
         key: 'reports',
-        label: 'Reportes y Analítica',
+        label: 'Reportes',
+        icon: BarChart3,
         items: [
             { to: '/work-logs', label: 'Registro Horas', icon: Clock },
             { to: '/reports/daily', label: 'Reporte Diario', icon: FileText },
@@ -58,6 +65,7 @@ const SECTIONS = [
     {
         key: 'team',
         label: 'Equipo',
+        icon: Users,
         items: [
             { to: '/team', label: 'Equipo', icon: Users },
             { to: '/notifications', label: 'Notificaciones', icon: Bell },
@@ -66,43 +74,46 @@ const SECTIONS = [
     {
         key: 'lists',
         label: 'Listas',
+        icon: LayoutList,
         items: [
             { to: '/listas', label: 'Listas Gestionadas', icon: LayoutList },
         ],
     },
 ];
 
-const ADMIN_ROUTES = ['/automation', '/settings'];
+const ADMIN_SECTION = {
+    key: 'admin',
+    label: 'Admin',
+    icon: Settings,
+    items: [
+        { to: '/automation', label: 'Automatización', icon: Zap },
+        { to: '/settings', label: 'Configuración', icon: Settings },
+    ],
+};
 
+// ─── Helper: check if a section contains the active route ───
+function sectionContainsRoute(section, pathname) {
+    return section.items.some(i =>
+        i.to === '/' ? pathname === '/' : pathname.startsWith(i.to)
+    );
+}
+
+// ─── Sidebar Component ───
 export default function Sidebar() {
     const { user, signOut } = useAuth();
     const { role, isAdmin, canEdit } = useRole();
     const { proyectos, catalogo, engProjects, engTasks } = useAppData();
     const location = useLocation();
+    const panelRef = useRef(null);
+    const sidebarRef = useRef(null);
 
-    // Sections start closed. Hover opens them (sticky). Click chevron closes.
-    const [openSections, setOpenSections] = useState(() => {
-        // Auto-open the section containing the current active route on mount
-        const initial = {};
-        SECTIONS.forEach(s => {
-            if (!s.label) { initial[s.key] = true; return; } // main always open
-            if (s.items.some(i => i.to === '/' ? location.pathname === '/' : location.pathname.startsWith(i.to))) {
-                initial[s.key] = true;
-            }
-        });
-        if (ADMIN_ROUTES.some(r => location.pathname.startsWith(r))) {
-            initial.admin = true;
-        }
-        return initial;
-    });
+    // Which panel is open (section key or null)
+    const [openPanel, setOpenPanel] = useState(null);
 
-    const openSection = (key) => {
-        setOpenSections(prev => ({ ...prev, [key]: true }));
-    };
-
-    const closeSection = (key) => {
-        setOpenSections(prev => ({ ...prev, [key]: false }));
-    };
+    // Determine which section the current route belongs to
+    const activeSection = [...SECTIONS, ...(isAdmin ? [ADMIN_SECTION] : [])].find(
+        s => sectionContainsRoute(s, location.pathname)
+    )?.key || 'main';
 
     const counts = {
         proyectos: proyectos.length,
@@ -111,160 +122,227 @@ export default function Sidebar() {
         engTasks: engTasks.length,
     };
 
-    const renderSection = (section) => {
-        const isOpen = openSections[section.key];
-        return (
-            <div
-                key={section.key}
-                onMouseEnter={() => { if (section.label && !isOpen) openSection(section.key); }}
-            >
-                {/* Section Header */}
-                {section.label && (
-                    <div className="w-full pt-4 pb-2 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap overflow-hidden h-9 group-hover:h-auto flex items-center justify-between">
-                        <span className={`text-[9px] font-black uppercase tracking-[0.2em] transition-colors ${isOpen ? 'text-slate-400' : 'text-slate-600'}`}>
-                            {section.label}
-                        </span>
-                        <button
-                            onClick={(e) => { e.stopPropagation(); isOpen ? closeSection(section.key) : openSection(section.key); }}
-                            className="p-0.5 rounded hover:bg-slate-800 transition-colors"
-                            title={isOpen ? 'Contraer sección' : 'Expandir sección'}
-                        >
-                            {isOpen
-                                ? <ChevronDown className="w-3 h-3 text-slate-500 hover:text-slate-300 transition-colors" />
-                                : <ChevronRight className="w-3 h-3 text-slate-600 hover:text-slate-300 transition-colors" />
-                            }
-                        </button>
-                    </div>
-                )}
+    // Click outside to close panel
+    useEffect(() => {
+        function handleClickOutside(e) {
+            if (
+                openPanel &&
+                sidebarRef.current &&
+                !sidebarRef.current.contains(e.target)
+            ) {
+                setOpenPanel(null);
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [openPanel]);
 
-                {/* Section Items with smooth animation */}
-                <div className={`overflow-hidden transition-all duration-200 ease-in-out ${isOpen ? 'max-h-[500px] opacity-100' : section.label ? 'max-h-0 opacity-0' : 'max-h-[500px] opacity-100'}`}>
-                    {section.items.map(item => {
-                        const Icon = item.icon;
-                        const count = item.countKey ? counts[item.countKey] : null;
-                        return (
-                            <NavLink
-                                key={item.to}
-                                to={item.to}
-                                end={item.to === '/'}
-                                title={item.label}
-                                className={({ isActive }) =>
-                                    `w-[220px] flex items-center gap-4 px-2.5 py-2.5 rounded-xl text-sm font-bold transition-all ${isActive
-                                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/30'
-                                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                                    }`
-                                }
-                            >
-                                <Icon className="w-5 h-5 flex-shrink-0 ml-[1px]" />
-                                <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 truncate">{item.label}</span>
-                                {count != null && (
-                                    <span className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[10px] bg-slate-800 px-2 py-0.5 rounded-full">{count}</span>
-                                )}
-                            </NavLink>
-                        );
-                    })}
-                </div>
-            </div>
-        );
-    };
+    // Close panel on route change
+    useEffect(() => {
+        setOpenPanel(null);
+    }, [location.pathname]);
 
-    const isAdminOpen = openSections.admin;
+    const handleIconClick = useCallback((section) => {
+        // For sections with directNav and only 1 item, we don't need a panel
+        // (but we keep panel for multi-item sections)
+        if (openPanel === section.key) {
+            setOpenPanel(null); // toggle off
+        } else {
+            setOpenPanel(section.key);
+        }
+    }, [openPanel]);
+
+    // Get the section data for the current open panel
+    const panelSection = openPanel
+        ? [...SECTIONS, ADMIN_SECTION].find(s => s.key === openPanel)
+        : null;
 
     return (
         <>
-            {/* Spacer */}
-            <div className="hidden md:block w-16 bg-slate-900 flex-shrink-0 z-40 border-r border-slate-800"></div>
+            {/* Spacer to maintain layout */}
+            <div className="hidden md:block w-[60px] bg-slate-950 flex-shrink-0 z-40" />
 
-            {/* Sidebar */}
-            <aside className="hidden md:flex flex-col h-full bg-slate-900 text-white fixed left-0 top-0 z-[100] transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] w-16 hover:w-64 group border-r border-slate-800 shadow-[4px_0_24px_rgba(0,0,0,0.3)] hover:shadow-[12px_0_48px_rgba(0,0,0,0.5)] overflow-x-hidden overflow-y-hidden hover:overflow-y-auto scrollbar-thin">
+            {/* ═══ TWO-COLUMN SIDEBAR ═══ */}
+            <div ref={sidebarRef} className="hidden md:flex fixed left-0 top-0 h-full z-[100]">
 
-                {/* Logo */}
-                <div className="p-4 border-b border-slate-800 h-[73px] flex items-center justify-start flex-shrink-0">
-                    <div className="flex items-center gap-4 w-[220px]">
-                        <BrainCircuit className="text-indigo-400 w-8 h-8 flex-shrink-0 ml-0.5" />
-                        <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity duration-300 overflow-hidden whitespace-nowrap">
-                            <div className="flex items-center gap-2">
-                                <h1 className="text-lg font-black tracking-tighter leading-none">AutoBOM Pro</h1>
-                            </div>
-                            <span className="text-[10px] font-mono text-slate-400 mt-1">v{APP_VERSION}</span>
-                        </div>
+                {/* ─── COLUMN 1: Icon Strip (always visible) ─── */}
+                <div className="w-[60px] h-full bg-slate-950 border-r border-slate-800/50 flex flex-col items-center py-3 flex-shrink-0">
+
+                    {/* Logo */}
+                    <div className="mb-4 p-1.5">
+                        <BrainCircuit className="w-7 h-7 text-indigo-400" />
                     </div>
-                </div>
 
-                {/* Nav Sections */}
-                <nav className="flex-1 px-3 py-4 space-y-0.5">
-                    {SECTIONS.map(renderSection)}
+                    <div className="w-8 h-px bg-slate-800 mb-3" />
 
-                    {/* Admin */}
-                    {isAdmin && (
-                        <div onMouseEnter={() => { if (!isAdminOpen) openSection('admin'); }}>
-                            <div className="w-full pt-4 pb-2 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap overflow-hidden h-9 group-hover:h-auto flex items-center justify-between">
-                                <span className={`text-[9px] font-black uppercase tracking-[0.2em] transition-colors ${isAdminOpen ? 'text-slate-400' : 'text-slate-600'}`}>
-                                    Admin
-                                </span>
+                    {/* Section Icons */}
+                    <nav className="flex-1 flex flex-col items-center gap-1 w-full px-2 overflow-y-auto scrollbar-none">
+                        {SECTIONS.map(section => {
+                            const Icon = section.icon;
+                            const isActive = activeSection === section.key;
+                            const isPanelOpen = openPanel === section.key;
+                            return (
                                 <button
-                                    onClick={(e) => { e.stopPropagation(); isAdminOpen ? closeSection('admin') : openSection('admin'); }}
-                                    className="p-0.5 rounded hover:bg-slate-800 transition-colors"
-                                    title={isAdminOpen ? 'Contraer sección' : 'Expandir sección'}
+                                    key={section.key}
+                                    onClick={() => handleIconClick(section)}
+                                    title={section.label}
+                                    className={`
+                                        group/icon relative w-10 h-10 rounded-xl flex items-center justify-center
+                                        transition-all duration-200 ease-out
+                                        ${isActive
+                                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/25'
+                                            : isPanelOpen
+                                                ? 'bg-slate-800 text-white'
+                                                : 'text-slate-500 hover:text-slate-200 hover:bg-slate-800/60'
+                                        }
+                                    `}
                                 >
-                                    {isAdminOpen
-                                        ? <ChevronDown className="w-3 h-3 text-slate-500 hover:text-slate-300 transition-colors" />
-                                        : <ChevronRight className="w-3 h-3 text-slate-600 hover:text-slate-300 transition-colors" />
-                                    }
+                                    <Icon className="w-[18px] h-[18px]" />
+                                    {/* Tooltip */}
+                                    {!openPanel && (
+                                        <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-slate-800 text-white text-xs font-semibold rounded-lg
+                                            opacity-0 group-hover/icon:opacity-100 pointer-events-none transition-opacity duration-150 whitespace-nowrap
+                                            shadow-lg shadow-black/30 border border-slate-700/50 z-50">
+                                            {section.label}
+                                            <div className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-r-[5px] border-r-slate-800" />
+                                        </div>
+                                    )}
                                 </button>
-                            </div>
-                            <div className={`overflow-hidden transition-all duration-200 ease-in-out ${isAdminOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                                <NavLink
-                                    to="/automation"
-                                    title="Automatización"
-                                    className={({ isActive }) =>
-                                        `w-[220px] flex items-center gap-4 px-2.5 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${isActive
-                                            ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/30'
-                                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                                        }`
-                                    }
-                                >
-                                    <Zap className="w-5 h-5 flex-shrink-0 ml-[1px]" />
-                                    <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">Automatización</span>
-                                </NavLink>
-                                <NavLink
-                                    to="/settings"
-                                    title="Configuración"
-                                    className={({ isActive }) =>
-                                        `w-[220px] flex items-center gap-4 px-2.5 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${isActive
-                                            ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/30'
-                                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                                        }`
-                                    }
-                                >
-                                    <Settings className="w-5 h-5 flex-shrink-0 ml-[1px]" />
-                                    <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">Configuración</span>
-                                </NavLink>
-                            </div>
-                        </div>
-                    )}
-                </nav>
+                            );
+                        })}
 
-                {/* User Info & Sign Out */}
-                <div className="p-4 border-t border-slate-800 flex-shrink-0 flex items-center justify-between overflow-hidden whitespace-nowrap w-[256px]">
-                    <div className="flex items-center gap-4">
+                        {/* Admin icon */}
+                        {isAdmin && (
+                            <>
+                                <div className="w-6 h-px bg-slate-800 my-1" />
+                                <button
+                                    onClick={() => handleIconClick(ADMIN_SECTION)}
+                                    title="Admin"
+                                    className={`
+                                        group/icon relative w-10 h-10 rounded-xl flex items-center justify-center
+                                        transition-all duration-200 ease-out
+                                        ${activeSection === 'admin'
+                                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/25'
+                                            : openPanel === 'admin'
+                                                ? 'bg-slate-800 text-white'
+                                                : 'text-slate-500 hover:text-slate-200 hover:bg-slate-800/60'
+                                        }
+                                    `}
+                                >
+                                    <Settings className="w-[18px] h-[18px]" />
+                                    {!openPanel && (
+                                        <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-slate-800 text-white text-xs font-semibold rounded-lg
+                                            opacity-0 group-hover/icon:opacity-100 pointer-events-none transition-opacity duration-150 whitespace-nowrap
+                                            shadow-lg shadow-black/30 border border-slate-700/50 z-50">
+                                            Admin
+                                            <div className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-r-[5px] border-r-slate-800" />
+                                        </div>
+                                    )}
+                                </button>
+                            </>
+                        )}
+                    </nav>
+
+                    <div className="w-8 h-px bg-slate-800 my-2" />
+
+                    {/* User Avatar */}
+                    <div className="flex flex-col items-center gap-2 pb-1">
+                        <button
+                            onClick={signOut}
+                            title="Cerrar Sesión"
+                            className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:text-red-400 hover:bg-red-950/30 transition-all duration-200"
+                        >
+                            <LogOut className="w-[18px] h-[18px]" />
+                        </button>
                         {user.photoURL ? (
-                            <img src={user.photoURL} alt="" className="w-8 h-8 rounded-full flex-shrink-0" referrerPolicy="no-referrer" />
+                            <img
+                                src={user.photoURL}
+                                alt=""
+                                className="w-8 h-8 rounded-full ring-2 ring-slate-800 hover:ring-indigo-500 transition-all cursor-pointer"
+                                referrerPolicy="no-referrer"
+                                title={user.displayName || user.email}
+                            />
                         ) : (
-                            <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                            <div
+                                className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold ring-2 ring-slate-800"
+                                title={user.displayName || user.email}
+                            >
                                 {(user.displayName || user.email || '?')[0].toUpperCase()}
                             </div>
                         )}
-                        <div className="min-w-0 flex-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                            <p className="text-xs font-bold text-white truncate max-w-[100px]">{user.displayName || 'Usuario'}</p>
-                            <span className={`text-[9px] font-black uppercase tracking-wider ${isAdmin ? 'text-emerald-400' : canEdit ? 'text-amber-400' : 'text-slate-500'}`}>{role || 'viewer'}</span>
-                        </div>
                     </div>
-                    <button onClick={signOut} title="Cerrar Sesión" className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-all opacity-0 group-hover:opacity-100">
-                        <LogOut className="w-4 h-4" />
-                    </button>
                 </div>
-            </aside>
+
+                {/* ─── COLUMN 2: Slide-out Panel ─── */}
+                <div
+                    ref={panelRef}
+                    className={`
+                        h-full bg-slate-900/95 backdrop-blur-xl border-r border-slate-700/40
+                        transition-all duration-250 ease-[cubic-bezier(0.4,0,0.2,1)] overflow-hidden
+                        ${openPanel ? 'w-[240px] opacity-100' : 'w-0 opacity-0'}
+                    `}
+                    style={{ boxShadow: openPanel ? '8px 0 32px rgba(0,0,0,0.4)' : 'none' }}
+                >
+                    {panelSection && (
+                        <div className="w-[240px] h-full flex flex-col">
+                            {/* Panel Header */}
+                            <div className="px-4 pt-4 pb-3 border-b border-slate-800/60 flex items-center justify-between flex-shrink-0">
+                                <div className="flex items-center gap-2.5">
+                                    {(() => { const PIcon = panelSection.icon; return <PIcon className="w-4 h-4 text-indigo-400" />; })()}
+                                    <h2 className="text-sm font-bold text-white tracking-tight">{panelSection.label}</h2>
+                                </div>
+                                <button
+                                    onClick={() => setOpenPanel(null)}
+                                    className="p-1 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+                                >
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+
+                            {/* Panel Items */}
+                            <div className="flex-1 px-2 py-2 overflow-y-auto scrollbar-thin">
+                                {panelSection.items.map((item, idx) => {
+                                    const ItemIcon = item.icon;
+                                    const count = item.countKey ? counts[item.countKey] : null;
+                                    return (
+                                        <NavLink
+                                            key={item.to}
+                                            to={item.to}
+                                            end={item.to === '/'}
+                                            className={({ isActive }) => `
+                                                flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium
+                                                transition-all duration-150 group/item mb-0.5
+                                                ${isActive
+                                                    ? 'bg-indigo-600/15 text-indigo-300 border border-indigo-500/20 shadow-sm'
+                                                    : 'text-slate-400 hover:text-white hover:bg-slate-800/70 border border-transparent'
+                                                }
+                                            `}
+                                            style={{ animationDelay: `${idx * 30}ms` }}
+                                        >
+                                            <ItemIcon className="w-4 h-4 flex-shrink-0" />
+                                            <span className="flex-1 truncate">{item.label}</span>
+                                            {count != null && (
+                                                <span className="text-[10px] font-mono bg-slate-800/80 text-slate-400 px-1.5 py-0.5 rounded-md min-w-[24px] text-center">
+                                                    {count}
+                                                </span>
+                                            )}
+                                            <ChevronRight className="w-3 h-3 text-slate-600 opacity-0 group-hover/item:opacity-100 transition-opacity" />
+                                        </NavLink>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Panel Footer */}
+                            <div className="px-4 py-3 border-t border-slate-800/40 flex-shrink-0">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    <span className="text-[10px] text-slate-500 font-mono">v{APP_VERSION}</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
         </>
     );
 }

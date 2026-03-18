@@ -3,9 +3,10 @@ import { useAppData } from '../contexts/AppDataContext';
 import { useRole } from '../contexts/RoleContext';
 import {
     Tag, Truck, LayoutList, AlertOctagon, ListTodo,
-    Plus, Edit2, Trash2, Check, X, Search, List
+    Plus, Edit2, Trash2, Check, X, Search, List, Compass, Target
 } from 'lucide-react';
 import { createDelayCause, updateDelayCause, deleteDelayCause } from '../services/delayService';
+import AreaTaskTypeRelationModal from '../components/milestones/AreaTaskTypeRelationModal';
 
 // ============================================================
 // Generic List Card — reusable for simple name-only lists
@@ -41,9 +42,14 @@ function SimpleListCard({ title, subtitle, icon: Icon, iconBg, iconColor, items,
         const added = editItems.filter(i => !i.original && i.name.trim()).map(i => i.name.trim());
         const remainingOriginals = editItems.map(i => i.original).filter(Boolean);
         const deleted = items.filter(name => !remainingOriginals.includes(name));
-        await onSave({ renames, deleted, added });
+        try {
+            await onSave({ renames, deleted, added });
+            setIsEditing(false);
+        } catch (err) {
+            console.error('Error saving managed list:', err);
+            alert('Error al guardar: ' + (err.message || 'Error desconocido'));
+        }
         setIsSaving(false);
-        setIsEditing(false);
     };
 
     const cancel = () => {
@@ -269,12 +275,71 @@ function DelayCausesCard({ causes }) {
         </div>
     );
 }
+// ============================================================
+// Area ↔ Task Type Relationship — Summary card + Modal trigger
+// ============================================================
+function AreaTaskTypeRelationSection({ workAreaTypes, taskTypes }) {
+    const [showModal, setShowModal] = useState(false);
 
-// ============================================================
-// MAIN PAGE
-// ============================================================
+    return (
+        <>
+            <div className="bg-slate-900 rounded-2xl border border-slate-800 shadow-lg overflow-hidden lg:col-span-2">
+                {/* Header */}
+                <div className="p-5 border-b border-slate-800 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-teal-100 rounded-2xl flex items-center justify-center">
+                            <Compass className="w-5 h-5 text-teal-600" />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-white text-sm">Relación Áreas ↔ Tipos de Tarea</h3>
+                            <p className="text-[11px] text-slate-500">Define qué tipos de tarea pertenecen a cada área · Aplica a todos los milestones</p>
+                        </div>
+                    </div>
+                    <button onClick={() => setShowModal(true)} className="flex items-center gap-1.5 text-xs font-bold text-teal-400 hover:text-teal-300 bg-teal-500/10 hover:bg-teal-500/20 px-3 py-1.5 rounded-lg transition-colors">
+                        <Edit2 className="w-3.5 h-3.5" /> Editar
+                    </button>
+                </div>
+                {/* Quick summary */}
+                <div className="p-4">
+                    <div className="space-y-1">
+                        {(workAreaTypes || []).map(area => {
+                            const types = area.defaultTaskTypes || [];
+                            return (
+                                <div key={area.id} className="flex items-center gap-3 px-3 py-2 bg-slate-800/30 rounded-lg">
+                                    <div className="w-2 h-2 bg-teal-500 rounded-full flex-shrink-0" />
+                                    <span className="text-sm font-semibold text-slate-200 min-w-[90px]">{area.name}</span>
+                                    <div className="flex flex-wrap gap-1 flex-1 min-w-0">
+                                        {types.length > 0 ? types.map(tt => (
+                                            <span key={tt} className="px-2 py-0.5 text-[10px] font-semibold rounded border border-teal-500/30 bg-teal-500/10 text-teal-300 whitespace-nowrap">{tt}</span>
+                                        )) : (
+                                            <span className="text-[10px] text-slate-500 italic">sin asignar</span>
+                                        )}
+                                    </div>
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded flex-shrink-0 ${types.length > 0 ? 'text-teal-400 bg-teal-500/10' : 'text-amber-400 bg-amber-500/10'}`}>
+                                        {types.length}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                        {(workAreaTypes || []).length === 0 && (
+                            <p className="text-xs text-slate-500 text-center py-4">Agrega áreas de trabajo primero.</p>
+                        )}
+                    </div>
+                </div>
+            </div>
+            <AreaTaskTypeRelationModal
+                open={showModal}
+                onClose={() => setShowModal(false)}
+                workAreaTypes={workAreaTypes}
+                taskTypes={taskTypes}
+            />
+        </>
+    );
+}
+
+
 export default function ManagedListsPage() {
-    const { managedLists, delayCauses, taskTypes, handleSaveManagedList } = useAppData();
+    const { managedLists, delayCauses, taskTypes, workAreaTypes, milestoneTypes, handleSaveManagedList } = useAppData();
     const { canEdit } = useRole();
 
     return (
@@ -328,6 +393,25 @@ export default function ManagedListsPage() {
                     iconColor="text-emerald-600"
                     items={(taskTypes || []).map(t => t.name)}
                     onSave={(data) => handleSaveManagedList({ type: 'taskType', data })}
+                />
+                <SimpleListCard
+                    title="Áreas de Trabajo"
+                    subtitle="Disciplinas de ingeniería para milestones"
+                    icon={Compass}
+                    iconBg="bg-teal-100"
+                    iconColor="text-teal-600"
+                    items={(workAreaTypes || []).map(t => t.name)}
+                    onSave={(data) => handleSaveManagedList({ type: 'workAreaType', data })}
+                />
+                <AreaTaskTypeRelationSection workAreaTypes={workAreaTypes} taskTypes={taskTypes} />
+                <SimpleListCard
+                    title="Tipos de Milestone"
+                    subtitle="Clasificación de hitos y fases del proyecto"
+                    icon={Target}
+                    iconBg="bg-purple-100"
+                    iconColor="text-purple-600"
+                    items={(milestoneTypes || []).map(t => t.name)}
+                    onSave={(data) => handleSaveManagedList({ type: 'milestoneType', data })}
                 />
             </div>
         </div>

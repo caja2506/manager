@@ -5,25 +5,29 @@ import { useRole } from '../contexts/RoleContext';
 import { useAppData } from '../contexts/AppDataContext';
 import ActiveTimer from '../components/time/ActiveTimer';
 import ManualTimeEntry from '../components/time/ManualTimeEntry';
-import { deleteTimeLog, formatDuration } from '../services/timeService';
+import TaskDetailModal from '../components/tasks/TaskDetailModal';
+import { deleteTimeLog, formatDuration, setActiveTimer, recalculateTaskHours } from '../services/timeService';
 import { db } from '../firebase';
 import { updateDoc, doc } from 'firebase/firestore';
 import {
     Clock, Plus, Trash2, Zap, Calendar, ListTodo, FolderGit2,
     BarChart3, ChevronLeft, ChevronRight, FileText, AlertTriangle,
-    User, MessageCircle
+    User, MessageCircle, Pencil
 } from 'lucide-react';
 
 export default function WorkLogs() {
     const { user } = useAuth();
     const { canEdit, canDelete } = useRole();
-    const { engProjects, engTasks, timeLogs, teamMembers } = useAppData();
+    const { engProjects, engTasks, engSubtasks, timeLogs, teamMembers, taskTypes } = useAppData();
 
     // Get selectedUser from shared ReportsLayout via outlet context
     const outletCtx = useOutletContext() || {};
     const selectedUser = outletCtx.selectedUser || user?.uid || '';
 
     const [showManual, setShowManual] = useState(false);
+    const [editingLog, setEditingLog] = useState(null);
+    const [selectedTask, setSelectedTask] = useState(null);
+    const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
     const [weekOffset, setWeekOffset] = useState(0);
     const [deletingId, setDeletingId] = useState(null);
     const [deleteError, setDeleteError] = useState('');
@@ -110,14 +114,33 @@ export default function WorkLogs() {
         return new Date(isoString).toLocaleDateString('es', { weekday: 'short', day: '2-digit', month: 'short' });
     };
 
+    // Duration with seconds (h:mm:ss)
+    const formatDurationSec = (hours) => {
+        if (!hours || hours <= 0) return '0:00:00';
+        const totalSec = Math.round(hours * 3600);
+        const h = Math.floor(totalSec / 3600);
+        const m = Math.floor((totalSec % 3600) / 60);
+        const s = totalSec % 60;
+        return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    };
+
+    const openTaskPopup = (taskId) => {
+        const task = engTasks.find(t => t.id === taskId);
+        if (task) {
+            setSelectedTask(task);
+            setIsTaskModalOpen(true);
+        }
+    };
+
     return (
         <div className="space-y-5">
             <ManualTimeEntry
-                isOpen={showManual}
-                onClose={() => setShowManual(false)}
+                isOpen={showManual || !!editingLog}
+                onClose={() => { setShowManual(false); setEditingLog(null); }}
                 tasks={engTasks}
                 projects={engProjects}
                 userId={user?.uid}
+                editLog={editingLog}
             />
 
             {/* Action bar (smaller, no duplicate banner) */}
@@ -237,8 +260,10 @@ export default function WorkLogs() {
                                 return (
                                     <div
                                         key={log.id}
-                                        className={`bg-slate-900/60 rounded-xl border p-4 transition-all hover:shadow-lg group ${isRunning ? 'border-green-500/50 ring-1 ring-green-500/20' :
-                                            log.overtime ? 'border-amber-500/30' : 'border-slate-800'
+                                        onClick={() => { if (!isRunning) setEditingLog(log); }}
+                                        className={`bg-slate-900/60 rounded-xl border p-4 transition-all hover:shadow-lg group ${!isRunning ? 'cursor-pointer hover:border-indigo-500/40' : ''
+                                            } ${isRunning ? 'border-green-500/50 ring-1 ring-green-500/20' :
+                                                log.overtime ? 'border-amber-500/30' : 'border-slate-800'
                                             }`}
                                     >
                                         <div className="flex items-start justify-between gap-3">
@@ -251,15 +276,22 @@ export default function WorkLogs() {
                                                         </span>
                                                     )}
                                                     {log.taskId && (
-                                                        <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg flex items-center gap-1 truncate max-w-[200px]">
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); openTaskPopup(log.taskId); }}
+                                                            className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg flex items-center gap-1 truncate max-w-[200px] hover:bg-indigo-100 hover:ring-1 hover:ring-indigo-300 transition-all cursor-pointer"
+                                                            title="Abrir tarea"
+                                                        >
                                                             <ListTodo className="w-3 h-3 flex-shrink-0" /> {getTaskName(log.taskId)}
-                                                        </span>
+                                                        </button>
                                                     )}
                                                     {!log.taskId && !isRunning && (
                                                         <span className="text-[10px] font-bold text-slate-500 bg-slate-800 px-2 py-0.5 rounded-lg">Sin tarea</span>
                                                     )}
                                                     {log.projectId && (
-                                                        <span className="text-[10px] font-bold text-purple-500 bg-purple-50 px-2 py-0.5 rounded-lg flex items-center gap-1 truncate max-w-[150px]">
+                                                        <span
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="text-[10px] font-bold text-purple-500 bg-purple-50 px-2 py-0.5 rounded-lg flex items-center gap-1 truncate max-w-[150px]"
+                                                        >
                                                             <FolderGit2 className="w-3 h-3 flex-shrink-0" /> {getProjectName(log.projectId)}
                                                         </span>
                                                     )}
@@ -308,13 +340,14 @@ export default function WorkLogs() {
                                                 <span className={`text-lg font-black tabular-nums ${isRunning ? 'text-green-400' :
                                                     log.overtime ? 'text-amber-500' : 'text-indigo-600'
                                                     }`}>
-                                                    {isRunning ? '⏱' : formatDuration(log.totalHours)}
+                                                    {isRunning ? '⏱' : formatDurationSec(log.totalHours)}
                                                 </span>
 
                                                 {/* Stop button for running logs */}
                                                 {isRunning && (canEdit || log.userId === user?.uid) && (
                                                     <button
-                                                        onClick={async () => {
+                                                        onClick={async (e) => {
+                                                            e.stopPropagation();
                                                             if (deletingId) return;
                                                             setDeletingId(log.id);
                                                             setDeleteError('');
@@ -329,6 +362,11 @@ export default function WorkLogs() {
                                                                     totalHours,
                                                                     overtimeHours: log.overtime ? totalHours : 0,
                                                                 });
+                                                                // Clear localStorage timer + notify ActiveTimer component
+                                                                setActiveTimer(null);
+                                                                window.dispatchEvent(new StorageEvent('storage', { key: 'autobom_active_timer' }));
+                                                                // Recalculate task hours if applicable
+                                                                if (log.taskId) await recalculateTaskHours(log.taskId);
                                                             } catch (err) {
                                                                 console.error("Stop Error:", err);
                                                                 setDeleteError(err.message || "Error deteniendo el timer");
@@ -344,10 +382,22 @@ export default function WorkLogs() {
                                                     </button>
                                                 )}
 
+                                                {/* Edit button for completed logs */}
+                                                {!isRunning && (canEdit || log.userId === user?.uid) && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setEditingLog(log); }}
+                                                        className="p-1.5 rounded-lg transition-all text-indigo-400 opacity-0 group-hover:opacity-100 hover:bg-indigo-50"
+                                                        title="Editar registro"
+                                                    >
+                                                        <Pencil className="w-4 h-4" />
+                                                    </button>
+                                                )}
+
                                                 {/* Delete button — always visible for running, hover for others */}
                                                 {(canDelete || log.userId === user?.uid) && (
                                                     <button
-                                                        onClick={async () => {
+                                                        onClick={async (e) => {
+                                                            e.stopPropagation();
                                                             if (deletingId) return;
                                                             setDeletingId(log.id);
                                                             setDeleteError('');
@@ -385,6 +435,22 @@ export default function WorkLogs() {
                     )}
                 </div>
             </div>
+
+            {/* Task Detail Modal */}
+            {isTaskModalOpen && selectedTask && (
+                <TaskDetailModal
+                    task={selectedTask}
+                    isOpen={isTaskModalOpen}
+                    onClose={() => { setIsTaskModalOpen(false); setSelectedTask(null); }}
+                    projects={engProjects}
+                    subtasks={(engSubtasks || []).filter(s => s.taskId === selectedTask.id)}
+                    taskTypes={taskTypes || []}
+                    teamMembers={teamMembers || []}
+                    userId={user?.uid}
+                    canEdit={canEdit}
+                    canDelete={canDelete}
+                />
+            )}
         </div>
     );
 }

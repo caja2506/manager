@@ -498,5 +498,63 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ============================================================
+    // V5 FOUNDATION COLLECTIONS
+    // ============================================================
+
+    // --- milestones ---
+    // Editors+ can create/update/delete milestones within projects
+    match /milestones/{docId} {
+      allow create, update, delete: if isEditor();
+    }
+
+    // --- workAreas ---
+    // Editors+ can manage work areas within milestones
+    // Only admins can delete
+    match /workAreas/{docId} {
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    // --- workAreaTypes ---
+    // Global catalog of work area names (Eléctrica, Mecánica, etc.)
+    // Editors+ can manage, admins can delete
+    match /workAreaTypes/{docId} {
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    // --- milestoneTypes ---
+    // Global catalog of milestone types (Setup, Commissioning, etc.)
+    // Editors+ can manage, admins can delete
+    match /milestoneTypes/{docId} {
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    // --- auditTrail ---
+    // IMMUTABLE, APPEND-ONLY — no updates, no deletes, EVER
+    // Written by Cloud Functions (Admin SDK) and client audit actions
+    match /auditTrail/{docId} {
+      allow create: if isAuthenticated();
+      // NO update or delete — immutable trail
+    }
+
+    // --- aiGovernance ---
+    // Admin-only: defines AI capability matrix
+    match /aiGovernance/{docId} {
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // --- scoreSnapshots ---
+    // Append-only score history for trend analysis
+    // Written by system/client on score computation events
+    match /scoreSnapshots/{docId} {
+      allow create: if isAuthenticated();
+      allow read: if isAuthenticated();
+      // NO update or delete — immutable history
+    }
+
   }
 }

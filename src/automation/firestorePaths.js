@@ -1,107 +1,77 @@
 /**
- * Automation Firestore Collection Paths
- * ======================================
- * 
- * Centralized collection path constants for all automation-related
- * Firestore collections. Avoids string duplication across the codebase.
- * 
+ * @deprecated V5 (O10): This file is a BACKWARD COMPATIBILITY wrapper.
+ * All collection path constants are now defined in schemas.js COLLECTIONS.
+ *
+ * New code should import directly from:
+ *   import { COLLECTIONS } from '../models/schemas';
+ *
+ * Existing imports continue to work via these re-exports.
+ * This file will be removed after all consumers are migrated.
+ *
  * @module automation/firestorePaths
  */
 
-// ============================================================
-// GENERIC AUTOMATION COLLECTIONS
-// ============================================================
+import { COLLECTIONS } from '../models/schemas.js';
 
-/** System settings documents (stored in existing 'settings' collection) */
-export const SETTINGS_COLLECTION = 'settings';
+// ── Re-exports from COLLECTIONS (single source of truth) ──
+
+/** @deprecated Use COLLECTIONS.SETTINGS */
+export const SETTINGS_COLLECTION = COLLECTIONS.SETTINGS;
+
+/** Settings document IDs (not in COLLECTIONS — these are doc-level) */
 export const SETTINGS_DOCS = {
     AUTOMATION_CORE: 'automationCore',
     TELEGRAM_OPS: 'telegramOps',
     AUTOMATION_AI: 'automationAI',
 };
 
-/** Automation routine definitions */
-export const AUTOMATION_ROUTINES = 'automationRoutines';
+/** @deprecated Use COLLECTIONS.AUTOMATION_ROUTINES */
+export const AUTOMATION_ROUTINES = COLLECTIONS.AUTOMATION_ROUTINES;
 
-/** Automation run execution records */
-export const AUTOMATION_RUNS = 'automationRuns';
+/** @deprecated Use COLLECTIONS.AUTOMATION_RUNS */
+export const AUTOMATION_RUNS = COLLECTIONS.AUTOMATION_RUNS;
 
-/** Daily aggregated automation metrics */
-export const AUTOMATION_METRICS_DAILY = 'automationMetricsDaily';
+/** @deprecated Use COLLECTIONS.AUTOMATION_METRICS_DAILY */
+export const AUTOMATION_METRICS_DAILY = COLLECTIONS.AUTOMATION_METRICS_DAILY;
 
-/** Generic operational incidents */
-export const OPERATION_INCIDENTS = 'operationIncidents';
+/** @deprecated Use COLLECTIONS.OPERATION_INCIDENTS */
+export const OPERATION_INCIDENTS = COLLECTIONS.OPERATION_INCIDENTS;
 
-/** AI execution audit trail */
-export const AI_EXECUTIONS = 'aiExecutions';
+/** @deprecated Use COLLECTIONS.AI_EXECUTIONS */
+export const AI_EXECUTIONS = COLLECTIONS.AI_EXECUTIONS;
 
-// ============================================================
-// TELEGRAM-SPECIFIC COLLECTIONS
-// ============================================================
+/** @deprecated Use COLLECTIONS.TELEGRAM_SESSIONS */
+export const TELEGRAM_SESSIONS = COLLECTIONS.TELEGRAM_SESSIONS;
 
-/** Telegram conversational sessions per user/chat */
-export const TELEGRAM_SESSIONS = 'telegramSessions';
+/** @deprecated Use COLLECTIONS.TELEGRAM_REPORTS */
+export const TELEGRAM_REPORTS = COLLECTIONS.TELEGRAM_REPORTS;
 
-/** Telegram daily progress reports */
-export const TELEGRAM_REPORTS = 'telegramReports';
+/** @deprecated Use COLLECTIONS.TELEGRAM_ESCALATIONS */
+export const TELEGRAM_ESCALATIONS = COLLECTIONS.TELEGRAM_ESCALATIONS;
 
-/** Telegram escalation records */
-export const TELEGRAM_ESCALATIONS = 'telegramEscalations';
+/** @deprecated Use COLLECTIONS.TELEGRAM_BOT_LOGS */
+export const TELEGRAM_BOT_LOGS = COLLECTIONS.TELEGRAM_BOT_LOGS;
 
-/** Telegram bot operational logs (append-only) */
-export const TELEGRAM_BOT_LOGS = 'telegramBotLogs';
+/** @deprecated Use COLLECTIONS.TELEGRAM_DELIVERIES */
+export const TELEGRAM_DELIVERIES = COLLECTIONS.TELEGRAM_DELIVERIES;
 
-/** Telegram message delivery tracking */
-export const TELEGRAM_DELIVERIES = 'telegramDeliveries';
+// ── Analytics Engine ──
+export const OPERATIONAL_KPI_SNAPSHOTS = COLLECTIONS.OPERATIONAL_KPI_SNAPSHOTS;
+export const USER_OPERATIONAL_SCORES = COLLECTIONS.USER_OPERATIONAL_SCORES;
+export const ROUTINE_OPERATIONAL_SCORES = COLLECTIONS.ROUTINE_OPERATIONAL_SCORES;
+export const TEAM_OPERATIONAL_SUMMARIES = COLLECTIONS.TEAM_OPERATIONAL_SUMMARIES;
+export const OPERATIONAL_RISK_FLAGS = COLLECTIONS.OPERATIONAL_RISK_FLAGS;
+export const OPERATIONAL_RECOMMENDATIONS = COLLECTIONS.OPERATIONAL_RECOMMENDATIONS;
+export const ANALYTICS_REFRESH_LOGS = COLLECTIONS.ANALYTICS_REFRESH_LOGS;
 
-// ============================================================
-// ANALYTICS ENGINE (Phase 4)
-// ============================================================
+// ── Optimization Engine ──
+export const OPTIMIZATION_OPPORTUNITIES = COLLECTIONS.OPTIMIZATION_OPPORTUNITIES;
+export const OPTIMIZATION_SIMULATIONS = COLLECTIONS.OPTIMIZATION_SIMULATIONS;
+export const OPERATIONAL_PLANS = COLLECTIONS.OPERATIONAL_PLANS;
+export const APPLIED_RECOMMENDATIONS = COLLECTIONS.APPLIED_RECOMMENDATIONS;
+export const OPTIMIZATION_HISTORY = COLLECTIONS.OPTIMIZATION_HISTORY;
 
-/** Operational KPI snapshots (global, per-period) */
-export const OPERATIONAL_KPI_SNAPSHOTS = 'operationalKpiSnapshots';
-
-/** User-level operational scores */
-export const USER_OPERATIONAL_SCORES = 'userOperationalScores';
-
-/** Routine-level operational scores */
-export const ROUTINE_OPERATIONAL_SCORES = 'routineOperationalScores';
-
-/** Team/role operational summaries */
-export const TEAM_OPERATIONAL_SUMMARIES = 'teamOperationalSummaries';
-
-/** Active risk flags */
-export const OPERATIONAL_RISK_FLAGS = 'operationalRiskFlags';
-
-/** Actionable recommendations */
-export const OPERATIONAL_RECOMMENDATIONS = 'operationalRecommendations';
-
-/** Analytics refresh audit logs */
-export const ANALYTICS_REFRESH_LOGS = 'analyticsRefreshLogs';
-
-// ============================================================
-// OPTIMIZATION ENGINE (Phase 5)
-// ============================================================
-
-/** Detected optimization opportunities */
-export const OPTIMIZATION_OPPORTUNITIES = 'optimizationOpportunities';
-
-/** What-if simulation results */
-export const OPTIMIZATION_SIMULATIONS = 'optimizationSimulations';
-
-/** Daily/weekly operational plans */
-export const OPERATIONAL_PLANS = 'operationalPlans';
-
-/** Applied recommendation tracking (before/after) */
-export const APPLIED_RECOMMENDATIONS = 'appliedRecommendations';
-
-/** Optimization audit trail */
-export const OPTIMIZATION_HISTORY = 'optimizationHistory';
-
-// ============================================================
-// ALL AUTOMATION PATHS (for iteration/validation)
-// ============================================================
-
+// ── Convenience: re-export the full array ──
 export const ALL_AUTOMATION_COLLECTIONS = [
     AUTOMATION_ROUTINES,
     AUTOMATION_RUNS,
@@ -126,4 +96,3 @@ export const ALL_AUTOMATION_COLLECTIONS = [
     APPLIED_RECOMMENDATIONS,
     OPTIMIZATION_HISTORY,
 ];
-

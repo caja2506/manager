@@ -236,12 +236,16 @@ async function updateTeamMember(adminDb, userId, fields) {
     return { updated: true, userId, fields: Object.keys(updates) };
 }
 
-// ── Get Team Members ──
+// ── Get Team Members (V5: READ-ONLY — no side effect writes) ──
 
 /**
  * Get all team members with their Telegram status.
  * Merges data from both "users" (operational) and "users_roles" (auth/RBAC)
  * so ALL registered users appear even if they haven't been set up for automation.
+ *
+ * V5 CHANGE (O5): This function is now READ-ONLY. It merges data in-memory
+ * but NEVER writes to Firestore. Use ensureTeamMemberProfiles() separately
+ * when you need to create missing user profiles.
  */
 async function getTeamMembers(adminDb) {
     // 1. Load operational users
@@ -253,25 +257,22 @@ async function getTeamMembers(adminDb) {
 
     // 2. Load RBAC users (source of truth for who's registered)
     const rolesSnap = await adminDb.collection(paths.USERS_ROLES).get();
-    const now = new Date().toISOString();
 
     for (const doc of rolesSnap.docs) {
         const rd = doc.data();
         if (!usersMap[doc.id]) {
-            // User exists in RBAC but not in operational users — create entry
-            const newUserData = {
+            // User exists in RBAC but not in operational users — merge in-memory only
+            usersMap[doc.id] = {
+                id: doc.id,
                 displayName: rd.displayName || rd.name || rd.email || doc.id,
                 name: rd.displayName || rd.name || rd.email || doc.id,
                 email: rd.email || "",
                 active: true,
                 isAutomationParticipant: false,
-                createdAt: now,
-                updatedAt: now,
+                _needsProfileCreation: true, // Flag for caller to detect
             };
-            await adminDb.collection(paths.USERS).doc(doc.id).set(newUserData);
-            usersMap[doc.id] = { id: doc.id, ...newUserData };
         } else {
-            // Merge: ensure displayName & email are up to date from RBAC
+            // Merge: ensure displayName & email are current from RBAC (in-memory)
             const u = usersMap[doc.id];
             const rbacName = rd.displayName || rd.name || '';
             if (rbacName && !u.displayName) {
@@ -291,6 +292,7 @@ async function getTeamMembers(adminDb) {
         displayName: d.displayName || d.name || d.email || d.id,
         email: d.email || "",
         operationalRole: d.operationalRole || null,
+        teamRole: d.teamRole || d.operationalRole || null, // V5: expose both names
         rbacRole: d.rbacRole || null,
         isAutomationParticipant: d.isAutomationParticipant || false,
         active: d.active !== false,
@@ -320,10 +322,50 @@ async function getTeamMembers(adminDb) {
     return { members, pendingCodes };
 }
 
+/**
+ * Ensure all RBAC users have corresponding users/{uid} profiles.
+ * This is the EXPLICIT write operation that was previously hidden
+ * inside getTeamMembers() as a side effect.
+ *
+ * Call this intentionally (e.g., from admin panel or bootstrap flow).
+ *
+ * @param {FirebaseFirestore.Firestore} adminDb
+ * @returns {{ created: number, total: number }}
+ */
+async function ensureTeamMemberProfiles(adminDb) {
+    const usersSnap = await adminDb.collection(paths.USERS).get();
+    const existingUids = new Set(usersSnap.docs.map(d => d.id));
+
+    const rolesSnap = await adminDb.collection(paths.USERS_ROLES).get();
+    const now = new Date().toISOString();
+    let created = 0;
+
+    for (const doc of rolesSnap.docs) {
+        if (!existingUids.has(doc.id)) {
+            const rd = doc.data();
+            await adminDb.collection(paths.USERS).doc(doc.id).set({
+                displayName: rd.displayName || rd.name || rd.email || doc.id,
+                name: rd.displayName || rd.name || rd.email || doc.id,
+                email: rd.email || "",
+                active: true,
+                isAutomationParticipant: false,
+                createdAt: now,
+                updatedAt: now,
+                createdBy: "system",
+                updatedBy: "system",
+            });
+            created++;
+        }
+    }
+
+    return { created, total: rolesSnap.size };
+}
+
 module.exports = {
     generateLinkCode,
     validateAndConsumeLinkCode,
     unlinkTelegramUser,
     updateTeamMember,
     getTeamMembers,
+    ensureTeamMemberProfiles,
 };
