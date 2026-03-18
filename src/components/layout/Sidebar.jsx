@@ -38,6 +38,7 @@ const SECTIONS = [
         items: [
             { to: '/projects', label: 'Proyectos', icon: Briefcase, countKey: 'engProjects' },
             { to: '/tasks', label: 'Tareas', icon: ListTodo, countKey: 'engTasks' },
+            { to: '/daily-scrum', label: 'Equipo Hoy', icon: Users },
             { to: '/planner', label: 'Weekly Planner', icon: CalendarDays },
             { to: '/gantt', label: 'Project Gantt', icon: GanttChartSquare },
         ],

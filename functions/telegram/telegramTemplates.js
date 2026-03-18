@@ -69,6 +69,115 @@ function morningDigestManager({ name, totalTasks = 0, overdueTasks = 0, blockedT
     return msg;
 }
 
+/**
+ * Team-level Daily Scrum summary for managers/engineers.
+ * Uses same logic as Equipo Hoy page.
+ * Shows actual task names, not just counts.
+ */
+function morningDigestTeamScrum({ name, summary, scrumData, teamMembers }) {
+    const memberMap = {};
+    (teamMembers || []).forEach(m => { memberMap[m.uid || m.id] = m.displayName || m.email; });
+
+    // Helper: list tasks as indented lines (max 3)
+    const listTasks = (tasks, max = 3) => {
+        let out = '';
+        tasks.slice(0, max).forEach(t => {
+            out += `      ◦ ${t.title || 'Sin título'}\n`;
+        });
+        if (tasks.length > max) out += `      ... +${tasks.length - max} más\n`;
+        return out;
+    };
+
+    let msg = `🌅 <b>Equipo Hoy — ${name}</b>\n`;
+    msg += `📊 Daily Scrum Digital Dashboard\n\n`;
+
+    // Summary line
+    msg += `👥 <b>${summary.total}</b> personas`;
+    msg += ` · 🟢 ${summary.ok} OK`;
+    if (summary.sin_tareas > 0) msg += ` · 🟡 ${summary.sin_tareas} sin tareas`;
+    if (summary.sin_reporte > 0) msg += ` · 🔴 ${summary.sin_reporte} sin reporte`;
+    if (summary.bloqueado > 0) msg += ` · ⛔ ${summary.bloqueado} bloqueado`;
+    msg += `\n`;
+
+    // ── Blocked
+    const blocked = scrumData.filter(p => p.status === 'bloqueado');
+    if (blocked.length > 0) {
+        msg += `\n⛔ <b>BLOQUEADOS</b>\n`;
+        blocked.forEach(p => {
+            const eng = p.engineerId ? memberMap[p.engineerId] : null;
+            msg += `  • <b>${p.displayName}</b>`;
+            if (eng) msg += ` → <i>resp: ${eng}</i>`;
+            msg += `\n`;
+            if (p.todayTasks.length > 0) msg += listTasks(p.todayTasks);
+        });
+    }
+
+    // ── No report
+    const noReport = scrumData.filter(p => p.status === 'sin_reporte');
+    if (noReport.length > 0) {
+        msg += `\n🔴 <b>SIN REPORTE AYER</b>\n`;
+        noReport.forEach(p => {
+            const eng = p.engineerId ? memberMap[p.engineerId] : null;
+            msg += `  • <b>${p.displayName}</b>`;
+            if (eng) msg += ` → <i>resp: ${eng}</i>`;
+            msg += `\n`;
+            if (p.todayTasks.length > 0) {
+                msg += `    📋 Hoy:\n`;
+                msg += listTasks(p.todayTasks);
+            } else {
+                msg += `    ⚠ Sin tareas hoy\n`;
+            }
+        });
+    }
+
+    // ── No tasks
+    const noTasks = scrumData.filter(p => p.status === 'sin_tareas');
+    if (noTasks.length > 0) {
+        msg += `\n🟡 <b>SIN TAREAS HOY</b>\n`;
+        noTasks.forEach(p => {
+            const eng = p.engineerId ? memberMap[p.engineerId] : null;
+            msg += `  • <b>${p.displayName}</b>`;
+            if (eng) msg += ` → <i>resp: ${eng}</i>`;
+            msg += `\n`;
+        });
+    }
+
+    // ── OK — show what they're working on
+    const okPeople = scrumData.filter(p => p.status === 'ok');
+    if (okPeople.length > 0) {
+        msg += `\n🟢 <b>EQUIPO OK</b>\n`;
+        okPeople.forEach(p => {
+            msg += `  • <b>${p.displayName}</b> (${p.todayTasks.length} tarea${p.todayTasks.length !== 1 ? 's' : ''})\n`;
+            msg += listTasks(p.todayTasks);
+        });
+    }
+
+    // ── Engineers that need to react
+    const engineerAlerts = {};
+    scrumData.filter(p => p.status !== 'ok' && p.engineerId).forEach(p => {
+        const engName = memberMap[p.engineerId] || p.engineerId;
+        if (!engineerAlerts[engName]) engineerAlerts[engName] = [];
+        engineerAlerts[engName].push(p.displayName);
+    });
+
+    const engKeys = Object.keys(engineerAlerts);
+    if (engKeys.length > 0) {
+        msg += `\n👷 <b>INGENIEROS QUE DEBEN REVISAR</b>\n`;
+        engKeys.forEach(eng => {
+            msg += `  • ${eng}: ${engineerAlerts[eng].join(', ')}\n`;
+        });
+    }
+
+    // ── Footer
+    if (summary.needsAttention > 0) {
+        msg += `\n⚡ <b>Acción requerida:</b> ${summary.needsAttention} persona(s) necesitan atención.`;
+    } else {
+        msg += `\n✅ Equipo completo y sin alertas.`;
+    }
+
+    return msg;
+}
+
 // ── Report Templates ──
 
 function reportRequest({ name }) {
@@ -190,6 +299,7 @@ module.exports = {
     morningDigestTechnician,
     morningDigestEngineer,
     morningDigestManager,
+    morningDigestTeamScrum,
     reportRequest,
     reportConfirmation,
     reportFormatError,

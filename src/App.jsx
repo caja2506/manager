@@ -38,6 +38,7 @@ import MilestoneDetailPage from './pages/MilestoneDetailPage';
 import MilestoneHistoryPage from './pages/MilestoneHistoryPage';
 import AIMonitoringPage from './pages/AIMonitoringPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
+import DailyScrumPage from './pages/DailyScrumPage';
 
 
 // ========================================================
@@ -108,6 +109,7 @@ export default function App() {
           <Route path="/control-tower" element={<ErrorBoundary module="Control Tower"><ControlTower /></ErrorBoundary>} />
           <Route path="/planner" element={<ErrorBoundary module="Planner Semanal"><WeeklyPlanner /></ErrorBoundary>} />
           <Route path="/gantt" element={<ErrorBoundary module="Gantt"><ProjectGantt /></ErrorBoundary>} />
+          <Route path="/daily-scrum" element={<ErrorBoundary module="Equipo Hoy"><DailyScrumPage /></ErrorBoundary>} />
 
           {/* Team */}
           <Route path="/team" element={<ErrorBoundary module="Equipo"><Team /></ErrorBoundary>} />

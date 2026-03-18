@@ -86,4 +86,5 @@ module.exports = {
     AUDIT_TRAIL: "auditTrail",
     AI_GOVERNANCE: "aiGovernance",
     SCORE_SNAPSHOTS: "scoreSnapshots",
+    RESOURCE_ASSIGNMENTS: "resourceAssignments",
 };

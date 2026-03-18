@@ -96,6 +96,7 @@ export const COLLECTIONS = {
     AUDIT_TRAIL: 'auditTrail',          // @classification: core (append-only, immutable)
     AI_GOVERNANCE: 'aiGovernance',      // @classification: config
     SCORE_SNAPSHOTS: 'scoreSnapshots',  // @classification: derived (V5: score history)
+    RESOURCE_ASSIGNMENTS: 'resourceAssignments', // @classification: core (V5: operational responsibility)
 };
 
 
