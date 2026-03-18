@@ -13,39 +13,50 @@ const paths = require("../automation/firestorePaths");
  * Load active tasks + subtasks for a user identified by Telegram chatId.
  */
 async function getQuickReportData(adminDb, chatId) {
-    // ── 1. Resolve user from chatId ──
-    const usersSnap = await adminDb.collection(paths.USERS)
-        .where("telegramChatId", "==", String(chatId))
+    const chatIdStr = String(chatId);
+
+    // ── 1. Try direct field: users.telegramChatId ──
+    let usersSnap = await adminDb.collection(paths.USERS)
+        .where("telegramChatId", "==", chatIdStr)
         .limit(1)
         .get();
 
-    if (usersSnap.empty) {
-        // Try linked sessions as fallback
-        const sessionSnap = await adminDb.collection(paths.TELEGRAM_SESSIONS)
-            .where("chatId", "==", String(chatId))
-            .limit(1)
-            .get();
-
-        if (sessionSnap.empty) {
-            return { error: "user_not_found", tasks: [] };
-        }
-
-        const session = sessionSnap.docs[0].data();
-        if (!session.userId) {
-            return { error: "user_not_linked", tasks: [] };
-        }
-
-        // Get user by userId from session
-        const userDoc = await adminDb.collection(paths.USERS).doc(session.userId).get();
-        if (!userDoc.exists) {
-            return { error: "user_not_found", tasks: [] };
-        }
-
+    if (!usersSnap.empty) {
+        const userDoc = usersSnap.docs[0];
         return await buildReportData(adminDb, userDoc.id, userDoc.data());
     }
 
-    const userDoc = usersSnap.docs[0];
-    return await buildReportData(adminDb, userDoc.id, userDoc.data());
+    // ── 2. Try providerLinks.telegram.chatId (scan automation participants) ──
+    const participantsSnap = await adminDb.collection(paths.USERS)
+        .where("isAutomationParticipant", "==", true)
+        .get();
+
+    for (const doc of participantsSnap.docs) {
+        const u = doc.data();
+        const linkedChatId = u.providerLinks?.telegram?.chatId;
+        if (linkedChatId && String(linkedChatId) === chatIdStr) {
+            return await buildReportData(adminDb, doc.id, u);
+        }
+    }
+
+    // ── 3. Try telegramSessions ──
+    const sessionSnap = await adminDb.collection(paths.TELEGRAM_SESSIONS)
+        .where("chatId", "==", chatIdStr)
+        .limit(1)
+        .get();
+
+    if (!sessionSnap.empty) {
+        const session = sessionSnap.docs[0].data();
+        if (session.userId) {
+            const userDoc = await adminDb.collection(paths.USERS).doc(session.userId).get();
+            if (userDoc.exists) {
+                return await buildReportData(adminDb, userDoc.id, userDoc.data());
+            }
+        }
+    }
+
+    console.warn(`[quickReport] User not found for chatId: ${chatIdStr}`);
+    return { error: "user_not_found", tasks: [] };
 }
 
 async function buildReportData(adminDb, userId, userData) {
