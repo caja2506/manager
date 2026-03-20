@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
     Radar, Shield, TrendingUp, TrendingDown, Minus, Users, Activity,
     AlertTriangle, Zap, Target, Clock, Calendar, BrainCircuit, RefreshCw,
@@ -7,8 +7,10 @@ import {
 import { useAuditData } from '../hooks/useAuditData';
 import { useAnalyticsData } from '../hooks/useAnalyticsData';
 import { useGeminiInsights } from '../hooks/useGeminiInsights';
+import { useAppData } from '../contexts/AppDataContext';
 import ComplianceScoresPanel from '../components/audit/ComplianceScoresPanel';
 import AIInsightsPanel from '../components/audit/AIInsightsPanel';
+import TaskDetailModal from '../components/tasks/TaskDetailModal';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -23,11 +25,12 @@ export default function ControlTower() {
     // ── Hooks ──
     const {
         runClientAudit, auditResult, scores, summary, isAuditing,
-        findingsBySeverity, findingsByEntity,
+        findingsBySeverity, findingsByEntity, isReady: auditReady,
     } = useAuditData();
 
     const {
         teamUtilization, liveKPIs, generateSnapshot, snapshot, isGenerating,
+        isReady: analyticsReady,
     } = useAnalyticsData();
 
     const {
@@ -35,11 +38,26 @@ export default function ControlTower() {
         insights, teamAnalysis, weeklyBrief, isGenerating: isAIGenerating, error: aiError,
     } = useGeminiInsights();
 
-    // Auto-run audit + snapshot on load
+    const { engTasks = [], engProjects = [], engSubtasks = [], taskTypes = [], teamMembers = [] } = useAppData();
+
+    // ── Task Edit Modal ──
+    const [selectedTask, setSelectedTask] = useState(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const closeModal = () => { setIsModalOpen(false); setSelectedTask(null); };
+
+    const handleOpenTask = useCallback((taskId) => {
+        const task = engTasks.find(t => t.id === taskId);
+        if (task) {
+            setSelectedTask(task);
+            setIsModalOpen(true);
+        }
+    }, [engTasks]);
+
+    // Auto-run audit + snapshot when data is ready
     useEffect(() => {
-        if (!auditResult && !isAuditing) runClientAudit();
-        if (!snapshot && !isGenerating) generateSnapshot();
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+        if (auditReady && !auditResult && !isAuditing) runClientAudit();
+        if (analyticsReady && !snapshot && !isGenerating) generateSnapshot();
+    }, [auditReady, analyticsReady, auditResult, isAuditing, snapshot, isGenerating, runClientAudit, generateSnapshot]);
 
     // ── Handlers ──
     const handleRunAll = () => {
@@ -147,10 +165,16 @@ export default function ControlTower() {
                             return prioritized.length > 0 ? (
                                 <div className="space-y-2">
                                     {prioritized.map((f, i) => (
-                                        <div key={`${f.ruleId}-${f.entityId}-${i}`} className={`flex items-start gap-3 p-3 rounded-xl border-l-4 ${f.severity === 'critical' ? 'bg-rose-500/5 border-rose-500' :
+                                        <div
+                                            key={`${f.ruleId}-${f.entityId}-${i}`}
+                                            onClick={() => f.entityType === 'task' && f.entityId && handleOpenTask(f.entityId)}
+                                            className={`flex items-start gap-3 p-3 rounded-xl border-l-4 ${
+                                                f.entityType === 'task' && f.entityId ? 'cursor-pointer hover:bg-slate-800/60' : ''
+                                            } ${f.severity === 'critical' ? 'bg-rose-500/5 border-rose-500' :
                                                 f.severity === 'warning' ? 'bg-amber-500/5 border-amber-500' :
                                                     'bg-blue-500/5 border-blue-500'
-                                            }`}>
+                                            }`}
+                                        >
                                             {f.severity === 'critical'
                                                 ? <AlertOctagon className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
                                                 : f.severity === 'warning'
@@ -236,6 +260,17 @@ export default function ControlTower() {
                     </div>
                 </div>
             </div>
+
+            {/* Task Detail Modal */}
+            <TaskDetailModal
+                isOpen={isModalOpen}
+                onClose={closeModal}
+                task={selectedTask}
+                projects={engProjects}
+                teamMembers={teamMembers}
+                subtasks={selectedTask ? engSubtasks.filter(s => s.taskId === selectedTask.id) : []}
+                taskTypes={taskTypes}
+            />
         </div>
     );
 }

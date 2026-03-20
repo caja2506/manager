@@ -31,6 +31,7 @@ export function useAuditData() {
         timeLogs,
         delays,
         teamMembers,
+        isReady,
     } = useEngineeringData();
 
     const { user } = useAuth();
@@ -151,6 +152,7 @@ export function useAuditData() {
         isAuditing,
         isSaving,
         lastAuditTime,
+        isReady,
 
         // Derived
         scores,

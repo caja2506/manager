@@ -46,6 +46,7 @@ export default function AuditFindings() {
         summary,
         findingsBySeverity,
         findingsByEntity,
+        isReady,
     } = useAuditData();
 
     const { engTasks = [], engProjects = [], engSubtasks = [], taskTypes = [], teamMembers = [] } = useAppData();
@@ -69,12 +70,12 @@ export default function AuditFindings() {
     const [categoryFilter, setCategoryFilter] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
 
-    // Auto-run audit on first load
+    // Auto-run audit when data is ready (not on mount with empty data)
     useEffect(() => {
-        if (!auditResult && !isAuditing) {
+        if (isReady && !auditResult && !isAuditing) {
             runClientAudit();
         }
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [isReady, auditResult, isAuditing, runClientAudit]);
 
     // Filtered findings
     const filteredFindings = useMemo(() => {

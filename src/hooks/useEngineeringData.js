@@ -18,13 +18,16 @@
  * @module hooks/useEngineeringData
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { COLLECTIONS } from '../models/schemas';
 import { db } from '../firebase';
 
 const safeLocaleCompare = (a, b, field) =>
     String(a[field] || '').localeCompare(String(b[field] || ''));
+
+// Total number of Firestore subscriptions managed by this hook
+const TOTAL_SUBSCRIPTIONS = 10;
 
 export function useEngineeringData() {
     const [engProjects, setEngProjects] = useState([]);
@@ -38,40 +41,63 @@ export function useEngineeringData() {
     const [delayCauses, setDelayCauses] = useState([]);
     const [delays, setDelays] = useState([]);
 
+    // Track readiness: all subscriptions must fire at least once
+    const [isReady, setIsReady] = useState(false);
+    const loadedCountRef = useRef(0);
+    const readyFiredRef = useRef(false);
+
+    const markLoaded = useCallback(() => {
+        loadedCountRef.current += 1;
+        if (!readyFiredRef.current && loadedCountRef.current >= TOTAL_SUBSCRIPTIONS) {
+            readyFiredRef.current = true;
+            setIsReady(true);
+        }
+    }, []);
+
     useEffect(() => {
-        const unsubEngProjects = onSnapshot(collection(db, COLLECTIONS.PROJECTS), s =>
-            setEngProjects(s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)))
-        );
-        const unsubEngTasks = onSnapshot(collection(db, COLLECTIONS.TASKS), s =>
-            setEngTasks(s.docs.map(d => ({ ...d.data(), id: d.id })))
-        );
-        const unsubEngSubtasks = onSnapshot(collection(db, COLLECTIONS.SUBTASKS), s =>
-            setEngSubtasks(s.docs.map(d => ({ ...d.data(), id: d.id })))
-        );
-        const unsubTaskTypes = onSnapshot(collection(db, COLLECTIONS.TASK_TYPES), s =>
-            setTaskTypes(s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => safeLocaleCompare(a, b, 'name')))
-        );
-        const unsubWorkAreaTypes = onSnapshot(collection(db, COLLECTIONS.WORK_AREA_TYPES), s =>
-            setWorkAreaTypes(s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => safeLocaleCompare(a, b, 'name')))
-        );
-        const unsubMilestoneTypes = onSnapshot(collection(db, COLLECTIONS.MILESTONE_TYPES), s =>
-            setMilestoneTypes(s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => safeLocaleCompare(a, b, 'name')))
-        );
+        const unsubEngProjects = onSnapshot(collection(db, COLLECTIONS.PROJECTS), s => {
+            setEngProjects(s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)));
+            markLoaded();
+        });
+        const unsubEngTasks = onSnapshot(collection(db, COLLECTIONS.TASKS), s => {
+            setEngTasks(s.docs.map(d => ({ ...d.data(), id: d.id })));
+            markLoaded();
+        });
+        const unsubEngSubtasks = onSnapshot(collection(db, COLLECTIONS.SUBTASKS), s => {
+            setEngSubtasks(s.docs.map(d => ({ ...d.data(), id: d.id })));
+            markLoaded();
+        });
+        const unsubTaskTypes = onSnapshot(collection(db, COLLECTIONS.TASK_TYPES), s => {
+            setTaskTypes(s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => safeLocaleCompare(a, b, 'name')));
+            markLoaded();
+        });
+        const unsubWorkAreaTypes = onSnapshot(collection(db, COLLECTIONS.WORK_AREA_TYPES), s => {
+            setWorkAreaTypes(s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => safeLocaleCompare(a, b, 'name')));
+            markLoaded();
+        });
+        const unsubMilestoneTypes = onSnapshot(collection(db, COLLECTIONS.MILESTONE_TYPES), s => {
+            setMilestoneTypes(s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => safeLocaleCompare(a, b, 'name')));
+            markLoaded();
+        });
         // IMPORTANT: Loads from `users` collection (operational profiles),
         // NOT from `users_roles` (RBAC only). This ensures teamRole and
         // weeklyCapacityHours are available to dashboards, analytics, and planner.
-        const unsubTeamMembers = onSnapshot(collection(db, COLLECTIONS.USERS), s =>
-            setTeamMembers(s.docs.map(d => ({ ...d.data(), uid: d.id })))
-        );
-        const unsubTimeLogs = onSnapshot(collection(db, COLLECTIONS.TIME_LOGS), s =>
-            setTimeLogs(s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => new Date(b.startTime || 0) - new Date(a.startTime || 0)))
-        );
-        const unsubDelayCauses = onSnapshot(collection(db, COLLECTIONS.DELAY_CAUSES), s =>
-            setDelayCauses(s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => (a.order || 0) - (b.order || 0)))
-        );
-        const unsubDelays = onSnapshot(collection(db, COLLECTIONS.DELAYS), s =>
-            setDelays(s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)))
-        );
+        const unsubTeamMembers = onSnapshot(collection(db, COLLECTIONS.USERS), s => {
+            setTeamMembers(s.docs.map(d => ({ ...d.data(), uid: d.id })));
+            markLoaded();
+        });
+        const unsubTimeLogs = onSnapshot(collection(db, COLLECTIONS.TIME_LOGS), s => {
+            setTimeLogs(s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => new Date(b.startTime || 0) - new Date(a.startTime || 0)));
+            markLoaded();
+        });
+        const unsubDelayCauses = onSnapshot(collection(db, COLLECTIONS.DELAY_CAUSES), s => {
+            setDelayCauses(s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => (a.order || 0) - (b.order || 0)));
+            markLoaded();
+        });
+        const unsubDelays = onSnapshot(collection(db, COLLECTIONS.DELAYS), s => {
+            setDelays(s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)));
+            markLoaded();
+        });
 
         return () => {
             unsubEngProjects(); unsubEngTasks(); unsubEngSubtasks();
@@ -79,7 +105,7 @@ export function useEngineeringData() {
             unsubTeamMembers(); unsubTimeLogs();
             unsubDelayCauses(); unsubDelays();
         };
-    }, []);
+    }, [markLoaded]);
 
     return {
         engProjects,
@@ -92,5 +118,6 @@ export function useEngineeringData() {
         timeLogs,
         delayCauses,
         delays,
+        isReady,
     };
 }

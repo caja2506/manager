@@ -19,6 +19,7 @@ export function useAnalyticsData() {
         timeLogs,
         delays,
         teamMembers,
+        isReady,
     } = useEngineeringData();
 
     const { scores: auditScores } = useAuditData();
@@ -111,6 +112,7 @@ export function useAnalyticsData() {
         // State
         snapshot,
         isGenerating,
+        isReady,
 
         // Derived
         teamUtilization,
