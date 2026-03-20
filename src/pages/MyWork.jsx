@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAppData } from '../contexts/AppDataContext';
+import { useEngineeringData } from '../hooks/useEngineeringData';
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
 import { format, startOfWeek, addDays, addWeeks } from 'date-fns';
@@ -43,7 +43,7 @@ export default function MyWork() {
     const {
         engTasks, engProjects, engSubtasks,
         taskTypes, teamMembers, timeLogs,
-    } = useAppData();
+    } = useEngineeringData();
 
     // ── Weekly plan items (fetched for current week) ──
     const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });

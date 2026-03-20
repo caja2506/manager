@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAppData } from '../contexts/AppDataContext';
+import { useEngineeringData } from '../hooks/useEngineeringData';
 import { useRole } from '../contexts/RoleContext';
 import {
     Tag, Truck, LayoutList, AlertOctagon, ListTodo,
@@ -339,7 +340,8 @@ function AreaTaskTypeRelationSection({ workAreaTypes, taskTypes }) {
 
 
 export default function ManagedListsPage() {
-    const { managedLists, delayCauses, taskTypes, workAreaTypes, milestoneTypes, handleSaveManagedList } = useAppData();
+    const { managedLists, handleSaveManagedList } = useAppData();
+    const { delayCauses, taskTypes, workAreaTypes, milestoneTypes } = useEngineeringData();
     const { canEdit } = useRole();
 
     return (

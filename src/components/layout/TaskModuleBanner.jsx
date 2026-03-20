@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { LayoutGrid, Plus } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useAppData } from '../../contexts/AppDataContext';
+import { useEngineeringData } from '../../hooks/useEngineeringData';
 
 /**
  * TaskModuleBanner — Shared header across Task Management pages.
@@ -25,7 +25,7 @@ export default function TaskModuleBanner({ onNewTask, canEdit = false, actionLab
     const navigate = useNavigate();
     const location = useLocation();
     const { user } = useAuth();
-    const { engTasks, engProjects } = useAppData();
+    const { engTasks, engProjects } = useEngineeringData();
 
     const activeTasks = engTasks.filter(t => !['completed', 'cancelled'].includes(t.status));
 

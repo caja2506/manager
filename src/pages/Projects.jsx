@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
 import { useAppData } from '../contexts/AppDataContext';
+import { useEngineeringData } from '../hooks/useEngineeringData';
 import {
     FolderGit2, Plus, Trash2, Edit3, ChevronRight,
     Clock, ListTodo, AlertTriangle, Users as UsersIcon, Shield, AlertOctagon
@@ -15,7 +16,8 @@ import { deleteProject } from '../services/taskService';
 export default function Projects() {
     const { user } = useAuth();
     const { canEdit, canDelete, isAdmin } = useRole();
-    const { engProjects, engTasks, teamMembers, setConfirmDelete } = useAppData();
+    const { engProjects, engTasks, teamMembers } = useEngineeringData();
+    const { setConfirmDelete } = useAppData();
     const navigate = useNavigate();
 
     const [isModalOpen, setIsModalOpen] = useState(false);

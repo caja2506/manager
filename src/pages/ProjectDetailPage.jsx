@@ -11,7 +11,7 @@ import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
-import { useAppData } from '../contexts/AppDataContext';
+import { useEngineeringData } from '../hooks/useEngineeringData';
 import {
     ArrowLeft, Target, ListTodo, Clock, Calendar, AlertTriangle,
     ChevronRight, Plus, BarChart3, Settings, FolderGit2,
@@ -34,7 +34,7 @@ export default function ProjectDetailPage() {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { canEdit } = useRole();
-    const { engProjects, engTasks, teamMembers } = useAppData();
+    const { engProjects, engTasks, teamMembers } = useEngineeringData();
 
     const [showEditModal, setShowEditModal] = useState(false);
     const [showMilestoneModal, setShowMilestoneModal] = useState(false);

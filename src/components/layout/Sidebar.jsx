@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRole } from '../../contexts/RoleContext';
 import { useAppData, APP_VERSION } from '../../contexts/AppDataContext';
+import { useEngineeringData } from '../../hooks/useEngineeringData';
 import {
     BrainCircuit, Activity, LayoutDashboard, User, FolderGit2,
     ListTodo, Database, Clock, FileText, BarChart3, Users,
@@ -104,7 +105,8 @@ function sectionContainsRoute(section, pathname) {
 export default function Sidebar() {
     const { user, signOut } = useAuth();
     const { role, isAdmin, canEdit } = useRole();
-    const { proyectos, catalogo, engProjects, engTasks } = useAppData();
+    const { proyectos, catalogo } = useAppData();
+    const { engProjects, engTasks } = useEngineeringData();
     const location = useLocation();
     const panelRef = useRef(null);
     const sidebarRef = useRef(null);

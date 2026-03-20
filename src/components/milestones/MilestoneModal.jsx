@@ -8,9 +8,11 @@
 import React, { useState, useEffect } from 'react';
 import { X, Target, Calendar, Save, Loader2, Plus, Trash2 } from 'lucide-react';
 import { useAppData } from '../../contexts/AppDataContext';
+import { useEngineeringData } from '../../hooks/useEngineeringData';
 
 export default function MilestoneModal({ isOpen, onClose, onSave, teamMembers = [], milestone = null }) {
-    const { milestoneTypes, handleSaveManagedList } = useAppData();
+    const { handleSaveManagedList } = useAppData();
+    const { milestoneTypes } = useEngineeringData();
 
     // Use name directly as value — same data as the managed list
     const typeOptions = (milestoneTypes || []).map(t => t.name);

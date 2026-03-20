@@ -17,7 +17,7 @@ import TaskDetailModal from '../components/tasks/TaskDetailModal';
 import TaskModuleBanner from '../components/layout/TaskModuleBanner';
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
-import { useAppData } from '../contexts/AppDataContext';
+import { useEngineeringData } from '../hooks/useEngineeringData';
 import {
     getTasksForGantt,
     getDependencies,
@@ -72,7 +72,7 @@ function formatRangeLabel(viewStart, viewMode) {
 export default function ProjectGantt() {
     const { user } = useAuth();
     const { canEdit, canDelete } = useRole();
-    const { engProjects, engSubtasks, teamMembers, taskTypes: appTaskTypes } = useAppData();
+    const { engProjects, engSubtasks, teamMembers, taskTypes: appTaskTypes } = useEngineeringData();
 
     // View state
     const [viewMode, setViewMode] = useState('weekly');

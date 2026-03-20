@@ -1,25 +1,25 @@
 /**
  * AppDataContext
  * ==============
- * [Phase M.3] Reduced to thin orchestration layer.
+ * [Phase M.6] Reduced to BOM data + processing/modal state + AI handlers.
  *
- * Engineering data subscriptions → delegated to useEngineeringData
- * BOM data (projects, catalog, items, managed lists) → delegated to useAutoBomData
- * AI/PDF/Excel operations → delegated to aiService
- * Managed list CRUD → delegated to managedListService
+ * Engineering data subscriptions → use useEngineeringData directly
+ * BOM data (projects, catalog, items, managed lists) → useAutoBomData
+ * AI/PDF/Excel operations → aiService
+ * Managed list CRUD → managedListService
  *
  * This context retains ONLY:
+ * - BOM data (via useAutoBomData)
  * - Processing/modal state shared across pages
  * - PDF review modal orchestration
  * - Wiring between AI service and UI callbacks
- * - Re-export of delegated data for backward compatibility
+ * - Managed list handler
  */
 
 import React, { createContext, useContext, useState } from 'react';
 
 // --- Extracted modules ---
 import { useAutoBomData } from '../hooks/useAutoBomData';
-import { useEngineeringData } from '../hooks/useEngineeringData';
 import {
     handlePdfUpload as aiHandlePdfUpload,
     executePdfImport,
@@ -41,10 +41,9 @@ export function useAppData() {
 
 export function AppDataProvider({ children }) {
     // ============================================================
-    // DATA — Delegated to domain hooks
+    // DATA — BOM data only (engineering data moved to useEngineeringData)
     // ============================================================
     const bomData = useAutoBomData();
-    const engineeringData = useEngineeringData();
 
     // ============================================================
     // PROCESSING STATE
@@ -123,9 +122,6 @@ export function AppDataProvider({ children }) {
     const value = {
         // BOM Data (spread from hook)
         ...bomData,
-
-        // Engineering Data (spread from hook — backward compatible)
-        ...engineeringData,
 
         // Processing
         isProcessing, setIsProcessing,

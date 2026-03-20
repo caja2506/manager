@@ -19,7 +19,7 @@ import AttentionRanking from '../components/milestones/AttentionRanking';
 import ScoreExplainer from '../components/milestones/ScoreExplainer';
 import { explainScore } from '../core/scoring/scoreEngine';
 import { MILESTONE_TYPE } from '../models/schemas';
-import { useAppData } from '../contexts/AppDataContext';
+import { useEngineeringData } from '../hooks/useEngineeringData';
 import { createWorkArea } from '../services/workAreaService';
 import { addWorkAreaType } from '../services/engineeringDataService';
 import { useRole } from '../contexts/RoleContext';
@@ -347,7 +347,7 @@ export default function MilestoneDetailPage() {
     const { milestoneId } = useParams();
     const navigate = useNavigate();
     const { milestone, workAreas, scoreResult, ranking, loading, error, reload } = useMilestoneScore(milestoneId);
-    const { workAreaTypes, taskTypes } = useAppData();
+    const { workAreaTypes, taskTypes } = useEngineeringData();
     const { user } = useRole();
     const [showAddAreas, setShowAddAreas] = useState(false);
     const [showRelationModal, setShowRelationModal] = useState(false);

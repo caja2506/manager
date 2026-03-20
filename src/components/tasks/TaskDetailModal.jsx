@@ -7,6 +7,7 @@ import { createTask, updateTask, updateTaskStatus, deleteTask } from '../../serv
 import { startTimer, stopTimer, getActiveTimer } from '../../services/timeService';
 import { resolveAreaSync } from '../../services/mappingService';
 import { useAppData } from '../../contexts/AppDataContext';
+import { useEngineeringData } from '../../hooks/useEngineeringData';
 import {
     fetchProjectMilestones,
     fetchMilestoneWorkAreas,
@@ -28,8 +29,8 @@ export default function TaskDetailModal({
 }) {
     const {
         setIsDelayReportOpen, setDelayReportTarget, setListManager,
-        timeLogs, engTasks, delays,
     } = useAppData();
+    const { timeLogs, engTasks, delays } = useEngineeringData();
     const isNew = !task;
 
     const [form, setForm] = useState({

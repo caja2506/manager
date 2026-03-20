@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { useAppData } from '../../contexts/AppDataContext';
+import { useEngineeringData } from '../../hooks/useEngineeringData';
 import { Clock, FileText, BarChart3, LineChart } from 'lucide-react';
 
 const REPORT_TABS = [
@@ -13,7 +13,7 @@ const REPORT_TABS = [
 
 export default function ReportsLayout() {
     const { user } = useAuth();
-    const { teamMembers } = useAppData();
+    const { teamMembers } = useEngineeringData();
     const location = useLocation();
 
     const [selectedUser, setSelectedUser] = useState(user?.uid || '');

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { useAppData } from '../../contexts/AppDataContext';
+import { useEngineeringData } from '../../hooks/useEngineeringData';
 import { createDelayCause, updateDelayCause, deleteDelayCause } from '../../services/delayService';
 import { Plus, Edit2, Trash2, Check, X, AlertOctagon } from 'lucide-react';
 
 export default function DelayCausesAdmin() {
-    const { delayCauses } = useAppData();
+    const { delayCauses } = useEngineeringData();
     const [isEditing, setIsEditing] = useState(null);
     const [editForm, setEditForm] = useState({ name: '', description: '', active: true, order: 0 });
     const [isCreating, setIsCreating] = useState(false);

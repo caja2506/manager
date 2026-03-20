@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { useAppData } from '../contexts/AppDataContext';
+import { useEngineeringData } from '../hooks/useEngineeringData';
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
 import { plannerService } from '../services/plannerService';
@@ -24,7 +24,7 @@ const PROJECT_COLOR_KEYS = ['indigo', 'violet', 'emerald', 'amber', 'rose', 'cya
 export default function WeeklyPlanner() {
     const { user } = useAuth();
     const { canEdit, canDelete } = useRole();
-    const { engTasks, engProjects, engSubtasks, timeLogs, teamMembers, taskTypes } = useAppData();
+    const { engTasks, engProjects, engSubtasks, timeLogs, teamMembers, taskTypes } = useEngineeringData();
 
     // ──────────────── Week navigation ────────────────
     const [weekOffset, setWeekOffset] = useState(0);

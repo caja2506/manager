@@ -7,7 +7,7 @@ import {
 import { useAuditData } from '../hooks/useAuditData';
 import { useAnalyticsData } from '../hooks/useAnalyticsData';
 import { useGeminiInsights } from '../hooks/useGeminiInsights';
-import { useAppData } from '../contexts/AppDataContext';
+import { useEngineeringData } from '../hooks/useEngineeringData';
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
 import ComplianceScoresPanel from '../components/audit/ComplianceScoresPanel';
@@ -40,7 +40,7 @@ export default function ControlTower() {
         insights, teamAnalysis, weeklyBrief, isGenerating: isAIGenerating, error: aiError,
     } = useGeminiInsights();
 
-    const { engTasks = [], engProjects = [], engSubtasks = [], taskTypes = [], teamMembers = [] } = useAppData();
+    const { engTasks = [], engProjects = [], engSubtasks = [], taskTypes = [], teamMembers = [] } = useEngineeringData();
     const { user } = useAuth();
     const { canEdit, canDelete } = useRole();
 

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAppData } from '../../contexts/AppDataContext';
+import { useEngineeringData } from '../../hooks/useEngineeringData';
 import { useAuth } from '../../contexts/AuthContext';
 import { createDelay, createDelayCause, deleteDelayCause } from '../../services/delayService';
 import { TASK_STATUS } from '../../models/schemas';
@@ -10,8 +11,8 @@ export default function DelayReportModal() {
     const {
         isDelayReportOpen, setIsDelayReportOpen,
         delayReportTarget, setDelayReportTarget,
-        delayCauses, engProjects, engTasks
     } = useAppData();
+    const { delayCauses, engProjects, engTasks } = useEngineeringData();
     const { user } = useAuth();
 
     const [selectedCauseId, setSelectedCauseId] = useState('');
