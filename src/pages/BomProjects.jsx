@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRole } from '../contexts/RoleContext';
 import { useAppData } from '../contexts/AppDataContext';
-import { doc, deleteDoc } from 'firebase/firestore';
+import { deleteBomProject } from '../services/bomCrudService';
 import { db } from '../firebase';
 import {
     FolderGit2, Plus, Trash2, ChevronRight, DollarSign, Edit3, X
@@ -80,7 +80,7 @@ export default function BomProjects() {
                                                     isOpen: true,
                                                     title: '¿Borrar proyecto?',
                                                     message: `Se borrarán todos los datos de "${p.name}".`,
-                                                    onConfirm: () => deleteDoc(doc(db, 'proyectos_bom', p.id))
+                                                    onConfirm: () => deleteBomProject(p.id)
                                                 });
                                             }}
                                             className="p-2 text-red-500 bg-red-50 rounded-lg hover:bg-red-100"

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
-import { useAppData } from '../contexts/AppDataContext';
+import { useEngineeringData } from '../hooks/useEngineeringData';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
 import TransitionConfirmModal from '../components/workflow/TransitionConfirmModal';
 import TaskModuleBanner from '../components/layout/TaskModuleBanner';
@@ -289,7 +289,7 @@ function TableGroup({ label, color, tasks, engProjects, teamMembers, onTaskClick
 export default function MainTable() {
     const { user } = useAuth();
     const { canEdit, canDelete } = useRole();
-    const { engProjects, engTasks, engSubtasks, teamMembers, taskTypes } = useAppData();
+    const { engProjects, engTasks, engSubtasks, teamMembers, taskTypes } = useEngineeringData();
 
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);

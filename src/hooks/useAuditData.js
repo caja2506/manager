@@ -12,7 +12,7 @@
  */
 
 import { useState, useCallback, useMemo } from 'react';
-import { useAppData } from '../contexts/AppDataContext';
+import { useEngineeringData } from './useEngineeringData';
 import { useAuth } from '../contexts/AuthContext';
 import { runAudit } from '../core/audit/auditEngine';
 import { persistAuditResults } from '../services/auditPersistence';
@@ -31,7 +31,7 @@ export function useAuditData() {
         timeLogs,
         delays,
         teamMembers,
-    } = useAppData();
+    } = useEngineeringData();
 
     const { user } = useAuth();
 

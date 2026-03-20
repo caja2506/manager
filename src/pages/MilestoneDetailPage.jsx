@@ -18,12 +18,11 @@ import AreaTaskTypeRelationModal from '../components/milestones/AreaTaskTypeRela
 import AttentionRanking from '../components/milestones/AttentionRanking';
 import ScoreExplainer from '../components/milestones/ScoreExplainer';
 import { explainScore } from '../core/scoring/scoreEngine';
-import { MILESTONE_TYPE, COLLECTIONS } from '../models/schemas';
+import { MILESTONE_TYPE } from '../models/schemas';
 import { useAppData } from '../contexts/AppDataContext';
 import { createWorkArea } from '../services/workAreaService';
+import { addWorkAreaType } from '../services/engineeringDataService';
 import { useRole } from '../contexts/RoleContext';
-import { collection, addDoc } from 'firebase/firestore';
-import { db } from '../firebase';
 
 const TRAFFIC_STYLES = {
     green:  { bg: 'rgba(34,197,94,0.12)', border: '#22c55e', glow: '0 0 40px rgba(34,197,94,0.15)', label: 'Verde' },
@@ -87,7 +86,7 @@ function AddAreasModal({ open, onClose, milestoneId, projectId, existingAreas, w
     const handleAddNewType = async () => {
         const trimmed = newTypeName.trim();
         if (!trimmed) return;
-        await addDoc(collection(db, COLLECTIONS.WORK_AREA_TYPES), { name: trimmed });
+        await addWorkAreaType(trimmed);
         setSelected(prev => ({ ...prev, [trimmed]: [] }));
         setNewTypeName('');
         setAddingNew(false);

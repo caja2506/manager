@@ -8,7 +8,7 @@
  */
 
 import {
-    collection, doc, addDoc, updateDoc, getDocs,
+    collection, doc, addDoc, updateDoc, deleteDoc, getDocs,
     query, where, orderBy
 } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -133,4 +133,33 @@ export async function applyAreaOverride(areaId, override, userId) {
         trafficLightOverrideAt: new Date().toISOString(),
         trafficLightOverrideExpires: override.expiresAt,
     }, userId);
+}
+
+/**
+ * Delete a work area.
+ * [Phase M.2] Extracted from AreaScoreCard.
+ */
+export async function deleteWorkArea(areaId) {
+    await deleteDoc(doc(db, COLLECTIONS.WORK_AREAS, areaId));
+}
+
+/**
+ * Update a work area type's default task types (global relation mapping).
+ * [Phase M.2] Extracted from AreaTaskTypeRelationModal.
+ */
+export async function updateWorkAreaTypeMapping(workAreaTypeId, taskTypeIds) {
+    await updateDoc(doc(db, COLLECTIONS.WORK_AREA_TYPES, workAreaTypeId), {
+        defaultTaskTypes: taskTypeIds,
+    });
+}
+
+/**
+ * Update a work area's task type IDs (per-milestone mapping).
+ * [Phase M.2] Extracted from AreaTaskTypeRelationModal.
+ */
+export async function updateWorkAreaTaskTypes(workAreaId, taskTypeIds) {
+    await updateDoc(doc(db, COLLECTIONS.WORK_AREAS, workAreaId), {
+        taskTypeIds,
+        'taskFilter.typeMatch': taskTypeIds.length > 0 ? taskTypeIds : null,
+    });
 }

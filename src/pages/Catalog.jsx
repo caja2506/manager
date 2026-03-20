@@ -1,8 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useRole } from '../contexts/RoleContext';
 import { useAppData } from '../contexts/AppDataContext';
-import { doc, deleteDoc, writeBatch } from 'firebase/firestore';
-import { db } from '../firebase';
+import { deleteCatalogRecord, deleteCatalogRecordsBatch } from '../services/bomCrudService';
 import FilterPopover from '../components/ui/FilterPopover';
 import {
     Search, Plus, Trash2, Database,
@@ -60,11 +59,7 @@ export default function Catalog() {
             title: `¿Borrar ${selectedCatalogItems.length} ítems?`,
             message: `Esto eliminará permanentemente los ${selectedCatalogItems.length} registros seleccionados del catálogo.`,
             onConfirm: async () => {
-                const batch = writeBatch(db);
-                selectedCatalogItems.forEach(id => {
-                    batch.delete(doc(db, 'catalogo_maestro', id));
-                });
-                await batch.commit();
+                await deleteCatalogRecordsBatch(selectedCatalogItems);
                 setSelectedCatalogItems([]);
             }
         });
@@ -181,7 +176,7 @@ export default function Catalog() {
                                             <td className="p-5 text-center">
                                                 <div className="flex justify-center items-center gap-2">
                                                     {canEdit && <button onClick={(e) => { e.stopPropagation(); handleEditClick(item); }} className="p-2 text-amber-400 bg-amber-500/15 rounded-lg hover:bg-amber-500/25 transition-all active:scale-90"><Edit3 className="w-4 h-4" /></button>}
-                                                    {canDelete && <button onClick={(e) => { e.stopPropagation(); setConfirmDelete({ isOpen: true, title: 'Borrar Maestro', message: `¿Eliminar "${item.name}" del catálogo global?`, onConfirm: () => deleteDoc(doc(db, 'catalogo_maestro', item.id)) }); }} className="p-2 text-red-400 bg-red-500/15 rounded-lg hover:bg-red-500/25 transition-all active:scale-90"><Trash2 className="w-4 h-4" /></button>}
+                                                    {canDelete && <button onClick={(e) => { e.stopPropagation(); setConfirmDelete({ isOpen: true, title: 'Borrar Maestro', message: `¿Eliminar "${item.name}" del catálogo global?`, onConfirm: () => deleteCatalogRecord(item.id) }); }} className="p-2 text-red-400 bg-red-500/15 rounded-lg hover:bg-red-500/25 transition-all active:scale-90"><Trash2 className="w-4 h-4" /></button>}
                                                 </div>
                                             </td>
                                         )}

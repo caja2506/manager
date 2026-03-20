@@ -5,8 +5,7 @@ import {
     ChevronDown, Clock, Smartphone
 } from 'lucide-react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { collection, onSnapshot } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { subscribeToRbacUsers } from '../../services/userAdminService';
 
 const functions = getFunctions();
 
@@ -49,11 +48,10 @@ export default function TeamManagementPanel() {
 
     // Subscribe to users_roles for correct display names (client-side source of truth)
     useEffect(() => {
-        const unsub = onSnapshot(collection(db, 'users_roles'), (snap) => {
+        const unsub = subscribeToRbacUsers((users) => {
             const map = {};
-            snap.docs.forEach(d => {
-                const data = d.data();
-                if (data.displayName) map[d.id] = data.displayName;
+            users.forEach(u => {
+                if (u.displayName) map[u.uid] = u.displayName;
             });
             setNameMap(map);
         });

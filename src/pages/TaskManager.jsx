@@ -10,7 +10,7 @@ import { useDroppable } from '@dnd-kit/core';
 
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
-import { useAppData } from '../contexts/AppDataContext';
+import { useEngineeringData } from '../hooks/useEngineeringData';
 import TaskCard from '../components/tasks/TaskCard';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
 import TransitionConfirmModal from '../components/workflow/TransitionConfirmModal';
@@ -86,7 +86,7 @@ const KANBAN_COLUMNS = [
 export default function TaskManager() {
     const { user } = useAuth();
     const { canEdit, canDelete } = useRole();
-    const { engProjects, engTasks, engSubtasks, teamMembers, taskTypes } = useAppData();
+    const { engProjects, engTasks, engSubtasks, teamMembers, taskTypes } = useEngineeringData();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);

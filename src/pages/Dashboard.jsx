@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { useAppData } from '../contexts/AppDataContext';
+import { useEngineeringData } from '../hooks/useEngineeringData';
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
 import {
@@ -18,7 +18,7 @@ import { resolveDelay } from '../services/delayService';
 export default function Dashboard() {
     const {
         engProjects, engTasks, engSubtasks, teamMembers, timeLogs, delays, taskTypes
-    } = useAppData();
+    } = useEngineeringData();
     const { user } = useAuth();
     const { canEdit, canDelete } = useRole();
     const navigate = useNavigate();

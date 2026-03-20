@@ -9,9 +9,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { X, Search, Compass, ChevronDown } from 'lucide-react';
-import { updateDoc, doc } from 'firebase/firestore';
-import { db } from '../../firebase';
-import { COLLECTIONS } from '../../models/schemas';
+import { updateWorkAreaTypeMapping, updateWorkAreaTaskTypes } from '../../services/workAreaService';
 
 export default function AreaTaskTypeRelationModal({ open, onClose, workAreaTypes, workAreas, taskTypes }) {
     const [localMapping, setLocalMapping] = useState({});
@@ -58,16 +56,10 @@ export default function AreaTaskTypeRelationModal({ open, onClose, workAreaTypes
                 const types = localMapping[area.id] || [];
                 if (isPerMilestone) {
                     // V5: Write to per-milestone work area
-                    await updateDoc(doc(db, COLLECTIONS.WORK_AREAS, area.id), {
-                        taskTypeIds: types,
-                        // Also update legacy taskFilter for backward compat
-                        'taskFilter.typeMatch': types.length > 0 ? types : null,
-                    });
+                    await updateWorkAreaTaskTypes(area.id, types);
                 } else {
                     // Global fallback
-                    await updateDoc(doc(db, COLLECTIONS.WORK_AREA_TYPES, area.id), {
-                        defaultTaskTypes: types,
-                    });
+                    await updateWorkAreaTypeMapping(area.id, types);
                 }
             }
             onClose();

@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
-    collection, query, where, orderBy, onSnapshot, doc, updateDoc, writeBatch, limit
-} from 'firebase/firestore';
-import { db } from '../firebase';
-import { COLLECTIONS } from '../models/schemas';
+    subscribeToNotifications,
+    markNotificationRead,
+    markAllNotificationsRead,
+} from '../services/notificationService';
 import {
     Bell, Check, CheckCheck, AlertTriangle, Info, Briefcase,
     Clock, ChevronRight, Inbox, Filter
@@ -34,21 +34,11 @@ export default function Notifications() {
     useEffect(() => {
         if (!user?.uid) return;
 
-        const q = query(
-            collection(db, COLLECTIONS.NOTIFICATIONS),
-            where('userId', '==', user.uid),
-            orderBy('createdAt', 'desc'),
-            limit(100)
+        const unsub = subscribeToNotifications(
+            user.uid,
+            (items) => { setNotifications(items); setLoading(false); },
+            (err) => { console.error('[Notifications] Subscription failed:', err); setLoading(false); }
         );
-
-        const unsub = onSnapshot(q, (snap) => {
-            const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            setNotifications(items);
-            setLoading(false);
-        }, (err) => {
-            console.error('[Notifications] Subscription failed:', err);
-            setLoading(false);
-        });
 
         return unsub;
     }, [user?.uid]);
@@ -56,23 +46,16 @@ export default function Notifications() {
     // Mark single as read
     const markAsRead = useCallback(async (notifId) => {
         try {
-            await updateDoc(doc(db, COLLECTIONS.NOTIFICATIONS, notifId), { read: true });
+            await markNotificationRead(notifId);
         } catch (err) {
             console.error('Error marking notification as read:', err);
         }
     }, []);
 
     // Mark all as read
-    const markAllAsRead = useCallback(async () => {
-        const unread = notifications.filter(n => !n.read);
-        if (unread.length === 0) return;
-
+    const handleMarkAllRead = useCallback(async () => {
         try {
-            const batch = writeBatch(db);
-            unread.forEach(n => {
-                batch.update(doc(db, COLLECTIONS.NOTIFICATIONS, n.id), { read: true });
-            });
-            await batch.commit();
+            await markAllNotificationsRead(notifications);
         } catch (err) {
             console.error('Error marking all as read:', err);
         }
@@ -124,7 +107,7 @@ export default function Notifications() {
 
                     {unreadCount > 0 && (
                         <button
-                            onClick={markAllAsRead}
+                            onClick={handleMarkAllRead}
                             className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/15 text-indigo-400 text-xs font-bold rounded-lg hover:bg-indigo-500/25 transition-colors"
                         >
                             <CheckCheck className="w-3.5 h-3.5" />

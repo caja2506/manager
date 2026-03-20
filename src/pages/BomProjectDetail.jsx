@@ -2,8 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useRole } from '../contexts/RoleContext';
 import { useAppData } from '../contexts/AppDataContext';
-import { doc, deleteDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { deleteBomItem } from '../services/bomCrudService';
 import SearchableDropdown from '../components/ui/SearchableDropdown';
 import FilterPopover from '../components/ui/FilterPopover';
 import CatalogPickerModal from '../components/catalog/CatalogPickerModal';
@@ -106,12 +105,9 @@ export default function BomProjectDetail() {
             title: `¿Quitar ${selectedBomItems.length} ítems?`,
             message: `Esto quitará permanentemente los ${selectedBomItems.length} ítems seleccionados de este proyecto. No se borrarán del catálogo maestro.`,
             onConfirm: async () => {
-                const { writeBatch } = await import('firebase/firestore');
-                const batch = writeBatch(db);
-                selectedBomItems.forEach(id => {
-                    batch.delete(doc(db, 'items_bom', id));
-                });
-                await batch.commit();
+                // Dynamic import for one-shot batch delete
+                const { deleteBomItemsBatch } = await import('../services/bomCrudService');
+                await deleteBomItemsBatch(selectedBomItems);
                 setSelectedBomItems([]);
             }
         });
@@ -321,7 +317,7 @@ export default function BomProjectDetail() {
                                                 <td className="p-5 text-center">
                                                     <div className='flex justify-center items-center gap-2'>
                                                         {canEdit && <button onClick={() => setEditingBomItem(item)} className="p-2 text-amber-500 bg-amber-50 rounded-lg hover:bg-amber-100 transition-all active:scale-90"><Edit3 className="w-4 h-4" /></button>}
-                                                        {canDelete && <button onClick={() => setConfirmDelete({ isOpen: true, title: 'Quitar ítem', message: `¿Quitar "${details.name}" de la lista?`, onConfirm: () => deleteDoc(doc(db, 'items_bom', item.id)) })} className="p-2 text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition-all active:scale-90"><Trash2 className="w-4 h-4" /></button>}
+                                                        {canDelete && <button onClick={() => setConfirmDelete({ isOpen: true, title: 'Quitar ítem', message: `¿Quitar "${details.name}" de la lista?`, onConfirm: () => deleteBomItem(item.id) })} className="p-2 text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition-all active:scale-90"><Trash2 className="w-4 h-4" /></button>}
                                                     </div>
                                                 </td>
                                             )}

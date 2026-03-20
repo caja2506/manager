@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Check, X, AlertTriangle, Brain, Mic, MessageSquare } from 'lucide-react';
-import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { loadRecentAIExecutions } from '../../services/automationDataService';
 
 /**
  * AIExecutionLogCard
@@ -14,24 +13,11 @@ export default function AIExecutionLogCard() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        loadRecentExecutions();
+        loadRecentAIExecutions(20)
+            .then(setExecutions)
+            .catch(err => console.warn('[AIExecutionLog] Error:', err))
+            .finally(() => setLoading(false));
     }, []);
-
-    async function loadRecentExecutions() {
-        try {
-            const q = query(
-                collection(db, 'aiExecutions'),
-                orderBy('createdAt', 'desc'),
-                limit(20)
-            );
-            const snap = await getDocs(q);
-            setExecutions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        } catch (err) {
-            console.warn('[AIExecutionLog] Error:', err);
-        } finally {
-            setLoading(false);
-        }
-    }
 
     const FEATURE_LABELS = {
         report_extraction: { label: 'Extracción', icon: MessageSquare, color: 'text-blue-400' },

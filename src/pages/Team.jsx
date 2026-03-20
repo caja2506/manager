@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { useAppData } from '../contexts/AppDataContext';
+import { useEngineeringData } from '../hooks/useEngineeringData';
 import {
     Users, Briefcase, Clock, AlertTriangle, TrendingUp,
     Shield, ChevronRight, Activity
@@ -16,7 +16,7 @@ const ROLE_CONFIG = {
 const DEFAULT_ROLE = { label: 'Sin rol', color: 'from-slate-500 to-slate-600', badge: 'bg-slate-500/20 text-slate-400' };
 
 export default function Team() {
-    const { engTasks, timeLogs, teamMembers } = useAppData();
+    const { engTasks, timeLogs, teamMembers } = useEngineeringData();
 
     // Build per-member metrics
     const memberMetrics = useMemo(() => {

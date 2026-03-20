@@ -10,8 +10,7 @@ import {
     ChevronDown, ChevronUp, AlertTriangle, TrendingUp,
     TrendingDown, Minus, Lock, Clock, User, Trash2
 } from 'lucide-react';
-import { deleteDoc, doc } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { deleteWorkArea } from '../../services/workAreaService';
 import { COLLECTIONS } from '../../models/schemas';
 
 const TRAFFIC_COLORS = {
@@ -42,7 +41,7 @@ export default function AreaScoreCard({ areaId, areaName, result, workArea, onDe
 
     const handleDelete = async () => {
         try {
-            await deleteDoc(doc(db, COLLECTIONS.WORK_AREAS, areaId));
+            await deleteWorkArea(areaId);
             if (onDeleted) onDeleted();
         } catch (err) {
             console.error('Error deleting area:', err);

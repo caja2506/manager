@@ -7,7 +7,7 @@
  */
 
 import { useState, useCallback, useMemo } from 'react';
-import { useAppData } from '../contexts/AppDataContext';
+import { useEngineeringData } from './useEngineeringData';
 import { useAuditData } from './useAuditData';
 import { buildDepartmentSnapshot, buildProjectSnapshot, buildUserSnapshot } from '../core/analytics/snapshotBuilder';
 import { calculateTeamUtilization } from '../core/analytics/teamUtilization';
@@ -19,7 +19,7 @@ export function useAnalyticsData() {
         timeLogs,
         delays,
         teamMembers,
-    } = useAppData();
+    } = useEngineeringData();
 
     const { scores: auditScores } = useAuditData();
 

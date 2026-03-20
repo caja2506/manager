@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
-import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRole } from '../../contexts/RoleContext';
-import { COLLECTIONS, TEAM_ROLES } from '../../models/schemas';
+import { TEAM_ROLES } from '../../models/schemas';
 import { updateUserProfile } from '../../services/userProfileService';
+import {
+    subscribeToRbacUsers,
+    subscribeToUserProfiles,
+    updateRbacRole,
+    updateUserDisplayName,
+    removeRbacUser,
+} from '../../services/userAdminService';
 import { Shield, Trash2, X, Search, Users, ShieldCheck, Pencil, Check } from 'lucide-react';
 
 // ── RBAC roles (admin/editor/viewer) — controls Firestore write permissions ──
@@ -37,23 +42,13 @@ export default function UserAdminPanel({ onClose }) {
 
     // Subscribe to users_roles (RBAC)
     useEffect(() => {
-        const unsub = onSnapshot(collection(db, 'users_roles'), (snap) => {
-            setRbacUsers(
-                snap.docs
-                    .map((d) => ({ uid: d.id, ...d.data() }))
-                    .sort((a, b) => (a.displayName || a.email || '').localeCompare(b.displayName || b.email || ''))
-            );
-        });
+        const unsub = subscribeToRbacUsers(setRbacUsers);
         return () => unsub();
     }, []);
 
     // Subscribe to users (operational profiles) — indexed by uid
     useEffect(() => {
-        const unsub = onSnapshot(collection(db, COLLECTIONS.USERS), (snap) => {
-            const profileMap = {};
-            snap.docs.forEach(d => { profileMap[d.id] = d.data(); });
-            setProfiles(profileMap);
-        });
+        const unsub = subscribeToUserProfiles(setProfiles);
         return () => unsub();
     }, []);
 
@@ -85,13 +80,13 @@ export default function UserAdminPanel({ onClose }) {
                 title: '¿Cambiar tu propio rol?',
                 message: `Si cambias tu rol a "${newRole}", perderás acceso a este panel de administración.`,
                 onConfirm: async () => {
-                    await updateDoc(doc(db, 'users_roles', uid), { role: newRole });
+                    await updateRbacRole(uid, newRole);
                     setConfirmAction(null);
                 },
             });
             return;
         }
-        await updateDoc(doc(db, 'users_roles', uid), { role: newRole });
+        await updateRbacRole(uid, newRole);
     };
 
     // ── Team role change → writes to users/{uid} ──
@@ -117,10 +112,7 @@ export default function UserAdminPanel({ onClose }) {
         const trimmed = editingNameValue.trim();
         if (!trimmed) { setEditingNameUid(null); return; }
         try {
-            // Use setDoc with merge to handle docs that may not exist
-            const usersRef = doc(db, COLLECTIONS.USERS, uid);
-            await setDoc(usersRef, { displayName: trimmed, updatedAt: new Date().toISOString() }, { merge: true });
-            await updateDoc(doc(db, 'users_roles', uid), { displayName: trimmed });
+            await updateUserDisplayName(uid, trimmed);
         } catch (err) {
             console.error('Error updating display name:', err);
         }
@@ -132,7 +124,7 @@ export default function UserAdminPanel({ onClose }) {
             title: `¿Eliminar a ${u.displayName || u.email}?`,
             message: 'El usuario deberá volver a iniciar sesión para recuperar acceso.',
             onConfirm: async () => {
-                await deleteDoc(doc(db, 'users_roles', u.uid));
+                await removeRbacUser(u.uid);
                 setConfirmAction(null);
             },
         });

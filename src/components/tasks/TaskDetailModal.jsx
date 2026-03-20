@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
-    TASK_STATUS, TASK_PRIORITY, COLLECTIONS,
+    TASK_STATUS, TASK_PRIORITY,
 } from '../../models/schemas';
 import { createTask, updateTask, updateTaskStatus, deleteTask } from '../../services/taskService';
 import { startTimer, stopTimer, getActiveTimer } from '../../services/timeService';
 import { resolveAreaSync } from '../../services/mappingService';
 import { useAppData } from '../../contexts/AppDataContext';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../../firebase';
+import {
+    fetchProjectMilestones,
+    fetchMilestoneWorkAreas,
+    fetchTaskDependencies,
+    fetchTaskPlannerItems,
+} from '../../services/engineeringDataService';
 
 // Editor subcomponents
 import TaskHeader from './editor/TaskHeader';
@@ -97,18 +101,9 @@ export default function TaskDetailModal({
             return;
         }
         let cancelled = false;
-        const fetchMilestones = async () => {
-            try {
-                const msQ = query(collection(db, COLLECTIONS.MILESTONES), where('projectId', '==', projectId));
-                const msSnap = await getDocs(msQ);
-                if (!cancelled) {
-                    setProjectMilestones(msSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-                }
-            } catch (err) {
-                console.warn('TaskDetailModal: error fetching milestones:', err);
-            }
-        };
-        fetchMilestones();
+        fetchProjectMilestones(projectId)
+            .then(ms => { if (!cancelled) setProjectMilestones(ms); })
+            .catch(err => console.warn('TaskDetailModal: error fetching milestones:', err));
         return () => { cancelled = true; };
     }, [form.projectId]);
 
@@ -120,18 +115,9 @@ export default function TaskDetailModal({
             return;
         }
         let cancelled = false;
-        const fetchAreas = async () => {
-            try {
-                const arQ = query(collection(db, COLLECTIONS.WORK_AREAS), where('milestoneId', '==', milestoneId));
-                const arSnap = await getDocs(arQ);
-                if (!cancelled) {
-                    setMilestoneWorkAreas(arSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-                }
-            } catch (err) {
-                console.warn('TaskDetailModal: error fetching work areas:', err);
-            }
-        };
-        fetchAreas();
+        fetchMilestoneWorkAreas(milestoneId)
+            .then(areas => { if (!cancelled) setMilestoneWorkAreas(areas); })
+            .catch(err => console.warn('TaskDetailModal: error fetching work areas:', err));
         return () => { cancelled = true; };
     }, [form.milestoneId]);
 
@@ -144,36 +130,16 @@ export default function TaskDetailModal({
         }
         let cancelled = false;
 
-        const fetchExtra = async () => {
-            try {
-                // Dependencies (this task as predecessor or successor)
-                const depsRef = collection(db, COLLECTIONS.TASK_DEPENDENCIES);
-                const [predSnap, succSnap] = await Promise.all([
-                    getDocs(query(depsRef, where('successorTaskId', '==', task.id))),
-                    getDocs(query(depsRef, where('predecessorTaskId', '==', task.id))),
-                ]);
-                if (!cancelled) {
-                    const all = [
-                        ...predSnap.docs.map(d => ({ id: d.id, ...d.data() })),
-                        ...succSnap.docs.map(d => ({ id: d.id, ...d.data() })),
-                    ];
-                    // Deduplicate by id
-                    const unique = Array.from(new Map(all.map(d => [d.id, d])).values());
-                    setDependencies(unique);
-                }
-
-                // Weekly planner items for this task
-                const planRef = collection(db, COLLECTIONS.WEEKLY_PLAN_ITEMS || 'weeklyPlanItems');
-                const planSnap = await getDocs(query(planRef, where('taskId', '==', task.id)));
-                if (!cancelled) {
-                    setPlannerItems(planSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-                }
-            } catch (err) {
-                console.warn('TaskDetailModal: error fetching extra data:', err);
+        Promise.all([
+            fetchTaskDependencies(task.id),
+            fetchTaskPlannerItems(task.id),
+        ]).then(([deps, planItems]) => {
+            if (!cancelled) {
+                setDependencies(deps);
+                setPlannerItems(planItems);
             }
-        };
+        }).catch(err => console.warn('TaskDetailModal: error fetching extra data:', err));
 
-        fetchExtra();
         return () => { cancelled = true; };
     }, [task?.id]);
 

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { useAppData } from '../contexts/AppDataContext';
+import { useEngineeringData } from '../hooks/useEngineeringData';
 import { useAuth } from '../contexts/AuthContext';
 import { generateWeeklyReport } from '../services/reportService';
 import { BarChart3, Calendar as CalendarIcon, Download, Clock, Zap, Target } from 'lucide-react';
@@ -10,7 +10,7 @@ import { exportWeeklyReport } from '../utils/excelExport';
 
 export default function WeeklyReports() {
     const { user } = useAuth();
-    const { timeLogs, engTasks, engProjects, delays, teamMembers } = useAppData();
+    const { timeLogs, engTasks, engProjects, delays, teamMembers } = useEngineeringData();
 
     // Get selectedUser from shared ReportsLayout via outlet context
     const outletCtx = useOutletContext() || {};

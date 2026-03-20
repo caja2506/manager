@@ -2,13 +2,11 @@ import React, { useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
-import { useAppData } from '../contexts/AppDataContext';
+import { useEngineeringData } from '../hooks/useEngineeringData';
 import ActiveTimer from '../components/time/ActiveTimer';
 import ManualTimeEntry from '../components/time/ManualTimeEntry';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
-import { deleteTimeLog, formatDuration, setActiveTimer, recalculateTaskHours } from '../services/timeService';
-import { db } from '../firebase';
-import { updateDoc, doc } from 'firebase/firestore';
+import { deleteTimeLog, formatDuration, setActiveTimer, recalculateTaskHours, stopTimer } from '../services/timeService';
 import {
     Clock, Plus, Trash2, Zap, Calendar, ListTodo, FolderGit2,
     BarChart3, ChevronLeft, ChevronRight, FileText, AlertTriangle,
@@ -18,7 +16,7 @@ import {
 export default function WorkLogs() {
     const { user } = useAuth();
     const { canEdit, canDelete } = useRole();
-    const { engProjects, engTasks, engSubtasks, timeLogs, teamMembers, taskTypes } = useAppData();
+    const { engProjects, engTasks, engSubtasks, timeLogs, teamMembers, taskTypes } = useEngineeringData();
 
     // Get selectedUser from shared ReportsLayout via outlet context
     const outletCtx = useOutletContext() || {};
@@ -352,21 +350,9 @@ export default function WorkLogs() {
                                                             setDeletingId(log.id);
                                                             setDeleteError('');
                                                             try {
-                                                                const now = new Date();
-                                                                const startTime = new Date(log.startTime);
-                                                                const totalMs = now - startTime;
-                                                                let totalHours = parseFloat((totalMs / 3600000).toFixed(6));
-                                                                if (totalHours < 0.016666) totalHours = 0.016666;
-                                                                await updateDoc(doc(db, 'timeLogs', log.id), {
-                                                                    endTime: now.toISOString(),
-                                                                    totalHours,
-                                                                    overtimeHours: log.overtime ? totalHours : 0,
-                                                                });
-                                                                // Clear localStorage timer + notify ActiveTimer component
-                                                                setActiveTimer(null);
+                                                                await stopTimer(log.id, { overtime: log.overtime });
+                                                                // Dispatch storage event so ActiveTimer component updates
                                                                 window.dispatchEvent(new StorageEvent('storage', { key: 'autobom_active_timer' }));
-                                                                // Recalculate task hours if applicable
-                                                                if (log.taskId) await recalculateTaskHours(log.taskId);
                                                             } catch (err) {
                                                                 console.error("Stop Error:", err);
                                                                 setDeleteError(err.message || "Error deteniendo el timer");

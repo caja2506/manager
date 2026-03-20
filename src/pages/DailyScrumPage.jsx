@@ -16,7 +16,7 @@ import {
     ListTodo, CalendarCheck, UserCheck, RefreshCw, Activity,
     Briefcase, Eye
 } from 'lucide-react';
-import { useAppData } from '../contexts/AppDataContext';
+import { useEngineeringData } from '../hooks/useEngineeringData';
 import { useAuth } from '../contexts/AuthContext';
 import {
     getActiveAssignments,
@@ -296,7 +296,7 @@ function PersonCard({ person, teamMembers, onReassign }) {
 
 // ─── Main Page ───
 export default function DailyScrumPage() {
-    const { engTasks, teamMembers, timeLogs, delays } = useAppData();
+    const { engTasks, teamMembers, timeLogs, delays } = useEngineeringData();
     const { user } = useAuth();
     const userId = user?.uid;
 
