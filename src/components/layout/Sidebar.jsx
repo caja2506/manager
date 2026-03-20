@@ -21,6 +21,7 @@ const SECTIONS = [
         items: [
             { to: '/', label: 'Dashboard', icon: LayoutDashboard },
             { to: '/my-work', label: 'Mi Trabajo', icon: User },
+            { to: '/daily-briefing', label: 'Daily Briefing', icon: Activity },
             { to: '/overview', label: 'Cómo Funciona', icon: Map },
         ],
     },

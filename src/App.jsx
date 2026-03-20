@@ -40,6 +40,7 @@ import AIMonitoringPage from './pages/AIMonitoringPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import DailyScrumPage from './pages/DailyScrumPage';
 import PlatformOverview from './pages/PlatformOverview';
+import DailyBriefing from './pages/DailyBriefing';
 
 
 // ========================================================
@@ -78,6 +79,7 @@ export default function App() {
           <Route path="/" element={<ErrorBoundary module="Dashboard"><Dashboard /></ErrorBoundary>} />
           <Route path="/my-work" element={<ErrorBoundary module="Mi Trabajo"><MyWork /></ErrorBoundary>} />
           <Route path="/overview" element={<ErrorBoundary module="Cómo Funciona"><PlatformOverview /></ErrorBoundary>} />
+          <Route path="/daily-briefing" element={<ErrorBoundary module="Daily Briefing"><DailyBriefing /></ErrorBoundary>} />
 
           {/* AutoBOM */}
           <Route path="/bom/projects" element={<ErrorBoundary module="BOM Proyectos"><BomProjects /></ErrorBoundary>} />

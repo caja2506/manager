@@ -13,6 +13,7 @@ import { useRole } from '../contexts/RoleContext';
 import ComplianceScoresPanel from '../components/audit/ComplianceScoresPanel';
 import AIInsightsPanel from '../components/audit/AIInsightsPanel';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
+import PageHeader from '../components/layout/PageHeader';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -86,6 +87,9 @@ export default function ControlTower() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-300">
+            {/* Back Button */}
+            <PageHeader title="" showBack={true} />
+
             {/* Header */}
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>

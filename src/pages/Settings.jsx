@@ -1,7 +1,8 @@
 import React from 'react';
 import { useRole } from '../contexts/RoleContext';
 import UserAdminPanel from '../components/admin/UserAdminPanel';
-import DelayCausesAdmin from '../components/admin/DelayCausesAdmin';
+import PageHeader from '../components/layout/PageHeader';
+
 import { Settings as SettingsIcon, Shield } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -19,6 +20,7 @@ export default function SettingsPage() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-300">
+            <PageHeader title="" showBack={true} />
             <div className="bg-slate-900/70 backdrop-blur-sm p-6 rounded-2xl border border-slate-800 shadow-lg">
                 <div className="flex items-center gap-3 mb-6">
                     <div className="w-12 h-12 bg-indigo-600/20 border border-indigo-500/30 rounded-2xl flex items-center justify-center">
@@ -31,7 +33,7 @@ export default function SettingsPage() {
                 </div>
             </div>
             <UserAdminPanel />
-            <DelayCausesAdmin />
+
         </div>
     );
 }

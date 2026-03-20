@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import PageHeader from './PageHeader';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useEngineeringData } from '../../hooks/useEngineeringData';
@@ -27,6 +28,7 @@ export default function ReportsLayout() {
 
     return (
         <div className="space-y-5 animate-in fade-in duration-300">
+            <PageHeader title="" showBack={true} />
             {/* Shared Banner */}
             <div className="bg-slate-900/70 backdrop-blur-sm rounded-2xl border border-slate-800 shadow-lg overflow-hidden">
                 {/* Top row: Title + User Filter */}

@@ -1,13 +1,13 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LayoutGrid, Plus } from 'lucide-react';
+import { LayoutGrid, Plus, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useEngineeringData } from '../../hooks/useEngineeringData';
 
 /**
  * TaskModuleBanner — Shared header across Task Management pages.
  * ===
- * Displays: Icon + Title + Stats | Action icons | + New Task | User avatar
+ * Displays: Back | Icon + Title + Stats | Action icons | + New Task | User avatar
  * Navigation tabs: Tareas, Weekly Planner, Gantt, Analytics
  *
  * Standard design rule documented in blueprint.md
@@ -42,8 +42,15 @@ export default function TaskModuleBanner({ onNewTask, canEdit = false, actionLab
         <div className="flex-shrink-0">
             {/* ── Main Banner Row ── */}
             <div className="flex items-center justify-between px-3 md:px-6 py-3 md:py-4 bg-slate-900/90 backdrop-blur-md border-b border-slate-800/60">
-                {/* Left: Icon + Title + Stats */}
+                {/* Left: Back + Icon + Title + Stats */}
                 <div className="flex items-center gap-2.5 md:gap-3.5 min-w-0">
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="w-8 h-8 rounded-xl bg-slate-800/80 border border-slate-700/50 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 hover:border-slate-600 transition-all shrink-0"
+                        title="Volver"
+                    >
+                        <ArrowLeft className="w-4 h-4" />
+                    </button>
                     <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
                         <LayoutGrid className="w-4 h-4 md:w-5 md:h-5 text-indigo-400" />
                     </div>

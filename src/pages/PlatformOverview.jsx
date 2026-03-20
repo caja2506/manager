@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import PageHeader from '../components/layout/PageHeader';
 import { useNavigate } from 'react-router-dom';
 import {
     BrainCircuit, LayoutDashboard, ListTodo, Clock, BarChart3, Users,
@@ -234,6 +235,7 @@ export default function PlatformOverview() {
 
     return (
         <div className="min-h-screen pb-20">
+            <PageHeader title="" showBack={true} />
 
             {/* ═══════════════════════════════════════════════════
                 SECCIÓN 1: HERO

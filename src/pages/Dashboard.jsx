@@ -13,11 +13,12 @@ import { RISK_LEVEL_CONFIG, PROJECT_STATUS_CONFIG, TASK_STATUS_CONFIG } from '..
 import { useAuditData } from '../hooks/useAuditData';
 import ComplianceScoresPanel from '../components/audit/ComplianceScoresPanel';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
+import PageHeader from '../components/layout/PageHeader';
 import { resolveDelay } from '../services/delayService';
 
 export default function Dashboard() {
     const {
-        engProjects, engTasks, engSubtasks, teamMembers, timeLogs, delays, taskTypes
+        engProjects, engTasks, engSubtasks, teamMembers, timeLogs, delays, taskTypes, isReady
     } = useEngineeringData();
     const { user } = useAuth();
     const { canEdit, canDelete } = useRole();
@@ -59,12 +60,12 @@ export default function Dashboard() {
     // ── Audit Data ──
     const { runClientAudit, scores, summary, isAuditing, auditResult } = useAuditData();
 
-    // Auto-run audit on first load
+    // Auto-run audit once engineering data is ready
     useEffect(() => {
-        if (!auditResult && !isAuditing) {
+        if (isReady && !auditResult && !isAuditing) {
             runClientAudit();
         }
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [isReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // ------------------------------------------------------------------------
     // AGGREGATED METRICS (KPIs)
@@ -188,6 +189,25 @@ export default function Dashboard() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-300">
+            {/* Loading skeleton while Firestore initializes */}
+            {!isReady && (
+                <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/95 backdrop-blur-sm">
+                    <div className="flex flex-col items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center animate-pulse">
+                            <LayoutDashboard className="w-6 h-6 text-indigo-400" />
+                        </div>
+                        <div className="text-center">
+                            <p className="text-sm font-black text-white mb-1">Cargando Sala Obeya</p>
+                            <p className="text-xs font-bold text-slate-500">Conectando con datos en vivo...</p>
+                        </div>
+                        <div className="flex gap-1 mt-2">
+                            {[0,1,2,3,4].map(i => (
+                                <div key={i} className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: `${i * 100}ms` }} />
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
             {/* Task Detail Popup */}
             <TaskDetailModal
                 isOpen={isModalOpen}
@@ -201,6 +221,9 @@ export default function Dashboard() {
                 canEdit={canEdit}
                 canDelete={canDelete}
             />
+            {/* Back Button */}
+            <PageHeader title="" showBack={true} />
+
             {/* Header */}
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>

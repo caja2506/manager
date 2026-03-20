@@ -4,6 +4,7 @@ import {
     Users, Briefcase, Clock, AlertTriangle, TrendingUp,
     Shield, ChevronRight, Activity
 } from 'lucide-react';
+import PageHeader from '../components/layout/PageHeader';
 
 // Role display config
 const ROLE_CONFIG = {
@@ -61,6 +62,9 @@ export default function Team() {
 
     return (
         <div className="space-y-6">
+            {/* Back Button */}
+            <PageHeader title="" showBack={true} />
+
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>

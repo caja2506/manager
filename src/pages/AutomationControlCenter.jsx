@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import PageHeader from '../components/layout/PageHeader';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, ShieldAlert } from 'lucide-react';
 import {
@@ -367,6 +368,7 @@ export default function AutomationControlCenter() {
 
     return (
         <div className="p-6 max-w-7xl mx-auto">
+            <PageHeader title="" showBack={true} />
             <AutomationControlShell
                 coreConfig={coreConfig}
                 telegramConfig={telegramConfig}

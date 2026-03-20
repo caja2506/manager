@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
+import PageHeader from '../components/layout/PageHeader';
 import { useEngineeringData } from '../hooks/useEngineeringData';
 import {
     LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -291,6 +292,7 @@ export default function EngineeringAnalytics() {
 
     return (
         <div className="space-y-5 animate-in fade-in duration-300">
+            <PageHeader title="" showBack={true} />
             {/* --- FILTER BAR (Power BI Style) --- */}
             <div className="bg-slate-900/70 backdrop-blur-sm rounded-2xl border border-slate-800 shadow-lg relative z-20">
                 {/* Title row */}

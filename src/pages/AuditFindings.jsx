@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import PageHeader from '../components/layout/PageHeader';
 import { Shield, Filter, Download, RefreshCw, Search, ChevronDown } from 'lucide-react';
 import { useAuditData } from '../hooks/useAuditData';
 import { useEngineeringData } from '../hooks/useEngineeringData';
@@ -144,6 +145,7 @@ export default function AuditFindings() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-300">
+            <PageHeader title="" showBack={true} />
             {/* Header */}
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>

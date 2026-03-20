@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import PageHeader from '../components/layout/PageHeader';
 import { useAuth } from '../contexts/AuthContext';
 import {
     subscribeToNotifications,
@@ -69,6 +70,7 @@ export default function Notifications() {
 
     return (
         <div className="space-y-6">
+            <PageHeader title="" showBack={true} />
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>

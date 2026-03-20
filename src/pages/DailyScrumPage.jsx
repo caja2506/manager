@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useEngineeringData } from '../hooks/useEngineeringData';
 import { useAuth } from '../contexts/AuthContext';
+import PageHeader from '../components/layout/PageHeader';
 import {
     getActiveAssignments,
     reassignTechnician,
@@ -350,6 +351,9 @@ export default function DailyScrumPage() {
 
     return (
         <div className="space-y-6">
+            {/* Back Button */}
+            <PageHeader title="" showBack={true} />
+
             {/* ─── Header ─── */}
             <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import PageHeader from '../components/layout/PageHeader';
 import { useAppData } from '../contexts/AppDataContext';
 import { useEngineeringData } from '../hooks/useEngineeringData';
 import { useRole } from '../contexts/RoleContext';
@@ -346,6 +347,7 @@ export default function ManagedListsPage() {
 
     return (
         <div className="max-w-6xl mx-auto space-y-6">
+            <PageHeader title="" showBack={true} />
             {/* Page Header */}
             <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-indigo-500/15 rounded-2xl flex items-center justify-center">

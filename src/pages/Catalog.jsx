@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import PageHeader from '../components/layout/PageHeader';
 import { useRole } from '../contexts/RoleContext';
 import { useAppData } from '../contexts/AppDataContext';
 import { deleteCatalogRecord, deleteCatalogRecordsBatch } from '../services/bomCrudService';
@@ -67,6 +68,7 @@ export default function Catalog() {
 
     return (
         <div className="grid grid-cols-1 gap-8 animate-in fade-in duration-300">
+            <PageHeader title="" showBack={true} />
             <div className="space-y-4">
                 <div className="flex flex-wrap gap-2 items-center">
                     <div className="relative w-full sm:flex-1 sm:min-w-[200px]">

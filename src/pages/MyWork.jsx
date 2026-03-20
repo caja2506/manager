@@ -5,6 +5,7 @@ import { useRole } from '../contexts/RoleContext';
 import { format, startOfWeek, addDays, addWeeks } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { User, CalendarDays, ExternalLink } from 'lucide-react';
+import PageHeader from '../components/layout/PageHeader';
 
 // Sub-components
 import FocusNowCard from '../components/mywork/FocusNowCard';
@@ -157,6 +158,11 @@ export default function MyWork() {
 
     return (
         <div className="space-y-4 md:space-y-6 animate-in fade-in duration-300">
+
+            {/* ══════════════════════════════════════════
+                BACK BUTTON
+            ══════════════════════════════════════════ */}
+            <PageHeader title="" showBack={true} />
 
             {/* ══════════════════════════════════════════
                 HEADER — greeting + date
