@@ -7,7 +7,7 @@ import {
     BrainCircuit, Activity, LayoutDashboard, User, FolderGit2,
     ListTodo, Database, Clock, FileText, BarChart3, Users,
     Bell, Settings, LogOut, Shield, LayoutList, Briefcase, LineChart, CalendarDays, GanttChartSquare, Radar, Zap,
-    ChevronRight, X, Target
+    ChevronRight, X, Target, Map
 } from 'lucide-react';
 
 // ─── Section Definitions ───
@@ -20,6 +20,7 @@ const SECTIONS = [
         items: [
             { to: '/', label: 'Dashboard', icon: LayoutDashboard },
             { to: '/my-work', label: 'Mi Trabajo', icon: User },
+            { to: '/overview', label: 'Cómo Funciona', icon: Map },
         ],
     },
     {

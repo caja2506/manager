@@ -143,7 +143,7 @@ const WEBAPP_URL = "https://bom-ame-cr.web.app/tg-report";
 
 const MAIN_MENU_KEYBOARD = {
     keyboard: [
-        [{ text: "⚡ Quick Report" }, { text: "📝 Reportar" }],
+        [{ text: "⚡ Quick Report", web_app: { url: WEBAPP_URL } }, { text: "📝 Reportar" }],
         [{ text: "📊 Status" }, { text: "❓ Ayuda" }],
     ],
     resize_keyboard: true,

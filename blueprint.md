@@ -1,8 +1,8 @@
 # AutoBOM Pro — Engineering Management Platform Blueprint
 
-> **Version:** 4.0 — Full Platform + Management Intelligence + Hardening  
-> **Last Updated:** 2026-03-14  
-> **Status:** All core modules implemented — hardening and remediation in progress
+> **Version:** 4.1 — Full Platform + Modularization Phase 1  
+> **Last Updated:** 2026-03-20  
+> **Status:** All core modules implemented — modularization and hardening in progress
 
 ---
 
@@ -144,13 +144,23 @@ AutoBOM Pro is a Bill of Materials management application designed for engineers
 
 #### Current Component Structure
 
+> **Note:** As of Phase M.1 (2026-03-20), the single-file mandate for `App.jsx` has been officially eliminated. The application is now structured using multi-file modularization across `src/services/`, `src/hooks/`, `src/components/`, and `src/pages/`.
+
 ```
 src/
-├── App.jsx                          # Main app (1249 lines — monolithic, to be modularized)
+├── App.jsx                          # Route definitions only (133 lines)
 ├── App.css                          # Legacy CSS (mostly unused)
 ├── main.jsx                         # Entry point with AuthProvider + RoleProvider
-├── firebase.js                      # Firebase config & SDK init
+├── firebase.js                      # Firebase SDK init + ensureSession() utility
 ├── index.css                        # Base styles
+├── services/
+│   └── aiService.js                 # [Phase M.1] PDF/Excel import + Gemini AI logic
+├── hooks/
+│   └── useAutoBomData.js            # [Phase M.1] BOM Firestore subscriptions + handlers
+├── contexts/
+│   ├── AuthContext.jsx              # Firebase auth state
+│   ├── RoleContext.jsx              # User role state (admin/editor/viewer)
+│   └── AppDataContext.jsx           # Orchestration layer (332 lines, reduced from 727)
 ├── components/
 │   ├── admin/
 │   │   └── UserAdminPanel.jsx       # User role management (admin only)
@@ -168,9 +178,6 @@ src/
 │       ├── FilterPopover.jsx        # Multi-criteria filter UI
 │       ├── ListManagerModal.jsx     # CRUD for managed lists
 │       └── SearchableDropdown.jsx   # Searchable select component
-├── contexts/
-│   ├── AuthContext.jsx              # Firebase auth state
-│   └── RoleContext.jsx              # User role state (admin/editor/viewer)
 └── utils/
     └── normalizers.js               # P/N normalization, provider matching
 ```
@@ -690,13 +697,23 @@ The system must support **Excel export** for:
 - [x] Audit persistence service (`src/services/auditPersistence.js`)
 - [x] Workflow transition UI (`src/components/workflow/TransitionConfirmModal.jsx`)
 
+### Phase M.1 — Monolith Dismantling: Core Logic & Services ✅
+> **Status:** COMPLETE (2026-03-20) — Build verified, 186 tests passing
+
+- [x] Eliminate single-file mandate — multi-file architecture now official
+- [x] Enhance `src/firebase.js` with `ensureSession()` auth utility
+- [x] Extract PDF/Excel/Gemini logic → `src/services/aiService.js` (313 lines)
+- [x] Extract BOM subscriptions + handlers → `src/hooks/useAutoBomData.js` (275 lines)
+- [x] Reduce `AppDataContext.jsx` from 727 → 332 lines (orchestration layer)
+- [x] Verify build (3406 modules, 0 errors) and tests (11 files, 186 tests)
+
 ### Phase R — Audit Remediation Program 📋
 > **Status:** BASELINE ESTABLISHED — See [`remediation-plan.md`](file:///c:/Users/CJ00083620/.gemini/antigravity/scratch/autobom-pro/remediation-plan.md)
 
 - [ ] Phase R.0 — Housekeeping & Documentation Consistency
 - [ ] Phase R.1 — Error Boundaries & Resilience
 - [ ] Phase R.2 — Test Infrastructure & Critical Path Coverage
-- [ ] Phase R.3 — AppDataContext Decomposition
+- [/] Phase R.3 — AppDataContext Decomposition (partially addressed by Phase M.1)
 - [ ] Phase R.4 — schemas.js Modularization
 - [ ] Phase R.5 — Cloud Functions Modularization & Testing
 - [ ] Phase R.6 — CI/CD & Build Verification
@@ -715,10 +732,10 @@ Stabilize and harden the Engineering Management Platform after rapid iterative d
 
 | Area | Current State | Target |
 |------|--------------|--------|
-| Test coverage | 1 test file (0.8%) | ≥ 70% on `src/core/` |
-| `AppDataContext` | 672 lines (god-context) | < 150 lines (decomposed) |
-| `architecture.md` | Outdated (pre-Phase 3) | Reflects actual structure |
-| Error boundaries | None | All major route groups |
+| Test coverage | 11 test files (186 tests) | ≥ 70% on `src/core/` |
+| `AppDataContext` | 332 lines (reduced from 727 by Phase M.1) | < 150 lines (fully decomposed) |
+| `architecture.md` | Updated (2026-03-20) | Reflects actual structure |
+| Error boundaries | Implemented at route level | All major route groups |
 | CI/CD | None | Lint + Test + Build on PR |
 
 ### Protected Modules (DO NOT MODIFY)
@@ -727,7 +744,8 @@ The following modules **MUST NOT** be modified during remediation, except for me
 
 - **BOM Core**: `BomProjects.jsx`, `BomProjectDetail.jsx`, `Catalog.jsx`
 - **BOM Components**: `components/catalog/*`, `components/projects/*`
-- **AI Import Pipeline**: PDF/Excel import flows in `AppDataContext`
+- **AI Import Pipeline**: `src/services/aiService.js` (extracted from AppDataContext in Phase M.1)
+- **BOM Data Hook**: `src/hooks/useAutoBomData.js` (extracted from AppDataContext in Phase M.1)
 - **Image Search**: `ImagePickerModal.jsx`, `searchImages` Cloud Function
 - **Login/Auth**: `LoginPage.jsx`, `AuthContext.jsx`
 - **Firestore Rules**: `firestore.rules`
@@ -741,10 +759,39 @@ The following modules **MUST NOT** be modified during remediation, except for me
 2. **Do not execute all phases simultaneously** — proceed one phase at a time
 3. **Before each phase:** analyze the project, confirm compatibility, preserve existing functionality
 4. **Never break existing AutoBOM functionality** — all changes must be additive
-5. **Do not refactor aggressively** — modularize incrementally
+5. **Multi-file modularization is mandatory** — do not consolidate logic into a single file (single-file mandate eliminated as of 2026-03-20)
 6. **Always analyze before implementing** — read existing code before writing new code
 7. **Update this blueprint** after completing each phase
 8. **Follow UI Design Standards** — use shared module banners for related pages (see Appendix B)
+
+---
+
+## Appendix C: Migration Notes (Phase M.1)
+
+### Compatibility
+
+- All 30+ consumer files that call `useAppData()` continue to work without changes
+- The context value object maintains the exact same property names
+- `AppDataContext.jsx` spreads `...bomData` from `useAutoBomData()` into the context value
+
+### Import Impact
+
+- No existing import paths were changed — `useAppData` remains the single consumer API
+- New modules (`aiService.js`, `useAutoBomData.js`) are only imported by `AppDataContext.jsx`
+- `firebase.js` now exports `ensureSession()` in addition to existing exports
+
+### Known Risks
+
+- `AppDataContext` still acts as an intermediary for BOM data — consumers do not import `useAutoBomData` directly
+- `aiService.js` receives UI state callbacks as parameters; tight coupling remains at the orchestration layer
+- Engineering subscriptions (tasks, projects, team) still live in `AppDataContext` — not yet extracted
+
+### Pending Decoupling (Phase 2 — Not Implemented)
+
+- Extract engineering Firestore subscriptions into a dedicated `useEngineeringData` hook
+- Extract managed list handlers into a dedicated service
+- Allow pages to import `useAutoBomData` directly instead of going through `useAppData`
+- UI component extraction is explicitly out of scope until further phases
 
 ---
 
