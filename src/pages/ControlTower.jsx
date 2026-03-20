@@ -8,6 +8,8 @@ import { useAuditData } from '../hooks/useAuditData';
 import { useAnalyticsData } from '../hooks/useAnalyticsData';
 import { useGeminiInsights } from '../hooks/useGeminiInsights';
 import { useAppData } from '../contexts/AppDataContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useRole } from '../contexts/RoleContext';
 import ComplianceScoresPanel from '../components/audit/ComplianceScoresPanel';
 import AIInsightsPanel from '../components/audit/AIInsightsPanel';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
@@ -39,6 +41,8 @@ export default function ControlTower() {
     } = useGeminiInsights();
 
     const { engTasks = [], engProjects = [], engSubtasks = [], taskTypes = [], teamMembers = [] } = useAppData();
+    const { user } = useAuth();
+    const { canEdit, canDelete } = useRole();
 
     // ── Task Edit Modal ──
     const [selectedTask, setSelectedTask] = useState(null);
@@ -270,6 +274,9 @@ export default function ControlTower() {
                 teamMembers={teamMembers}
                 subtasks={selectedTask ? engSubtasks.filter(s => s.taskId === selectedTask.id) : []}
                 taskTypes={taskTypes}
+                userId={user?.uid}
+                canEdit={canEdit}
+                canDelete={canDelete}
             />
         </div>
     );

@@ -2,6 +2,8 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Shield, Filter, Download, RefreshCw, Search, ChevronDown } from 'lucide-react';
 import { useAuditData } from '../hooks/useAuditData';
 import { useAppData } from '../contexts/AppDataContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useRole } from '../contexts/RoleContext';
 import ComplianceScoresPanel from '../components/audit/ComplianceScoresPanel';
 import { FindingCardList, FindingSeverityBadge } from '../components/audit/FindingCard';
 import { RULE_CATALOG, RULE_CATEGORY, getRulesByCategory } from '../core/rules/ruleCatalog';
@@ -50,6 +52,8 @@ export default function AuditFindings() {
     } = useAuditData();
 
     const { engTasks = [], engProjects = [], engSubtasks = [], taskTypes = [], teamMembers = [] } = useAppData();
+    const { user } = useAuth();
+    const { canEdit, canDelete } = useRole();
 
     // Task modal state
     const [selectedTask, setSelectedTask] = useState(null);
@@ -278,6 +282,9 @@ export default function AuditFindings() {
                 teamMembers={teamMembers}
                 subtasks={selectedTask ? engSubtasks.filter(s => s.taskId === selectedTask.id) : []}
                 taskTypes={taskTypes}
+                userId={user?.uid}
+                canEdit={canEdit}
+                canDelete={canDelete}
             />
 
             {/* Data Snapshot Footer */}
