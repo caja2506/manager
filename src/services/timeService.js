@@ -1,47 +1,87 @@
 /**
  * Time Tracking Service
+ * =====================
  * CRUD operations for time log entries.
+ *
+ * ARCHITECTURE (V6): Timer state lives entirely in Firestore.
+ * An "active timer" = a timeLog document with endTime === null.
+ * localStorage is no longer used for timer state.
+ *
+ * This enables:
+ *  - Admin/Manager/TL can start timers for other users
+ *  - Timer visible in any browser/device
+ *  - Timer is auditable and modifiable
  */
 import { db } from '../firebase';
 import {
     collection, doc, setDoc, updateDoc, deleteDoc,
-    query, where, getDocs, orderBy, getDoc
+    query, where, getDocs, getDoc
 } from 'firebase/firestore';
 import { COLLECTIONS, createTimeLogDocument } from '../models/schemas';
 import { calculateProjectRisk } from './riskService';
 
 // ============================================================
-// ACTIVE TIMER — stored in localStorage + Firestore
+// ACTIVE TIMER — Firestore-based (no localStorage)
 // ============================================================
 
-const TIMER_KEY = 'autobom_active_timer';
-
-export function getActiveTimer() {
-    const raw = localStorage.getItem(TIMER_KEY);
-    if (!raw) return null;
-    try {
-        return JSON.parse(raw);
-    } catch {
-        return null;
-    }
+/**
+ * Find the active (open) timer for a given user from pre-loaded timeLogs.
+ * An active timer = timeLog where endTime is null/empty.
+ *
+ * @param {Array} timeLogs — all time logs (from useEngineeringData)
+ * @param {string} userId — the user to find an active timer for
+ * @returns {Object|null} — the active time log object, or null
+ */
+export function getActiveTimerFromLogs(timeLogs, userId) {
+    if (!timeLogs || !userId) return null;
+    return timeLogs.find(
+        log => log.userId === userId && !log.endTime && log.startTime
+    ) || null;
 }
 
-export function setActiveTimer(timer) {
-    if (timer) {
-        localStorage.setItem(TIMER_KEY, JSON.stringify(timer));
-    } else {
-        localStorage.removeItem(TIMER_KEY);
-    }
+/**
+ * Find the active timer for a specific task (regardless of user).
+ * Useful for checking if a task already has a running timer.
+ *
+ * @param {Array} timeLogs — all time logs
+ * @param {string} taskId — the task to check
+ * @returns {Object|null}
+ */
+export function getActiveTimerForTask(timeLogs, taskId) {
+    if (!timeLogs || !taskId) return null;
+    return timeLogs.find(
+        log => log.taskId === taskId && !log.endTime && log.startTime
+    ) || null;
+}
+
+/**
+ * Check if a user has permission to start/stop timers for OTHER users.
+ * - Admin (RBAC role) → yes
+ * - Manager (teamRole) → yes
+ * - Team Lead (teamRole) → yes
+ * - Everyone else → only their own
+ *
+ * @param {string} role — RBAC role (admin/editor/viewer)
+ * @param {string} teamRole — operational team role (manager/team_lead/engineer/technician)
+ * @returns {boolean}
+ */
+export function canManageOthersTimers(role, teamRole) {
+    if (role === 'admin') return true;
+    if (teamRole === 'manager' || teamRole === 'team_lead') return true;
+    return false;
 }
 
 // ============================================================
-// START / STOP / PAUSE TIMER
+// START / STOP TIMER
 // ============================================================
 
 /**
  * Start a new timer. Creates an "open" time log in Firestore.
+ * No localStorage is touched.
+ *
+ * @returns {Object} — { logId, taskId, projectId, startTime, userId }
  */
-export async function startTimer({ taskId, projectId, userId, notes = '', overtime = false, taskTitle = '', projectName = '' }) {
+export async function startTimer({ taskId, projectId, userId, notes = '', overtime = false }) {
     const now = new Date().toISOString();
     const logData = createTimeLogDocument({
         taskId,
@@ -55,37 +95,43 @@ export async function startTimer({ taskId, projectId, userId, notes = '', overti
     });
     const ref = doc(collection(db, COLLECTIONS.TIME_LOGS));
     await setDoc(ref, logData);
-
-    const timer = { logId: ref.id, taskId, projectId, startTime: now, overtime, notes, taskTitle, projectName };
-    setActiveTimer(timer);
-    return timer;
+    return { logId: ref.id, taskId, projectId, startTime: now, userId };
 }
 
 /**
- * Stop the active timer. Updates the Firestore time log with endTime and totalHours.
- * Always clears localStorage to prevent stuck timers, even if Firestore update fails.
+ * Stop an active timer by its log ID.
+ * Updates the Firestore time log with endTime and totalHours.
+ *
+ * @param {string} logId — the time log document ID
+ * @param {Object} options — { notes, overtime }
+ * @returns {Object|null} — { totalHours, overtimeHours, taskId }
  */
 export async function stopTimer(logId, { notes = '', overtime = false } = {}) {
+    if (!logId) return null;
+
     const now = new Date();
-    const timer = getActiveTimer();
-    if (!timer) {
-        // No timer in localStorage — clear anyway
-        setActiveTimer(null);
+    const logRef = doc(db, COLLECTIONS.TIME_LOGS, logId);
+
+    // Read the log to get startTime
+    let logSnap;
+    try {
+        logSnap = await getDoc(logRef);
+    } catch (err) {
+        console.warn('[timeService] Could not read time log:', err.message);
         return null;
     }
 
-    // Use the logId from localStorage if passed logId doesn't match
-    const effectiveLogId = logId || timer.logId;
-    if (!effectiveLogId) {
-        setActiveTimer(null);
+    if (!logSnap.exists()) {
+        console.warn(`[timeService] Time log ${logId} not found`);
         return null;
     }
 
-    const startTime = new Date(timer.startTime);
+    const logData = logSnap.data();
+    const startTime = new Date(logData.startTime);
     const totalMs = now - startTime;
     let totalHours = parseFloat((totalMs / 3600000).toFixed(6));
 
-    // Fallback: If timer stopped too fast (less than 1 min), log at least 1 minute
+    // Fallback: at least 1 minute
     if (totalHours < 0.016666) {
         totalHours = 0.016666;
     }
@@ -93,87 +139,41 @@ export async function stopTimer(logId, { notes = '', overtime = false } = {}) {
     const overtimeHours = overtime ? totalHours : 0;
 
     try {
-        await updateDoc(doc(db, COLLECTIONS.TIME_LOGS, effectiveLogId), {
+        await updateDoc(logRef, {
             endTime: now.toISOString(),
             totalHours,
             overtime,
             overtimeHours,
-            notes: notes || timer.notes || '',
+            notes: notes || logData.notes || '',
         });
 
-        // Update task's actualHours
-        if (timer.taskId) {
-            await recalculateTaskHours(timer.taskId);
+        // Recalculate task's actualHours
+        if (logData.taskId) {
+            await recalculateTaskHours(logData.taskId);
         }
 
-        if (timer.projectId && (overtime || overtimeHours > 0)) {
-            await calculateProjectRisk(timer.projectId);
+        if (logData.projectId && (overtime || overtimeHours > 0)) {
+            await calculateProjectRisk(logData.projectId);
         }
     } catch (err) {
-        console.warn('[timeService] Firestore update failed during stop, clearing timer anyway:', err.message);
+        console.error('[timeService] Error stopping timer:', err);
     }
 
-    // ALWAYS clear localStorage, even if Firestore update failed
-    setActiveTimer(null);
-    return { totalHours, overtimeHours, taskId: timer.taskId };
+    return { totalHours, overtimeHours, taskId: logData.taskId };
 }
 
-/**
- * Force-stop: unconditionally clears the active timer from localStorage.
- * Use when the normal stop fails (e.g., orphaned timer, Firestore doc missing).
- */
-export function forceStopTimer() {
-    const timer = getActiveTimer();
-    setActiveTimer(null);
-    console.warn('[timeService] Timer force-stopped:', timer?.logId);
-    return timer;
-}
-
-/** Maximum hours before a timer is considered stale and auto-stopped */
-const MAX_TIMER_HOURS = 10;
+// ============================================================
+// LEGACY CLEANUP — remove orphaned localStorage timers
+// ============================================================
 
 /**
- * Validate the active timer on app startup.
- * - If the Firestore time log document no longer exists → clear the timer
- * - If the timer has been running for more than MAX_TIMER_HOURS → auto-stop it
- * Call this once on app mount (e.g., in MyWork or App).
- * 
- * @returns {{ valid: boolean, autoStopped?: boolean, orphaned?: boolean, hours?: number }}
+ * One-time cleanup: remove any leftover localStorage timer from the old system.
+ * Call this once on app startup to clear zombie timers.
  */
-export async function validateActiveTimer() {
-    const timer = getActiveTimer();
-    if (!timer) return { valid: true };
-
-    // Check elapsed hours
-    const hours = (Date.now() - new Date(timer.startTime).getTime()) / 3600000;
-
-    // Check if Firestore doc still exists
-    if (timer.logId) {
-        try {
-            const snap = await getDoc(doc(db, COLLECTIONS.TIME_LOGS, timer.logId));
-            if (!snap.exists()) {
-                console.warn(`[timeService] Orphaned timer: Firestore doc ${timer.logId} not found. Clearing.`);
-                setActiveTimer(null);
-                return { valid: false, orphaned: true, hours };
-            }
-        } catch (err) {
-            console.warn('[timeService] Could not validate timer doc:', err.message);
-            // Don't clear on network errors — might just be offline
-        }
-    }
-
-    // Auto-stop if running too long
-    if (hours > MAX_TIMER_HOURS) {
-        console.warn(`[timeService] Timer running ${hours.toFixed(1)}h (>${MAX_TIMER_HOURS}h). Auto-stopping.`);
-        try {
-            await stopTimer(timer.logId);
-        } catch {
-            setActiveTimer(null);
-        }
-        return { valid: false, autoStopped: true, hours };
-    }
-
-    return { valid: true, hours };
+export function clearLegacyTimer() {
+    try {
+        localStorage.removeItem('autobom_active_timer');
+    } catch { /* ignore */ }
 }
 
 // ============================================================
@@ -181,7 +181,7 @@ export async function validateActiveTimer() {
 // ============================================================
 
 /**
- * Recalculate the actualHours field on a task by summing all its timeLogs.
+ * Recalculate the actualHours field on a task by summing all its completed timeLogs.
  */
 export async function recalculateTaskHours(taskId) {
     if (!taskId) return;
@@ -197,7 +197,6 @@ export async function recalculateTaskHours(taskId) {
             }
         });
 
-        // Final precision on the task document (4 decimals is enough for accurate summing while keeping display clean)
         totalHours = parseFloat(totalHours.toFixed(4));
         await updateDoc(doc(db, COLLECTIONS.TASKS, taskId), {
             actualHours: totalHours,
@@ -243,7 +242,6 @@ export async function createManualTimeLog({
     const ref = doc(collection(db, COLLECTIONS.TIME_LOGS));
     await setDoc(ref, logData);
 
-    // Recalculate task hours
     if (taskId) await recalculateTaskHours(taskId);
 
     if (projectId && (overtime || overtimeHours > 0)) {
@@ -254,7 +252,6 @@ export async function createManualTimeLog({
 }
 
 export async function updateTimeLog(logId, updates) {
-    // Recalculate totals if times changed
     if (updates.startTime && updates.endTime) {
         const start = new Date(updates.startTime);
         const end = new Date(updates.endTime);
@@ -266,8 +263,6 @@ export async function updateTimeLog(logId, updates) {
     }
     await updateDoc(doc(db, COLLECTIONS.TIME_LOGS, logId), updates);
 
-    // If overtime was involved, recalculate risk.
-    // Need to get the document to know projectId.
     if (updates.overtime !== undefined) {
         const snap = await getDoc(doc(db, COLLECTIONS.TIME_LOGS, logId));
         if (snap.exists() && snap.data().projectId) {
@@ -279,12 +274,11 @@ export async function updateTimeLog(logId, updates) {
 export async function deleteTimeLog(logId, taskId = null, projectId = null) {
     try {
         await deleteDoc(doc(db, COLLECTIONS.TIME_LOGS, logId));
-        // Recalculate task hours after deletion
         if (taskId) await recalculateTaskHours(taskId);
         if (projectId) await calculateProjectRisk(projectId);
     } catch (err) {
         console.error('CRITICAL: Error deleting time log:', err);
-        throw err; // Re-throw to be caught in UI
+        throw err;
     }
 }
 

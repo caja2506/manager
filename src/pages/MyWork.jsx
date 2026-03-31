@@ -28,7 +28,7 @@ import { plannerService } from '../services/plannerService';
 
 // Time service helpers
 import { updateTaskStatus } from '../services/taskService';
-import { getActiveTimer } from '../services/timeService';
+import { getActiveTimerFromLogs } from '../services/timeService';
 
 // Greeting helper
 function getGreeting() {
@@ -142,8 +142,8 @@ export default function MyWork() {
             .catch(console.error);
     }, [weekStartStr]);
 
-    // ── Active timer state (for FocusNowCard) ──
-    const activeTimer = getActiveTimer();
+    // ── Active timer state (for FocusNowCard) — from Firestore ──
+    const activeTimer = getActiveTimerFromLogs(timeLogs, user?.uid);
     const focusTimerTask = activeTimer
         ? (engTasks.find(t => t.id === activeTimer.taskId) || focusTask)
         : focusTask;
@@ -211,6 +211,7 @@ export default function MyWork() {
                         task={focusTimerTask || focusTask}
                         userId={user?.uid}
                         engTasks={engTasks}
+                        timeLogs={timeLogs}
                         onOpenTask={handleOpenTask}
                         onStatusChange={handleStatusChange}
                     />
@@ -219,6 +220,7 @@ export default function MyWork() {
                     <TodayTasksPanel
                         tasks={todayTasks}
                         userId={user?.uid}
+                        timeLogs={timeLogs}
                         onOpenTask={handleOpenTask}
                         onStatusChange={handleStatusChange}
                     />
@@ -231,6 +233,7 @@ export default function MyWork() {
                         allTasks={engTasks}
                         projects={engProjects}
                         userId={user?.uid}
+                        timeLogs={timeLogs}
                         onTimerStop={handleTimerStop}
                     />
 

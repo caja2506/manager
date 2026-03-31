@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { formatDuration, getActiveTimer, formatElapsed } from '../../services/timeService';
+import { formatDuration, getActiveTimerForTask, formatElapsed } from '../../services/timeService';
 import {
     AlertTriangle, CheckCheck, User, Calendar, Clock,
     GripVertical
@@ -43,7 +43,7 @@ const PRIORITY_COLORS = {
 const PILL = 'h-6 inline-flex items-center gap-1 px-2.5 rounded-full text-[10px] font-semibold border';
 const ICON = 'w-3 h-3 flex-shrink-0';
 
-export default function TaskCard({ task, project, teamMembers, subtasks = [], onClick, isDragOverlay = false }) {
+export default function TaskCard({ task, project, teamMembers, subtasks = [], onClick, isDragOverlay = false, timeLogs = [] }) {
     const {
         attributes, listeners, setNodeRef, transform, transition, isDragging,
     } = useSortable({
@@ -68,27 +68,21 @@ export default function TaskCard({ task, project, teamMembers, subtasks = [], on
 
     const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'completed' && task.status !== 'cancelled';
 
-    // Live Timer
+    // Live Timer — detect from Firestore timeLogs
     const [liveElapsed, setLiveElapsed] = useState(null);
 
     useEffect(() => {
         let interval;
-        const checkAndTick = () => {
-            if (task.status === 'in_progress') {
-                const active = getActiveTimer();
-                if (active && active.taskId === task.id && active.startTime) {
-                    setLiveElapsed(formatElapsed(active.startTime));
-                } else {
-                    setLiveElapsed(null);
-                }
-            } else {
-                setLiveElapsed(null);
-            }
-        };
-        checkAndTick();
-        if (task.status === 'in_progress') interval = setInterval(checkAndTick, 1000);
+        const activeLog = getActiveTimerForTask(timeLogs, task.id);
+        if (activeLog && activeLog.startTime) {
+            const tick = () => setLiveElapsed(formatElapsed(activeLog.startTime));
+            tick();
+            interval = setInterval(tick, 1000);
+        } else {
+            setLiveElapsed(null);
+        }
         return () => clearInterval(interval);
-    }, [task.status, task.id]);
+    }, [task.id, timeLogs]);
 
     // ── Card class ──
     let cardCls = 'rounded-xl border p-3.5 transition-all duration-200 group cursor-grab active:cursor-grabbing relative';

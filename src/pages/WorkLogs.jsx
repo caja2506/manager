@@ -4,9 +4,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
 import { useEngineeringData } from '../hooks/useEngineeringData';
 import ActiveTimer from '../components/time/ActiveTimer';
+import AdminActiveTimersPanel from '../components/time/AdminActiveTimersPanel';
 import ManualTimeEntry from '../components/time/ManualTimeEntry';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
-import { deleteTimeLog, formatDuration, setActiveTimer, recalculateTaskHours, stopTimer } from '../services/timeService';
+import { deleteTimeLog, formatDuration, stopTimer, canManageOthersTimers } from '../services/timeService';
 import {
     Clock, Plus, Trash2, Zap, Calendar, ListTodo, FolderGit2,
     BarChart3, ChevronLeft, ChevronRight, FileText, AlertTriangle,
@@ -15,7 +16,7 @@ import {
 
 export default function WorkLogs() {
     const { user } = useAuth();
-    const { canEdit, canDelete } = useRole();
+    const { canEdit, canDelete, role, teamRole } = useRole();
     const { engProjects, engTasks, engSubtasks, timeLogs, teamMembers, taskTypes } = useEngineeringData();
 
     // Get selectedUser from shared ReportsLayout via outlet context
@@ -141,6 +142,15 @@ export default function WorkLogs() {
                 editLog={editingLog}
             />
 
+            {/* Admin: Active Timers Panel */}
+            <AdminActiveTimersPanel
+                timeLogs={timeLogs}
+                teamMembers={teamMembers}
+                tasks={engTasks}
+                projects={engProjects}
+                canManageOthers={canManageOthersTimers(role, teamRole)}
+            />
+
             {/* Action bar (smaller, no duplicate banner) */}
             <div className="flex items-center justify-between gap-3">
                 {deleteError && (
@@ -169,6 +179,7 @@ export default function WorkLogs() {
                         tasks={engTasks}
                         projects={engProjects}
                         userId={user?.uid}
+                        timeLogs={timeLogs}
                         onTimerStop={() => { }}
                     />
 
@@ -351,8 +362,6 @@ export default function WorkLogs() {
                                                             setDeleteError('');
                                                             try {
                                                                 await stopTimer(log.id, { overtime: log.overtime });
-                                                                // Dispatch storage event so ActiveTimer component updates
-                                                                window.dispatchEvent(new StorageEvent('storage', { key: 'autobom_active_timer' }));
                                                             } catch (err) {
                                                                 console.error("Stop Error:", err);
                                                                 setDeleteError(err.message || "Error deteniendo el timer");

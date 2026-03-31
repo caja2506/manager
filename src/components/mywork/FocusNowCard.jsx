@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Play, Square, ExternalLink, Clock, Flag, Folder, Zap, Target, ChevronRight } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import { startTimer, stopTimer, getActiveTimer, formatElapsed } from '../../services/timeService';
+import { startTimer, stopTimer, getActiveTimerFromLogs, formatElapsed } from '../../services/timeService';
 import { TASK_PRIORITY_CONFIG, TASK_STATUS_CONFIG } from '../../models/schemas';
 
 const PRIORITY_STYLES = {
@@ -18,8 +18,8 @@ const PRIORITY_GLOW = {
     low: 'shadow-slate-800/40',
 };
 
-export default function FocusNowCard({ task, userId, engTasks, onOpenTask, onStatusChange }) {
-    const [activeTimer, setActiveTimer] = useState(() => getActiveTimer());
+export default function FocusNowCard({ task, userId, engTasks, timeLogs, onOpenTask, onStatusChange }) {
+    const activeTimer = getActiveTimerFromLogs(timeLogs, userId);
     const [elapsed, setElapsed] = useState('0:00:00');
     const [isStarting, setIsStarting] = useState(false);
     const [isStopping, setIsStopping] = useState(false);
@@ -38,27 +38,17 @@ export default function FocusNowCard({ task, userId, engTasks, onOpenTask, onSta
         } else {
             setElapsed('0:00:00');
         }
-    }, [activeTimer, timerIsForThisTask]);
-
-    // Sync timer from localStorage
-    useEffect(() => {
-        const check = () => setActiveTimer(getActiveTimer());
-        window.addEventListener('storage', check);
-        return () => window.removeEventListener('storage', check);
-    }, []);
+    }, [activeTimer?.startTime, activeTimer?.id, timerIsForThisTask]);
 
     const handleStartTimer = useCallback(async () => {
         if (!task || anyActiveTimer) return;
         setIsStarting(true);
         try {
-            const timer = await startTimer({
+            await startTimer({
                 taskId: task.id,
                 projectId: task.projectId,
                 userId,
-                taskTitle: task.title || '',
-                projectName: task.projectName || '',
             });
-            setActiveTimer(timer);
         } catch (e) { console.error(e); }
         setIsStarting(false);
     }, [task, userId, anyActiveTimer]);
@@ -67,10 +57,7 @@ export default function FocusNowCard({ task, userId, engTasks, onOpenTask, onSta
         if (!activeTimer) return;
         setIsStopping(true);
         try {
-            await stopTimer(activeTimer.logId, { notes: '', overtime: false });
-            setActiveTimer(null);
-            clearInterval(intervalRef.current);
-            setElapsed('0:00:00');
+            await stopTimer(activeTimer.id);
         } catch (e) { console.error(e); }
         setIsStopping(false);
     }, [activeTimer]);

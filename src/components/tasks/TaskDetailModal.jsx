@@ -4,8 +4,9 @@ import {
     TASK_STATUS, TASK_PRIORITY,
 } from '../../models/schemas';
 import { createTask, updateTask, updateTaskStatus, deleteTask } from '../../services/taskService';
-import { startTimer, stopTimer, getActiveTimer } from '../../services/timeService';
+import { startTimer, stopTimer, getActiveTimerForTask, canManageOthersTimers } from '../../services/timeService';
 import { resolveAreaSync } from '../../services/mappingService';
+import { useRole } from '../../contexts/RoleContext';
 import { useAppData } from '../../contexts/AppDataContext';
 import { useEngineeringData } from '../../hooks/useEngineeringData';
 import {
@@ -30,6 +31,7 @@ export default function TaskDetailModal({
     const {
         setIsDelayReportOpen, setDelayReportTarget, setListManager,
     } = useAppData();
+    const { role, teamRole } = useRole();
     const { timeLogs, engTasks, delays } = useEngineeringData();
     const isNew = !task;
 
@@ -196,15 +198,26 @@ export default function TaskDetailModal({
         await updateTaskStatus(task.id, newStatus, task.projectId || form.projectId);
 
         // Auto-Timer logic for IN_PROGRESS
+        // Timer is created for the task's assignedTo user (not the logged-in user)
+        const taskOwner = form.assignedTo || task?.assignedTo;
+        const isSelf = taskOwner === userId;
+        const canManageOthers = canManageOthersTimers(role, teamRole);
+
         if (newStatus === TASK_STATUS.IN_PROGRESS && oldStatus !== TASK_STATUS.IN_PROGRESS) {
-            const currentActive = getActiveTimer();
-            if (!currentActive && userId) {
-                await startTimer({ taskId: task.id, projectId: task.projectId || form.projectId, userId, notes: 'Auto-started in detail modal' });
+            // Only start if: user is the assignee OR has permission to manage others
+            if (taskOwner && (isSelf || canManageOthers)) {
+                const existingTimer = getActiveTimerForTask(timeLogs, task.id);
+                if (!existingTimer) {
+                    await startTimer({ taskId: task.id, projectId: task.projectId || form.projectId, userId: taskOwner, notes: 'Auto-started in detail modal' });
+                }
             }
         } else if (oldStatus === TASK_STATUS.IN_PROGRESS && newStatus !== TASK_STATUS.IN_PROGRESS) {
-            const currentActive = getActiveTimer();
-            if (currentActive && currentActive.taskId === task.id) {
-                await stopTimer(currentActive.logId);
+            // Stop the task's active timer (if any)
+            if (isSelf || canManageOthers) {
+                const activeLog = getActiveTimerForTask(timeLogs, task.id);
+                if (activeLog) {
+                    await stopTimer(activeLog.id);
+                }
             }
         }
     };

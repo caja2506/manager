@@ -4,13 +4,13 @@ import {
     FileText, ChevronDown, Timer as TimerIcon
 } from 'lucide-react';
 import {
-    startTimer, stopTimer, getActiveTimer, formatElapsed
+    startTimer, stopTimer, getActiveTimerFromLogs, formatElapsed
 } from '../../services/timeService';
 
 export default function ActiveTimer({
-    tasks, projects, userId, onTimerStop
+    tasks, projects, userId, timeLogs, onTimerStop
 }) {
-    const [activeTimer, setActiveTimerState] = useState(() => getActiveTimer());
+    const activeTimer = getActiveTimerFromLogs(timeLogs, userId);
     const [elapsed, setElapsed] = useState('0:00:00');
     const [showForm, setShowForm] = useState(false);
     const [isStarting, setIsStarting] = useState(false);
@@ -34,31 +34,19 @@ export default function ActiveTimer({
         } else {
             setElapsed('0:00:00');
         }
-    }, [activeTimer]);
-
-    // Check localStorage on mount (in case timer was started in another tab)
-    useEffect(() => {
-        const check = () => {
-            const stored = getActiveTimer();
-            if (stored && !activeTimer) setActiveTimerState(stored);
-            else if (!stored && activeTimer) setActiveTimerState(null);
-        };
-        window.addEventListener('storage', check);
-        return () => window.removeEventListener('storage', check);
-    }, [activeTimer]);
+    }, [activeTimer?.startTime, activeTimer?.id]);
 
     const handleStart = useCallback(async () => {
         if (!formTask && !formProject) return;
         setIsStarting(true);
         try {
-            const timer = await startTimer({
+            await startTimer({
                 taskId: formTask || null,
                 projectId: formProject || null,
                 userId,
                 notes: formNotes,
                 overtime: formOvertime,
             });
-            setActiveTimerState(timer);
             setShowForm(false);
             setFormTask(''); setFormProject(''); setFormNotes(''); setFormOvertime(false);
         } catch (err) {
@@ -71,13 +59,7 @@ export default function ActiveTimer({
         if (!activeTimer) return;
         setIsStopping(true);
         try {
-            const result = await stopTimer(activeTimer.logId, {
-                notes: activeTimer.notes || '',
-                overtime: activeTimer.overtime || false,
-            });
-            setActiveTimerState(null);
-            clearInterval(intervalRef.current);
-            setElapsed('0:00:00');
+            const result = await stopTimer(activeTimer.id);
             onTimerStop?.(result);
         } catch (err) {
             console.error('Error stopping timer:', err);

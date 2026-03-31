@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG } from '../../models/schemas';
-import { getActiveTimer, startTimer } from '../../services/timeService';
+import { getActiveTimerFromLogs, getActiveTimerForTask, startTimer } from '../../services/timeService';
 
 const SOURCE_LABELS = {
     in_progress: { label: 'En Progreso', icon: ChevronsRight, color: 'text-amber-400 bg-amber-500/15 border-amber-500/30' },
@@ -21,11 +21,11 @@ const PRIORITY_DOT = {
     low:      'bg-slate-300',
 };
 
-export default function TodayTasksPanel({ tasks, userId, onOpenTask, onStatusChange }) {
+export default function TodayTasksPanel({ tasks, userId, timeLogs, onOpenTask, onStatusChange }) {
     const [startingId, setStartingId] = useState(null);
 
     const handleStartTimer = async (task) => {
-        const active = getActiveTimer();
+        const active = getActiveTimerFromLogs(timeLogs, userId);
         if (active) { alert('Ya tienes un timer activo. Por favor detenlo antes.'); return; }
         setStartingId(task.id);
         try {
@@ -63,7 +63,7 @@ export default function TodayTasksPanel({ tasks, userId, onOpenTask, onStatusCha
                     const sourceCfg = SOURCE_LABELS[task.todaySource] || SOURCE_LABELS.planned;
                     const SourceIcon = sourceCfg.icon;
                     const priorityDot = PRIORITY_DOT[task.priority] || PRIORITY_DOT.medium;
-                    const isTimerActive = getActiveTimer()?.taskId === task.id;
+                    const isTimerActive = !!getActiveTimerForTask(timeLogs, task.id);
 
                     return (
                         <div

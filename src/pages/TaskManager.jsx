@@ -17,7 +17,7 @@ import TransitionConfirmModal from '../components/workflow/TransitionConfirmModa
 import TaskModuleBanner from '../components/layout/TaskModuleBanner';
 import { useWorkflowTransition } from '../hooks/useWorkflowTransition';
 import { updateTaskStatus } from '../services/taskService';
-import { startTimer, stopTimer, getActiveTimer } from '../services/timeService';
+import { startTimer, stopTimer, getActiveTimerForTask, canManageOthersTimers } from '../services/timeService';
 import {
     TASK_STATUS, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG
 } from '../models/schemas';
@@ -85,8 +85,8 @@ const KANBAN_COLUMNS = [
 
 export default function TaskManager() {
     const { user } = useAuth();
-    const { canEdit, canDelete } = useRole();
-    const { engProjects, engTasks, engSubtasks, teamMembers, taskTypes } = useEngineeringData();
+    const { canEdit, canDelete, role, teamRole } = useRole();
+    const { engProjects, engTasks, engSubtasks, teamMembers, taskTypes, timeLogs } = useEngineeringData();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
@@ -185,21 +185,30 @@ export default function TaskManager() {
         try {
             await result.execute();
 
+            // Auto-timer: start for the task's assignedTo, not the dragging user
+            const taskOwner = task.assignedTo;
+            const isSelf = taskOwner === user.uid;
+            const canManageOthers = canManageOthersTimers(role, teamRole);
+
             if (targetStatus === TASK_STATUS.IN_PROGRESS && task.status !== TASK_STATUS.IN_PROGRESS) {
-                const currentActive = getActiveTimer();
-                if (!currentActive) {
-                    await startTimer({ taskId, projectId: task.projectId, userId: user.uid, notes: 'Auto-started from Kanban' });
+                if (taskOwner && (isSelf || canManageOthers)) {
+                    const existingTimer = getActiveTimerForTask(timeLogs, taskId);
+                    if (!existingTimer) {
+                        await startTimer({ taskId, projectId: task.projectId, userId: taskOwner, notes: 'Auto-started from Kanban' });
+                    }
                 }
             } else if (task.status === TASK_STATUS.IN_PROGRESS && targetStatus !== TASK_STATUS.IN_PROGRESS) {
-                const currentActive = getActiveTimer();
-                if (currentActive && currentActive.taskId === taskId) {
-                    await stopTimer(currentActive.logId);
+                if (isSelf || canManageOthers) {
+                    const activeLog = getActiveTimerForTask(timeLogs, taskId);
+                    if (activeLog) {
+                        await stopTimer(activeLog.id);
+                    }
                 }
             }
         } catch (err) {
             console.error('Error updating task status:', err);
         }
-    }, [engTasks, canEdit, user, requestTransition]);
+    }, [engTasks, canEdit, user, requestTransition, role, teamRole, timeLogs]);
 
     const handleDragCancel = useCallback(() => {
         setActiveId(null);
@@ -329,6 +338,7 @@ export default function TaskManager() {
                                                     project={engProjects.find(p => p.id === task.projectId)}
                                                     teamMembers={teamMembers}
                                                     subtasks={engSubtasks.filter(s => s.taskId === task.id)}
+                                                    timeLogs={timeLogs}
                                                     onClick={() => openTask(task)}
                                                 />
                                             ))
@@ -352,6 +362,7 @@ export default function TaskManager() {
                                 project={engProjects.find(p => p.id === activeTask.projectId)}
                                 teamMembers={teamMembers}
                                 subtasks={engSubtasks.filter(s => s.taskId === activeTask.id)}
+                                timeLogs={timeLogs}
                                 onClick={() => { }}
                                 isDragOverlay
                             />
@@ -377,6 +388,7 @@ export default function TaskManager() {
                                 project={engProjects.find(p => p.id === task.projectId)}
                                 teamMembers={teamMembers}
                                 subtasks={engSubtasks.filter(s => s.taskId === task.id)}
+                                timeLogs={timeLogs}
                                 onClick={() => openTask(task)}
                             />
                         ))}
