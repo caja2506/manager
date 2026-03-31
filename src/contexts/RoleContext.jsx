@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthContext';
 import { ensureUserProfile } from '../services/userProfileService';
@@ -47,28 +47,30 @@ export function RoleProvider({ children }) {
 
         setRoleLoading(true);
 
-        // ── V5 (M7): Read rbacRole from users/{uid} as primary source ──
+        // ── Role resolution: users_roles is authoritative (Firestore rules use it) ──
+        // Read users_roles FIRST, then users/{uid}.rbacRole as fallback.
+        // This guarantees the frontend permission checks match security rules.
         const userDocRef = doc(db, 'users', user.uid);
         const legacyRoleRef = doc(db, 'users_roles', user.uid);
 
-        const unsubscribe = onSnapshot(userDocRef, async (userSnap) => {
+        const unsubscribe = onSnapshot(legacyRoleRef, async (legacySnap) => {
             let resolvedRole = null;
 
-            // 1. Try V5 source: users/{uid}.rbacRole
-            if (userSnap.exists() && userSnap.data().rbacRole) {
-                resolvedRole = userSnap.data().rbacRole;
+            // 1. Primary source: users_roles/{uid}.role (used by Firestore security rules)
+            if (legacySnap.exists() && legacySnap.data().role) {
+                resolvedRole = legacySnap.data().role;
             }
 
-            // 2. Fallback: legacy users_roles/{uid}.role
+            // 2. Fallback: users/{uid}.rbacRole (V5 profile)
             if (!resolvedRole) {
                 try {
                     const { getDoc: getDocFn } = await import('firebase/firestore');
-                    const legacySnap = await getDocFn(legacyRoleRef);
-                    if (legacySnap.exists()) {
-                        resolvedRole = legacySnap.data().role || 'viewer';
+                    const userSnap = await getDocFn(userDocRef);
+                    if (userSnap.exists() && userSnap.data().rbacRole) {
+                        resolvedRole = userSnap.data().rbacRole;
                     }
                 } catch (err) {
-                    console.warn('[RoleContext] Legacy fallback failed:', err);
+                    console.warn('[RoleContext] V5 profile fallback failed:', err);
                 }
             }
 

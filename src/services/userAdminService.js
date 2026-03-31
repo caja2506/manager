@@ -45,7 +45,21 @@ export function subscribeToUserProfiles(onData) {
  * @param {string} newRole
  */
 export async function updateRbacRole(uid, newRole) {
+    // Write to legacy RBAC collection (used by Firestore security rules)
     await updateDoc(doc(db, 'users_roles', uid), { role: newRole });
+
+    // Sync to users/{uid}.rbacRole (V5 primary source read by RoleContext)
+    // Without this, RoleContext reads the stale rbacRole from users/{uid}
+    // and never falls through to the updated users_roles value.
+    try {
+        await setDoc(
+            doc(db, COLLECTIONS.USERS, uid),
+            { rbacRole: newRole, updatedAt: new Date().toISOString() },
+            { merge: true }
+        );
+    } catch (err) {
+        console.warn('[userAdminService] Failed to sync rbacRole to users/ profile:', err);
+    }
 }
 
 /**
