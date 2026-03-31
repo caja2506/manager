@@ -163,6 +163,120 @@ export async function stopTimer(logId, { notes = '', overtime = false } = {}) {
 }
 
 // ============================================================
+// DAY CLOSE / DAY OPEN — batch timer management
+// ============================================================
+
+/**
+ * Close the day: stop ALL active timers and mark them as autoStopped.
+ * This allows openDay() to know which timers to restart the next morning.
+ *
+ * @param {Array} timeLogs — all time logs (from useEngineeringData)
+ * @returns {number} — count of timers stopped
+ */
+export async function closeDay(timeLogs) {
+    const runningTimers = (timeLogs || []).filter(log => !log.endTime && log.startTime);
+    if (runningTimers.length === 0) return 0;
+
+    const now = new Date();
+    let stopped = 0;
+
+    for (const log of runningTimers) {
+        const startTime = new Date(log.startTime);
+        const totalMs = now - startTime;
+        let totalHours = parseFloat((totalMs / 3600000).toFixed(6));
+        if (totalHours < 0.016666) totalHours = 0.016666;
+
+        try {
+            await updateDoc(doc(db, COLLECTIONS.TIME_LOGS, log.id), {
+                endTime: now.toISOString(),
+                totalHours,
+                autoStopped: true,    // ← flag for openDay() to find
+                notes: (log.notes || '') + ' [Auto-cerrado al cierre de día]',
+            });
+
+            if (log.taskId) {
+                await recalculateTaskHours(log.taskId);
+            }
+            stopped++;
+        } catch (err) {
+            console.error(`[closeDay] Error stopping timer ${log.id}:`, err);
+        }
+    }
+
+    return stopped;
+}
+
+/**
+ * Open the day: find timers that were auto-stopped yesterday (closeDay)
+ * and restart them for the same task/user combinations.
+ *
+ * @param {Array} timeLogs — all time logs (from useEngineeringData)
+ * @param {Array} tasks — all engineering tasks (to check status is still in_progress)
+ * @returns {number} — count of timers restarted
+ */
+export async function openDay(timeLogs, tasks) {
+    // Find auto-stopped timers from the last 24 hours
+    const yesterday = new Date(Date.now() - 24 * 3600000);
+
+    const autoStoppedTimers = (timeLogs || []).filter(log => {
+        if (!log.autoStopped) return false;
+        if (!log.endTime) return false;
+        const endTime = new Date(log.endTime);
+        return endTime >= yesterday;
+    });
+
+    if (autoStoppedTimers.length === 0) return 0;
+
+    // Deduplicate by taskId+userId (in case of multiple auto-stops)
+    const seen = new Set();
+    const uniqueTimers = [];
+    for (const log of autoStoppedTimers) {
+        const key = `${log.taskId || ''}_${log.userId}`;
+        if (!seen.has(key)) {
+            seen.add(key);
+            uniqueTimers.push(log);
+        }
+    }
+
+    let restarted = 0;
+
+    for (const log of uniqueTimers) {
+        // Check if there's already an active timer for this task
+        const alreadyRunning = (timeLogs || []).find(
+            l => l.taskId === log.taskId && l.userId === log.userId && !l.endTime
+        );
+        if (alreadyRunning) continue;
+
+        // Check if task is still in_progress
+        if (log.taskId) {
+            const task = (tasks || []).find(t => t.id === log.taskId);
+            if (task && task.status !== 'in_progress') continue;
+        }
+
+        try {
+            await startTimer({
+                taskId: log.taskId,
+                projectId: log.projectId,
+                userId: log.userId,
+                notes: 'Auto-iniciado al abrir el día',
+                overtime: false,
+            });
+
+            // Clear the autoStopped flag on the original log
+            await updateDoc(doc(db, COLLECTIONS.TIME_LOGS, log.id), {
+                autoStopped: false,
+            });
+
+            restarted++;
+        } catch (err) {
+            console.error(`[openDay] Error restarting timer:`, err);
+        }
+    }
+
+    return restarted;
+}
+
+// ============================================================
 // LEGACY CLEANUP — remove orphaned localStorage timers
 // ============================================================
 

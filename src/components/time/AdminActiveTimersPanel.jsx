@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     Users, Clock, Square, Pencil, X, Check,
-    ListTodo, FolderGit2, User, AlertTriangle
+    ListTodo, FolderGit2, AlertTriangle,
+    Sunset, Sunrise
 } from 'lucide-react';
-import { stopTimer, formatElapsed } from '../../services/timeService';
+import { stopTimer, formatElapsed, closeDay, openDay } from '../../services/timeService';
 import { updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { COLLECTIONS } from '../../models/schemas';
@@ -17,42 +18,142 @@ import { COLLECTIONS } from '../../models/schemas';
  *  - See who is tracking time right now
  *  - Stop any timer
  *  - Edit the start time of a running timer
+ *  - CERRAR DÍA: stop all timers at once (6PM)
+ *  - INICIAR DÍA: restart auto-stopped timers (8AM)
  */
 export default function AdminActiveTimersPanel({
     timeLogs, teamMembers, tasks, projects, canManageOthers
 }) {
+    const [isClosing, setIsClosing] = useState(false);
+    const [isOpening, setIsOpening] = useState(false);
+    const [feedback, setFeedback] = useState(null);
+
     if (!canManageOthers) return null;
 
     // All running timers (endTime is null/empty)
     const runningTimers = (timeLogs || []).filter(log => !log.endTime && log.startTime);
 
-    if (runningTimers.length === 0) return null;
+    // Count auto-stopped timers from last 24h (for "Iniciar Día" visibility)
+    const yesterday = new Date(Date.now() - 24 * 3600000);
+    const autoStoppedCount = (timeLogs || []).filter(log =>
+        log.autoStopped && log.endTime && new Date(log.endTime) >= yesterday
+    ).length;
+
+    const handleCloseDay = async () => {
+        if (!confirm(`¿Cerrar el día? Se detendrán ${runningTimers.length} timer(s) activos.`)) return;
+        setIsClosing(true);
+        setFeedback(null);
+        try {
+            const stopped = await closeDay(timeLogs);
+            setFeedback({ type: 'success', msg: `🌇 Día cerrado. ${stopped} timer(s) detenidos.` });
+        } catch (e) {
+            setFeedback({ type: 'error', msg: 'Error cerrando el día: ' + e.message });
+        }
+        setIsClosing(false);
+    };
+
+    const handleOpenDay = async () => {
+        if (!confirm('¿Iniciar el día? Se reactivarán los timers del cierre de ayer.')) return;
+        setIsOpening(true);
+        setFeedback(null);
+        try {
+            const restarted = await openDay(timeLogs, tasks);
+            setFeedback({ type: 'success', msg: `🌅 Día iniciado. ${restarted} timer(s) reactivados.` });
+        } catch (e) {
+            setFeedback({ type: 'error', msg: 'Error iniciando el día: ' + e.message });
+        }
+        setIsOpening(false);
+    };
+
+    // If no running timers and no auto-stopped, just show day controls
+    const showTimerList = runningTimers.length > 0;
 
     return (
         <div className="bg-slate-900/70 rounded-2xl border border-emerald-500/30 shadow-lg overflow-hidden">
             {/* Header */}
-            <div className="px-5 py-4 border-b border-slate-800 flex items-center gap-2">
+            <div className="px-5 py-4 border-b border-slate-800 flex items-center gap-2 flex-wrap">
                 <Users className="w-4 h-4 text-emerald-500" />
                 <span className="text-xs font-black uppercase tracking-widest text-slate-400">
                     Timers Activos del Equipo
                 </span>
-                <span className="ml-auto bg-emerald-500/20 text-emerald-400 text-[10px] font-black px-2.5 py-1 rounded-full border border-emerald-500/30">
-                    {runningTimers.length} {runningTimers.length === 1 ? 'activo' : 'activos'}
-                </span>
+                {runningTimers.length > 0 && (
+                    <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-black px-2.5 py-1 rounded-full border border-emerald-500/30">
+                        {runningTimers.length} {runningTimers.length === 1 ? 'activo' : 'activos'}
+                    </span>
+                )}
+
+                {/* Day controls — right side */}
+                <div className="ml-auto flex items-center gap-2">
+                    {/* Iniciar Día — only if there are auto-stopped timers */}
+                    {autoStoppedCount > 0 && runningTimers.length === 0 && (
+                        <button
+                            onClick={handleOpenDay}
+                            disabled={isOpening}
+                            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black rounded-lg transition-all flex items-center gap-1.5 disabled:bg-slate-600 shadow-lg shadow-amber-500/20"
+                        >
+                            <Sunrise className="w-4 h-4" />
+                            {isOpening ? 'Iniciando...' : `Iniciar Día (${autoStoppedCount})`}
+                        </button>
+                    )}
+
+                    {/* Cerrar Día — only if there are running timers */}
+                    {runningTimers.length > 0 && (
+                        <button
+                            onClick={handleCloseDay}
+                            disabled={isClosing}
+                            className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-black rounded-lg transition-all flex items-center gap-1.5 disabled:bg-slate-600 shadow-lg shadow-orange-600/20"
+                        >
+                            <Sunset className="w-4 h-4" />
+                            {isClosing ? 'Cerrando...' : 'Cerrar Día'}
+                        </button>
+                    )}
+                </div>
             </div>
 
+            {/* Feedback message */}
+            {feedback && (
+                <div className={`mx-5 mt-3 px-3 py-2 rounded-lg text-xs font-bold ${
+                    feedback.type === 'success'
+                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-red-500/15 text-red-400 border border-red-500/30'
+                }`}>
+                    {feedback.msg}
+                </div>
+            )}
+
+            {/* No timers message */}
+            {!showTimerList && autoStoppedCount === 0 && (
+                <div className="px-5 py-8 text-center">
+                    <p className="text-sm text-slate-500 font-medium">No hay timers activos en este momento.</p>
+                </div>
+            )}
+
+            {/* Auto-stopped waiting message */}
+            {!showTimerList && autoStoppedCount > 0 && (
+                <div className="px-5 py-5 text-center">
+                    <p className="text-sm text-amber-400 font-bold mb-1">
+                        {autoStoppedCount} timer(s) del cierre de ayer esperando reactivación
+                    </p>
+                    <p className="text-xs text-slate-500">
+                        Presiona "Iniciar Día" para reactivarlos automáticamente.
+                    </p>
+                </div>
+            )}
+
             {/* Timer rows */}
-            <div className="divide-y divide-slate-800/60">
-                {runningTimers.map(log => (
-                    <ActiveTimerRow
-                        key={log.id}
-                        log={log}
-                        teamMembers={teamMembers}
-                        tasks={tasks}
-                        projects={projects}
-                    />
-                ))}
-            </div>
+            {showTimerList && (
+                <div className="divide-y divide-slate-800/60">
+                    {runningTimers.map(log => (
+                        <ActiveTimerRow
+                            key={log.id}
+                            log={log}
+                            teamMembers={teamMembers}
+                            tasks={tasks}
+                            projects={projects}
+                        />
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
@@ -95,7 +196,6 @@ function ActiveTimerRow({ log, teamMembers, tasks, projects }) {
     };
 
     const handleEditStart = () => {
-        // Convert ISO startTime to local datetime-local format
         const dt = new Date(log.startTime);
         const local = new Date(dt.getTime() - dt.getTimezoneOffset() * 60000)
             .toISOString().slice(0, 16);
@@ -118,7 +218,6 @@ function ActiveTimerRow({ log, teamMembers, tasks, projects }) {
         setIsSaving(false);
     };
 
-    // Initials helper
     const getInitials = () => {
         const name = userName || '?';
         const parts = name.trim().split(/\s+/);
@@ -173,7 +272,6 @@ function ActiveTimerRow({ log, teamMembers, tasks, projects }) {
 
                 {/* Actions */}
                 <div className="flex items-center gap-1.5 shrink-0">
-                    {/* Edit start time */}
                     <button
                         onClick={handleEditStart}
                         className="p-2 rounded-lg text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all"
@@ -181,8 +279,6 @@ function ActiveTimerRow({ log, teamMembers, tasks, projects }) {
                     >
                         <Pencil className="w-4 h-4" />
                     </button>
-
-                    {/* Stop */}
                     <button
                         onClick={handleStop}
                         disabled={isStopping}
