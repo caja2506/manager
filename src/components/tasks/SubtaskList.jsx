@@ -6,6 +6,7 @@ import {
     createSubtask, toggleSubtask, deleteSubtask,
     updateSubtask, reorderSubtasks
 } from '../../services/taskService';
+import { logActivity, ACTIVITY_TYPES } from '../../services/activityLogService';
 
 /**
  * SubtaskList — enhanced with:
@@ -50,9 +51,19 @@ export default function SubtaskList({ subtasks = [], taskId, readOnly = false, o
     const handleAdd = async (e) => {
         if (e) e.preventDefault();
         if (!newTitle.trim()) return;
-        await createSubtask(taskId, newTitle.trim());
+        const trimmed = newTitle.trim();
+        await createSubtask(taskId, trimmed);
         setNewTitle('');
         inputRef.current?.focus();
+
+        // Log subtask creation
+        logActivity(taskId, {
+            type: ACTIVITY_TYPES.SUBTASK_CREATED,
+            description: `Subtarea creada: ${trimmed}`,
+            userId,
+            userName,
+            meta: { subtaskTitle: trimmed },
+        });
     };
 
     const handleKeyDown = (e) => {
@@ -81,7 +92,17 @@ export default function SubtaskList({ subtasks = [], taskId, readOnly = false, o
 
     // ── Delete ──
     const handleDelete = async (subtaskId) => {
+        const st = subtasks.find(s => s.id === subtaskId);
         await deleteSubtask(subtaskId);
+
+        // Log subtask deletion
+        logActivity(taskId, {
+            type: ACTIVITY_TYPES.SUBTASK_DELETED,
+            description: `Subtarea eliminada: ${st?.title || ''}`,
+            userId,
+            userName,
+            meta: { subtaskTitle: st?.title || '' },
+        });
     };
 
     // ── Inline Edit ──

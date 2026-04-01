@@ -3,6 +3,7 @@ import { useEngineeringData } from '../hooks/useEngineeringData';
 import { fetchAllActivityLogs, fetchTaskActivityLog, updateActivityLog, deleteActivityLog } from '../services/activityLogService';
 import {
     AreaChart, Area, BarChart, Bar, LineChart, Line, Cell,
+    PieChart, Pie,
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import { useSearchParams } from 'react-router-dom';
@@ -17,19 +18,55 @@ import { es } from 'date-fns/locale';
 const EVENT_COLORS = {
     subtask_completed: '#22c55e',
     subtask_unchecked: '#64748b',
+    subtask_created: '#06b6d4',
+    subtask_deleted: '#ef4444',
     status_changed: '#6366f1',
     timer_started: '#f59e0b',
     timer_stopped: '#f59e0b',
     delay_reported: '#ef4444',
+    task_created: '#3b82f6',
+    task_completed: '#22c55e',
+    priority_changed: '#f97316',
+    assignee_changed: '#8b5cf6',
+    due_date_changed: '#ec4899',
+    title_changed: '#64748b',
+    description_changed: '#64748b',
 };
 
 const EVENT_ICONS = {
     subtask_completed: '✅',
     subtask_unchecked: '⬜',
+    subtask_created: '➕',
+    subtask_deleted: '🗑️',
     status_changed: '🔄',
     timer_started: '▶️',
     timer_stopped: '⏹️',
     delay_reported: '⚠️',
+    task_created: '🆕',
+    task_completed: '🏁',
+    priority_changed: '🔺',
+    assignee_changed: '👤',
+    due_date_changed: '📅',
+    title_changed: '✏️',
+    description_changed: '📝',
+};
+
+const EVENT_LABELS = {
+    subtask_completed: 'Subtarea completada',
+    subtask_unchecked: 'Subtarea desmarcada',
+    subtask_created: 'Subtarea creada',
+    subtask_deleted: 'Subtarea eliminada',
+    status_changed: 'Cambio de estado',
+    timer_started: 'Timer iniciado',
+    timer_stopped: 'Timer detenido',
+    delay_reported: 'Retraso',
+    task_created: 'Tarea creada',
+    task_completed: 'Tarea completada',
+    priority_changed: 'Prioridad',
+    assignee_changed: 'Reasignación',
+    due_date_changed: 'Fecha cambiada',
+    title_changed: 'Título editado',
+    description_changed: 'Descripción editada',
 };
 
 // --- Multi-select Dropdown (same pattern as EngineeringAnalytics) ---
@@ -281,7 +318,26 @@ export default function TaskActivityPage() {
             timelineByDay[dateStr].push(log);
         });
 
-        return { kpis, trendData, topTasks, timelineByDay, totalEvents: filtered.length };
+        // Event type distribution (for donut chart)
+        const typeCountMap = {};
+        filtered.forEach(log => {
+            const t = log.type || 'unknown';
+            typeCountMap[t] = (typeCountMap[t] || 0) + 1;
+        });
+        const eventTypeDistribution = Object.entries(typeCountMap)
+            .map(([type, count]) => ({
+                name: EVENT_LABELS[type] || type,
+                value: count,
+                type,
+                color: EVENT_COLORS[type] || '#64748b',
+            }))
+            .sort((a, b) => b.value - a.value);
+
+        // Task lifeline (created → completed dates)
+        const taskCreatedLog = filtered.find(l => l.type === 'task_created');
+        const taskCompletedLog = filtered.find(l => l.type === 'task_completed');
+
+        return { kpis, trendData, topTasks, timelineByDay, totalEvents: filtered.length, eventTypeDistribution, taskCreatedLog, taskCompletedLog };
     }, [activityLogs, selectedPersons, selectedProjects, selectedTaskId, engTasks, dateFrom, dateTo]);
 
     // Progress chart data (built from logs with percentComplete in meta)
@@ -560,6 +616,142 @@ export default function TaskActivityPage() {
                             </div>
                         )}
                     </div>
+
+                    {/* Donut: Event Type Distribution (general mode) */}
+                    {!activeTaskId && analytics.eventTypeDistribution.length > 0 && (
+                        <div className="bg-slate-900/70 p-6 rounded-2xl border border-slate-800 shadow-lg">
+                            <div className="flex items-center gap-2 mb-5">
+                                <Activity className="w-5 h-5 text-violet-400" />
+                                <h3 className="font-bold text-lg text-white">Distribución por Tipo</h3>
+                            </div>
+                            <div className="flex flex-col lg:flex-row items-center gap-6">
+                                <div className="h-[220px] w-[220px] shrink-0">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie
+                                                data={analytics.eventTypeDistribution}
+                                                cx="50%"
+                                                cy="50%"
+                                                innerRadius={55}
+                                                outerRadius={90}
+                                                paddingAngle={3}
+                                                dataKey="value"
+                                                stroke="none"
+                                            >
+                                                {analytics.eventTypeDistribution.map((entry, idx) => (
+                                                    <Cell key={idx} fill={entry.color} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip
+                                                contentStyle={{ borderRadius: '12px', border: '1px solid #334155', backgroundColor: '#1e293b', color: '#e2e8f0', fontSize: '12px' }}
+                                                formatter={(value, name) => [`${value} eventos`, name]}
+                                            />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {analytics.eventTypeDistribution.map((item, idx) => (
+                                        <div key={idx} className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/60 rounded-lg border border-slate-700/50">
+                                            <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                            <span className="text-xs font-bold text-slate-300">{item.name}</span>
+                                            <span className="text-xs font-mono text-slate-500">{item.value}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Task Lifeline (task-specific mode) */}
+                    {activeTaskId && (analytics.taskCreatedLog || analytics.taskCompletedLog) && (
+                        <div className="bg-slate-900/70 p-6 rounded-2xl border border-slate-800 shadow-lg">
+                            <div className="flex items-center gap-2 mb-5">
+                                <CalendarIcon className="w-5 h-5 text-blue-400" />
+                                <h3 className="font-bold text-lg text-white">Ciclo de Vida</h3>
+                            </div>
+                            <div className="relative">
+                                {/* Gantt-like horizontal bar */}
+                                <div className="flex items-center gap-4">
+                                    {/* Start marker */}
+                                    <div className="flex flex-col items-center shrink-0">
+                                        <span className="text-lg">🆕</span>
+                                        <span className="text-[10px] font-bold text-blue-400 mt-1">
+                                            {analytics.taskCreatedLog
+                                                ? format(new Date(analytics.taskCreatedLog.timestamp), 'dd MMM yyyy', { locale: es })
+                                                : '—'}
+                                        </span>
+                                        <span className="text-[9px] text-slate-500 font-bold">Creada</span>
+                                    </div>
+
+                                    {/* Progress bar */}
+                                    <div className="flex-1 relative h-8">
+                                        <div className="absolute inset-0 bg-slate-800 rounded-full border border-slate-700" />
+                                        <div
+                                            className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
+                                            style={{
+                                                width: analytics.taskCompletedLog ? '100%' : '60%',
+                                                background: analytics.taskCompletedLog
+                                                    ? 'linear-gradient(90deg, #3b82f6, #22c55e)'
+                                                    : 'linear-gradient(90deg, #3b82f6, #6366f1)',
+                                            }}
+                                        />
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <span className="text-[11px] font-black text-white drop-shadow-lg">
+                                                {analytics.taskCreatedLog && analytics.taskCompletedLog
+                                                    ? (() => {
+                                                        const start = new Date(analytics.taskCreatedLog.timestamp);
+                                                        const end = new Date(analytics.taskCompletedLog.timestamp);
+                                                        const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+                                                        return `${days} día${days !== 1 ? 's' : ''}`;
+                                                    })()
+                                                    : analytics.taskCreatedLog
+                                                        ? (() => {
+                                                            const start = new Date(analytics.taskCreatedLog.timestamp);
+                                                            const days = Math.ceil((new Date() - start) / (1000 * 60 * 60 * 24));
+                                                            return `${days} día${days !== 1 ? 's' : ''} (en curso)`;
+                                                        })()
+                                                        : '—'}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* End marker */}
+                                    <div className="flex flex-col items-center shrink-0">
+                                        <span className="text-lg">{analytics.taskCompletedLog ? '🏁' : '⏳'}</span>
+                                        <span className={`text-[10px] font-bold mt-1 ${analytics.taskCompletedLog ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                            {analytics.taskCompletedLog
+                                                ? format(new Date(analytics.taskCompletedLog.timestamp), 'dd MMM yyyy', { locale: es })
+                                                : 'En progreso'}
+                                        </span>
+                                        <span className="text-[9px] text-slate-500 font-bold">
+                                            {analytics.taskCompletedLog ? 'Completada' : 'Pendiente'}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Priority change badges */}
+                                {(() => {
+                                    const priorityLogs = (activityLogs || []).filter(
+                                        l => l.taskId === activeTaskId && l.type === 'priority_changed'
+                                    );
+                                    if (priorityLogs.length === 0) return null;
+                                    return (
+                                        <div className="mt-4 flex flex-wrap gap-2">
+                                            <span className="text-[10px] font-bold text-slate-500 self-center">Prioridad:</span>
+                                            {priorityLogs.map((pl, i) => (
+                                                <span key={i} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-orange-500/10 border border-orange-500/20 text-orange-300">
+                                                    🔺 {pl.meta?.from} → {pl.meta?.to}
+                                                    <span className="text-slate-500 ml-1">
+                                                        ({format(new Date(pl.timestamp), 'dd MMM', { locale: es })})
+                                                    </span>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Top Tasks BarChart */}
                     <div className="bg-slate-900/70 p-6 rounded-2xl border border-slate-800 shadow-lg">

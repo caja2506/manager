@@ -184,6 +184,52 @@ export default function TaskDetailModal({
                 await createTask(data, userId);
             } else {
                 await updateTask(task.id, data);
+
+                // ── Detect and log field changes ──
+                const taskAssignee = form.assignedTo || task?.assignedTo;
+                const assigneeName = teamMembers?.find(m => m.uid === taskAssignee)?.displayName || null;
+
+                if (form.priority !== task.priority) {
+                    logActivity(task.id, {
+                        type: ACTIVITY_TYPES.PRIORITY_CHANGED,
+                        description: `Prioridad: ${task.priority} → ${form.priority}`,
+                        userId: taskAssignee, userName: assigneeName,
+                        meta: { from: task.priority, to: form.priority },
+                    });
+                }
+                if (form.assignedTo !== task.assignedTo) {
+                    const fromName = teamMembers?.find(m => m.uid === task.assignedTo)?.displayName || task.assignedTo || '—';
+                    const toName = teamMembers?.find(m => m.uid === form.assignedTo)?.displayName || form.assignedTo || '—';
+                    logActivity(task.id, {
+                        type: ACTIVITY_TYPES.ASSIGNEE_CHANGED,
+                        description: `Reasignado: ${fromName} → ${toName}`,
+                        userId: taskAssignee, userName: assigneeName,
+                        meta: { fromUser: task.assignedTo, toUser: form.assignedTo, fromName, toName },
+                    });
+                }
+                if (form.dueDate !== (task.dueDate ? task.dueDate.substring(0, 10) : '')) {
+                    logActivity(task.id, {
+                        type: ACTIVITY_TYPES.DUE_DATE_CHANGED,
+                        description: `Fecha límite: ${task.dueDate?.substring(0, 10) || '—'} → ${form.dueDate || '—'}`,
+                        userId: taskAssignee, userName: assigneeName,
+                        meta: { from: task.dueDate?.substring(0, 10) || null, to: form.dueDate || null },
+                    });
+                }
+                if (form.title !== task.title) {
+                    logActivity(task.id, {
+                        type: ACTIVITY_TYPES.TITLE_CHANGED,
+                        description: `Título: "${task.title}" → "${form.title}"`,
+                        userId: taskAssignee, userName: assigneeName,
+                        meta: { from: task.title, to: form.title },
+                    });
+                }
+                if (form.description !== (task.description || '')) {
+                    logActivity(task.id, {
+                        type: ACTIVITY_TYPES.DESCRIPTION_CHANGED,
+                        description: 'Descripción actualizada',
+                        userId: taskAssignee, userName: assigneeName,
+                    });
+                }
             }
             onClose();
         } catch (err) {
@@ -200,13 +246,25 @@ export default function TaskDetailModal({
 
         // Log the status change (use task assignee, not logged-in user)
         const taskAssignee = form.assignedTo || task?.assignedTo;
+        const assigneeName = teamMembers?.find(m => m.uid === taskAssignee)?.displayName || null;
         logActivity(task.id, {
             type: ACTIVITY_TYPES.STATUS_CHANGED,
             description: `Estado: ${oldStatus} → ${newStatus}`,
             userId: taskAssignee,
-            userName: teamMembers?.find(m => m.uid === taskAssignee)?.displayName || null,
+            userName: assigneeName,
             meta: { from: oldStatus, to: newStatus },
         });
+
+        // If task is now completed, log that too
+        if (newStatus === 'done') {
+            logActivity(task.id, {
+                type: ACTIVITY_TYPES.TASK_COMPLETED,
+                description: `Tarea completada: ${form.title}`,
+                userId: taskAssignee,
+                userName: assigneeName,
+                meta: { completedAt: new Date().toISOString() },
+            });
+        }
 
         // Auto-Timer logic for IN_PROGRESS
         // Timer is created for the task's assignedTo user (not the logged-in user)

@@ -102,6 +102,16 @@ export async function createTask(data, userId) {
 
     const ref = doc(collection(db, COLLECTIONS.TASKS));
     await setDoc(ref, taskData);
+
+    // Log creation event
+    logActivity(ref.id, {
+        type: ACTIVITY_TYPES.TASK_CREATED,
+        description: `Tarea creada: ${taskData.title}`,
+        userId: userId,
+        userName: null,
+        meta: { title: taskData.title, projectId: taskData.projectId },
+    });
+
     return ref.id;
 }
 
