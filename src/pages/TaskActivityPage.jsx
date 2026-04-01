@@ -265,15 +265,19 @@ export default function TaskActivityPage() {
             delaysReported: filtered.filter(l => l.type === 'delay_reported').length,
         };
 
-        // Trend data (events per day) — extend to show future days
-        const startDate = new Date(dateFrom + 'T00:00:00');
-        const endDate = new Date(dateTo + 'T00:00:00');
+        // Trend data — auto-adjusted range + correlation data
         const today = startOfDay(new Date());
 
-        // Extend chart: if endDate is today or before, add 3 extra days for visual breathing room
-        const chartEndDate = isBefore(endDate, addDays(today, 3)) ? addDays(today, 3) : endDate;
+        // Find first and last day with actual activity
+        const eventDates = filtered.map(l => l.date).filter(Boolean).sort();
+        const firstEventDay = eventDates.length > 0 ? new Date(eventDates[0] + 'T00:00:00') : today;
+        const lastEventDay = eventDates.length > 0 ? new Date(eventDates[eventDates.length - 1] + 'T00:00:00') : today;
 
-        const days = eachDayOfInterval({ start: startDate, end: chartEndDate });
+        // Auto-adjust: start 2 days before first event, end 3 days after today
+        const chartStart = addDays(firstEventDay, -2);
+        const chartEnd = addDays(isBefore(lastEventDay, today) ? today : lastEventDay, 3);
+
+        const days = eachDayOfInterval({ start: chartStart, end: chartEnd });
         const trendMap = new Map();
         let todayLabel = '';
 
@@ -285,7 +289,7 @@ export default function TaskActivityPage() {
             trendMap.set(dateStr, {
                 name: label,
                 subtareas: isFutureDay ? null : 0,
-                timers: isFutureDay ? null : 0,
+                horas: isFutureDay ? null : 0,
                 status: isFutureDay ? null : 0,
                 isFuture: isFutureDay,
                 isToday: isToday(day),
@@ -296,9 +300,11 @@ export default function TaskActivityPage() {
             const dateStr = log.date;
             if (trendMap.has(dateStr)) {
                 const d = trendMap.get(dateStr);
-                if (d.isFuture) return; // don't count future
+                if (d.isFuture) return;
                 if (log.type === 'subtask_completed') d.subtareas++;
-                if (log.type === 'timer_started' || log.type === 'timer_stopped') d.timers++;
+                if (log.type === 'timer_stopped' && log.meta?.totalHours) {
+                    d.horas = Math.round(((d.horas || 0) + log.meta.totalHours) * 10) / 10;
+                }
                 if (log.type === 'status_changed') d.status++;
             }
         });
@@ -311,6 +317,8 @@ export default function TaskActivityPage() {
 
         // Store today label for reference line
         const todayRefLabel = todayLabel;
+
+        // ------- snip: the rest of analytics stays the same -------
 
         // Top tasks by activity
         const taskCountMap = new Map();
@@ -685,49 +693,50 @@ export default function TaskActivityPage() {
             {analytics && (
                 <div className="grid lg:grid-cols-2 gap-5">
 
-                    {/* Trend AreaChart (full width) */}
+                    {/* Trend / Correlation Chart (full width) */}
                     <div className="bg-slate-900/70 p-6 rounded-2xl border border-slate-800 shadow-lg lg:col-span-2">
                         <div className="flex items-center gap-2 mb-5">
                             <TrendingUp className="w-5 h-5 text-emerald-400" />
-                            <h3 className="font-bold text-lg text-white">Tendencia de Actividad</h3>
+                            <h3 className="font-bold text-lg text-white">Correlación: Horas vs Avance</h3>
+                            <span className="text-[9px] font-bold text-slate-400 bg-slate-700/50 px-2 py-0.5 rounded-full">
+                                ¿Muchas horas, pocas subtareas?
+                            </span>
                         </div>
                         {analytics.totalEvents === 0 ? (
                             <div className="h-[280px] flex items-center justify-center text-slate-400 font-bold">
                                 No hay eventos registrados en este período. Completa subtareas o inicia timers para ver actividad.
                             </div>
                         ) : (
-                            <div className="h-[280px] w-full">
+                            <div className="h-[300px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={analytics.trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                    <ComposedChart data={analytics.trendData} margin={{ top: 10, right: 40, left: -10, bottom: 0 }}>
                                         <defs>
-                                            <linearGradient id="colorSubtareas" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#22c55e" stopOpacity={0.4} />
-                                                <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-                                            </linearGradient>
-                                            <linearGradient id="colorTimers" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
-                                                <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
-                                            </linearGradient>
-                                            <linearGradient id="colorStatus" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
-                                                <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                                            <linearGradient id="colorHoras" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.6} />
+                                                <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.05} />
                                             </linearGradient>
                                         </defs>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
-                                        <XAxis dataKey="displayName" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} dy={10} />
-                                        <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                                        <XAxis dataKey="displayName" tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 700 }} axisLine={false} tickLine={false} dy={10} />
+                                        <YAxis yAxisId="left" allowDecimals={false} tick={{ fontSize: 10, fill: '#22c55e', fontWeight: 700 }} axisLine={false} tickLine={false} label={{ value: 'Subtareas', angle: -90, position: 'insideLeft', fill: '#22c55e', fontSize: 10, fontWeight: 700, dx: -5 }} />
+                                        <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#f59e0b', fontWeight: 700 }} axisLine={false} tickLine={false} unit="h" label={{ value: 'Horas', angle: 90, position: 'insideRight', fill: '#f59e0b', fontSize: 10, fontWeight: 700, dx: 10 }} />
                                         <Tooltip
                                             labelFormatter={(_, payload) => payload?.[0]?.payload?.name || ''}
-                                            contentStyle={{ borderRadius: '16px', border: '1px solid #334155', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3)', backgroundColor: '#1e293b', color: '#e2e8f0' }}
+                                            contentStyle={{ borderRadius: '16px', border: '1px solid #334155', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3)', backgroundColor: '#1e293b', color: '#e2e8f0', fontSize: 12, fontWeight: 700 }}
                                             cursor={{ stroke: '#475569', strokeWidth: 1, strokeDasharray: '4 4' }}
-                                            formatter={(value) => value === null ? ['—', ''] : value}
+                                            formatter={(value, name) => {
+                                                if (value === null) return ['—', ''];
+                                                if (name === 'Horas Trabajadas') return [`${value}h`, name];
+                                                return [value, name];
+                                            }}
                                         />
-                                        <Legend wrapperStyle={{ fontSize: '12px', fontWeight: 'bold' }} />
+                                        <Legend wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }} />
 
                                         {/* TODAY marker line */}
                                         {analytics.todayRefLabel && (
                                             <ReferenceLine
                                                 x={analytics.todayRefLabel}
+                                                yAxisId="left"
                                                 stroke="#f43f5e"
                                                 strokeWidth={2}
                                                 strokeDasharray="6 3"
@@ -741,10 +750,15 @@ export default function TaskActivityPage() {
                                             />
                                         )}
 
-                                        <Area type="monotone" name="Subtareas" dataKey="subtareas" stroke="#22c55e" strokeWidth={3} fillOpacity={1} fill="url(#colorSubtareas)" connectNulls={false} />
-                                        <Area type="monotone" name="Timers" dataKey="timers" stroke="#f59e0b" strokeWidth={3} fillOpacity={1} fill="url(#colorTimers)" connectNulls={false} />
-                                        <Area type="monotone" name="Status" dataKey="status" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorStatus)" connectNulls={false} />
-                                    </AreaChart>
+                                        {/* Hours worked - bars (right axis) */}
+                                        <Bar yAxisId="right" name="Horas Trabajadas" dataKey="horas" fill="url(#colorHoras)" barSize={20} radius={[4, 4, 0, 0]} />
+
+                                        {/* Subtasks completed - line (left axis) */}
+                                        <Line yAxisId="left" type="monotone" name="Subtareas Completadas" dataKey="subtareas" stroke="#22c55e" strokeWidth={3} dot={{ fill: '#22c55e', r: 4, strokeWidth: 0 }} activeDot={{ r: 6, fill: '#22c55e' }} connectNulls={false} />
+
+                                        {/* Status changes - subtle line (left axis) */}
+                                        <Line yAxisId="left" type="monotone" name="Cambios Status" dataKey="status" stroke="#6366f1" strokeWidth={2} strokeDasharray="4 2" dot={{ fill: '#6366f1', r: 3, strokeWidth: 0 }} connectNulls={false} />
+                                    </ComposedChart>
                                 </ResponsiveContainer>
                             </div>
                         )}
