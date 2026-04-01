@@ -18,9 +18,6 @@ function toDateStr(d) {
     return new Date(d).toISOString().substring(0, 10);
 }
 
-function getToday() {
-    return new Date().toISOString().substring(0, 10);
-}
 
 function getYesterday() {
     const d = new Date();
@@ -42,19 +39,10 @@ const PERSON_STATUS = {
 // ── Core detection (mirrors frontend) ──
 
 function getTasksToday(personId, tasks) {
-    const today = getToday();
-    const TERMINAL = ['completed', 'cancelled'];
-
     return tasks.filter(t => {
         if (t.assignedTo !== personId) return false;
-        if (TERMINAL.includes(t.status)) return false;
-        const startDate = toDateStr(t.plannedStartDate);
-        const dueDate = toDateStr(t.dueDate);
-        if (startDate && startDate > today) return false;
-        if (dueDate && dueDate < today) return true;
-        if (startDate && startDate <= today) return true;
-        if (!startDate) return true;
-        return false;
+        if (t.status !== 'in_progress') return false;
+        return true;
     });
 }
 
@@ -67,16 +55,14 @@ function getEvidenceYesterday(personId, tasks, timeLogs) {
         return logDate === yesterday;
     });
 
-    const yesterdayTasks = tasks.filter(t => {
-        if (t.assignedTo !== personId) return false;
-        const updatedDate = toDateStr(t.updatedAt);
-        return updatedDate === yesterday;
-    });
+    // Tasks that had time logged yesterday (derive from logs)
+    const loggedTaskIds = new Set(yesterdayLogs.map(l => l.taskId).filter(Boolean));
+    const yesterdayTasks = tasks.filter(t => loggedTaskIds.has(t.id));
 
     return {
         timeLogs: yesterdayLogs,
         tasks: yesterdayTasks,
-        hasEvidence: yesterdayLogs.length > 0 || yesterdayTasks.length > 0,
+        hasEvidence: yesterdayLogs.length > 0,
         totalHours: yesterdayLogs.reduce((sum, l) => sum + (l.totalHours || 0), 0),
     };
 }

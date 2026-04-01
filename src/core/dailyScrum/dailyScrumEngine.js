@@ -15,9 +15,7 @@ function toDateStr(d) {
     return new Date(d).toISOString().substring(0, 10);
 }
 
-function getToday() {
-    return new Date().toISOString().substring(0, 10);
-}
+
 
 function getYesterday() {
     const d = new Date();
@@ -64,33 +62,20 @@ export const STATUS_CONFIG = {
 // ── Core detection functions ──
 
 /**
- * Get tasks assigned to a person for today (active, not completed/cancelled)
+ * Get tasks assigned to a person for today — only in_progress
  */
 export function getTasksToday(personId, tasks) {
-    const today = getToday();
-    const TERMINAL = ['completed', 'cancelled'];
-
     return tasks.filter(t => {
         if (t.assignedTo !== personId) return false;
-        if (TERMINAL.includes(t.status)) return false;
-
-        // Task is "today" if:
-        // 1. It has a planned date for today, OR
-        // 2. It's in_progress / backlog with no future start date
-        const startDate = toDateStr(t.plannedStartDate);
-        const dueDate = toDateStr(t.dueDate);
-
-        if (startDate && startDate > today) return false; // future task
-        if (dueDate && dueDate < today) return true; // overdue
-        if (startDate && startDate <= today) return true;
-        if (!startDate) return true; // no start date = assume active now
-
-        return false;
+        if (t.status !== 'in_progress') return false;
+        return true;
     });
 }
 
 /**
- * Get evidence of work yesterday: tasks + time logs
+ * Get evidence of work yesterday: time logs only
+ * A person has evidence if they have time logs recorded for yesterday.
+ * Tasks shown under "AYER" are the ones that had time logged.
  */
 export function getEvidenceYesterday(personId, tasks, timeLogs) {
     const yesterday = getYesterday();
@@ -102,17 +87,14 @@ export function getEvidenceYesterday(personId, tasks, timeLogs) {
         return logDate === yesterday;
     });
 
-    // Tasks that were in_progress or completed yesterday
-    const yesterdayTasks = tasks.filter(t => {
-        if (t.assignedTo !== personId) return false;
-        const updatedDate = toDateStr(t.updatedAt);
-        return updatedDate === yesterday;
-    });
+    // Tasks that had time logged yesterday (derive from logs)
+    const loggedTaskIds = new Set(yesterdayLogs.map(l => l.taskId).filter(Boolean));
+    const yesterdayTasks = tasks.filter(t => loggedTaskIds.has(t.id));
 
     return {
         timeLogs: yesterdayLogs,
         tasks: yesterdayTasks,
-        hasEvidence: yesterdayLogs.length > 0 || yesterdayTasks.length > 0,
+        hasEvidence: yesterdayLogs.length > 0,
         totalHours: yesterdayLogs.reduce((sum, l) => sum + (l.totalHours || 0), 0),
     };
 }
