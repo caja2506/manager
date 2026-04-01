@@ -37,7 +37,7 @@ export default function ReportsLayout() {
     })();
 
     return (
-        <div className="flex flex-col h-full animate-in fade-in duration-300">
+        <div className="-m-4 md:-m-8 flex flex-col bg-slate-950 text-white animate-in fade-in duration-300" style={{ minHeight: '100vh' }}>
             {/* ── Main Banner Row — same style as TaskModuleBanner ── */}
             <div className="shrink-0">
                 <div className="flex items-center justify-between px-3 md:px-6 py-3 md:py-4 bg-slate-900/90 backdrop-blur-md border-b border-slate-800/60">
