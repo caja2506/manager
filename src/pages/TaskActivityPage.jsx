@@ -1,13 +1,14 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useEngineeringData } from '../hooks/useEngineeringData';
-import { fetchAllActivityLogs, ACTIVITY_TYPE_CONFIG } from '../services/activityLogService';
+import { fetchAllActivityLogs, updateActivityLog, deleteActivityLog } from '../services/activityLogService';
 import {
     AreaChart, Area, BarChart, Bar,
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import {
     Activity, TrendingUp, CheckSquare, RefreshCw, Timer, AlertTriangle,
-    Calendar as CalendarIcon, X, ChevronDown, Check, FolderGit2, User
+    Calendar as CalendarIcon, X, ChevronDown, Check, FolderGit2, User,
+    Pencil, Trash2, Save
 } from 'lucide-react';
 import { format, subDays, eachDayOfInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -101,6 +102,38 @@ export default function TaskActivityPage() {
     // Data
     const [activityLogs, setActivityLogs] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    // Edit state
+    const [editingLog, setEditingLog] = useState(null); // { id, taskId, description, userName }
+
+    const startEditing = (log) => {
+        setEditingLog({ id: log.id, taskId: log.taskId, description: log.description || '', userName: log.userName || '' });
+    };
+
+    const cancelEditing = () => setEditingLog(null);
+
+    const saveEdit = async () => {
+        if (!editingLog) return;
+        try {
+            await updateActivityLog(editingLog.taskId, editingLog.id, {
+                description: editingLog.description,
+                userName: editingLog.userName,
+            });
+            // Update local state
+            setActivityLogs(prev => prev.map(l =>
+                l.id === editingLog.id ? { ...l, description: editingLog.description, userName: editingLog.userName } : l
+            ));
+            setEditingLog(null);
+        } catch { /* ignore */ }
+    };
+
+    const handleDelete = async (log) => {
+        if (!confirm(`¿Eliminar este evento?\n"${log.description}"`)) return;
+        try {
+            await deleteActivityLog(log.taskId, log.id);
+            setActivityLogs(prev => prev.filter(l => l.id !== log.id));
+        } catch { /* ignore */ }
+    };
 
     // Fetch activity logs when date range changes
     useEffect(() => {
@@ -454,7 +487,9 @@ export default function TaskActivityPage() {
                                             </span>
                                         </div>
                                         <div className="space-y-1 ml-2 border-l-2 border-slate-700 pl-4">
-                                            {logs.slice(0, 20).map((log) => (
+                                            {logs.slice(0, 20).map((log) => {
+                                                const isEditing = editingLog?.id === log.id;
+                                                return (
                                                 <div key={log.id}
                                                     className="flex items-start gap-2 py-1.5 group hover:bg-slate-800/50 rounded-lg px-2 -ml-2 transition-colors"
                                                 >
@@ -462,26 +497,68 @@ export default function TaskActivityPage() {
                                                         {EVENT_ICONS[log.type] || '📋'}
                                                     </span>
                                                     <div className="flex-1 min-w-0">
-                                                        <p className="text-sm text-slate-200 font-medium leading-snug">
-                                                            {log.description}
-                                                        </p>
-                                                        <div className="flex items-center gap-2 mt-0.5">
-                                                            <span className="text-[10px] font-bold text-slate-500">
-                                                                {formatTime(log.timestamp)}
-                                                            </span>
-                                                            {log.userId && (
-                                                                <span className="text-[10px] font-bold text-slate-500">
-                                                                    · {log.userName || getUserName(log.userId)}
-                                                                </span>
-                                                            )}
-                                                        </div>
+                                                        {isEditing ? (
+                                                            <div className="space-y-1">
+                                                                <input
+                                                                    value={editingLog.description}
+                                                                    onChange={e => setEditingLog(prev => ({ ...prev, description: e.target.value }))}
+                                                                    className="w-full px-2 py-1 bg-slate-800 border border-indigo-500 rounded text-sm text-slate-200 outline-none"
+                                                                    placeholder="Descripción"
+                                                                />
+                                                                <input
+                                                                    value={editingLog.userName}
+                                                                    onChange={e => setEditingLog(prev => ({ ...prev, userName: e.target.value }))}
+                                                                    className="w-full px-2 py-1 bg-slate-800 border border-slate-600 rounded text-xs text-slate-300 outline-none"
+                                                                    placeholder="Nombre de persona"
+                                                                />
+                                                                <div className="flex gap-1">
+                                                                    <button onClick={saveEdit}
+                                                                        className="px-2 py-0.5 bg-emerald-600 text-white text-[10px] font-bold rounded hover:bg-emerald-500 flex items-center gap-1">
+                                                                        <Save className="w-3 h-3" /> Guardar
+                                                                    </button>
+                                                                    <button onClick={cancelEditing}
+                                                                        className="px-2 py-0.5 bg-slate-700 text-slate-300 text-[10px] font-bold rounded hover:bg-slate-600">
+                                                                        Cancelar
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <p className="text-sm text-slate-200 font-medium leading-snug">
+                                                                    {log.description}
+                                                                </p>
+                                                                <div className="flex items-center gap-2 mt-0.5">
+                                                                    <span className="text-[10px] font-bold text-slate-500">
+                                                                        {formatTime(log.timestamp)}
+                                                                    </span>
+                                                                    {log.userId && (
+                                                                        <span className="text-[10px] font-bold text-slate-500">
+                                                                            · {log.userName || getUserName(log.userId)}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </>
+                                                        )}
                                                     </div>
+                                                    {!isEditing && (
+                                                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                                            <button onClick={() => startEditing(log)}
+                                                                className="p-1 text-slate-500 hover:text-indigo-400 transition-colors" title="Editar">
+                                                                <Pencil className="w-3 h-3" />
+                                                            </button>
+                                                            <button onClick={() => handleDelete(log)}
+                                                                className="p-1 text-slate-500 hover:text-red-400 transition-colors" title="Eliminar">
+                                                                <Trash2 className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                     <div
                                                         className="w-2 h-2 rounded-full shrink-0 mt-2"
                                                         style={{ backgroundColor: EVENT_COLORS[log.type] || '#64748b' }}
                                                     />
                                                 </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 ))}

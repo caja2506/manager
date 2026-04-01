@@ -12,8 +12,8 @@
 
 import { db } from '../firebase';
 import {
-    collection, doc, setDoc, getDocs, query, where, orderBy, limit,
-    collectionGroup
+    collection, doc, setDoc, getDocs, updateDoc, deleteDoc,
+    query, where, orderBy, limit, collectionGroup
 } from 'firebase/firestore';
 
 // ── Event types ──
@@ -114,5 +114,35 @@ export async function fetchAllActivityLogs(dateFrom, dateTo) {
     } catch (err) {
         console.warn('[activityLogService] Failed to fetch all activity logs:', err.message);
         return [];
+    }
+}
+/**
+ * Update fields on an existing activity log.
+ * @param {string} taskId
+ * @param {string} logId
+ * @param {Object} updates — e.g. { userName, description }
+ */
+export async function updateActivityLog(taskId, logId, updates) {
+    try {
+        const ref = doc(db, 'tasks', taskId, 'activityLog', logId);
+        await updateDoc(ref, updates);
+    } catch (err) {
+        console.warn('[activityLogService] Failed to update activity log:', err.message);
+        throw err;
+    }
+}
+
+/**
+ * Delete an activity log entry.
+ * @param {string} taskId
+ * @param {string} logId
+ */
+export async function deleteActivityLog(taskId, logId) {
+    try {
+        const ref = doc(db, 'tasks', taskId, 'activityLog', logId);
+        await deleteDoc(ref);
+    } catch (err) {
+        console.warn('[activityLogService] Failed to delete activity log:', err.message);
+        throw err;
     }
 }
