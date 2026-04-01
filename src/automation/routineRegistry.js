@@ -151,6 +151,48 @@ export const DEFAULT_ROUTINES = [
         ],
         priority: 10,
     }),
+
+    createAutomationRoutineDocument({
+        key: ROUTINE_KEYS.CLOSE_DAY_REPORT,
+        name: 'Cierre de Día — Detener Timers',
+        description: 'Detiene todos los timers activos, genera reporte individual y resumen de equipo por Telegram. Horario controlado por settings/daySchedule.',
+        channel: AUTOMATION_CHANNELS.TELEGRAM,
+        provider: AUTOMATION_PROVIDERS.TELEGRAM_BOT,
+        enabled: true,
+        scheduleType: SCHEDULE_TYPE.DAILY,
+        scheduleConfig: { cron: '0 18 * * 1-5', timezone: 'America/Costa_Rica' },
+        delayMinutes: 0,
+        gracePeriodMinutes: 0,
+        personalityMode: PERSONALITY_MODES.PROFESSIONAL,
+        allowedRoles: [
+            OPERATIONAL_ROLES.MANAGER,
+            OPERATIONAL_ROLES.TEAM_LEAD,
+            OPERATIONAL_ROLES.ENGINEER,
+            OPERATIONAL_ROLES.TECHNICIAN,
+        ],
+        priority: 1,
+    }),
+
+    createAutomationRoutineDocument({
+        key: ROUTINE_KEYS.OPEN_DAY,
+        name: 'Apertura de Día — Reactivar Timers',
+        description: 'Reactiva timers de tareas en progreso que fueron auto-cerrados el día anterior. Horario controlado por settings/daySchedule.',
+        channel: AUTOMATION_CHANNELS.TELEGRAM,
+        provider: AUTOMATION_PROVIDERS.TELEGRAM_BOT,
+        enabled: true,
+        scheduleType: SCHEDULE_TYPE.DAILY,
+        scheduleConfig: { cron: '0 8 * * 1-5', timezone: 'America/Costa_Rica' },
+        delayMinutes: 0,
+        gracePeriodMinutes: 0,
+        personalityMode: PERSONALITY_MODES.PROFESSIONAL,
+        allowedRoles: [
+            OPERATIONAL_ROLES.MANAGER,
+            OPERATIONAL_ROLES.TEAM_LEAD,
+            OPERATIONAL_ROLES.ENGINEER,
+            OPERATIONAL_ROLES.TECHNICIAN,
+        ],
+        priority: 1,
+    }),
 ];
 
 /**

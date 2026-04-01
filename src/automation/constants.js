@@ -212,6 +212,8 @@ export const ROUTINE_KEYS = {
     MANAGER_SUMMARY: 'manager_summary',
     ENGINEER_RISK_DIGEST: 'engineer_risk_digest',
     MANUAL_TEST_MESSAGE: 'manual_test_message',
+    CLOSE_DAY_REPORT: 'close_day_report',
+    OPEN_DAY: 'open_day',
 };
 
 // ============================================================
