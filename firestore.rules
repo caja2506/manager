@@ -77,7 +77,7 @@ service cloud.firestore {
     match /{path=**}/activityLog/{logId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
-      allow update, delete: if isAdmin();
+      allow update, delete: if isAuthenticated();
     }
 
     // WeeklyPlanItems: authenticated users can fully manage their own planning blocks
@@ -179,7 +179,7 @@ service cloud.firestore {
       match /activityLog/{logId} {
         allow read: if isAuthenticated();
         allow create: if isAuthenticated();
-        allow update, delete: if isAdmin();
+        allow update, delete: if isAuthenticated();
       }
     }
 
