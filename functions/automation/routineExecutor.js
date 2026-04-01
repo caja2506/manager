@@ -22,6 +22,8 @@ const HANDLER_REGISTRY = {
     manual_test_message: () => require("../handlers/manualTestMessageHandler"),
     engineer_risk_digest: () => require("../handlers/genericDigestHandler").engineerRiskDigest,
     block_incident_alert: () => require("../handlers/genericDigestHandler").blockIncidentAlert,
+    close_day_report: () => require("../handlers/closeDayReportHandler"),
+    open_day: () => require("../handlers/openDayHandler"),
 };
 
 /**
@@ -39,7 +41,7 @@ async function executeRoutine(adminDb, token, routineKey, triggerType, options =
 
     // ── 1. Guard: should this routine run? ──
     const guard = await shouldRoutineRun(adminDb, routineKey);
-    if (!guard.shouldRun && triggerType !== TRIGGER_TYPE.MANUAL) {
+    if (!guard.shouldRun && triggerType !== TRIGGER_TYPE.MANUAL && triggerType !== TRIGGER_TYPE.DAY_SCHEDULE) {
         console.log(`${tag} Skipped: ${guard.reason}`);
         return { success: false, runId: null, status: "skipped", error: guard.reason };
     }
@@ -49,7 +51,7 @@ async function executeRoutine(adminDb, token, routineKey, triggerType, options =
     let effectiveDryRun = guard.effectiveDryRun ?? false;
     let effectiveDebug = guard.effectiveDebug ?? false;
 
-    if (!routine && triggerType === TRIGGER_TYPE.MANUAL) {
+    if (!routine && (triggerType === TRIGGER_TYPE.MANUAL || triggerType === TRIGGER_TYPE.DAY_SCHEDULE)) {
         const paths = require("./firestorePaths");
         const snap = await adminDb.collection(paths.AUTOMATION_ROUTINES).doc(routineKey).get();
         if (!snap.exists) {

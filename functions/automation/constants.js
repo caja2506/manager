@@ -17,6 +17,7 @@ const TRIGGER_TYPE = {
     SCHEDULED: "scheduled",
     MANUAL: "manual",
     EVENT: "event",
+    DAY_SCHEDULE: "day_schedule",
 };
 
 const OPERATIONAL_ROLES = {

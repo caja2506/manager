@@ -9,8 +9,9 @@ import {
     updateRbacRole,
     updateUserDisplayName,
     removeRbacUser,
+    registerOrphanUser,
 } from '../../services/userAdminService';
-import { Shield, Trash2, X, Search, Users, ShieldCheck, Pencil, Check } from 'lucide-react';
+import { Shield, Trash2, X, Search, Users, ShieldCheck, Pencil, Check, UserPlus } from 'lucide-react';
 
 // ── RBAC roles (admin/editor/viewer) — controls Firestore write permissions ──
 const ROLE_CONFIG = {
@@ -130,6 +131,23 @@ export default function UserAdminPanel({ onClose }) {
         });
     };
 
+    // ── Register orphan user (exists in users but not in users_roles) ──
+    const handleRegisterOrphan = async (uid) => {
+        const profile = profiles[uid];
+        if (!profile) return;
+        try {
+            await registerOrphanUser(uid, profile, 'viewer');
+        } catch (err) {
+            console.error('Error registering orphan user:', err);
+        }
+    };
+
+    // ── Orphan users: exist in users/ but missing from users_roles ──
+    const rbacUids = new Set(rbacUsers.map(u => u.uid));
+    const orphanUsers = Object.entries(profiles)
+        .filter(([uid]) => !rbacUids.has(uid))
+        .map(([uid, data]) => ({ uid, ...data }));
+
     const filtered = rbacUsers.filter((u) => {
         const s = search.toLowerCase();
         const profile = profiles[u.uid];
@@ -205,6 +223,7 @@ export default function UserAdminPanel({ onClose }) {
                     </div>
                 ))}
             </div>
+
 
             {/* Users Table */}
             <div className="bg-slate-900/70 rounded-2xl border border-slate-800 shadow-lg overflow-auto" style={{ maxHeight: 'calc(100vh - 320px)' }}>
@@ -344,6 +363,42 @@ export default function UserAdminPanel({ onClose }) {
                     </tbody>
                 </table>
             </div>
+
+            {/* Orphan Users Banner */}
+            {orphanUsers.length > 0 && (
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                        <UserPlus className="w-4 h-4 text-amber-400" />
+                        <span className="text-xs font-bold text-amber-300">
+                            {orphanUsers.length} usuario{orphanUsers.length > 1 ? 's' : ''} sin registrar en RBAC
+                        </span>
+                    </div>
+                    <div className="space-y-2">
+                        {orphanUsers.map((u) => (
+                            <div key={u.uid} className="flex items-center justify-between bg-slate-800/60 rounded-xl px-4 py-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-amber-600/20 flex items-center justify-center text-amber-400 text-sm font-bold">
+                                        {(u.displayName || u.email || '?')[0].toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-bold text-white">
+                                            {u.displayName || <span className="text-amber-400 italic">Sin nombre</span>}
+                                        </div>
+                                        <div className="text-[11px] text-slate-400">{u.email}</div>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => handleRegisterOrphan(u.uid)}
+                                    className="flex items-center gap-1.5 px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-xl text-xs font-bold transition-all active:scale-95 border border-amber-500/30"
+                                >
+                                    <UserPlus className="w-3.5 h-3.5" />
+                                    Agregar a RBAC
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -295,6 +295,88 @@ function linkSuccess({ name, role }) {
         "🎉 ¡Empezarás a recibir notificaciones automáticas!";
 }
 
+// ── Day Close Templates ──
+
+function closeDayIndividual({ name, date, totalHours, overtimeHours, tasksCompleted, tasks = [], delaysReported, quickReport }) {
+    const formattedDate = formatDateES(date);
+    let msg = `📊 <b>Cierre de Día — ${formattedDate}</b>\n\n`;
+    msg += `⏱ Horas: <b>${totalHours}h</b>`;
+    if (overtimeHours > 0) msg += ` (${overtimeHours}h overtime)`;
+    msg += `\n`;
+    msg += `✅ Completadas: <b>${tasksCompleted}</b>\n`;
+
+    if (tasks.length > 0) {
+        msg += `\n📋 <b>Desglose:</b>\n`;
+        tasks.forEach((t, i) => {
+            msg += `  ${i + 1}. ${t.title} — ${t.hours}h`;
+            if (t.progress) msg += ` (${t.progress}%)`;
+            msg += `\n`;
+        });
+    }
+
+    if (quickReport) {
+        if (quickReport.blocker) {
+            msg += `\n🚫 <b>Bloqueador:</b> ${quickReport.blocker}\n`;
+        }
+        if (quickReport.notes) {
+            const truncated = quickReport.notes.length > 150
+                ? quickReport.notes.substring(0, 150) + "..."
+                : quickReport.notes;
+            msg += `💬 <b>Tu reporte:</b> "${truncated}"\n`;
+        }
+    }
+
+    if (delaysReported > 0) {
+        msg += `\n⚠️ ${delaysReported} delay(s) reportado(s)\n`;
+    }
+
+    msg += `\nBuen trabajo, ${name} 💪`;
+    return msg;
+}
+
+function closeDayTeamSummary({ name, date, teamSize, totalHours, overtimeHours, tasksCompleted, delaysReported, missingReports, timersAutoStopped, team = [] }) {
+    const formattedDate = formatDateES(date);
+    let msg = `📊 <b>Equipo — Cierre (${formattedDate})</b>\n\n`;
+    msg += `👥 ${teamSize} personas · ⏱ ${totalHours}h`;
+    if (overtimeHours > 0) msg += ` (${overtimeHours}h OT)`;
+    msg += ` · ✅ ${tasksCompleted} completadas\n`;
+    msg += `⏹ ${timersAutoStopped} timers detenidos\n\n`;
+
+    // Per-person summary
+    team.forEach(p => {
+        let line = `👤 <b>${p.name}</b> — ${p.hours}h`;
+        if (p.tasksCompleted > 0) line += ` ✅`;
+        if (p.hasBlocker) line += ` ⚠️`;
+        if (p.quickReportMissing) line += ` 🔴`;
+        if (p.topTasks.length > 0) line += ` · ${p.topTasks.join(", ")}`;
+        msg += line + `\n`;
+    });
+
+    // Alerts
+    if (missingReports > 0) {
+        msg += `\n🔴 Sin Quick Report: <b>${missingReports}</b>`;
+    }
+    if (delaysReported > 0) {
+        msg += `\n📉 Delays nuevos: <b>${delaysReported}</b>`;
+    }
+
+    msg += `\n\n${name}, cierre de día completado. ✔️`;
+    return msg;
+}
+
+/**
+ * Format date string to Spanish format (31/Mar/2026)
+ */
+function formatDateES(dateStr) {
+    try {
+        const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+        const d = new Date(dateStr + 'T12:00:00');
+        return `${d.getDate()}/${months[d.getMonth()]}/${d.getFullYear()}`;
+    } catch {
+        return dateStr;
+    }
+}
+
 module.exports = {
     morningDigestTechnician,
     morningDigestEngineer,
@@ -311,4 +393,7 @@ module.exports = {
     helpMessage,
     unknownUserMessage,
     linkSuccess,
+    closeDayIndividual,
+    closeDayTeamSummary,
 };
+

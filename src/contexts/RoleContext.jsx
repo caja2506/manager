@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthContext';
 import { ensureUserProfile } from '../services/userProfileService';
@@ -74,9 +74,23 @@ export function RoleProvider({ children }) {
                 }
             }
 
-            // 3. Default for new users
+            // 3. Default for new users — AND auto-create users_roles doc
             if (!resolvedRole) {
                 resolvedRole = isSuperAdmin ? 'admin' : 'viewer';
+
+                // ── Auto-register: create users_roles/{uid} so the user
+                //    appears in Settings → Admin Panel for role assignment ──
+                try {
+                    await setDoc(legacyRoleRef, {
+                        role: resolvedRole,
+                        email: user.email || '',
+                        displayName: user.displayName || '',
+                        createdAt: new Date().toISOString(),
+                    });
+                    console.log(`[RoleContext] Auto-registered ${user.email} in users_roles with role=${resolvedRole}`);
+                } catch (err) {
+                    console.warn('[RoleContext] Failed to auto-register in users_roles:', err);
+                }
             }
 
             // ── Super Admin Auto-Recovery ──

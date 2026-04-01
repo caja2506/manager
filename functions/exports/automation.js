@@ -15,6 +15,7 @@ function createAutomationExports(adminDb, secrets) {
             try {
                 const { executeRoutine } = require("../automation/routineExecutor");
                 const routinePaths = require("../automation/firestorePaths");
+                const { TRIGGER_TYPE } = require("../automation/constants");
                 const token = telegramBotToken.value();
 
                 const routinesSnap = await adminDb.collection(routinePaths.AUTOMATION_ROUTINES).get();
@@ -26,9 +27,16 @@ function createAutomationExports(adminDb, secrets) {
                 const currentDay = nowInTz.getDay();
                 console.log(`[scheduler] Current time: ${currentHour}:${String(currentMinute).padStart(2, '0')} day=${currentDay}`);
 
+                // ── Cron-based routines (skip day-schedule managed ones) ──
+                const DAY_SCHEDULE_ROUTINES = new Set(["close_day_report", "open_day"]);
+
                 for (const doc of routinesSnap.docs) {
                     const routine = doc.data();
                     const key = routine.key || doc.id;
+
+                    // Skip routines managed by daySchedule settings
+                    if (DAY_SCHEDULE_ROUTINES.has(key)) continue;
+
                     if (routine.scheduleType !== "daily") continue;
                     if (!routine.enabled) continue;
                     if (!routine.scheduleConfig?.cron) continue;
@@ -64,6 +72,74 @@ function createAutomationExports(adminDb, secrets) {
                         console.error(`[scheduler] ${key} failed:`, routineErr);
                     }
                 }
+
+                // ── Day Schedule: close_day_report + open_day ──
+                // These are controlled by settings/daySchedule (admin UI)
+                // instead of static cron expressions.
+                try {
+                    const dayScheduleSnap = await adminDb
+                        .collection(routinePaths.SETTINGS)
+                        .doc(routinePaths.SETTINGS_DOCS.DAY_SCHEDULE)
+                        .get();
+
+                    if (dayScheduleSnap.exists) {
+                        const ds = dayScheduleSnap.data();
+                        if (ds.enabled) {
+                            const dsTz = ds.timezone || "America/Costa_Rica";
+                            const nowDs = new Date(now.toLocaleString("en-US", { timeZone: dsTz }));
+                            const dsHour = nowDs.getHours();
+                            const dsMin = nowDs.getMinutes();
+                            const dsDay = nowDs.getDay();
+                            const dsTotalMin = dsHour * 60 + dsMin;
+
+                            console.log(`[scheduler] daySchedule check: ${dsHour}:${String(dsMin).padStart(2, '0')} day=${dsDay} tz=${dsTz}`);
+
+                            // Only on weekdays (Mon-Fri)
+                            if (dsDay >= 1 && dsDay <= 5) {
+                                // ⏹ Close Day
+                                if (ds.closeTime) {
+                                    const [cH, cM] = ds.closeTime.split(":").map(Number);
+                                    const closeTotal = cH * 60 + cM;
+                                    const closeDiff = dsTotalMin - closeTotal;
+                                    if (closeDiff >= 0 && closeDiff < 15) {
+                                        console.log(`[scheduler] ⏹ close_day_report triggered by daySchedule (${ds.closeTime} ${dsTz})`);
+                                        try {
+                                            const result = await executeRoutine(adminDb, token, "close_day_report", TRIGGER_TYPE.DAY_SCHEDULE, {});
+                                            console.log(`[scheduler] close_day_report result:`, JSON.stringify(result));
+                                        } catch (e) {
+                                            console.error(`[scheduler] close_day_report failed:`, e);
+                                        }
+                                    }
+                                }
+
+                                // ▶ Open Day
+                                if (ds.openTime) {
+                                    const [oH, oM] = ds.openTime.split(":").map(Number);
+                                    const openTotal = oH * 60 + oM;
+                                    const openDiff = dsTotalMin - openTotal;
+                                    if (openDiff >= 0 && openDiff < 15) {
+                                        console.log(`[scheduler] ▶ open_day triggered by daySchedule (${ds.openTime} ${dsTz})`);
+                                        try {
+                                            const result = await executeRoutine(adminDb, token, "open_day", TRIGGER_TYPE.DAY_SCHEDULE, {});
+                                            console.log(`[scheduler] open_day result:`, JSON.stringify(result));
+                                        } catch (e) {
+                                            console.error(`[scheduler] open_day failed:`, e);
+                                        }
+                                    }
+                                }
+                            } else {
+                                console.log(`[scheduler] daySchedule: weekend (day=${dsDay}), skipping close/open`);
+                            }
+                        } else {
+                            console.log("[scheduler] daySchedule is disabled");
+                        }
+                    } else {
+                        console.log("[scheduler] No settings/daySchedule document found");
+                    }
+                } catch (dsErr) {
+                    console.error("[scheduler] daySchedule processing error:", dsErr);
+                }
+
                 console.log("[scheduler] Tick complete.");
             } catch (err) {
                 console.error("[scheduler] Fatal error:", err);

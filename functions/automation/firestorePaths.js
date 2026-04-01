@@ -14,6 +14,7 @@ module.exports = {
         AUTOMATION_CORE: "automationCore",
         TELEGRAM_OPS: "telegramOps",
         AUTOMATION_AI: "automationAI",
+        DAY_SCHEDULE: "daySchedule",
     },
 
     // ── Core Data ──

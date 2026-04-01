@@ -24,6 +24,7 @@ import { getMetricsDocId } from '../automation/metricsHelper.js';
 import { fetchAnalyticsDashboard } from '../automation/analyticsService.js';
 import { fetchOptimizationDashboard, runOptimizationScan as scanOptimization } from '../automation/optimizationService.js';
 import AutomationControlShell from '../components/automation/AutomationControlShell.jsx';
+import DayScheduleSettings from '../components/settings/DayScheduleSettings.jsx';
 
 /**
  * AutomationControlCenter
@@ -369,6 +370,9 @@ export default function AutomationControlCenter() {
     return (
         <div className="p-6 max-w-7xl mx-auto">
             <PageHeader title="" showBack={true} />
+            <div className="mb-6">
+                <DayScheduleSettings />
+            </div>
             <AutomationControlShell
                 coreConfig={coreConfig}
                 telegramConfig={telegramConfig}

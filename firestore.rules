@@ -83,12 +83,17 @@ service cloud.firestore {
     // ============================================================
 
     // --- users_roles ---
-    // Users can update their own role doc (needed for Super Admin auto-recovery).
+    // Users can create their own role doc (self-registration on first login).
+    // Admins can create role docs for other users (register orphan users).
     // Admins can update/delete any role doc.
     match /users_roles/{userId} {
       allow create: if isAuthenticated()
-        && request.auth.uid == userId
-        && request.resource.data.role == 'viewer';
+        && (
+          // Self-registration: user creates own doc with viewer role
+          (request.auth.uid == userId && request.resource.data.role == 'viewer')
+          // Admin registration: admin creates doc for another user
+          || isAdmin()
+        );
       allow update: if isAdmin()
         || (isAuthenticated() && request.auth.uid == userId);
       allow delete: if isAdmin();

@@ -80,3 +80,19 @@ export async function updateUserDisplayName(uid, displayName) {
 export async function removeRbacUser(uid) {
     await deleteDoc(doc(db, 'users_roles', uid));
 }
+
+/**
+ * Register an orphan user (exists in `users` but not in `users_roles`).
+ * Creates the `users_roles/{uid}` document so the user appears in the admin panel.
+ * @param {string} uid
+ * @param {Object} profileData - { email, displayName } from the users collection
+ * @param {string} [role='viewer'] - initial RBAC role
+ */
+export async function registerOrphanUser(uid, profileData, role = 'viewer') {
+    await setDoc(doc(db, 'users_roles', uid), {
+        role,
+        email: profileData.email || '',
+        displayName: profileData.displayName || '',
+        createdAt: new Date().toISOString(),
+    });
+}
