@@ -154,6 +154,10 @@ export default function TaskActivityPage() {
     const [activityLogs, setActivityLogs] = useState([]);
     const [loading, setLoading] = useState(false);
 
+    // Power BI style cross-filter state (from chart clicks)
+    const [selectedEventType, setSelectedEventType] = useState(null);
+    const [selectedDate, setSelectedDate] = useState(null);
+
     // Edit state
     const [editingLog, setEditingLog] = useState(null); // { id, taskId, description, userName }
 
@@ -236,7 +240,6 @@ export default function TaskActivityPage() {
         })).sort((a, b) => a.label.localeCompare(b.label));
     }, [engProjects]);
 
-    const hasActiveFilters = selectedPersons.length > 0 || selectedProjects.length > 0 || !!selectedTaskId;
 
     // Analytics computed from logs
     const analytics = useMemo(() => {
@@ -246,7 +249,7 @@ export default function TaskActivityPage() {
         const taskProjectMap = {};
         engTasks.forEach(t => { taskProjectMap[t.id] = t.projectId; });
 
-        // Filter logs
+        // Filter logs (including Power BI chart filters)
         const filtered = activityLogs.filter(log => {
             if (selectedPersons.length > 0 && !selectedPersons.includes(log.userId)) return false;
             if (selectedProjects.length > 0) {
@@ -254,6 +257,8 @@ export default function TaskActivityPage() {
                 if (!projId || !selectedProjects.includes(projId)) return false;
             }
             if (selectedTaskId && log.taskId !== selectedTaskId) return false;
+            if (selectedEventType && log.type !== selectedEventType) return false;
+            if (selectedDate && log.date !== selectedDate) return false;
             return true;
         });
 
@@ -367,7 +372,7 @@ export default function TaskActivityPage() {
         const taskCompletedLog = filtered.find(l => l.type === 'task_completed');
 
         return { kpis, trendData, todayRefLabel, topTasks, timelineByDay, totalEvents: filtered.length, eventTypeDistribution, taskCreatedLog, taskCompletedLog };
-    }, [activityLogs, selectedPersons, selectedProjects, selectedTaskId, engTasks, dateFrom, dateTo]);
+    }, [activityLogs, selectedPersons, selectedProjects, selectedTaskId, selectedEventType, selectedDate, engTasks, dateFrom, dateTo]);
 
     // Progress chart data (built from logs with percentComplete in meta)
     const progressChartData = useMemo(() => {
@@ -447,12 +452,16 @@ export default function TaskActivityPage() {
     }, [activeTaskId, activityLogs, engTasks]);
 
     // Helpers
+    const hasActiveFilters = selectedPersons.length > 0 || selectedProjects.length > 0 || selectedTaskId || selectedEventType || selectedDate;
+
     const clearFilters = () => {
         setDateFrom(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
         setDateTo(format(new Date(), 'yyyy-MM-dd'));
         setSelectedPersons([]);
         setSelectedProjects([]);
         setSelectedTaskId(null);
+        setSelectedEventType(null);
+        setSelectedDate(null);
         if (urlTaskId) {
             setSearchParams({});
         }
@@ -460,10 +469,34 @@ export default function TaskActivityPage() {
 
     const handleTaskClick = (taskId) => {
         if (selectedTaskId === taskId) {
-            setSelectedTaskId(null); // toggle off
+            setSelectedTaskId(null);
         } else {
             setSelectedTaskId(taskId);
         }
+    };
+
+    // Power BI: click on correlation chart bar → filter by date
+    const handleCorrelationClick = (data) => {
+        if (!data?.activePayload?.[0]?.payload) return;
+        const point = data.activePayload[0].payload;
+        if (point.isFuture || !point.name) return;
+        // Find the actual date string from trendData
+        const matchDay = analytics?.trendData?.find(d => d.name === point.name);
+        if (!matchDay) return;
+        // Convert display label back to YYYY-MM-DD by matching activityLogs dates
+        const dateStr = activityLogs.find(l => {
+            const logLabel = format(new Date(l.timestamp), 'dd MMM', { locale: es });
+            return logLabel === point.name;
+        })?.date;
+        if (dateStr) {
+            setSelectedDate(prev => prev === dateStr ? null : dateStr);
+        }
+    };
+
+    // Power BI: click on donut slice → filter by event type
+    const handleDonutClick = (entry) => {
+        if (!entry?.type) return;
+        setSelectedEventType(prev => prev === entry.type ? null : entry.type);
     };
 
     const applyPreset = (days) => {
@@ -514,6 +547,22 @@ export default function TaskActivityPage() {
                             className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 transition-all"
                         >
                             <X className="w-3 h-3" /> {focusedTask?.title?.substring(0, 20) || 'Tarea'}
+                        </button>
+                    )}
+                    {selectedEventType && (
+                        <button
+                            onClick={() => setSelectedEventType(null)}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-violet-300 bg-violet-500/10 border border-violet-500/20 hover:bg-violet-500/20 transition-all"
+                        >
+                            <X className="w-3 h-3" /> {EVENT_LABELS[selectedEventType] || selectedEventType}
+                        </button>
+                    )}
+                    {selectedDate && (
+                        <button
+                            onClick={() => setSelectedDate(null)}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-amber-300 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 transition-all"
+                        >
+                            <X className="w-3 h-3" /> {format(new Date(selectedDate + 'T12:00:00'), 'dd MMM yyyy', { locale: es })}
                         </button>
                     )}
                     {hasActiveFilters && (
@@ -700,7 +749,7 @@ export default function TaskActivityPage() {
                         ) : (
                             <div className="h-[300px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <ComposedChart data={analytics.trendData} margin={{ top: 10, right: 40, left: -10, bottom: 0 }}>
+                                    <ComposedChart data={analytics.trendData} margin={{ top: 10, right: 40, left: -10, bottom: 0 }} onClick={handleCorrelationClick} style={{ cursor: 'pointer' }}>
                                         <defs>
                                             <linearGradient id="colorHoras" x1="0" y1="0" x2="0" y2="1">
                                                 <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.6} />
@@ -775,9 +824,16 @@ export default function TaskActivityPage() {
                                                 paddingAngle={3}
                                                 dataKey="value"
                                                 stroke="none"
+                                                style={{ cursor: 'pointer' }}
                                             >
                                                 {analytics.eventTypeDistribution.map((entry, idx) => (
-                                                    <Cell key={idx} fill={entry.color} />
+                                                    <Cell
+                                                        key={idx}
+                                                        fill={entry.color}
+                                                        opacity={selectedEventType && selectedEventType !== entry.type ? 0.3 : 1}
+                                                        onClick={() => handleDonutClick(entry)}
+                                                        style={{ cursor: 'pointer' }}
+                                                    />
                                                 ))}
                                             </Pie>
                                             <Tooltip
@@ -789,11 +845,21 @@ export default function TaskActivityPage() {
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                     {analytics.eventTypeDistribution.map((item, idx) => (
-                                        <div key={idx} className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/60 rounded-lg border border-slate-700/50">
+                                        <button
+                                            key={idx}
+                                            onClick={() => handleDonutClick(item)}
+                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all cursor-pointer ${
+                                                selectedEventType === item.type
+                                                    ? 'bg-violet-500/20 border-violet-500/50 ring-1 ring-violet-500/30'
+                                                    : selectedEventType
+                                                        ? 'bg-slate-800/30 border-slate-700/30 opacity-50'
+                                                        : 'bg-slate-800/60 border-slate-700/50 hover:bg-slate-700/60'
+                                            }`}
+                                        >
                                             <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
                                             <span className="text-xs font-bold text-slate-300">{item.name}</span>
                                             <span className="text-xs font-mono text-slate-500">{item.value}</span>
-                                        </div>
+                                        </button>
                                     ))}
                                 </div>
                             </div>
