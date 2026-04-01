@@ -64,11 +64,18 @@ export default function SubtaskList({ subtasks = [], taskId, readOnly = false, o
 
     // ── Toggle ──
     const handleToggle = async (subtask) => {
-        await toggleSubtask(subtask.id, !subtask.completed, {
+        // Calculate what the new percentComplete will be after this toggle
+        const newCompleted = !subtask.completed;
+        const total = subtasks.length;
+        const completedCount = subtasks.filter(s => s.completed).length + (newCompleted ? 1 : -1);
+        const newPercent = total > 0 ? Math.round((completedCount / total) * 100) : 0;
+
+        await toggleSubtask(subtask.id, newCompleted, {
             taskId,
             subtaskTitle: subtask.title,
             userId,
             userName,
+            percentComplete: newPercent,
         });
     };
 

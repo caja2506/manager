@@ -1,62 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { FileText, BarChart2, Activity, ChevronDown } from 'lucide-react';
+import React from 'react';
+import { FileText, BarChart2, Activity } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import SubtaskList from '../SubtaskList';
-import { fetchTaskActivityLog } from '../../../services/activityLogService';
-
-const EVENT_ICONS = {
-    subtask_completed: '✅',
-    subtask_unchecked: '⬜',
-    status_changed: '🔄',
-    timer_started: '▶️',
-    timer_stopped: '⏹️',
-    delay_reported: '⚠️',
-};
-
-const EVENT_COLORS = {
-    subtask_completed: '#22c55e',
-    subtask_unchecked: '#64748b',
-    status_changed: '#6366f1',
-    timer_started: '#f59e0b',
-    timer_stopped: '#f59e0b',
-    delay_reported: '#ef4444',
-};
 
 /**
  * TaskMainPanel — left column of the task editor.
- * Contains title input, description, progress, subtasks, and activity timeline.
+ * Contains title input, description, progress, subtasks, and activity link.
  */
 export default function TaskMainPanel({
     form, setForm, isNew, task,
     subtasks, canEdit, onSubtaskProgressChange,
     userId, userName,
 }) {
+    const navigate = useNavigate();
     const totalSubtasks = (subtasks || []).length;
     const hasSubtasks = totalSubtasks > 0;
-
-    // Activity timeline state
-    const [showTimeline, setShowTimeline] = useState(false);
-    const [activityLogs, setActivityLogs] = useState([]);
-    const [loadingLogs, setLoadingLogs] = useState(false);
-
-    useEffect(() => {
-        if (!showTimeline || !task?.id) return;
-        let cancelled = false;
-        (async () => {
-            setLoadingLogs(true);
-            try {
-                const logs = await fetchTaskActivityLog(task.id, 50);
-                if (!cancelled) setActivityLogs(logs);
-            } catch { /* ignore */ }
-            finally { if (!cancelled) setLoadingLogs(false); }
-        })();
-        return () => { cancelled = true; };
-    }, [showTimeline, task?.id]);
-
-    const formatTime = (isoStr) => {
-        if (!isoStr) return '';
-        const d = new Date(isoStr);
-        return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-    };
 
     return (
         <div className="w-full lg:w-1/2 p-4 lg:p-5 overflow-y-auto space-y-4 lg:border-r border-slate-800">
@@ -140,57 +98,16 @@ export default function TaskMainPanel({
                 </div>
             )}
 
-            {/* Activity Timeline — collapsible */}
+            {/* Activity Timeline Link */}
             {!isNew && task?.id && (
                 <div className="border-t border-slate-700 pt-3">
                     <button
-                        onClick={() => setShowTimeline(prev => !prev)}
-                        className="w-full flex items-center justify-between group"
+                        onClick={() => navigate(`/reports/activity?taskId=${task.id}`)}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-bold hover:bg-emerald-600/20 hover:border-emerald-500/50 transition-all group"
                     >
-                        <div className="flex items-center gap-1.5">
-                            <Activity className="w-3 h-3 text-emerald-500" />
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-emerald-400 transition-colors">
-                                Historial de Actividad
-                            </span>
-                            {activityLogs.length > 0 && (
-                                <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded-full">
-                                    {activityLogs.length}
-                                </span>
-                            )}
-                        </div>
-                        <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${showTimeline ? 'rotate-180' : ''}`} />
+                        <Activity className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+                        Ver Avance y Actividad
                     </button>
-
-                    {showTimeline && (
-                        <div className="mt-2 space-y-0.5 max-h-[250px] overflow-y-auto">
-                            {loadingLogs ? (
-                                <p className="text-[10px] text-slate-500 animate-pulse py-2">Cargando historial...</p>
-                            ) : activityLogs.length === 0 ? (
-                                <p className="text-[10px] text-slate-500 italic py-2">Sin actividad registrada aún.</p>
-                            ) : (
-                                <div className="ml-1 border-l-2 border-slate-700/50 pl-3 space-y-0.5">
-                                    {activityLogs.map(log => (
-                                        <div key={log.id} className="flex items-start gap-1.5 py-1 hover:bg-slate-800/30 rounded px-1 -ml-1 transition-colors">
-                                            <span className="text-xs shrink-0 mt-px">{EVENT_ICONS[log.type] || '📋'}</span>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-[11px] text-slate-300 font-medium leading-snug truncate">
-                                                    {log.description}
-                                                </p>
-                                                <span className="text-[9px] font-bold text-slate-500">
-                                                    {formatTime(log.timestamp)}
-                                                    {log.userName && ` · ${log.userName}`}
-                                                </span>
-                                            </div>
-                                            <div
-                                                className="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5"
-                                                style={{ backgroundColor: EVENT_COLORS[log.type] || '#64748b' }}
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
                 </div>
             )}
         </div>

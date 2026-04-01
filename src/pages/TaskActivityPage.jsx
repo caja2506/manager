@@ -1,10 +1,11 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useEngineeringData } from '../hooks/useEngineeringData';
-import { fetchAllActivityLogs, updateActivityLog, deleteActivityLog } from '../services/activityLogService';
+import { fetchAllActivityLogs, fetchTaskActivityLog, updateActivityLog, deleteActivityLog } from '../services/activityLogService';
 import {
-    AreaChart, Area, BarChart, Bar,
+    AreaChart, Area, BarChart, Bar, LineChart, Line,
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
+import { useSearchParams } from 'react-router-dom';
 import {
     Activity, TrendingUp, CheckSquare, RefreshCw, Timer, AlertTriangle,
     Calendar as CalendarIcon, X, ChevronDown, Check, FolderGit2, User,
@@ -92,6 +93,11 @@ function MultiSelect({ icon: Icon, options, selected, onChange, allLabel = 'Todo
 
 export default function TaskActivityPage() {
     const { engProjects, engTasks, teamMembers } = useEngineeringData();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const urlTaskId = searchParams.get('taskId');
+
+    // Find the task name for the header
+    const focusedTask = urlTaskId ? engTasks?.find(t => t.id === urlTaskId) : null;
 
     // Filter state
     const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
@@ -143,12 +149,19 @@ export default function TaskActivityPage() {
         }
     };
 
-    // Fetch activity logs when date range changes
+    // Fetch activity logs when date range or taskId changes
     useEffect(() => {
         let cancelled = false;
         (async () => {
+            setLoading(true);
             try {
-                const logs = await fetchAllActivityLogs(dateFrom, dateTo);
+                let logs;
+                if (urlTaskId) {
+                    // Single task mode
+                    logs = await fetchTaskActivityLog(urlTaskId, 500);
+                } else {
+                    logs = await fetchAllActivityLogs(dateFrom, dateTo);
+                }
                 if (!cancelled) {
                     setActivityLogs(logs);
                 }
@@ -159,7 +172,7 @@ export default function TaskActivityPage() {
             }
         })();
         return () => { cancelled = true; };
-    }, [dateFrom, dateTo]);
+    }, [dateFrom, dateTo, urlTaskId]);
 
     // Filter options
     const personOptions = useMemo(() => {
@@ -265,12 +278,35 @@ export default function TaskActivityPage() {
         return { kpis, trendData, topTasks, timelineByDay, totalEvents: filtered.length };
     }, [activityLogs, selectedPersons, selectedProjects, engTasks, dateFrom, dateTo]);
 
+    // Progress chart data (built from logs with percentComplete in meta)
+    const progressChartData = useMemo(() => {
+        if (!urlTaskId || !activityLogs.length) return [];
+        // Get all subtask events that have percentComplete in meta
+        const progressEvents = activityLogs
+            .filter(l => l.meta?.percentComplete != null)
+            .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+
+        if (progressEvents.length === 0) return [];
+
+        return progressEvents.map(log => {
+            const d = new Date(log.timestamp);
+            return {
+                name: `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`,
+                progreso: log.meta.percentComplete,
+                description: log.description,
+            };
+        });
+    }, [urlTaskId, activityLogs]);
+
     // Helpers
     const clearFilters = () => {
         setDateFrom(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
         setDateTo(format(new Date(), 'yyyy-MM-dd'));
         setSelectedPersons([]);
         setSelectedProjects([]);
+        if (urlTaskId) {
+            setSearchParams({});
+        }
     };
 
     const applyPreset = (days) => {
@@ -312,8 +348,12 @@ export default function TaskActivityPage() {
                             <Activity className="w-5 h-5 text-emerald-400" />
                         </div>
                         <div>
-                            <h2 className="font-black text-xl text-white tracking-tight">Actividad de Tareas</h2>
-                            <p className="text-[11px] text-slate-500 font-bold">Timeline de eventos · Datos en tiempo real</p>
+                            <h2 className="font-black text-xl text-white tracking-tight">
+                                {focusedTask ? `Actividad: ${focusedTask.title}` : 'Actividad de Tareas'}
+                            </h2>
+                            <p className="text-[11px] text-slate-500 font-bold">
+                                {focusedTask ? 'Progreso y timeline de esta tarea' : 'Timeline de eventos · Datos en tiempo real'}
+                            </p>
                         </div>
                     </div>
                     {hasActiveFilters && (
@@ -400,6 +440,39 @@ export default function TaskActivityPage() {
                             </div>
                             <span className="text-3xl font-black text-white">{analytics.kpis.delaysReported}</span>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- PROGRESS CHART (single task mode) --- */}
+            {urlTaskId && progressChartData.length > 0 && (
+                <div className="bg-slate-900/70 p-6 rounded-2xl border border-slate-800 shadow-lg">
+                    <div className="flex items-center gap-2 mb-5">
+                        <TrendingUp className="w-5 h-5 text-indigo-400" />
+                        <h3 className="font-bold text-lg text-white">Avance en el Tiempo</h3>
+                        <span className="text-[9px] font-bold text-indigo-400 bg-indigo-500/15 px-2 py-0.5 rounded-full">
+                            {progressChartData[progressChartData.length - 1]?.progreso ?? 0}% actual
+                        </span>
+                    </div>
+                    <div className="h-[250px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={progressChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="colorProgress" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
+                                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                                <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} />
+                                <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} unit="%" />
+                                <Tooltip
+                                    contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 12, fontSize: 12, fontWeight: 700 }}
+                                    formatter={(val) => [`${val}%`, 'Progreso']}
+                                />
+                                <Line type="stepAfter" dataKey="progreso" stroke="#6366f1" strokeWidth={3} dot={{ fill: '#6366f1', r: 5 }} activeDot={{ r: 7 }} />
+                            </LineChart>
+                        </ResponsiveContainer>
                     </div>
                 </div>
             )}
