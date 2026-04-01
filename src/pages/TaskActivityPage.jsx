@@ -2,7 +2,7 @@ import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useEngineeringData } from '../hooks/useEngineeringData';
 import { fetchAllActivityLogs, fetchTaskActivityLog, updateActivityLog, deleteActivityLog } from '../services/activityLogService';
 import {
-    AreaChart, Area, BarChart, Bar, LineChart, Line,
+    AreaChart, Area, BarChart, Bar, LineChart, Line, Cell,
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import { useSearchParams } from 'react-router-dom';
@@ -96,8 +96,12 @@ export default function TaskActivityPage() {
     const [searchParams, setSearchParams] = useSearchParams();
     const urlTaskId = searchParams.get('taskId');
 
+    // Interactive selection (Power BI style)
+    const [selectedTaskId, setSelectedTaskId] = useState(null);
+    const activeTaskId = urlTaskId || selectedTaskId;
+
     // Find the task name for the header
-    const focusedTask = urlTaskId ? engTasks?.find(t => t.id === urlTaskId) : null;
+    const focusedTask = activeTaskId ? engTasks?.find(t => t.id === activeTaskId) : null;
 
     // Filter state
     const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
@@ -191,7 +195,7 @@ export default function TaskActivityPage() {
         })).sort((a, b) => a.label.localeCompare(b.label));
     }, [engProjects]);
 
-    const hasActiveFilters = selectedPersons.length > 0 || selectedProjects.length > 0;
+    const hasActiveFilters = selectedPersons.length > 0 || selectedProjects.length > 0 || !!selectedTaskId;
 
     // Analytics computed from logs
     const analytics = useMemo(() => {
@@ -208,6 +212,7 @@ export default function TaskActivityPage() {
                 const projId = taskProjectMap[log.taskId];
                 if (!projId || !selectedProjects.includes(projId)) return false;
             }
+            if (selectedTaskId && log.taskId !== selectedTaskId) return false;
             return true;
         });
 
@@ -259,6 +264,7 @@ export default function TaskActivityPage() {
             .map(([taskId, count]) => {
                 const task = engTasks.find(t => t.id === taskId);
                 return {
+                    taskId,
                     name: task ? (task.title.length > 30 ? task.title.substring(0, 30) + '...' : task.title) : taskId.slice(0, 8),
                     eventos: count,
                 };
@@ -276,14 +282,14 @@ export default function TaskActivityPage() {
         });
 
         return { kpis, trendData, topTasks, timelineByDay, totalEvents: filtered.length };
-    }, [activityLogs, selectedPersons, selectedProjects, engTasks, dateFrom, dateTo]);
+    }, [activityLogs, selectedPersons, selectedProjects, selectedTaskId, engTasks, dateFrom, dateTo]);
 
     // Progress chart data (built from logs with percentComplete in meta)
     const progressChartData = useMemo(() => {
-        if (!urlTaskId || !activityLogs.length) return [];
-        // Get all subtask events that have percentComplete in meta
+        if (!activeTaskId || !activityLogs.length) return [];
+        // Get all subtask events for the active task that have percentComplete
         const progressEvents = activityLogs
-            .filter(l => l.meta?.percentComplete != null)
+            .filter(l => l.taskId === activeTaskId && l.meta?.percentComplete != null)
             .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 
         if (progressEvents.length === 0) return [];
@@ -305,7 +311,7 @@ export default function TaskActivityPage() {
         ];
 
         return points;
-    }, [urlTaskId, activityLogs]);
+    }, [activeTaskId, activityLogs]);
 
     // Helpers
     const clearFilters = () => {
@@ -313,8 +319,17 @@ export default function TaskActivityPage() {
         setDateTo(format(new Date(), 'yyyy-MM-dd'));
         setSelectedPersons([]);
         setSelectedProjects([]);
+        setSelectedTaskId(null);
         if (urlTaskId) {
             setSearchParams({});
+        }
+    };
+
+    const handleTaskClick = (taskId) => {
+        if (selectedTaskId === taskId) {
+            setSelectedTaskId(null); // toggle off
+        } else {
+            setSelectedTaskId(taskId);
         }
     };
 
@@ -361,18 +376,28 @@ export default function TaskActivityPage() {
                                 {focusedTask ? `Actividad: ${focusedTask.title}` : 'Actividad de Tareas'}
                             </h2>
                             <p className="text-[11px] text-slate-500 font-bold">
-                                {focusedTask ? 'Progreso y timeline de esta tarea' : 'Timeline de eventos · Datos en tiempo real'}
+                                {focusedTask ? 'Progreso y timeline de esta tarea' : 'Timeline de eventos · Click en barras o eventos para filtrar'}
                             </p>
                         </div>
                     </div>
-                    {hasActiveFilters && (
-                        <button
-                            onClick={clearFilters}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition-all"
-                        >
-                            <X className="w-3.5 h-3.5" /> Limpiar filtros
-                        </button>
-                    )}
+                    <div className="flex items-center gap-2">
+                        {selectedTaskId && !urlTaskId && (
+                            <button
+                                onClick={() => setSelectedTaskId(null)}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 transition-all"
+                            >
+                                <X className="w-3 h-3" /> {focusedTask?.title?.substring(0, 20) || 'Tarea'}
+                            </button>
+                        )}
+                        {hasActiveFilters && (
+                            <button
+                                onClick={clearFilters}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition-all"
+                            >
+                                <X className="w-3.5 h-3.5" /> Limpiar filtros
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 <div className="p-4 flex flex-wrap items-center gap-3">
@@ -453,8 +478,8 @@ export default function TaskActivityPage() {
                 </div>
             )}
 
-            {/* --- PROGRESS CHART (single task mode) --- */}
-            {urlTaskId && progressChartData.length > 0 && (
+            {/* --- PROGRESS CHART (when a task is selected) --- */}
+            {activeTaskId && progressChartData.length > 0 && (
                 <div className="bg-slate-900/70 p-6 rounded-2xl border border-slate-800 shadow-lg">
                     <div className="flex items-center gap-2 mb-5">
                         <TrendingUp className="w-5 h-5 text-indigo-400" />
@@ -547,12 +572,26 @@ export default function TaskActivityPage() {
                         ) : (
                             <div className="h-[300px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={analytics.topTasks} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
+                                    <BarChart data={analytics.topTasks} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}
+                                        onClick={(data) => {
+                                            if (data?.activePayload?.[0]?.payload?.taskId) {
+                                                handleTaskClick(data.activePayload[0].payload.taskId);
+                                            }
+                                        }}
+                                        style={{ cursor: 'pointer' }}
+                                    >
                                         <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#334155" />
                                         <XAxis type="number" hide />
                                         <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} width={160} />
                                         <Tooltip cursor={{ fill: '#1e293b' }} contentStyle={{ borderRadius: '12px', border: '1px solid #334155', backgroundColor: '#1e293b', color: '#e2e8f0' }} />
-                                        <Bar dataKey="eventos" name="Eventos" fill="#6366f1" radius={[0, 6, 6, 0]} barSize={20} />
+                                        <Bar dataKey="eventos" name="Eventos" radius={[0, 6, 6, 0]} barSize={20}>
+                                            {analytics.topTasks.map((entry, index) => (
+                                                <Cell key={index}
+                                                    fill={entry.taskId === selectedTaskId ? '#22c55e' : '#6366f1'}
+                                                    fillOpacity={selectedTaskId && entry.taskId !== selectedTaskId ? 0.3 : 1}
+                                                />
+                                            ))}
+                                        </Bar>
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
@@ -581,7 +620,12 @@ export default function TaskActivityPage() {
                                                 const isEditing = editingLog?.id === log.id;
                                                 return (
                                                 <div key={log.id}
-                                                    className="flex items-start gap-2 py-1.5 group hover:bg-slate-800/50 rounded-lg px-2 -ml-2 transition-colors"
+                                                    className={`flex items-start gap-2 py-1.5 group rounded-lg px-2 -ml-2 transition-all cursor-pointer ${
+                                                        selectedTaskId && log.taskId !== selectedTaskId
+                                                            ? 'opacity-30'
+                                                            : 'hover:bg-slate-800/50'
+                                                    } ${log.taskId === selectedTaskId ? 'bg-indigo-900/20 border border-indigo-500/20' : ''}`}
+                                                    onClick={() => !isEditing && handleTaskClick(log.taskId)}
                                                 >
                                                     <span className="text-base shrink-0 mt-0.5">
                                                         {EVENT_ICONS[log.type] || '📋'}
