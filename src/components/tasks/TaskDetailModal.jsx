@@ -6,6 +6,7 @@ import {
 import { createTask, updateTask, updateTaskStatus, deleteTask } from '../../services/taskService';
 import { startTimer, stopTimer, getActiveTimerForTask, canManageOthersTimers } from '../../services/timeService';
 import { resolveAreaSync } from '../../services/mappingService';
+import { logActivity, ACTIVITY_TYPES } from '../../services/activityLogService';
 import { useRole } from '../../contexts/RoleContext';
 import { useAppData } from '../../contexts/AppDataContext';
 import { useEngineeringData } from '../../hooks/useEngineeringData';
@@ -197,6 +198,15 @@ export default function TaskDetailModal({
         setForm(f => ({ ...f, status: newStatus }));
         await updateTaskStatus(task.id, newStatus, task.projectId || form.projectId);
 
+        // Log the status change
+        logActivity(task.id, {
+            type: ACTIVITY_TYPES.STATUS_CHANGED,
+            description: `Estado: ${oldStatus} → ${newStatus}`,
+            userId,
+            userName: teamMembers?.find(m => m.uid === userId)?.displayName || null,
+            meta: { from: oldStatus, to: newStatus },
+        });
+
         // Auto-Timer logic for IN_PROGRESS
         // Timer is created for the task's assignedTo user (not the logged-in user)
         const taskOwner = form.assignedTo || task?.assignedTo;
@@ -305,6 +315,8 @@ export default function TaskDetailModal({
                         task={task}
                         subtasks={subtasks}
                         canEdit={canEdit}
+                        userId={userId}
+                        userName={teamMembers?.find(m => m.uid === userId)?.displayName || null}
                     />
 
                     {/* Right: Control */}

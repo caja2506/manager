@@ -25,6 +25,7 @@ import WorkLogs from './pages/WorkLogs';
 import DailyReports from './pages/DailyReports';
 import WeeklyReports from './pages/WeeklyReports';
 import EngineeringAnalytics from './pages/EngineeringAnalytics';
+import TaskActivityPage from './pages/TaskActivityPage';
 import WeeklyPlanner from './pages/WeeklyPlanner';
 import ProjectGantt from './pages/ProjectGantt';
 import Team from './pages/Team';
@@ -108,6 +109,7 @@ export default function App() {
             <Route path="/reports/daily" element={<ErrorBoundary module="Reportes Diarios"><DailyReports /></ErrorBoundary>} />
             <Route path="/reports/weekly" element={<ErrorBoundary module="Reportes Semanales"><WeeklyReports /></ErrorBoundary>} />
             <Route path="/analytics" element={<ErrorBoundary module="Analítica"><EngineeringAnalytics /></ErrorBoundary>} />
+            <Route path="/reports/activity" element={<ErrorBoundary module="Actividad"><TaskActivityPage /></ErrorBoundary>} />
           </Route>
           <Route path="/audit" element={<ErrorBoundary module="Auditoría"><AuditFindings /></ErrorBoundary>} />
           <Route path="/control-tower" element={<ErrorBoundary module="Control Tower"><ControlTower /></ErrorBoundary>} />

@@ -22,6 +22,7 @@ import {
     createSubtaskDocument,
 } from '../models/schemas';
 import { resolveAreaForTask, validateTaskAreaConsistency } from './mappingService';
+import { logActivity, ACTIVITY_TYPES } from './activityLogService';
 
 // ── Cloud Function reference for workflow transitions ──
 const transitionTaskStatusFn = httpsCallable(functions, 'transitionTaskStatus');
@@ -199,8 +200,27 @@ export async function createSubtask(taskId, title) {
     return ref.id;
 }
 
-export async function toggleSubtask(subtaskId, completed) {
-    await updateDoc(doc(db, COLLECTIONS.SUBTASKS, subtaskId), { completed });
+export async function toggleSubtask(subtaskId, completed, { taskId = null, subtaskTitle = '', userId = null, userName = null } = {}) {
+    const updates = { completed };
+    if (completed) {
+        updates.completedAt = new Date().toISOString();
+    } else {
+        updates.completedAt = null;
+    }
+    await updateDoc(doc(db, COLLECTIONS.SUBTASKS, subtaskId), updates);
+
+    // Log activity
+    if (taskId) {
+        logActivity(taskId, {
+            type: completed ? ACTIVITY_TYPES.SUBTASK_COMPLETED : ACTIVITY_TYPES.SUBTASK_UNCHECKED,
+            description: completed
+                ? `Subtarea completada: ${subtaskTitle}`
+                : `Subtarea desmarcada: ${subtaskTitle}`,
+            userId,
+            userName,
+            meta: { subtaskId, subtaskTitle },
+        });
+    }
 }
 
 export async function deleteSubtask(subtaskId) {

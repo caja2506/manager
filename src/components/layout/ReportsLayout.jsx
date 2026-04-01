@@ -3,13 +3,14 @@ import PageHeader from './PageHeader';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useEngineeringData } from '../../hooks/useEngineeringData';
-import { Clock, FileText, BarChart3, LineChart } from 'lucide-react';
+import { Clock, FileText, BarChart3, LineChart, Activity } from 'lucide-react';
 
 const REPORT_TABS = [
     { to: '/work-logs', label: 'Registro Horas', icon: Clock },
     { to: '/reports/daily', label: 'Reporte Diario', icon: FileText },
     { to: '/reports/weekly', label: 'Reporte Semanal', icon: BarChart3 },
     { to: '/analytics', label: 'Analítica', icon: LineChart },
+    { to: '/reports/activity', label: 'Actividad', icon: Activity },
 ];
 
 export default function ReportsLayout() {

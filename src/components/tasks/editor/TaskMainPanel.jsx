@@ -9,6 +9,7 @@ import SubtaskList from '../SubtaskList';
 export default function TaskMainPanel({
     form, setForm, isNew, task,
     subtasks, canEdit, onSubtaskProgressChange,
+    userId, userName,
 }) {
     const totalSubtasks = (subtasks || []).length;
     const hasSubtasks = totalSubtasks > 0;
@@ -81,6 +82,8 @@ export default function TaskMainPanel({
                         taskId={task.id}
                         readOnly={!canEdit}
                         onProgressChange={onSubtaskProgressChange}
+                        userId={userId}
+                        userName={userName}
                     />
                 </div>
             )}

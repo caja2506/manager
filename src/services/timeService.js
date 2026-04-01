@@ -19,6 +19,7 @@ import {
 } from 'firebase/firestore';
 import { COLLECTIONS, createTimeLogDocument } from '../models/schemas';
 import { calculateProjectRisk } from './riskService';
+import { logActivity, ACTIVITY_TYPES } from './activityLogService';
 
 // ============================================================
 // ACTIVE TIMER — Firestore-based (no localStorage)
@@ -95,6 +96,17 @@ export async function startTimer({ taskId, projectId, userId, notes = '', overti
     });
     const ref = doc(collection(db, COLLECTIONS.TIME_LOGS));
     await setDoc(ref, logData);
+
+    // Log activity
+    if (taskId) {
+        logActivity(taskId, {
+            type: ACTIVITY_TYPES.TIMER_STARTED,
+            description: 'Timer iniciado',
+            userId,
+            meta: { logId: ref.id, notes },
+        });
+    }
+
     return { logId: ref.id, taskId, projectId, startTime: now, userId };
 }
 
@@ -157,6 +169,16 @@ export async function stopTimer(logId, { notes = '', overtime = false } = {}) {
         }
     } catch (err) {
         console.error('[timeService] Error stopping timer:', err);
+    }
+
+    // Log activity
+    if (logData.taskId) {
+        logActivity(logData.taskId, {
+            type: ACTIVITY_TYPES.TIMER_STOPPED,
+            description: `Timer detenido (${totalHours.toFixed(1)}h)`,
+            userId: logData.userId,
+            meta: { logId, totalHours, overtimeHours },
+        });
     }
 
     return { totalHours, overtimeHours, taskId: logData.taskId };

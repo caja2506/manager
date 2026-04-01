@@ -165,6 +165,14 @@ service cloud.firestore {
         && !request.resource.data.diff(resource.data).affectedKeys()
             .hasAny(['status', 'completedDate', 'completedAt', 'reopenedAt', 'reopenedBy', 'updatedBy']);
       allow delete: if isAdmin();
+
+      // --- activityLog (sub-collection) ---
+      // Timeline events for task activity tracking
+      match /activityLog/{logId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+        allow update, delete: if isAdmin();
+      }
     }
 
     // --- subtasks ---

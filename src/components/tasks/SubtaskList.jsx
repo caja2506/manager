@@ -15,7 +15,7 @@ import {
  * - onProgressChange callback for parent notification
  * - Dark theme color fixes
  */
-export default function SubtaskList({ subtasks = [], taskId, readOnly = false, onProgressChange }) {
+export default function SubtaskList({ subtasks = [], taskId, readOnly = false, onProgressChange, userId = null, userName = null }) {
     const [newTitle, setNewTitle] = useState('');
     const [editingId, setEditingId] = useState(null);
     const [editTitle, setEditTitle] = useState('');
@@ -64,7 +64,12 @@ export default function SubtaskList({ subtasks = [], taskId, readOnly = false, o
 
     // ── Toggle ──
     const handleToggle = async (subtask) => {
-        await toggleSubtask(subtask.id, !subtask.completed);
+        await toggleSubtask(subtask.id, !subtask.completed, {
+            taskId,
+            subtaskTitle: subtask.title,
+            userId,
+            userName,
+        });
     };
 
     // ── Delete ──
