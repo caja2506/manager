@@ -72,6 +72,14 @@ service cloud.firestore {
       allow read: if isAuthenticated();
     }
 
+    // ActivityLog: collectionGroup queries need explicit path matching
+    // This enables the cross-task activity timeline page
+    match /{path=**}/activityLog/{logId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
     // WeeklyPlanItems: authenticated users can fully manage their own planning blocks
     // This is placed at global level to ensure it overrides any potential conflicts
     match /weeklyPlanItems/{docId} {
