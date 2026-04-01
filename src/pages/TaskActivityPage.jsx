@@ -362,20 +362,23 @@ export default function TaskActivityPage() {
 
     // Progress chart data (built from logs with percentComplete in meta)
     const progressChartData = useMemo(() => {
-        if (!activeTaskId || !activityLogs.length) return [];
+        if (!activeTaskId || !activityLogs.length) return { points: [], todayLabel: '' };
         // Get all subtask events for the active task that have percentComplete
         const progressEvents = activityLogs
             .filter(l => l.taskId === activeTaskId && l.meta?.percentComplete != null)
             .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 
-        if (progressEvents.length === 0) return [];
+        if (progressEvents.length === 0) return { points: [], todayLabel: '' };
 
         const formatPoint = (d) =>
             `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
 
+        const formatDay = (d) =>
+            `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}`;
+
         // Always start from 0% (use task creation or 1 day before first event)
         const firstEventDate = new Date(progressEvents[0].timestamp);
-        const originDate = new Date(firstEventDate.getTime() - 24 * 60 * 60 * 1000); // 1 day before
+        const originDate = new Date(firstEventDate.getTime() - 24 * 60 * 60 * 1000);
 
         const points = [
             { name: formatPoint(originDate), progreso: 0, description: 'Inicio' },
@@ -386,8 +389,51 @@ export default function TaskActivityPage() {
             })),
         ];
 
-        return points;
-    }, [activeTaskId, activityLogs]);
+        // Add TODAY marker and future extension
+        const today = startOfDay(new Date());
+        const todayLabel = formatDay(today) + ' (HOY)';
+
+        // Find the task to get dueDate for future extension
+        const task = engTasks.find(t => t.id === activeTaskId);
+        const dueDate = task?.dueDate ? new Date(task.dueDate) : null;
+
+        // Determine chart end: dueDate or today+3, whichever is later
+        const futureEnd = dueDate && isBefore(addDays(today, 3), dueDate)
+            ? dueDate
+            : addDays(today, 3);
+
+        // Last known progress value
+        const lastProgress = points[points.length - 1]?.progreso ?? 0;
+        const lastEventDate = new Date(progressEvents[progressEvents.length - 1].timestamp);
+
+        // Add today point if last event is before today
+        if (isBefore(startOfDay(lastEventDate), today)) {
+            points.push({
+                name: todayLabel,
+                progreso: lastProgress,
+                description: 'Hoy',
+                isToday: true,
+            });
+        } else {
+            // Mark last point as today-ish for reference
+            points[points.length - 1].isToday = true;
+        }
+
+        // Add future empty points (null progreso so line doesn't extend)
+        const futureDays = eachDayOfInterval({ start: addDays(today, 1), end: futureEnd });
+        futureDays.forEach(day => {
+            const label = formatDay(day);
+            const isDue = dueDate && format(day, 'yyyy-MM-dd') === format(dueDate, 'yyyy-MM-dd');
+            points.push({
+                name: isDue ? label + ' (META)' : label,
+                progreso: null,
+                isFuture: true,
+                isDueDate: isDue,
+            });
+        });
+
+        return { points, todayLabel };
+    }, [activeTaskId, activityLogs, engTasks]);
 
     // Helpers
     const clearFilters = () => {
@@ -555,18 +601,18 @@ export default function TaskActivityPage() {
             )}
 
             {/* --- PROGRESS CHART (when a task is selected) --- */}
-            {activeTaskId && progressChartData.length > 0 && (
+            {activeTaskId && progressChartData.points.length > 0 && (
                 <div className="bg-slate-900/70 p-6 rounded-2xl border border-slate-800 shadow-lg">
                     <div className="flex items-center gap-2 mb-5">
                         <TrendingUp className="w-5 h-5 text-indigo-400" />
                         <h3 className="font-bold text-lg text-white">Avance en el Tiempo</h3>
                         <span className="text-[9px] font-bold text-indigo-400 bg-indigo-500/15 px-2 py-0.5 rounded-full">
-                            {progressChartData[progressChartData.length - 1]?.progreso ?? 0}% actual
+                            {progressChartData.points.filter(p => p.progreso != null).slice(-1)[0]?.progreso ?? 0}% actual
                         </span>
                     </div>
                     <div className="h-[250px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={progressChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <LineChart data={progressChartData.points} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                 <defs>
                                     <linearGradient id="colorProgress" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
@@ -578,9 +624,42 @@ export default function TaskActivityPage() {
                                 <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} unit="%" />
                                 <Tooltip
                                     contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 12, fontSize: 12, fontWeight: 700 }}
-                                    formatter={(val) => [`${val}%`, 'Progreso']}
+                                    formatter={(val) => val === null ? ['—', ''] : [`${val}%`, 'Progreso']}
                                 />
-                                <Line type="stepAfter" dataKey="progreso" stroke="#6366f1" strokeWidth={3} dot={{ fill: '#6366f1', r: 5 }} activeDot={{ r: 7 }} />
+
+                                {/* TODAY marker line */}
+                                {progressChartData.todayLabel && (
+                                    <ReferenceLine
+                                        x={progressChartData.todayLabel}
+                                        stroke="#f43f5e"
+                                        strokeWidth={2}
+                                        strokeDasharray="6 3"
+                                        label={{
+                                            value: 'HOY',
+                                            position: 'top',
+                                            fill: '#f43f5e',
+                                            fontSize: 11,
+                                            fontWeight: 'bold',
+                                        }}
+                                    />
+                                )}
+
+                                {/* 100% target line */}
+                                <ReferenceLine
+                                    y={100}
+                                    stroke="#22c55e"
+                                    strokeWidth={1}
+                                    strokeDasharray="4 4"
+                                    label={{
+                                        value: '100%',
+                                        position: 'right',
+                                        fill: '#22c55e',
+                                        fontSize: 10,
+                                        fontWeight: 'bold',
+                                    }}
+                                />
+
+                                <Line type="stepAfter" dataKey="progreso" stroke="#6366f1" strokeWidth={3} dot={{ fill: '#6366f1', r: 5 }} activeDot={{ r: 7 }} connectNulls={false} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
