@@ -97,9 +97,9 @@ export function getEvidenceYesterday(personId, tasks, timeLogs) {
         return logDate === yesterday;
     });
 
-    // Tasks that had time logged yesterday (derive from logs)
+    // Tasks that had time logged yesterday AND are assigned to this person
     const loggedTaskIds = new Set(yesterdayLogs.map(l => l.taskId).filter(Boolean));
-    const yesterdayTasks = tasks.filter(t => loggedTaskIds.has(t.id));
+    const yesterdayTasks = tasks.filter(t => loggedTaskIds.has(t.id) && t.assignedTo === personId);
 
     return {
         timeLogs: yesterdayLogs,
