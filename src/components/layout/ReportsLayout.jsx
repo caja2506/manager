@@ -1,9 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import PageHeader from './PageHeader';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useEngineeringData } from '../../hooks/useEngineeringData';
-import { Clock, FileText, BarChart3, LineChart, Activity } from 'lucide-react';
+import { Clock, FileText, BarChart3, LineChart, Activity, ArrowLeft } from 'lucide-react';
 
 const REPORT_TABS = [
     { to: '/work-logs', label: 'Registro Horas', icon: Clock },
@@ -17,6 +16,7 @@ export default function ReportsLayout() {
     const { user } = useAuth();
     const { teamMembers } = useEngineeringData();
     const location = useLocation();
+    const navigate = useNavigate();
 
     const [selectedUser, setSelectedUser] = useState(user?.uid || '');
 
@@ -27,45 +27,75 @@ export default function ReportsLayout() {
 
     const selectedMember = teamMembers.find(m => m.uid === selectedUser);
 
+    // Get initials for avatar
+    const initials = (() => {
+        const name = user?.displayName || user?.email || '?';
+        const parts = name.trim().split(/\s+/);
+        return parts.length >= 2
+            ? (parts[0][0] + parts[1][0]).toUpperCase()
+            : name[0].toUpperCase();
+    })();
+
     return (
-        <div className="space-y-5 animate-in fade-in duration-300">
-            <PageHeader title="" showBack={true} />
-            {/* Shared Banner */}
-            <div className="bg-slate-900/70 backdrop-blur-sm rounded-2xl border border-slate-800 shadow-lg overflow-hidden">
-                {/* Top row: Title + User Filter */}
-                <div className="flex flex-col md:flex-row justify-between gap-4 p-6 pb-4">
-                    <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 bg-emerald-600/20 border border-emerald-500/30 rounded-2xl flex items-center justify-center">
-                            <BarChart3 className="w-7 h-7 text-emerald-400" />
+        <div className="flex flex-col h-full animate-in fade-in duration-300">
+            {/* ── Main Banner Row — same style as TaskModuleBanner ── */}
+            <div className="shrink-0">
+                <div className="flex items-center justify-between px-3 md:px-6 py-3 md:py-4 bg-slate-900/90 backdrop-blur-md border-b border-slate-800/60">
+                    {/* Left: Back + Icon + Title + Stats */}
+                    <div className="flex items-center gap-2.5 md:gap-3.5 min-w-0">
+                        <button
+                            onClick={() => navigate(-1)}
+                            className="w-8 h-8 rounded-xl bg-slate-800/80 border border-slate-700/50 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 hover:border-slate-600 transition-all shrink-0"
+                            title="Volver"
+                        >
+                            <ArrowLeft className="w-4 h-4" />
+                        </button>
+                        <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                            <BarChart3 className="w-4 h-4 md:w-5 md:h-5 text-emerald-400" />
                         </div>
-                        <div>
-                            <h2 className="font-black text-2xl text-white tracking-tight">Reportes y Analítica</h2>
-                            <p className="text-sm text-slate-400 font-bold mt-1">
-                                {selectedMember?.displayName || selectedMember?.name || selectedMember?.email || 'Seleccionar usuario'}
+                        <div className="min-w-0">
+                            <h1 className="font-black text-base md:text-lg text-white tracking-tight leading-none truncate">
+                                Reportes y Analítica
+                            </h1>
+                            <p className="text-[10px] md:text-[11px] text-slate-400 font-medium mt-0.5 flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0" />
+                                <span className="truncate">
+                                    {selectedMember?.displayName || selectedMember?.name || selectedMember?.email || 'Seleccionar usuario'}
+                                </span>
                             </p>
                         </div>
                     </div>
 
-                    {/* User Filter — only on pages that don't have their own filters */}
-                    {!['/analytics', '/reports/activity'].includes(location.pathname) && (
-                        <div className="flex flex-col sm:flex-row gap-3 items-end md:items-center">
-                            <div className="bg-slate-800 border border-slate-700 rounded-xl flex items-center p-1.5 w-full sm:w-auto">
+                    {/* Right: User filter + Avatar */}
+                    <div className="flex items-center gap-2 shrink-0">
+                        {/* User Filter — only on pages that don't have their own filters */}
+                        {!['/analytics', '/reports/activity'].includes(location.pathname) && (
+                            <div className="bg-slate-800 border border-slate-700 rounded-xl flex items-center p-1 w-full sm:w-auto">
                                 <select
                                     value={selectedUser}
                                     onChange={e => setSelectedUser(e.target.value)}
-                                    className="bg-transparent border-none text-sm font-bold text-slate-200 py-1.5 px-3 focus:ring-0 cursor-pointer outline-none w-full"
+                                    className="bg-transparent border-none text-xs md:text-sm font-bold text-slate-200 py-1 px-2 focus:ring-0 cursor-pointer outline-none w-full"
                                 >
                                     {engineersAndTechs.map(m => (
                                         <option key={m.uid} value={m.uid}>{m.displayName || m.name || m.email}</option>
                                     ))}
                                 </select>
                             </div>
+                        )}
+
+                        {/* User avatar */}
+                        <div
+                            className="w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center text-[10px] md:text-[11px] font-bold ring-2 ring-emerald-500/40 cursor-pointer hover:ring-emerald-400/60 transition-all shrink-0 hidden sm:flex"
+                            style={{ background: 'linear-gradient(135deg, #d1fae5, #a7f3d0)', color: '#065f46' }}
+                            title={user?.displayName || user?.email}
+                        >
+                            {initials}
                         </div>
-                    )}
+                    </div>
                 </div>
 
-                {/* Tab Navigation */}
-                <div className="flex border-t border-slate-800 px-2">
+                {/* ── Tab Navigation — same style as TaskModuleBanner ── */}
+                <div className="flex items-center gap-0 px-3 md:px-6 bg-slate-900/70 border-b border-slate-800/50 overflow-x-auto scrollbar-none">
                     {REPORT_TABS.map(tab => {
                         const Icon = tab.icon;
                         const isActive = location.pathname === tab.to || location.pathname.startsWith(tab.to + '/');
@@ -73,13 +103,16 @@ export default function ReportsLayout() {
                             <NavLink
                                 key={tab.to}
                                 to={tab.to}
-                                className={`flex items-center gap-2 px-5 py-3.5 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${isActive
-                                        ? 'border-indigo-500 text-indigo-400'
-                                        : 'border-transparent text-slate-500 hover:text-slate-300 hover:border-slate-600'
+                                className={`relative flex items-center gap-1.5 px-3 md:px-4 py-2.5 md:py-3 text-xs md:text-sm font-semibold transition-colors whitespace-nowrap shrink-0 ${isActive
+                                    ? 'text-white'
+                                    : 'text-slate-500 hover:text-slate-300'
                                     }`}
                             >
-                                <Icon className="w-4 h-4" />
+                                <Icon className="w-3.5 h-3.5" />
                                 {tab.label}
+                                {isActive && (
+                                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500 rounded-t-full" />
+                                )}
                             </NavLink>
                         );
                     })}
@@ -87,7 +120,9 @@ export default function ReportsLayout() {
             </div>
 
             {/* Page Content — rendered by child route via Outlet */}
-            <Outlet context={{ selectedUser, selectedMember }} />
+            <div className="flex-1 overflow-y-auto p-3 md:p-5">
+                <Outlet context={{ selectedUser, selectedMember }} />
+            </div>
         </div>
     );
 }

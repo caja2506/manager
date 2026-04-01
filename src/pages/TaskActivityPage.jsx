@@ -497,72 +497,63 @@ export default function TaskActivityPage() {
     return (
         <div className="space-y-5 animate-in fade-in duration-300">
 
-            {/* --- FILTER BAR --- */}
-            <div className="bg-slate-900/70 backdrop-blur-sm rounded-2xl border border-slate-800 shadow-lg relative z-20">
-                <div className="flex items-center justify-between p-4 pb-0">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-emerald-600/20 border border-emerald-500/30 rounded-xl flex items-center justify-center">
-                            <Activity className="w-5 h-5 text-emerald-400" />
-                        </div>
-                        <div>
-                            <h2 className="font-black text-xl text-white tracking-tight">
-                                {focusedTask ? `Actividad: ${focusedTask.title}` : 'Actividad de Tareas'}
-                            </h2>
-                            <p className="text-[11px] text-slate-500 font-bold">
-                                {focusedTask ? 'Progreso y timeline de esta tarea' : 'Timeline de eventos · Click en barras o eventos para filtrar'}
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {selectedTaskId && !urlTaskId && (
-                            <button
-                                onClick={() => setSelectedTaskId(null)}
-                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 transition-all"
-                            >
-                                <X className="w-3 h-3" /> {focusedTask?.title?.substring(0, 20) || 'Tarea'}
-                            </button>
-                        )}
-                        {hasActiveFilters && (
-                            <button
-                                onClick={clearFilters}
-                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition-all"
-                            >
-                                <X className="w-3.5 h-3.5" /> Limpiar filtros
-                            </button>
-                        )}
-                    </div>
+            {/* --- FILTER BAR (compact toolbar) --- */}
+            <div className="flex flex-wrap items-center gap-3 relative z-20">
+                {/* Focused task label */}
+                {focusedTask && (
+                    <span className="text-sm font-black text-white bg-indigo-600/20 border border-indigo-500/30 px-3 py-1.5 rounded-xl truncate max-w-[200px]">
+                        {focusedTask.title}
+                    </span>
+                )}
+
+                {/* Active filter pills */}
+                <div className="flex items-center gap-2">
+                    {selectedTaskId && !urlTaskId && (
+                        <button
+                            onClick={() => setSelectedTaskId(null)}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 transition-all"
+                        >
+                            <X className="w-3 h-3" /> {focusedTask?.title?.substring(0, 20) || 'Tarea'}
+                        </button>
+                    )}
+                    {hasActiveFilters && (
+                        <button
+                            onClick={clearFilters}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition-all"
+                        >
+                            <X className="w-3.5 h-3.5" /> Limpiar filtros
+                        </button>
+                    )}
                 </div>
 
-                <div className="p-4 flex flex-wrap items-center gap-3">
-                    {/* Date Range */}
-                    <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-xl p-1 pl-3">
-                        <CalendarIcon className="w-4 h-4 text-slate-400 shrink-0" />
-                        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                            className="bg-transparent border-none text-sm font-bold text-slate-200 py-1 px-1 focus:ring-0 outline-none w-[120px]" />
-                        <span className="text-slate-500 text-xs font-bold">→</span>
-                        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-                            max={format(new Date(), 'yyyy-MM-dd')}
-                            className="bg-transparent border-none text-sm font-bold text-slate-200 py-1 px-1 focus:ring-0 outline-none w-[120px]" />
-                    </div>
+                {/* Date Range */}
+                <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-xl p-1 pl-3">
+                    <CalendarIcon className="w-4 h-4 text-slate-400 shrink-0" />
+                    <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                        className="bg-transparent border-none text-sm font-bold text-slate-200 py-1 px-1 focus:ring-0 outline-none w-[120px]" />
+                    <span className="text-slate-500 text-xs font-bold">→</span>
+                    <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                        max={format(new Date(), 'yyyy-MM-dd')}
+                        className="bg-transparent border-none text-sm font-bold text-slate-200 py-1 px-1 focus:ring-0 outline-none w-[120px]" />
+                </div>
 
-                    {/* Quick presets */}
-                    <div className="flex gap-1">
-                        {[{ label: '7d', days: 7 }, { label: '15d', days: 15 }, { label: '30d', days: 30 }, { label: '90d', days: 90 }].map(p => (
-                            <button key={p.days} onClick={() => applyPreset(p.days)}
-                                className="px-2.5 py-1 rounded-lg text-[11px] font-black text-slate-400 hover:text-indigo-300 hover:bg-indigo-500/10 transition-all">
-                                {p.label}
-                            </button>
-                        ))}
-                    </div>
+                {/* Quick presets */}
+                <div className="flex gap-1">
+                    {[{ label: '7d', days: 7 }, { label: '15d', days: 15 }, { label: '30d', days: 30 }, { label: '90d', days: 90 }].map(p => (
+                        <button key={p.days} onClick={() => applyPreset(p.days)}
+                            className="px-2.5 py-1 rounded-lg text-[11px] font-black text-slate-400 hover:text-indigo-300 hover:bg-indigo-500/10 transition-all">
+                            {p.label}
+                        </button>
+                    ))}
+                </div>
 
-                    <div className="w-px h-6 bg-slate-700" />
+                <div className="w-px h-6 bg-slate-700" />
 
-                    <MultiSelect icon={User} options={personOptions} selected={selectedPersons} onChange={setSelectedPersons} allLabel="Todas las personas" />
-                    <MultiSelect icon={FolderGit2} options={projectOptions} selected={selectedProjects} onChange={setSelectedProjects} allLabel="Todos los proyectos" />
+                <MultiSelect icon={User} options={personOptions} selected={selectedPersons} onChange={setSelectedPersons} allLabel="Todas las personas" />
+                <MultiSelect icon={FolderGit2} options={projectOptions} selected={selectedProjects} onChange={setSelectedProjects} allLabel="Todos los proyectos" />
 
-                    <div className="ml-auto text-[11px] text-slate-500 font-bold">
-                        {analytics?.totalEvents || 0} eventos
-                    </div>
+                <div className="ml-auto text-[11px] text-slate-500 font-bold">
+                    {analytics?.totalEvents || 0} eventos
                 </div>
             </div>
 
