@@ -16,7 +16,6 @@ import TaskDetailModal from '../components/tasks/TaskDetailModal';
 import TransitionConfirmModal from '../components/workflow/TransitionConfirmModal';
 import TaskModuleBanner from '../components/layout/TaskModuleBanner';
 import { useWorkflowTransition } from '../hooks/useWorkflowTransition';
-import { updateTaskStatus } from '../services/taskService';
 import { startTimer, stopTimer, getActiveTimerForTask, canManageOthersTimers } from '../services/timeService';
 import {
     TASK_STATUS, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG
@@ -348,6 +347,9 @@ export default function TaskManager() {
                                                     subtasks={engSubtasks.filter(s => s.taskId === task.id)}
                                                     timeLogs={timeLogs}
                                                     onClick={() => openTask(task)}
+                                                    currentUserId={user?.uid}
+                                                    userRole={role}
+                                                    userTeamRole={teamRole}
                                                 />
                                             ))
                                         )}
@@ -373,6 +375,9 @@ export default function TaskManager() {
                                 timeLogs={timeLogs}
                                 onClick={() => { }}
                                 isDragOverlay
+                                currentUserId={user?.uid}
+                                userRole={role}
+                                userTeamRole={teamRole}
                             />
                         </div>
                     ) : null}
@@ -398,6 +403,9 @@ export default function TaskManager() {
                                 subtasks={engSubtasks.filter(s => s.taskId === task.id)}
                                 timeLogs={timeLogs}
                                 onClick={() => openTask(task)}
+                                currentUserId={user?.uid}
+                                userRole={role}
+                                userTeamRole={teamRole}
                             />
                         ))}
                     </div>

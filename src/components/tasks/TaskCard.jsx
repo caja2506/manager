@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { formatDuration, getActiveTimerForTask, formatElapsed } from '../../services/timeService';
+import { formatDuration, getActiveTimerForTask, formatElapsed, startTimer, stopTimer, canManageOthersTimers } from '../../services/timeService';
 import {
     AlertTriangle, CheckCheck, User, Calendar, Clock,
-    GripVertical
+    GripVertical, Play, Square
 } from 'lucide-react';
 import {
     TASK_STATUS_CONFIG,
@@ -41,9 +41,9 @@ const PRIORITY_COLORS = {
 
 // ── Shared pill class for all tags ──
 const PILL = 'h-6 inline-flex items-center gap-1 px-2.5 rounded-full text-[10px] font-semibold border';
-const ICON = 'w-3 h-3 flex-shrink-0';
+const ICON = 'w-3 h-3 shrink-0';
 
-export default function TaskCard({ task, project, teamMembers, subtasks = [], onClick, isDragOverlay = false, timeLogs = [] }) {
+export default function TaskCard({ task, project, teamMembers, subtasks = [], onClick, isDragOverlay = false, timeLogs = [], currentUserId, userRole, userTeamRole }) {
     const {
         attributes, listeners, setNodeRef, transform, transition, isDragging,
     } = useSortable({
@@ -70,10 +70,12 @@ export default function TaskCard({ task, project, teamMembers, subtasks = [], on
 
     // Live Timer — detect from Firestore timeLogs
     const [liveElapsed, setLiveElapsed] = useState(null);
+    const [isTimerLoading, setIsTimerLoading] = useState(false);
+
+    const activeLog = getActiveTimerForTask(timeLogs, task.id);
 
     useEffect(() => {
         let interval;
-        const activeLog = getActiveTimerForTask(timeLogs, task.id);
         if (activeLog && activeLog.startTime) {
             const tick = () => setLiveElapsed(formatElapsed(activeLog.startTime));
             tick();
@@ -82,7 +84,46 @@ export default function TaskCard({ task, project, teamMembers, subtasks = [], on
             setLiveElapsed(null);
         }
         return () => clearInterval(interval);
-    }, [task.id, timeLogs]);
+    }, [activeLog]);
+
+    // Timer toggle handler
+    const handleTimerToggle = useCallback(async (e) => {
+        e.stopPropagation();
+        if (isTimerLoading || isDragOverlay) return;
+
+        const taskOwner = task.assignedTo;
+        const isSelf = taskOwner === currentUserId;
+        const canManage = canManageOthersTimers(userRole, userTeamRole);
+
+        if (!taskOwner) return;
+        if (!isSelf && !canManage) return;
+
+        setIsTimerLoading(true);
+        try {
+            if (activeLog) {
+                await stopTimer(activeLog.id);
+            } else {
+                await startTimer({
+                    taskId: task.id,
+                    projectId: task.projectId,
+                    userId: taskOwner,
+                    notes: 'Started from Kanban card',
+                    taskTitle: task.title || '',
+                    projectName: project?.name || '',
+                    displayName: assignee?.displayName || assignee?.email || '',
+                });
+            }
+        } catch (err) {
+            console.error('Timer toggle error:', err);
+        }
+        setIsTimerLoading(false);
+    }, [activeLog, task, project, assignee, currentUserId, userRole, userTeamRole, isTimerLoading, isDragOverlay]);
+
+    // Can the current user control this timer?
+    const canToggleTimer = task.assignedTo && (
+        task.assignedTo === currentUserId ||
+        canManageOthersTimers(userRole, userTeamRole)
+    );
 
     // ── Card class ──
     let cardCls = 'rounded-xl border p-3.5 transition-all duration-200 group cursor-grab active:cursor-grabbing relative';
@@ -92,6 +133,7 @@ export default function TaskCard({ task, project, teamMembers, subtasks = [], on
     if (isDragging) cardCls += ' shadow-2xl ring-2 ring-indigo-400 scale-[1.03] z-50';
     else if (isDragOverlay) cardCls += ' shadow-2xl ring-2 ring-indigo-400 rotate-[2deg]';
     if (isOverdue) cardCls += ' border-red-500/40 shadow-red-500/10';
+    if (activeLog) cardCls += ' ring-1 ring-emerald-500/30';
 
     // ── Initials helper ──
     const getInitials = (member) => {
@@ -126,7 +168,7 @@ export default function TaskCard({ task, project, teamMembers, subtasks = [], on
                             color: pColor.text,
                         }}
                     >
-                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: pColor.dot }} />
+                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: pColor.dot }} />
                         {(priorityConfig.label || 'Media').toUpperCase()}
                     </span>
                 </div>
@@ -160,8 +202,8 @@ export default function TaskCard({ task, project, teamMembers, subtasks = [], on
                     <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
                         <div
                             className={`h-full rounded-full transition-all duration-500 ${subtaskProgress === 100
-                                ? 'bg-gradient-to-r from-emerald-400 to-green-500'
-                                : 'bg-gradient-to-r from-indigo-500 to-blue-500'
+                                ? 'bg-linear-to-r from-emerald-400 to-green-500'
+                                : 'bg-linear-to-r from-indigo-500 to-blue-500'
                                 }`}
                             style={{ width: `${subtaskProgress}%` }}
                         />
@@ -169,22 +211,44 @@ export default function TaskCard({ task, project, teamMembers, subtasks = [], on
                 </div>
             )}
 
-            {/* ── Row 3: Avatar + Tags ── */}
+            {/* ── Row 3: Avatar + Timer Button + Tags ── */}
             <div className="flex items-center justify-between pt-2.5 border-t border-slate-700/40">
-                {/* Avatar */}
-                {assignee ? (
-                    <div
-                        className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold ring-2 ring-amber-500/30 flex-shrink-0"
-                        style={{ background: 'linear-gradient(135deg, #fef3c7, #fde68a)', color: '#b45309' }}
-                        title={assignee.displayName || assignee.email}
-                    >
-                        {getInitials(assignee)}
-                    </div>
-                ) : (
-                    <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center ring-2 ring-slate-700 flex-shrink-0">
-                        <User className="w-3 h-3 text-slate-500" />
-                    </div>
-                )}
+                {/* Avatar + Timer toggle */}
+                <div className="flex items-center gap-1.5">
+                    {assignee ? (
+                        <div
+                            className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold ring-2 ring-amber-500/30 shrink-0"
+                            style={{ background: 'linear-gradient(135deg, #fef3c7, #fde68a)', color: '#b45309' }}
+                            title={assignee.displayName || assignee.email}
+                        >
+                            {getInitials(assignee)}
+                        </div>
+                    ) : (
+                        <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center ring-2 ring-slate-700 shrink-0">
+                            <User className="w-3 h-3 text-slate-500" />
+                        </div>
+                    )}
+
+                    {/* Timer Toggle Button */}
+                    {canToggleTimer && !isDragOverlay && (
+                        <button
+                            onClick={handleTimerToggle}
+                            disabled={isTimerLoading}
+                            className={`w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90 shrink-0 ${
+                                activeLog
+                                    ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 ring-1 ring-red-500/30'
+                                    : 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 ring-1 ring-emerald-500/25 opacity-0 group-hover:opacity-100'
+                            } ${isTimerLoading ? 'animate-pulse' : ''}`}
+                            title={activeLog ? 'Detener timer' : 'Iniciar timer'}
+                        >
+                            {activeLog ? (
+                                <Square className="w-2.5 h-2.5 fill-current" />
+                            ) : (
+                                <Play className="w-2.5 h-2.5 fill-current ml-0.5" />
+                            )}
+                        </button>
+                    )}
+                </div>
 
                 {/* Tags */}
                 <div className="flex items-center gap-1.5">
@@ -227,10 +291,11 @@ export default function TaskCard({ task, project, teamMembers, subtasks = [], on
             {/* ── Blocked ── */}
             {task.status === 'blocked' && task.blockedReason && (
                 <div className="mt-2.5 bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2 flex items-start gap-2">
-                    <AlertTriangle className="w-3 h-3 text-red-400 flex-shrink-0 mt-0.5" />
+                    <AlertTriangle className="w-3 h-3 text-red-400 shrink-0 mt-0.5" />
                     <span className="text-[10px] text-red-300 font-semibold leading-tight">{task.blockedReason}</span>
                 </div>
             )}
         </div>
     );
 }
+
