@@ -64,6 +64,7 @@ const SECTIONS = [
             { to: '/reports/daily', label: 'Reporte Diario', icon: FileText },
             { to: '/reports/weekly', label: 'Reporte Semanal', icon: BarChart3 },
             { to: '/analytics', label: 'Analítica', icon: LineChart },
+            { to: '/reports/activity', label: 'Actividad', icon: Activity },
         ],
     },
     {
