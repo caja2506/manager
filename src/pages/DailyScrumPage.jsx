@@ -42,14 +42,39 @@ const ROLE_CONFIG = {
 const DEFAULT_ROLE = { label: 'Sin rol', gradient: 'from-slate-500 to-slate-600', badge: 'bg-slate-500/20 text-slate-400 border-slate-500/30' };
 
 // ─── Summary Card ───
-function SummaryCard({ icon: Icon, label, value, color, alert }) {
+const COLOR_MAP = {
+    indigo: { bg: 'rgba(99,102,241,0.1)', border: 'rgba(99,102,241,0.6)', shadow: 'rgba(99,102,241,0.1)', text: '#818cf8' },
+    emerald: { bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.6)', shadow: 'rgba(16,185,129,0.1)', text: '#34d399' },
+    amber: { bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.6)', shadow: 'rgba(245,158,11,0.1)', text: '#fbbf24' },
+    rose: { bg: 'rgba(244,63,94,0.1)', border: 'rgba(244,63,94,0.6)', shadow: 'rgba(244,63,94,0.1)', text: '#fb7185' },
+};
+
+function SummaryCard({ icon: Icon, label, value, color, alert, active, onClick }) {
+    const c = COLOR_MAP[color] || COLOR_MAP.indigo;
     return (
-        <div className={`bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 ${alert ? 'border-rose-500/40 bg-rose-500/5' : ''}`}>
+        <div
+            onClick={onClick}
+            className={`rounded-xl p-4 cursor-pointer transition-all duration-200 select-none
+                ${active
+                    ? 'border-2 scale-[1.02]'
+                    : 'bg-slate-800/60 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80'
+                }
+                ${alert && !active ? 'border-rose-500/40 bg-rose-500/5' : ''}
+            `}
+            style={active ? {
+                backgroundColor: c.bg,
+                borderColor: c.border,
+                boxShadow: `0 10px 15px -3px ${c.shadow}`,
+            } : undefined}
+        >
             <div className="flex items-center gap-2 mb-1">
                 <Icon className={`w-4 h-4 text-${color}-400`} />
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">{label}</span>
             </div>
-            <p className={`text-2xl font-black ${alert ? 'text-rose-400' : 'text-white'}`}>{value}</p>
+            <p
+                className={`text-2xl font-black ${!active && alert ? 'text-rose-400' : !active ? 'text-white' : ''}`}
+                style={active ? { color: c.text } : undefined}
+            >{value}</p>
         </div>
     );
 }
@@ -316,6 +341,7 @@ export default function DailyScrumPage() {
     const [loading, setLoading] = useState(true);
     const [reassigning, setReassigning] = useState(null);
     const [refreshKey, setRefreshKey] = useState(0);
+    const [statusFilter, setStatusFilter] = useState(null);
 
     // Load assignments
     useEffect(() => {
@@ -387,12 +413,39 @@ export default function DailyScrumPage() {
 
             {/* ─── Summary Cards ─── */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                <SummaryCard icon={Users} label="Total" value={summary.total} color="indigo" />
-                <SummaryCard icon={CheckCircle2} label="OK" value={summary.ok} color="emerald" />
-                <SummaryCard icon={Activity} label="Sin tareas" value={summary.sin_tareas} color="amber" alert={summary.sin_tareas > 0} />
-                <SummaryCard icon={AlertTriangle} label="Sin reporte" value={summary.sin_reporte} color="rose" alert={summary.sin_reporte > 0} />
-                <SummaryCard icon={Shield} label="Bloqueados" value={summary.bloqueado} color="rose" alert={summary.bloqueado > 0} />
+                <SummaryCard icon={Users} label="Total" value={summary.total} color="indigo"
+                    active={statusFilter === null}
+                    onClick={() => setStatusFilter(null)} />
+                <SummaryCard icon={CheckCircle2} label="OK" value={summary.ok} color="emerald"
+                    active={statusFilter === 'ok'}
+                    onClick={() => setStatusFilter(f => f === 'ok' ? null : 'ok')} />
+                <SummaryCard icon={Activity} label="Sin tareas" value={summary.sin_tareas} color="amber"
+                    alert={summary.sin_tareas > 0}
+                    active={statusFilter === 'sin_tareas'}
+                    onClick={() => setStatusFilter(f => f === 'sin_tareas' ? null : 'sin_tareas')} />
+                <SummaryCard icon={AlertTriangle} label="Sin reporte" value={summary.sin_reporte} color="rose"
+                    alert={summary.sin_reporte > 0}
+                    active={statusFilter === 'sin_reporte'}
+                    onClick={() => setStatusFilter(f => f === 'sin_reporte' ? null : 'sin_reporte')} />
+                <SummaryCard icon={Shield} label="Bloqueados" value={summary.bloqueado} color="rose"
+                    alert={summary.bloqueado > 0}
+                    active={statusFilter === 'bloqueado'}
+                    onClick={() => setStatusFilter(f => f === 'bloqueado' ? null : 'bloqueado')} />
             </div>
+
+            {/* Active filter indicator */}
+            {statusFilter && (
+                <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-500">Filtrando por:</span>
+                    <button
+                        onClick={() => setStatusFilter(null)}
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-bold hover:bg-indigo-500/20 transition-colors"
+                    >
+                        {statusFilter === 'ok' ? '✅ OK' : statusFilter === 'sin_tareas' ? '⚡ Sin tareas' : statusFilter === 'sin_reporte' ? '⚠️ Sin reporte' : '🛡️ Bloqueados'}
+                        <X className="w-3 h-3" />
+                    </button>
+                </div>
+            )}
 
             {/* ─── Loading ─── */}
             {loading && (
@@ -404,7 +457,9 @@ export default function DailyScrumPage() {
             {/* ─── Person Cards Grid ─── */}
             {!loading && (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                    {scrumData.map(person => (
+                    {scrumData
+                        .filter(person => !statusFilter || person.status === statusFilter)
+                        .map(person => (
                         <PersonCard
                             key={person.uid}
                             person={person}
