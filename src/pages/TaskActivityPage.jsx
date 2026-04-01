@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useEngineeringData } from '../hooks/useEngineeringData';
+import { useRole } from '../contexts/RoleContext';
 import { fetchAllActivityLogs, fetchTaskActivityLog, updateActivityLog, deleteActivityLog } from '../services/activityLogService';
 import {
     AreaChart, Area, BarChart, Bar, LineChart, Line, Cell,
@@ -130,6 +131,8 @@ function MultiSelect({ icon: Icon, options, selected, onChange, allLabel = 'Todo
 
 export default function TaskActivityPage() {
     const { engProjects, engTasks, teamMembers } = useEngineeringData();
+    const { role } = useRole();
+    const isAdmin = role === 'admin';
     const [searchParams, setSearchParams] = useSearchParams();
     const urlTaskId = searchParams.get('taskId');
 
@@ -880,7 +883,7 @@ export default function TaskActivityPage() {
                                                             </>
                                                         )}
                                                     </div>
-                                                    {!isEditing && (
+                                                    {!isEditing && isAdmin && (
                                                         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                                                             <button onClick={() => startEditing(log)}
                                                                 className="p-1 text-slate-500 hover:text-indigo-400 transition-colors" title="Editar">
