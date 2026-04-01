@@ -125,15 +125,22 @@ export default function TaskActivityPage() {
                 l.id === editingLog.id ? { ...l, description: editingLog.description, userName: editingLog.userName, userId: editingLog.userId } : l
             ));
             setEditingLog(null);
-        } catch { /* ignore */ }
+        } catch (err) {
+            console.error('[ActivityPage] Failed to save edit:', err);
+            alert('Error al guardar: ' + err.message);
+        }
     };
 
     const handleDelete = async (log) => {
-        if (!confirm(`¿Eliminar este evento?\n"${log.description}"`)) return;
+        if (!window.confirm(`¿Eliminar este evento?\n"${log.description}"`)) return;
+        console.log('[ActivityPage] Deleting log:', { taskId: log.taskId, logId: log.id, log });
         try {
             await deleteActivityLog(log.taskId, log.id);
             setActivityLogs(prev => prev.filter(l => l.id !== log.id));
-        } catch { /* ignore */ }
+        } catch (err) {
+            console.error('[ActivityPage] Failed to delete:', err);
+            alert('Error al eliminar: ' + err.message);
+        }
     };
 
     // Fetch activity logs when date range changes
