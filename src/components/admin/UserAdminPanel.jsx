@@ -10,6 +10,7 @@ import {
     updateUserDisplayName,
     removeRbacUser,
     registerOrphanUser,
+    removeOrphanUser,
 } from '../../services/userAdminService';
 import { Shield, Trash2, X, Search, Users, ShieldCheck, Pencil, Check, UserPlus } from 'lucide-react';
 
@@ -140,6 +141,22 @@ export default function UserAdminPanel({ onClose }) {
         } catch (err) {
             console.error('Error registering orphan user:', err);
         }
+    };
+
+    // ── Remove orphan user completely ──
+    const handleRemoveOrphan = (u) => {
+        setConfirmAction({
+            title: `¿Eliminar a ${u.displayName || u.email} por completo?`,
+            message: 'Se eliminará de la colección de usuarios. Esta acción no se puede deshacer.',
+            onConfirm: async () => {
+                try {
+                    await removeOrphanUser(u.uid);
+                } catch (err) {
+                    console.error('Error removing orphan user:', err);
+                }
+                setConfirmAction(null);
+            },
+        });
     };
 
     // ── Orphan users: exist in users/ but missing from users_roles ──
@@ -387,13 +404,22 @@ export default function UserAdminPanel({ onClose }) {
                                         <div className="text-[11px] text-slate-400">{u.email}</div>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => handleRegisterOrphan(u.uid)}
-                                    className="flex items-center gap-1.5 px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-xl text-xs font-bold transition-all active:scale-95 border border-amber-500/30"
-                                >
-                                    <UserPlus className="w-3.5 h-3.5" />
-                                    Agregar a RBAC
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => handleRegisterOrphan(u.uid)}
+                                        className="flex items-center gap-1.5 px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-xl text-xs font-bold transition-all active:scale-95 border border-amber-500/30"
+                                    >
+                                        <UserPlus className="w-3.5 h-3.5" />
+                                        Agregar a RBAC
+                                    </button>
+                                    <button
+                                        onClick={() => handleRemoveOrphan(u)}
+                                        className="p-2 text-red-500 bg-red-500/15 rounded-lg hover:bg-red-500/25 transition-all active:scale-90"
+                                        title="Eliminar usuario por completo"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>

@@ -96,3 +96,17 @@ export async function registerOrphanUser(uid, profileData, role = 'viewer') {
         createdAt: new Date().toISOString(),
     });
 }
+
+/**
+ * Fully remove an orphan user from the system.
+ * Deletes from both `users` and `users_roles` collections.
+ * @param {string} uid
+ */
+export async function removeOrphanUser(uid) {
+    // Delete from users collection (profile)
+    await deleteDoc(doc(db, COLLECTIONS.USERS, uid));
+    // Also delete from users_roles if it exists (safety cleanup)
+    try {
+        await deleteDoc(doc(db, 'users_roles', uid));
+    } catch { /* may not exist */ }
+}
