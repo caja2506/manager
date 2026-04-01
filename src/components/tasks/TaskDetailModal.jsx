@@ -198,12 +198,13 @@ export default function TaskDetailModal({
         setForm(f => ({ ...f, status: newStatus }));
         await updateTaskStatus(task.id, newStatus, task.projectId || form.projectId);
 
-        // Log the status change
+        // Log the status change (use task assignee, not logged-in user)
+        const taskAssignee = form.assignedTo || task?.assignedTo;
         logActivity(task.id, {
             type: ACTIVITY_TYPES.STATUS_CHANGED,
             description: `Estado: ${oldStatus} → ${newStatus}`,
-            userId,
-            userName: teamMembers?.find(m => m.uid === userId)?.displayName || null,
+            userId: taskAssignee,
+            userName: teamMembers?.find(m => m.uid === taskAssignee)?.displayName || null,
             meta: { from: oldStatus, to: newStatus },
         });
 
@@ -315,8 +316,8 @@ export default function TaskDetailModal({
                         task={task}
                         subtasks={subtasks}
                         canEdit={canEdit}
-                        userId={userId}
-                        userName={teamMembers?.find(m => m.uid === userId)?.displayName || null}
+                        userId={form.assignedTo || task?.assignedTo}
+                        userName={teamMembers?.find(m => m.uid === (form.assignedTo || task?.assignedTo))?.displayName || null}
                     />
 
                     {/* Right: Control */}
