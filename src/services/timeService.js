@@ -82,7 +82,7 @@ export function canManageOthersTimers(role, teamRole) {
  *
  * @returns {Object} — { logId, taskId, projectId, startTime, userId }
  */
-export async function startTimer({ taskId, projectId, userId, notes = '', overtime = false }) {
+export async function startTimer({ taskId, projectId, userId, notes = '', overtime = false, taskTitle = '', projectName = '', displayName = '' }) {
     const now = new Date().toISOString();
     const logData = createTimeLogDocument({
         taskId,
@@ -93,6 +93,9 @@ export async function startTimer({ taskId, projectId, userId, notes = '', overti
         totalHours: 0,
         overtime,
         notes,
+        taskTitle,
+        projectName,
+        displayName,
     });
     const ref = doc(collection(db, COLLECTIONS.TIME_LOGS));
     await setDoc(ref, logData);

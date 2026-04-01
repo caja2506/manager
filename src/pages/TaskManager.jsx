@@ -194,7 +194,15 @@ export default function TaskManager() {
                 if (taskOwner && (isSelf || canManageOthers)) {
                     const existingTimer = getActiveTimerForTask(timeLogs, taskId);
                     if (!existingTimer) {
-                        await startTimer({ taskId, projectId: task.projectId, userId: taskOwner, notes: 'Auto-started from Kanban' });
+                        const proj = engProjects.find(p => p.id === task.projectId);
+                        const owner = teamMembers.find(m => (m.uid || m.id) === taskOwner);
+                        await startTimer({
+                            taskId, projectId: task.projectId, userId: taskOwner,
+                            notes: 'Auto-started from Kanban',
+                            taskTitle: task.title || '',
+                            projectName: proj?.name || '',
+                            displayName: owner?.displayName || owner?.email || '',
+                        });
                     }
                 }
             } else if (task.status === TASK_STATUS.IN_PROGRESS && targetStatus !== TASK_STATUS.IN_PROGRESS) {
@@ -208,7 +216,7 @@ export default function TaskManager() {
         } catch (err) {
             console.error('Error updating task status:', err);
         }
-    }, [engTasks, canEdit, user, requestTransition, role, teamRole, timeLogs]);
+    }, [engTasks, engProjects, teamMembers, canEdit, user, requestTransition, role, teamRole, timeLogs]);
 
     const handleDragCancel = useCallback(() => {
         setActiveId(null);

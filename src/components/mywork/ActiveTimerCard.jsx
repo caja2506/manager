@@ -67,10 +67,10 @@ export default function ActiveTimerCard({ tasks, allTasks, projects, userId, tim
 
     const lookupTasks = allTasks || tasks;
     const activeTaskName = activeTimer?.taskId
-        ? (lookupTasks?.find(t => t.id === activeTimer.taskId)?.title || 'Tarea desconocida')
+        ? (lookupTasks?.find(t => t.id === activeTimer.taskId)?.title || activeTimer.taskTitle || 'Tarea desconocida')
         : null;
     const activeProjectName = activeTimer?.projectId
-        ? (projects?.find(p => p.id === activeTimer.projectId)?.name || 'Proyecto')
+        ? (projects?.find(p => p.id === activeTimer.projectId)?.name || activeTimer.projectName || 'Proyecto')
         : null;
 
     return (

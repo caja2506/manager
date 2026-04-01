@@ -92,8 +92,8 @@ export default function WorkLogs() {
     }, [myWeekLogs]);
 
     // --- Helpers ---
-    const getTaskName = (taskId) => engTasks.find(t => t.id === taskId)?.title || '';
-    const getProjectName = (projectId) => engProjects.find(p => p.id === projectId)?.name || '';
+    const getTaskName = (taskId, log) => engTasks.find(t => t.id === taskId)?.title || log?.taskTitle || '';
+    const getProjectName = (projectId, log) => engProjects.find(p => p.id === projectId)?.name || log?.projectName || '';
     const getPersonName = (log) => {
         const member = teamMembers?.find(m => m.uid === log.userId || m.id === log.userId);
         if (member?.name) return member.name;
@@ -290,7 +290,7 @@ export default function WorkLogs() {
                                                             className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg flex items-center gap-1 truncate max-w-[200px] hover:bg-indigo-100 hover:ring-1 hover:ring-indigo-300 transition-all cursor-pointer"
                                                             title="Abrir tarea"
                                                         >
-                                                            <ListTodo className="w-3 h-3 flex-shrink-0" /> {getTaskName(log.taskId)}
+                                                            <ListTodo className="w-3 h-3 shrink-0" /> {getTaskName(log.taskId, log)}
                                                         </button>
                                                     )}
                                                     {!log.taskId && !isRunning && (
@@ -301,7 +301,7 @@ export default function WorkLogs() {
                                                             onClick={(e) => e.stopPropagation()}
                                                             className="text-[10px] font-bold text-purple-500 bg-purple-50 px-2 py-0.5 rounded-lg flex items-center gap-1 truncate max-w-[150px]"
                                                         >
-                                                            <FolderGit2 className="w-3 h-3 flex-shrink-0" /> {getProjectName(log.projectId)}
+                                                            <FolderGit2 className="w-3 h-3 shrink-0" /> {getProjectName(log.projectId, log)}
                                                         </span>
                                                     )}
                                                     {log.overtime && (

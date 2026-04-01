@@ -275,7 +275,15 @@ export default function TaskDetailModal({
             if (taskOwner && (isSelf || canManageOthers)) {
                 const existingTimer = getActiveTimerForTask(timeLogs, task.id);
                 if (!existingTimer) {
-                    await startTimer({ taskId: task.id, projectId: task.projectId || form.projectId, userId: taskOwner, notes: 'Auto-started in detail modal' });
+                    const proj = projects?.find(p => p.id === (task.projectId || form.projectId));
+                    const owner = teamMembers?.find(m => (m.uid || m.id) === taskOwner);
+                    await startTimer({
+                        taskId: task.id, projectId: task.projectId || form.projectId, userId: taskOwner,
+                        notes: 'Auto-started in detail modal',
+                        taskTitle: form.title || task.title || '',
+                        projectName: proj?.name || '',
+                        displayName: owner?.displayName || owner?.email || '',
+                    });
                 }
             }
         } else if (oldStatus === TASK_STATUS.IN_PROGRESS && newStatus !== TASK_STATUS.IN_PROGRESS) {

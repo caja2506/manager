@@ -179,8 +179,8 @@ function ActiveTimerRow({ log, teamMembers, tasks, projects }) {
     // Resolve names
     const member = teamMembers?.find(m => m.uid === log.userId || m.id === log.userId);
     const userName = member?.displayName || member?.name || member?.email?.split('@')[0] || 'Usuario';
-    const taskName = log.taskId ? tasks?.find(t => t.id === log.taskId)?.title : null;
-    const projectName = log.projectId ? projects?.find(p => p.id === log.projectId)?.name : null;
+    const taskName = log.taskId ? (tasks?.find(t => t.id === log.taskId)?.title || log.taskTitle || null) : null;
+    const projectName = log.projectId ? (projects?.find(p => p.id === log.projectId)?.name || log.projectName || null) : null;
 
     // Elapsed hours for warning
     const elapsedHours = parseInt(elapsed.split(':')[0] || '0');

@@ -69,10 +69,10 @@ export default function ActiveTimer({
 
     // Resolve task/project names
     const activeTaskName = activeTimer?.taskId
-        ? (tasks.find(t => t.id === activeTimer.taskId)?.title || 'Tarea')
+        ? (tasks.find(t => t.id === activeTimer.taskId)?.title || activeTimer.taskTitle || 'Tarea')
         : null;
     const activeProjectName = activeTimer?.projectId
-        ? (projects.find(p => p.id === activeTimer.projectId)?.name || 'Proyecto')
+        ? (projects.find(p => p.id === activeTimer.projectId)?.name || activeTimer.projectName || 'Proyecto')
         : null;
 
     // Parse elapsed for color coding
