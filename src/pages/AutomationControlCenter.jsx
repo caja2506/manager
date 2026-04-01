@@ -370,9 +370,6 @@ export default function AutomationControlCenter() {
     return (
         <div className="p-6 max-w-7xl mx-auto">
             <PageHeader title="" showBack={true} />
-            <div className="mb-6">
-                <DayScheduleSettings />
-            </div>
             <AutomationControlShell
                 coreConfig={coreConfig}
                 telegramConfig={telegramConfig}
@@ -398,6 +395,9 @@ export default function AutomationControlCenter() {
                 onOptimizationScan={handleOptimizationScan}
                 onSimulate={handleSimulateFromOpportunity}
             />
+            <div className="mt-6">
+                <DayScheduleSettings />
+            </div>
         </div>
     );
 }
