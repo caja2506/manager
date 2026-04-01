@@ -107,7 +107,7 @@ export default function TaskActivityPage() {
     const [editingLog, setEditingLog] = useState(null); // { id, taskId, description, userName }
 
     const startEditing = (log) => {
-        setEditingLog({ id: log.id, taskId: log.taskId, description: log.description || '', userName: log.userName || '' });
+        setEditingLog({ id: log.id, taskId: log.taskId, description: log.description || '', userName: log.userName || '', userId: log.userId || '' });
     };
 
     const cancelEditing = () => setEditingLog(null);
@@ -118,10 +118,11 @@ export default function TaskActivityPage() {
             await updateActivityLog(editingLog.taskId, editingLog.id, {
                 description: editingLog.description,
                 userName: editingLog.userName,
+                userId: editingLog.userId,
             });
             // Update local state
             setActivityLogs(prev => prev.map(l =>
-                l.id === editingLog.id ? { ...l, description: editingLog.description, userName: editingLog.userName } : l
+                l.id === editingLog.id ? { ...l, description: editingLog.description, userName: editingLog.userName, userId: editingLog.userId } : l
             ));
             setEditingLog(null);
         } catch { /* ignore */ }
@@ -505,12 +506,26 @@ export default function TaskActivityPage() {
                                                                     className="w-full px-2 py-1 bg-slate-800 border border-indigo-500 rounded text-sm text-slate-200 outline-none"
                                                                     placeholder="Descripción"
                                                                 />
-                                                                <input
-                                                                    value={editingLog.userName}
-                                                                    onChange={e => setEditingLog(prev => ({ ...prev, userName: e.target.value }))}
-                                                                    className="w-full px-2 py-1 bg-slate-800 border border-slate-600 rounded text-xs text-slate-300 outline-none"
-                                                                    placeholder="Nombre de persona"
-                                                                />
+                                                                <select
+                                                                    value={editingLog.userId}
+                                                                    onChange={e => {
+                                                                        const uid = e.target.value;
+                                                                        const member = teamMembers?.find(m => (m.uid || m.id) === uid);
+                                                                        setEditingLog(prev => ({
+                                                                            ...prev,
+                                                                            userId: uid,
+                                                                            userName: member?.displayName || member?.name || ''
+                                                                        }));
+                                                                    }}
+                                                                    className="w-full px-2 py-1 bg-slate-800 border border-slate-600 rounded text-xs text-slate-300 outline-none cursor-pointer"
+                                                                >
+                                                                    <option value="">— Seleccionar persona —</option>
+                                                                    {(teamMembers || []).map(m => (
+                                                                        <option key={m.uid || m.id} value={m.uid || m.id}>
+                                                                            {m.displayName || m.name || m.email?.split('@')[0] || 'Sin nombre'}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
                                                                 <div className="flex gap-1">
                                                                     <button onClick={saveEdit}
                                                                         className="px-2 py-0.5 bg-emerald-600 text-white text-[10px] font-bold rounded hover:bg-emerald-500 flex items-center gap-1">
