@@ -186,14 +186,13 @@ export default function TaskDetailModal({
                 await updateTask(task.id, data);
 
                 // ── Detect and log field changes ──
-                const taskAssignee = form.assignedTo || task?.assignedTo;
-                const assigneeName = teamMembers?.find(m => m.uid === taskAssignee)?.displayName || null;
+                const loggedInUserName = teamMembers?.find(m => m.uid === userId)?.displayName || null;
 
                 if (form.priority !== task.priority) {
                     logActivity(task.id, {
                         type: ACTIVITY_TYPES.PRIORITY_CHANGED,
                         description: `Prioridad: ${task.priority} → ${form.priority}`,
-                        userId: taskAssignee, userName: assigneeName,
+                        userId, userName: loggedInUserName,
                         meta: { from: task.priority, to: form.priority },
                     });
                 }
@@ -203,7 +202,7 @@ export default function TaskDetailModal({
                     logActivity(task.id, {
                         type: ACTIVITY_TYPES.ASSIGNEE_CHANGED,
                         description: `Reasignado: ${fromName} → ${toName}`,
-                        userId: taskAssignee, userName: assigneeName,
+                        userId, userName: loggedInUserName,
                         meta: { fromUser: task.assignedTo, toUser: form.assignedTo, fromName, toName },
                     });
                 }
@@ -211,7 +210,7 @@ export default function TaskDetailModal({
                     logActivity(task.id, {
                         type: ACTIVITY_TYPES.DUE_DATE_CHANGED,
                         description: `Fecha límite: ${task.dueDate?.substring(0, 10) || '—'} → ${form.dueDate || '—'}`,
-                        userId: taskAssignee, userName: assigneeName,
+                        userId, userName: loggedInUserName,
                         meta: { from: task.dueDate?.substring(0, 10) || null, to: form.dueDate || null },
                     });
                 }
@@ -219,7 +218,7 @@ export default function TaskDetailModal({
                     logActivity(task.id, {
                         type: ACTIVITY_TYPES.TITLE_CHANGED,
                         description: `Título: "${task.title}" → "${form.title}"`,
-                        userId: taskAssignee, userName: assigneeName,
+                        userId, userName: loggedInUserName,
                         meta: { from: task.title, to: form.title },
                     });
                 }
@@ -227,7 +226,7 @@ export default function TaskDetailModal({
                     logActivity(task.id, {
                         type: ACTIVITY_TYPES.DESCRIPTION_CHANGED,
                         description: 'Descripción actualizada',
-                        userId: taskAssignee, userName: assigneeName,
+                        userId, userName: loggedInUserName,
                     });
                 }
             }
@@ -244,14 +243,13 @@ export default function TaskDetailModal({
         setForm(f => ({ ...f, status: newStatus }));
         await updateTaskStatus(task.id, newStatus, task.projectId || form.projectId);
 
-        // Log the status change (use task assignee, not logged-in user)
-        const taskAssignee = form.assignedTo || task?.assignedTo;
-        const assigneeName = teamMembers?.find(m => m.uid === taskAssignee)?.displayName || null;
+        // Log the status change (who made the change, not the assignee)
+        const loggedInUserName = teamMembers?.find(m => m.uid === userId)?.displayName || null;
         logActivity(task.id, {
             type: ACTIVITY_TYPES.STATUS_CHANGED,
             description: `Estado: ${oldStatus} → ${newStatus}`,
-            userId: taskAssignee,
-            userName: assigneeName,
+            userId,
+            userName: loggedInUserName,
             meta: { from: oldStatus, to: newStatus },
         });
 
@@ -260,8 +258,8 @@ export default function TaskDetailModal({
             logActivity(task.id, {
                 type: ACTIVITY_TYPES.TASK_COMPLETED,
                 description: `Tarea completada: ${form.title}`,
-                userId: taskAssignee,
-                userName: assigneeName,
+                userId,
+                userName: loggedInUserName,
                 meta: { completedAt: new Date().toISOString() },
             });
         }
@@ -374,8 +372,8 @@ export default function TaskDetailModal({
                         task={task}
                         subtasks={subtasks}
                         canEdit={canEdit}
-                        userId={form.assignedTo || task?.assignedTo}
-                        userName={teamMembers?.find(m => m.uid === (form.assignedTo || task?.assignedTo))?.displayName || null}
+                        userId={userId}
+                        userName={teamMembers?.find(m => m.uid === userId)?.displayName || null}
                     />
 
                     {/* Right: Control */}
