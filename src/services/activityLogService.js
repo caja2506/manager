@@ -47,7 +47,10 @@ export async function logActivity(taskId, { type, description, userId = null, us
     if (!taskId || !type) return;
 
     try {
-        const now = new Date().toISOString();
+        const now = new Date();
+        const timestamp = now.toISOString();
+        // Use LOCAL date to match frontend filter (same fix as dailyScrumEngine)
+        const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
         const colRef = collection(db, 'tasks', taskId, 'activityLog');
         const ref = doc(colRef);
 
@@ -56,8 +59,8 @@ export async function logActivity(taskId, { type, description, userId = null, us
             description: description || TYPE_CONFIG[type]?.label || type,
             userId,
             userName,
-            timestamp: now,
-            date: now.substring(0, 10), // YYYY-MM-DD for date filtering
+            timestamp,
+            date: localDate, // YYYY-MM-DD local timezone for date filtering
             meta,
             taskId, // denormalized for collectionGroup queries
         });
