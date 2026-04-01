@@ -4,6 +4,7 @@ import { useRole } from '../contexts/RoleContext';
 import { fetchAllActivityLogs, fetchTaskActivityLog, updateActivityLog, deleteActivityLog } from '../services/activityLogService';
 import {
     AreaChart, Area, BarChart, Bar, LineChart, Line, Cell,
+    ComposedChart,
     PieChart, Pie, ReferenceLine,
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
@@ -381,10 +382,12 @@ export default function TaskActivityPage() {
         const originDate = new Date(firstEventDate.getTime() - 24 * 60 * 60 * 1000);
 
         const points = [
-            { name: formatPoint(originDate), progreso: 0, description: 'Inicio' },
+            { name: formatPoint(originDate), progreso: 0, totalSubtasks: null, completedSubtasks: null, description: 'Inicio' },
             ...progressEvents.map(log => ({
                 name: formatPoint(new Date(log.timestamp)),
                 progreso: log.meta.percentComplete,
+                totalSubtasks: log.meta.totalSubtasks ?? null,
+                completedSubtasks: log.meta.completedSubtasks ?? null,
                 description: log.description,
             })),
         ];
@@ -610,9 +613,9 @@ export default function TaskActivityPage() {
                             {progressChartData.points.filter(p => p.progreso != null).slice(-1)[0]?.progreso ?? 0}% actual
                         </span>
                     </div>
-                    <div className="h-[250px] w-full">
+                    <div className="h-[280px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={progressChartData.points} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <ComposedChart data={progressChartData.points} margin={{ top: 10, right: 40, left: -20, bottom: 0 }}>
                                 <defs>
                                     <linearGradient id="colorProgress" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
@@ -621,16 +624,23 @@ export default function TaskActivityPage() {
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                                 <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} />
-                                <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} unit="%" />
+                                <YAxis yAxisId="left" domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} unit="%" />
+                                <YAxis yAxisId="right" orientation="right" tick={{ fill: '#06b6d4', fontSize: 10, fontWeight: 700 }} allowDecimals={false} label={{ value: 'Subtareas', angle: 90, position: 'insideRight', fill: '#06b6d4', fontSize: 10, fontWeight: 700, dx: 20 }} />
                                 <Tooltip
                                     contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 12, fontSize: 12, fontWeight: 700 }}
-                                    formatter={(val) => val === null ? ['—', ''] : [`${val}%`, 'Progreso']}
+                                    formatter={(val, name) => {
+                                        if (val === null) return ['—', ''];
+                                        if (name === 'Progreso') return [`${val}%`, name];
+                                        return [val, name];
+                                    }}
                                 />
+                                <Legend wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }} />
 
                                 {/* TODAY marker line */}
                                 {progressChartData.todayLabel && (
                                     <ReferenceLine
                                         x={progressChartData.todayLabel}
+                                        yAxisId="left"
                                         stroke="#f43f5e"
                                         strokeWidth={2}
                                         strokeDasharray="6 3"
@@ -647,6 +657,7 @@ export default function TaskActivityPage() {
                                 {/* 100% target line */}
                                 <ReferenceLine
                                     y={100}
+                                    yAxisId="left"
                                     stroke="#22c55e"
                                     strokeWidth={1}
                                     strokeDasharray="4 4"
@@ -659,8 +670,12 @@ export default function TaskActivityPage() {
                                     }}
                                 />
 
-                                <Line type="stepAfter" dataKey="progreso" stroke="#6366f1" strokeWidth={3} dot={{ fill: '#6366f1', r: 5 }} activeDot={{ r: 7 }} connectNulls={false} />
-                            </LineChart>
+                                {/* Subtask count bars on right axis */}
+                                <Bar yAxisId="right" name="Total Subtareas" dataKey="totalSubtasks" fill="#06b6d4" opacity={0.3} barSize={16} radius={[4, 4, 0, 0]} />
+
+                                {/* Progress line on left axis */}
+                                <Line yAxisId="left" type="stepAfter" name="Progreso" dataKey="progreso" stroke="#6366f1" strokeWidth={3} dot={{ fill: '#6366f1', r: 5 }} activeDot={{ r: 7 }} connectNulls={false} />
+                            </ComposedChart>
                         </ResponsiveContainer>
                     </div>
                 </div>

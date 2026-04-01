@@ -56,13 +56,17 @@ export default function SubtaskList({ subtasks = [], taskId, readOnly = false, o
         setNewTitle('');
         inputRef.current?.focus();
 
-        // Log subtask creation
+        // Calculate new percentComplete after adding (new subtask is uncompleted)
+        const newTotal = subtasks.length + 1;
+        const newPercent = newTotal > 0 ? Math.round((completed / newTotal) * 100) : 0;
+
+        // Log subtask creation with progress info
         logActivity(taskId, {
             type: ACTIVITY_TYPES.SUBTASK_CREATED,
             description: `Subtarea creada: ${trimmed}`,
             userId,
             userName,
-            meta: { subtaskTitle: trimmed },
+            meta: { subtaskTitle: trimmed, percentComplete: newPercent, totalSubtasks: newTotal, completedSubtasks: completed },
         });
     };
 
@@ -77,9 +81,9 @@ export default function SubtaskList({ subtasks = [], taskId, readOnly = false, o
     const handleToggle = async (subtask) => {
         // Calculate what the new percentComplete will be after this toggle
         const newCompleted = !subtask.completed;
-        const total = subtasks.length;
+        const currentTotal = subtasks.length;
         const completedCount = subtasks.filter(s => s.completed).length + (newCompleted ? 1 : -1);
-        const newPercent = total > 0 ? Math.round((completedCount / total) * 100) : 0;
+        const newPercent = currentTotal > 0 ? Math.round((completedCount / currentTotal) * 100) : 0;
 
         await toggleSubtask(subtask.id, newCompleted, {
             taskId,
@@ -87,6 +91,8 @@ export default function SubtaskList({ subtasks = [], taskId, readOnly = false, o
             userId,
             userName,
             percentComplete: newPercent,
+            totalSubtasks: currentTotal,
+            completedSubtasks: completedCount,
         });
     };
 
@@ -95,13 +101,19 @@ export default function SubtaskList({ subtasks = [], taskId, readOnly = false, o
         const st = subtasks.find(s => s.id === subtaskId);
         await deleteSubtask(subtaskId);
 
-        // Log subtask deletion
+        // Calculate new percentComplete after deletion
+        const wasCompleted = st?.completed;
+        const newTotal = subtasks.length - 1;
+        const newCompletedCount = completed - (wasCompleted ? 1 : 0);
+        const newPercent = newTotal > 0 ? Math.round((newCompletedCount / newTotal) * 100) : 0;
+
+        // Log subtask deletion with progress info
         logActivity(taskId, {
             type: ACTIVITY_TYPES.SUBTASK_DELETED,
             description: `Subtarea eliminada: ${st?.title || ''}`,
             userId,
             userName,
-            meta: { subtaskTitle: st?.title || '' },
+            meta: { subtaskTitle: st?.title || '', percentComplete: newPercent, totalSubtasks: newTotal, completedSubtasks: newCompletedCount },
         });
     };
 

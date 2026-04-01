@@ -210,7 +210,7 @@ export async function createSubtask(taskId, title) {
     return ref.id;
 }
 
-export async function toggleSubtask(subtaskId, completed, { taskId = null, subtaskTitle = '', userId = null, userName = null, percentComplete = null } = {}) {
+export async function toggleSubtask(subtaskId, completed, { taskId = null, subtaskTitle = '', userId = null, userName = null, percentComplete = null, totalSubtasks = null, completedSubtasks = null } = {}) {
     const updates = { completed };
     if (completed) {
         updates.completedAt = new Date().toISOString();
@@ -228,7 +228,7 @@ export async function toggleSubtask(subtaskId, completed, { taskId = null, subta
                 : `Subtarea desmarcada: ${subtaskTitle}`,
             userId,
             userName,
-            meta: { subtaskId, subtaskTitle, percentComplete },
+            meta: { subtaskId, subtaskTitle, percentComplete, totalSubtasks, completedSubtasks },
         });
     }
 }
