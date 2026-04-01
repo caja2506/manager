@@ -7,15 +7,25 @@
  * Used by DailyScrumPage to show operational status per person.
  */
 
-// ── Helper: date comparison ──
+// ── Helper: date comparison (uses LOCAL timezone) ──
+
+function formatLocalDate(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
 
 function toDateStr(d) {
     if (!d) return null;
-    if (typeof d === 'string') return d.substring(0, 10);
-    return new Date(d).toISOString().substring(0, 10);
+    if (typeof d === 'string') {
+        if (d.length === 10) return d; // already YYYY-MM-DD
+        return formatLocalDate(new Date(d));
+    }
+    // Firestore Timestamp or Date object
+    if (d.toDate) return formatLocalDate(d.toDate());
+    return formatLocalDate(new Date(d));
 }
-
-
 
 function getYesterday() {
     const d = new Date();
@@ -23,7 +33,7 @@ function getYesterday() {
     // Skip weekends: if today is Monday, yesterday = Friday
     if (d.getDay() === 0) d.setDate(d.getDate() - 2); // Sunday → Friday
     if (d.getDay() === 6) d.setDate(d.getDate() - 1); // Saturday → Friday
-    return d.toISOString().substring(0, 10);
+    return formatLocalDate(d);
 }
 
 // ── Status constants ──
