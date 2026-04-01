@@ -250,12 +250,18 @@ export default function TaskActivityPage() {
         engTasks.forEach(t => { taskProjectMap[t.id] = t.projectId; });
 
         // Filter logs (including Power BI chart filters)
-        const filtered = activityLogs.filter(log => {
+        // baseFiltered: without chart-click filters (for keeping all bars/slices visible)
+        const baseFiltered = activityLogs.filter(log => {
             if (selectedPersons.length > 0 && !selectedPersons.includes(log.userId)) return false;
             if (selectedProjects.length > 0) {
                 const projId = taskProjectMap[log.taskId];
                 if (!projId || !selectedProjects.includes(projId)) return false;
             }
+            return true;
+        });
+
+        // Full filtered: includes chart-click filters (for KPIs, trend, timeline)
+        const filtered = baseFiltered.filter(log => {
             if (selectedTaskId && log.taskId !== selectedTaskId) return false;
             if (selectedEventType && log.type !== selectedEventType) return false;
             if (selectedDate && log.date !== selectedDate) return false;
@@ -325,9 +331,9 @@ export default function TaskActivityPage() {
 
         // ------- snip: the rest of analytics stays the same -------
 
-        // Top tasks by activity
+        // Top tasks by activity (from baseFiltered to keep all bars visible during cross-filtering)
         const taskCountMap = new Map();
-        filtered.forEach(log => {
+        baseFiltered.forEach(log => {
             if (!log.taskId) return;
             taskCountMap.set(log.taskId, (taskCountMap.get(log.taskId) || 0) + 1);
         });
@@ -352,9 +358,9 @@ export default function TaskActivityPage() {
             timelineByDay[dateStr].push(log);
         });
 
-        // Event type distribution (for donut chart)
+        // Event type distribution (from baseFiltered to keep all slices visible during cross-filtering)
         const typeCountMap = {};
-        filtered.forEach(log => {
+        baseFiltered.forEach(log => {
             const t = log.type || 'unknown';
             typeCountMap[t] = (typeCountMap[t] || 0) + 1;
         });
