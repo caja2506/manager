@@ -4,7 +4,7 @@ import { useRole } from '../contexts/RoleContext';
 import { fetchAllActivityLogs, fetchTaskActivityLog, updateActivityLog, deleteActivityLog } from '../services/activityLogService';
 import {
     AreaChart, Area, BarChart, Bar, LineChart, Line, Cell,
-    PieChart, Pie,
+    PieChart, Pie, ReferenceLine,
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import { useSearchParams } from 'react-router-dom';
@@ -13,7 +13,7 @@ import {
     Calendar as CalendarIcon, X, ChevronDown, Check, FolderGit2, User,
     Pencil, Trash2, Save
 } from 'lucide-react';
-import { format, subDays, eachDayOfInterval } from 'date-fns';
+import { format, subDays, addDays, eachDayOfInterval, isToday, isBefore, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const EVENT_COLORS = {
@@ -264,18 +264,30 @@ export default function TaskActivityPage() {
             delaysReported: filtered.filter(l => l.type === 'delay_reported').length,
         };
 
-        // Trend data (events per day)
+        // Trend data (events per day) — extend to show future days
         const startDate = new Date(dateFrom + 'T00:00:00');
         const endDate = new Date(dateTo + 'T00:00:00');
-        const days = eachDayOfInterval({ start: startDate, end: endDate });
+        const today = startOfDay(new Date());
+
+        // Extend chart: if endDate is today or before, add 3 extra days for visual breathing room
+        const chartEndDate = isBefore(endDate, addDays(today, 3)) ? addDays(today, 3) : endDate;
+
+        const days = eachDayOfInterval({ start: startDate, end: chartEndDate });
         const trendMap = new Map();
+        let todayLabel = '';
+
         days.forEach(day => {
             const dateStr = format(day, 'yyyy-MM-dd');
+            const label = format(day, 'dd MMM', { locale: es });
+            const isFutureDay = isBefore(today, day) && !isToday(day);
+            if (isToday(day)) todayLabel = label;
             trendMap.set(dateStr, {
-                name: format(day, 'dd MMM', { locale: es }),
-                subtareas: 0,
-                timers: 0,
-                status: 0,
+                name: label,
+                subtareas: isFutureDay ? null : 0,
+                timers: isFutureDay ? null : 0,
+                status: isFutureDay ? null : 0,
+                isFuture: isFutureDay,
+                isToday: isToday(day),
             });
         });
 
@@ -283,6 +295,7 @@ export default function TaskActivityPage() {
             const dateStr = log.date;
             if (trendMap.has(dateStr)) {
                 const d = trendMap.get(dateStr);
+                if (d.isFuture) return; // don't count future
                 if (log.type === 'subtask_completed') d.subtareas++;
                 if (log.type === 'timer_started' || log.type === 'timer_stopped') d.timers++;
                 if (log.type === 'status_changed') d.status++;
@@ -290,9 +303,13 @@ export default function TaskActivityPage() {
         });
 
         const trendData = Array.from(trendMap.values()).map((d, i, arr) => {
-            const showLabel = arr.length <= 14 || i % Math.ceil(arr.length / 14) === 0;
+            // Always show today's label for the reference line
+            const showLabel = d.isToday || arr.length <= 14 || i % Math.ceil(arr.length / 14) === 0;
             return { ...d, displayName: showLabel ? d.name : '' };
         });
+
+        // Store today label for reference line
+        const todayRefLabel = todayLabel;
 
         // Top tasks by activity
         const taskCountMap = new Map();
@@ -340,7 +357,7 @@ export default function TaskActivityPage() {
         const taskCreatedLog = filtered.find(l => l.type === 'task_created');
         const taskCompletedLog = filtered.find(l => l.type === 'task_completed');
 
-        return { kpis, trendData, topTasks, timelineByDay, totalEvents: filtered.length, eventTypeDistribution, taskCreatedLog, taskCompletedLog };
+        return { kpis, trendData, todayRefLabel, topTasks, timelineByDay, totalEvents: filtered.length, eventTypeDistribution, taskCreatedLog, taskCompletedLog };
     }, [activityLogs, selectedPersons, selectedProjects, selectedTaskId, engTasks, dateFrom, dateTo]);
 
     // Progress chart data (built from logs with percentComplete in meta)
@@ -609,11 +626,30 @@ export default function TaskActivityPage() {
                                             labelFormatter={(_, payload) => payload?.[0]?.payload?.name || ''}
                                             contentStyle={{ borderRadius: '16px', border: '1px solid #334155', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3)', backgroundColor: '#1e293b', color: '#e2e8f0' }}
                                             cursor={{ stroke: '#475569', strokeWidth: 1, strokeDasharray: '4 4' }}
+                                            formatter={(value) => value === null ? ['—', ''] : value}
                                         />
                                         <Legend wrapperStyle={{ fontSize: '12px', fontWeight: 'bold' }} />
-                                        <Area type="monotone" name="Subtareas" dataKey="subtareas" stroke="#22c55e" strokeWidth={3} fillOpacity={1} fill="url(#colorSubtareas)" />
-                                        <Area type="monotone" name="Timers" dataKey="timers" stroke="#f59e0b" strokeWidth={3} fillOpacity={1} fill="url(#colorTimers)" />
-                                        <Area type="monotone" name="Status" dataKey="status" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorStatus)" />
+
+                                        {/* TODAY marker line */}
+                                        {analytics.todayRefLabel && (
+                                            <ReferenceLine
+                                                x={analytics.todayRefLabel}
+                                                stroke="#f43f5e"
+                                                strokeWidth={2}
+                                                strokeDasharray="6 3"
+                                                label={{
+                                                    value: 'HOY',
+                                                    position: 'top',
+                                                    fill: '#f43f5e',
+                                                    fontSize: 11,
+                                                    fontWeight: 'bold',
+                                                }}
+                                            />
+                                        )}
+
+                                        <Area type="monotone" name="Subtareas" dataKey="subtareas" stroke="#22c55e" strokeWidth={3} fillOpacity={1} fill="url(#colorSubtareas)" connectNulls={false} />
+                                        <Area type="monotone" name="Timers" dataKey="timers" stroke="#f59e0b" strokeWidth={3} fillOpacity={1} fill="url(#colorTimers)" connectNulls={false} />
+                                        <Area type="monotone" name="Status" dataKey="status" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorStatus)" connectNulls={false} />
                                     </AreaChart>
                                 </ResponsiveContainer>
                             </div>
