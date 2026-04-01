@@ -46,20 +46,22 @@ export default function ReportsLayout() {
                         </div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row gap-3 items-end md:items-center">
-                        {/* User Filter */}
-                        <div className="bg-slate-800 border border-slate-700 rounded-xl flex items-center p-1.5 w-full sm:w-auto">
-                            <select
-                                value={selectedUser}
-                                onChange={e => setSelectedUser(e.target.value)}
-                                className="bg-transparent border-none text-sm font-bold text-slate-200 py-1.5 px-3 focus:ring-0 cursor-pointer outline-none w-full"
-                            >
-                                {engineersAndTechs.map(m => (
-                                    <option key={m.uid} value={m.uid}>{m.displayName || m.name || m.email}</option>
-                                ))}
-                            </select>
+                    {/* User Filter — only on pages that don't have their own filters */}
+                    {!['/analytics', '/reports/activity'].includes(location.pathname) && (
+                        <div className="flex flex-col sm:flex-row gap-3 items-end md:items-center">
+                            <div className="bg-slate-800 border border-slate-700 rounded-xl flex items-center p-1.5 w-full sm:w-auto">
+                                <select
+                                    value={selectedUser}
+                                    onChange={e => setSelectedUser(e.target.value)}
+                                    className="bg-transparent border-none text-sm font-bold text-slate-200 py-1.5 px-3 focus:ring-0 cursor-pointer outline-none w-full"
+                                >
+                                    {engineersAndTechs.map(m => (
+                                        <option key={m.uid} value={m.uid}>{m.displayName || m.name || m.email}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* Tab Navigation */}
