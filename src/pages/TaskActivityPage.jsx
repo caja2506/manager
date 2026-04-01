@@ -288,14 +288,23 @@ export default function TaskActivityPage() {
 
         if (progressEvents.length === 0) return [];
 
-        return progressEvents.map(log => {
-            const d = new Date(log.timestamp);
-            return {
-                name: `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`,
+        const formatPoint = (d) =>
+            `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+
+        // Always start from 0% (use task creation or 1 day before first event)
+        const firstEventDate = new Date(progressEvents[0].timestamp);
+        const originDate = new Date(firstEventDate.getTime() - 24 * 60 * 60 * 1000); // 1 day before
+
+        const points = [
+            { name: formatPoint(originDate), progreso: 0, description: 'Inicio' },
+            ...progressEvents.map(log => ({
+                name: formatPoint(new Date(log.timestamp)),
                 progreso: log.meta.percentComplete,
                 description: log.description,
-            };
-        });
+            })),
+        ];
+
+        return points;
     }, [urlTaskId, activityLogs]);
 
     // Helpers
