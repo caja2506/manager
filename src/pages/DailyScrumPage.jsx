@@ -61,11 +61,22 @@ function TaskPill({ task }) {
         blocked: 'bg-red-500', review: 'bg-purple-500', completed: 'bg-emerald-500',
     };
     const dotClass = statusColors[task.status] || 'bg-slate-500';
+    const pct = task.percentComplete ?? 0;
 
     return (
-        <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-800/80 border border-slate-700/40 rounded-md text-[10px] text-slate-300">
-            <div className={`w-1.5 h-1.5 rounded-full ${dotClass} flex-shrink-0`} />
-            <span className="truncate max-w-[160px]">{task.title || 'Sin título'}</span>
+        <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-800/80 border border-slate-700/40 rounded-md text-[10px] text-slate-300 relative overflow-hidden">
+            {/* Subtle progress fill */}
+            {pct > 0 && (
+                <div
+                    className="absolute inset-y-0 left-0 opacity-[0.07] rounded-md"
+                    style={{ width: `${pct}%`, backgroundColor: pct === 100 ? '#22c55e' : '#6366f1' }}
+                />
+            )}
+            <div className={`w-1.5 h-1.5 rounded-full ${dotClass} shrink-0 relative z-10`} />
+            <span className="truncate max-w-[140px] relative z-10">{task.title || 'Sin título'}</span>
+            <span className={`ml-auto text-[9px] font-bold shrink-0 relative z-10 ${pct === 100 ? 'text-emerald-400' : pct > 0 ? 'text-indigo-400/70' : 'text-slate-600'}`}>
+                {pct}%
+            </span>
         </div>
     );
 }
