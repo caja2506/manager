@@ -481,23 +481,6 @@ export default function TaskActivityPage() {
         }
     };
 
-    // Power BI: click on correlation chart bar → filter by date
-    const handleCorrelationClick = (data) => {
-        if (!data?.activePayload?.[0]?.payload) return;
-        const point = data.activePayload[0].payload;
-        if (point.isFuture || !point.name) return;
-        // Find the actual date string from trendData
-        const matchDay = analytics?.trendData?.find(d => d.name === point.name);
-        if (!matchDay) return;
-        // Convert display label back to YYYY-MM-DD by matching activityLogs dates
-        const dateStr = activityLogs.find(l => {
-            const logLabel = format(new Date(l.timestamp), 'dd MMM', { locale: es });
-            return logLabel === point.name;
-        })?.date;
-        if (dateStr) {
-            setSelectedDate(prev => prev === dateStr ? null : dateStr);
-        }
-    };
 
     // Power BI: click on donut slice → filter by event type
     const handleDonutClick = (entry) => {
@@ -755,7 +738,7 @@ export default function TaskActivityPage() {
                         ) : (
                             <div className="h-[300px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <ComposedChart data={analytics.trendData} margin={{ top: 10, right: 40, left: -10, bottom: 0 }} onClick={handleCorrelationClick} style={{ cursor: 'pointer' }}>
+                                    <ComposedChart data={analytics.trendData} margin={{ top: 10, right: 40, left: -10, bottom: 0 }} style={{ cursor: 'pointer' }}>
                                         <defs>
                                             <linearGradient id="colorHoras" x1="0" y1="0" x2="0" y2="1">
                                                 <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.6} />
@@ -797,7 +780,19 @@ export default function TaskActivityPage() {
                                         )}
 
                                         {/* Hours worked - bars (right axis) */}
-                                        <Bar yAxisId="right" name="Horas Trabajadas" dataKey="horas" fill="url(#colorHoras)" barSize={20} radius={[4, 4, 0, 0]} />
+                                        <Bar yAxisId="right" name="Horas Trabajadas" dataKey="horas" fill="url(#colorHoras)" barSize={20} radius={[4, 4, 0, 0]}
+                                            onClick={(data) => {
+                                                if (data && !data.isFuture && data.name) {
+                                                    // Find the actual YYYY-MM-DD date from the display label
+                                                    const dateStr = activityLogs.find(l => {
+                                                        const logLabel = format(new Date(l.timestamp), 'dd MMM', { locale: es });
+                                                        return logLabel === data.name;
+                                                    })?.date;
+                                                    if (dateStr) setSelectedDate(prev => prev === dateStr ? null : dateStr);
+                                                }
+                                            }}
+                                            style={{ cursor: 'pointer' }}
+                                        />
 
                                         {/* Subtasks completed - line (left axis) */}
                                         <Line yAxisId="left" type="monotone" name="Subtareas Completadas" dataKey="subtareas" stroke="#22c55e" strokeWidth={3} dot={{ fill: '#22c55e', r: 4, strokeWidth: 0 }} activeDot={{ r: 6, fill: '#22c55e' }} connectNulls={false} />
@@ -975,22 +970,22 @@ export default function TaskActivityPage() {
                             <div className="h-[300px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={analytics.topTasks} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}
-                                        onClick={(data) => {
-                                            if (data?.activePayload?.[0]?.payload?.taskId) {
-                                                handleTaskClick(data.activePayload[0].payload.taskId);
-                                            }
-                                        }}
                                         style={{ cursor: 'pointer' }}
                                     >
                                         <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#334155" />
                                         <XAxis type="number" hide />
                                         <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} width={160} />
                                         <Tooltip cursor={{ fill: '#1e293b' }} contentStyle={{ borderRadius: '12px', border: '1px solid #334155', backgroundColor: '#1e293b', color: '#e2e8f0' }} />
-                                        <Bar dataKey="eventos" name="Eventos" radius={[0, 6, 6, 0]} barSize={20}>
+                                        <Bar dataKey="eventos" name="Eventos" radius={[0, 6, 6, 0]} barSize={20}
+                                            onClick={(data) => {
+                                                if (data?.taskId) handleTaskClick(data.taskId);
+                                            }}
+                                        >
                                             {analytics.topTasks.map((entry, index) => (
                                                 <Cell key={index}
                                                     fill={entry.taskId === selectedTaskId ? '#22c55e' : '#6366f1'}
                                                     fillOpacity={selectedTaskId && entry.taskId !== selectedTaskId ? 0.3 : 1}
+                                                    style={{ cursor: 'pointer' }}
                                                 />
                                             ))}
                                         </Bar>
