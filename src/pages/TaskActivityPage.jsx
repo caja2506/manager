@@ -131,7 +131,7 @@ function MultiSelect({ icon: Icon, options, selected, onChange, allLabel = 'Todo
 }
 
 export default function TaskActivityPage() {
-    const { engProjects, engTasks, teamMembers } = useEngineeringData();
+    const { engProjects, engTasks, teamMembers, timeLogs } = useEngineeringData();
     const { role } = useRole();
     const isAdmin = role === 'admin';
     const [searchParams, setSearchParams] = useSearchParams();
@@ -143,6 +143,11 @@ export default function TaskActivityPage() {
 
     // Find the task name for the header
     const focusedTask = activeTaskId ? engTasks?.find(t => t.id === activeTaskId) : null;
+
+    // Actual hours from timeLogs (same source as TaskControlPanel — source of truth)
+    const actualHoursFromTimeLogs = activeTaskId && timeLogs
+        ? Math.round(timeLogs.filter(log => log.taskId === activeTaskId && log.totalHours).reduce((sum, log) => sum + (log.totalHours || 0), 0) * 10) / 10
+        : 0;
 
     // Filter state
     const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
@@ -642,7 +647,7 @@ export default function TaskActivityPage() {
                         <span className="text-[10px] font-black tracking-wider text-amber-400 uppercase">Horas Plan vs Real</span>
                         <div className="flex items-center gap-3 mt-2">
                             <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${
-                                focusedTask?.estimatedHours && analytics.kpis.totalRealHours > focusedTask.estimatedHours
+                                focusedTask?.estimatedHours && actualHoursFromTimeLogs > Number(focusedTask.estimatedHours)
                                     ? 'bg-rose-500/15 text-rose-400'
                                     : 'bg-amber-500/15 text-amber-400'
                             }`}>
@@ -650,16 +655,16 @@ export default function TaskActivityPage() {
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-2xl font-black text-white">
-                                    {analytics.kpis.totalRealHours}h
+                                    {actualHoursFromTimeLogs}h
                                     {focusedTask?.estimatedHours ? (
                                         <span className="text-sm font-bold text-slate-400"> / {focusedTask.estimatedHours}h</span>
                                     ) : null}
                                 </span>
                                 {focusedTask?.estimatedHours ? (
                                     <span className={`text-[10px] font-bold ${
-                                        analytics.kpis.totalRealHours > focusedTask.estimatedHours ? 'text-rose-400' : 'text-emerald-400'
+                                        actualHoursFromTimeLogs > Number(focusedTask.estimatedHours) ? 'text-rose-400' : 'text-emerald-400'
                                     }`}>
-                                        {Math.round((analytics.kpis.totalRealHours / focusedTask.estimatedHours) * 100)}% utilizado
+                                        {Math.round((actualHoursFromTimeLogs / Number(focusedTask.estimatedHours)) * 100)}% utilizado
                                     </span>
                                 ) : (
                                     <span className="text-[10px] font-bold text-slate-500">Sin estimación</span>
