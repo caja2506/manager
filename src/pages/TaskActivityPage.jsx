@@ -18,6 +18,9 @@ import {
 import { format, subDays, addDays, eachDayOfInterval, isToday, isBefore, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+// Timer events from activityLogs are unreliable — we use timeLogs as source of truth
+const TIMER_EVENT_TYPES = ['timer_started', 'timer_stopped'];
+
 const EVENT_COLORS = {
     subtask_completed: '#22c55e',
     subtask_unchecked: '#64748b',
@@ -26,6 +29,7 @@ const EVENT_COLORS = {
     status_changed: '#6366f1',
     timer_started: '#f59e0b',
     timer_stopped: '#f59e0b',
+    work_session: '#f59e0b',
     delay_reported: '#ef4444',
     task_created: '#3b82f6',
     task_completed: '#22c55e',
@@ -44,6 +48,7 @@ const EVENT_ICONS = {
     status_changed: '🔄',
     timer_started: '▶️',
     timer_stopped: '⏹️',
+    work_session: '⏱️',
     delay_reported: '⚠️',
     task_created: '🆕',
     task_completed: '🏁',
@@ -62,6 +67,7 @@ const EVENT_LABELS = {
     status_changed: 'Cambio de estado',
     timer_started: 'Timer iniciado',
     timer_stopped: 'Timer detenido',
+    work_session: 'Sesión de trabajo',
     delay_reported: 'Retraso',
     task_created: 'Tarea creada',
     task_completed: 'Tarea completada',
@@ -208,6 +214,11 @@ export default function TaskActivityPage() {
     };
 
     const handleDelete = async (log) => {
+        // Protect work_session pseudo-events (they come from timeLogs, not activityLogs)
+        if (log.isFromTimeLogs) {
+            alert('Este registro proviene de Registro de Horas.\nEdítalo desde la sección de Registro de Horas.');
+            return;
+        }
         if (!window.confirm(`¿Eliminar este evento?\n"${log.description}"`)) return;
         console.log('[ActivityPage] Deleting log:', { taskId: log.taskId, logId: log.id, log });
         try {
@@ -289,11 +300,19 @@ export default function TaskActivityPage() {
             return true;
         });
 
-        // KPIs
+        // KPIs — timerSessions now counted from timeLogs (source of truth)
+        const kpiTimeLogs = timeLogs ? timeLogs.filter(tl => {
+            if (!tl.totalHours || !tl.startTime) return false;
+            if (selectedPersons.length > 0 && !selectedPersons.includes(tl.userId)) return false;
+            if (selectedProjects.length > 0 && !selectedProjects.includes(tl.projectId)) return false;
+            if (activeTaskId && tl.taskId !== activeTaskId) return false;
+            if (selectedTaskId && tl.taskId !== selectedTaskId) return false;
+            return true;
+        }) : [];
         const kpis = {
             subtasksCompleted: filtered.filter(l => l.type === 'subtask_completed').length,
             statusChanges: filtered.filter(l => l.type === 'status_changed').length,
-            timerSessions: filtered.filter(l => l.type === 'timer_started').length,
+            timerSessions: kpiTimeLogs.length,
             delaysReported: filtered.filter(l => l.type === 'delay_reported').length,
         };
 
@@ -397,9 +416,10 @@ export default function TaskActivityPage() {
 
         // ------- snip: the rest of analytics stays the same -------
 
-        // Top tasks by activity (from baseFiltered to keep all bars visible during cross-filtering)
+        // Top tasks by activity — EXCLUDE timer events (unreliable from activityLogs)
+        const baseFilteredNoTimer = baseFiltered.filter(l => !TIMER_EVENT_TYPES.includes(l.type));
         const taskCountMap = new Map();
-        baseFiltered.forEach(log => {
+        baseFilteredNoTimer.forEach(log => {
             if (!log.taskId) return;
             taskCountMap.set(log.taskId, (taskCountMap.get(log.taskId) || 0) + 1);
         });
@@ -415,21 +435,49 @@ export default function TaskActivityPage() {
             .sort((a, b) => b.eventos - a.eventos)
             .slice(0, 8);
 
-        // Timeline (grouped by day)
+        // Timeline (grouped by day) — EXCLUDE timer events, INJECT work sessions from timeLogs
+        const filteredNoTimer = filtered.filter(l => !TIMER_EVENT_TYPES.includes(l.type));
+
+        // Create pseudo-events from timeLogs (real work sessions)
+        const workSessionEvents = kpiTimeLogs.map(tl => {
+            const member = teamMembers?.find(m => (m.uid || m.id) === tl.userId);
+            const taskName = engTasks?.find(t => t.id === tl.taskId)?.title || '';
+            const hours = Math.round((tl.totalHours || 0) * 10) / 10;
+            return {
+                id: `tl_${tl.id}`,
+                type: 'work_session',
+                taskId: tl.taskId,
+                userId: tl.userId,
+                userName: tl.displayName || member?.displayName || member?.name || '',
+                timestamp: tl.startTime,
+                date: tl.startTime.substring(0, 10),
+                description: `${hours}h — ${taskName}${tl.isManual ? ' (manual)' : ''}`,
+                meta: { totalHours: tl.totalHours, isManual: tl.isManual },
+                isFromTimeLogs: true,
+            };
+        });
+
+        // Combine and sort
+        const allTimelineEvents = [...filteredNoTimer, ...workSessionEvents]
+            .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+
         const timelineByDay = {};
-        filtered.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-        filtered.forEach(log => {
+        allTimelineEvents.forEach(log => {
             const dateStr = log.date;
             if (!timelineByDay[dateStr]) timelineByDay[dateStr] = [];
             timelineByDay[dateStr].push(log);
         });
 
-        // Event type distribution (from baseFiltered to keep all slices visible during cross-filtering)
+        // Event type distribution — EXCLUDE timer events, ADD work_session count
         const typeCountMap = {};
-        baseFiltered.forEach(log => {
+        baseFilteredNoTimer.forEach(log => {
             const t = log.type || 'unknown';
             typeCountMap[t] = (typeCountMap[t] || 0) + 1;
         });
+        // Add work sessions from timeLogs
+        if (kpiTimeLogs.length > 0) {
+            typeCountMap['work_session'] = kpiTimeLogs.length;
+        }
         const eventTypeDistribution = Object.entries(typeCountMap)
             .map(([type, count]) => ({
                 name: EVENT_LABELS[type] || type,
@@ -444,7 +492,7 @@ export default function TaskActivityPage() {
         const taskCompletedLog = filtered.find(l => l.type === 'task_completed');
 
         return { kpis, trendData, todayRefLabel, topTasks, timelineByDay, totalEvents: filtered.length, eventTypeDistribution, taskCreatedLog, taskCompletedLog, completedLabel, isTaskCompleted };
-    }, [activityLogs, selectedPersons, selectedProjects, selectedTaskId, selectedEventType, selectedDate, engTasks, activeTaskId, dateFrom, dateTo, timeLogs, autoDateRange]);
+    }, [activityLogs, selectedPersons, selectedProjects, selectedTaskId, selectedEventType, selectedDate, engTasks, activeTaskId, dateFrom, dateTo, timeLogs, autoDateRange, teamMembers]);
 
     // Progress chart data (built from logs with percentComplete in meta)
     const progressChartData = useMemo(() => {
