@@ -799,6 +799,27 @@ export default function TaskActivityPage() {
 
                                         {/* Status changes - subtle line (left axis) */}
                                         <Line yAxisId="left" type="monotone" name="Cambios Status" dataKey="status" stroke="#6366f1" strokeWidth={2} strokeDasharray="4 2" dot={{ fill: '#6366f1', r: 3, strokeWidth: 0 }} connectNulls={false} />
+
+                                        {/* DUE DATE marker line */}
+                                        {focusedTask?.dueDate && (() => {
+                                            const dueDateLabel = format(new Date(focusedTask.dueDate.substring(0, 10) + 'T12:00:00'), 'dd MMM', { locale: es });
+                                            return (
+                                                <ReferenceLine
+                                                    x={dueDateLabel}
+                                                    yAxisId="left"
+                                                    stroke="#f59e0b"
+                                                    strokeWidth={2}
+                                                    strokeDasharray="8 4"
+                                                    label={{
+                                                        value: `LÍMITE ${format(new Date(focusedTask.dueDate.substring(0, 10) + 'T12:00:00'), 'dd/MM', { locale: es })}`,
+                                                        position: 'top',
+                                                        fill: '#f59e0b',
+                                                        fontSize: 10,
+                                                        fontWeight: 'bold',
+                                                    }}
+                                                />
+                                            );
+                                        })()}
                                     </ComposedChart>
                                 </ResponsiveContainer>
                             </div>
