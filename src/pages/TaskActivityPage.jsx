@@ -274,6 +274,8 @@ export default function TaskActivityPage() {
             statusChanges: filtered.filter(l => l.type === 'status_changed').length,
             timerSessions: filtered.filter(l => l.type === 'timer_started').length,
             delaysReported: filtered.filter(l => l.type === 'delay_reported').length,
+            // Total real hours from timer_stopped logs
+            totalRealHours: Math.round(filtered.filter(l => l.type === 'timer_stopped' && l.meta?.totalHours).reduce((sum, l) => sum + (l.meta.totalHours || 0), 0) * 10) / 10,
         };
 
         // Trend data — auto-adjusted range + correlation data
@@ -284,9 +286,23 @@ export default function TaskActivityPage() {
         const firstEventDay = eventDates.length > 0 ? new Date(eventDates[0] + 'T00:00:00') : today;
         const lastEventDay = eventDates.length > 0 ? new Date(eventDates[eventDates.length - 1] + 'T00:00:00') : today;
 
-        // Auto-adjust: start 2 days before first event, end 3 days after today
+        // Check if task is completed (no future extension needed)
+        const taskCompletedDate = (() => {
+            const completedLog = filtered.find(l => l.type === 'task_completed');
+            if (completedLog?.date) return new Date(completedLog.date + 'T00:00:00');
+            // Also check task status
+            const currentTask = activeTaskId ? engTasks.find(t => t.id === activeTaskId) : null;
+            if (currentTask?.status === 'completed' || currentTask?.status === 'closed') {
+                return lastEventDay;
+            }
+            return null;
+        })();
+
+        // Auto-adjust: if task completed, end at completion date +1; otherwise end 3 days after today
         const chartStart = addDays(firstEventDay, -2);
-        const chartEnd = addDays(isBefore(lastEventDay, today) ? today : lastEventDay, 3);
+        const chartEnd = taskCompletedDate
+            ? addDays(taskCompletedDate, 1)
+            : addDays(isBefore(lastEventDay, today) ? today : lastEventDay, 3);
 
         const days = eachDayOfInterval({ start: chartStart, end: chartEnd });
         const trendMap = new Map();
@@ -378,7 +394,7 @@ export default function TaskActivityPage() {
         const taskCompletedLog = filtered.find(l => l.type === 'task_completed');
 
         return { kpis, trendData, todayRefLabel, topTasks, timelineByDay, totalEvents: filtered.length, eventTypeDistribution, taskCreatedLog, taskCompletedLog };
-    }, [activityLogs, selectedPersons, selectedProjects, selectedTaskId, selectedEventType, selectedDate, engTasks, dateFrom, dateTo]);
+    }, [activityLogs, selectedPersons, selectedProjects, selectedTaskId, selectedEventType, selectedDate, engTasks, activeTaskId, dateFrom, dateTo]);
 
     // Progress chart data (built from logs with percentComplete in meta)
     const progressChartData = useMemo(() => {
@@ -619,12 +635,32 @@ export default function TaskActivityPage() {
                     </div>
 
                     <div className="bg-slate-900/70 p-5 rounded-2xl border border-slate-800 shadow-lg">
-                        <span className="text-[10px] font-black tracking-wider text-amber-400 uppercase">Sesiones de Timer</span>
+                        <span className="text-[10px] font-black tracking-wider text-amber-400 uppercase">Horas Plan vs Real</span>
                         <div className="flex items-center gap-3 mt-2">
-                            <div className="w-12 h-12 rounded-full bg-amber-500/15 flex items-center justify-center text-amber-400 shrink-0">
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${
+                                focusedTask?.estimatedHours && analytics.kpis.totalRealHours > focusedTask.estimatedHours
+                                    ? 'bg-rose-500/15 text-rose-400'
+                                    : 'bg-amber-500/15 text-amber-400'
+                            }`}>
                                 <Timer className="w-6 h-6" />
                             </div>
-                            <span className="text-3xl font-black text-white">{analytics.kpis.timerSessions}</span>
+                            <div className="flex flex-col">
+                                <span className="text-2xl font-black text-white">
+                                    {analytics.kpis.totalRealHours}h
+                                    {focusedTask?.estimatedHours ? (
+                                        <span className="text-sm font-bold text-slate-400"> / {focusedTask.estimatedHours}h</span>
+                                    ) : null}
+                                </span>
+                                {focusedTask?.estimatedHours ? (
+                                    <span className={`text-[10px] font-bold ${
+                                        analytics.kpis.totalRealHours > focusedTask.estimatedHours ? 'text-rose-400' : 'text-emerald-400'
+                                    }`}>
+                                        {Math.round((analytics.kpis.totalRealHours / focusedTask.estimatedHours) * 100)}% utilizado
+                                    </span>
+                                ) : (
+                                    <span className="text-[10px] font-bold text-slate-500">Sin estimación</span>
+                                )}
+                            </div>
                         </div>
                     </div>
 
