@@ -856,70 +856,83 @@ export default function TaskActivityPage() {
                         }
                         milestones.sort((a, b) => a.date - b.date);
                         if (milestones.length === 0) return <div className="text-slate-400 font-bold text-center py-8">Sin fechas configuradas</div>;
+
+                        // Total hours summary
+                        const totalHoursSummary = actualHoursFromTimeLogs > 0 ? `${actualHoursFromTimeLogs}h total` : null;
+
                         return (
                             <div className="relative">
-                                <div className="flex gap-4 mb-4 flex-wrap">
-                                    <span className="flex items-center gap-1 text-[9px] font-bold text-slate-400">
-                                        <span className="w-3 h-0.5 bg-cyan-400 inline-block rounded" /> Fechas Plan
+                                {/* Legend */}
+                                <div className="flex gap-4 mb-3 flex-wrap items-center">
+                                    <span className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400">
+                                        <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 inline-block" /> Fechas Plan
                                     </span>
-                                    <span className="flex items-center gap-1 text-[9px] font-bold text-slate-400">
-                                        <span className="w-3 h-0.5 bg-indigo-400 inline-block rounded" /> Eventos Reales
+                                    <span className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400">
+                                        <span className="w-2.5 h-2.5 rounded-full bg-indigo-400 inline-block" /> Eventos
                                     </span>
-                                    <span className="flex items-center gap-1 text-[9px] font-bold text-slate-400">
-                                        <span className="w-3 h-0.5 bg-rose-400 inline-block rounded" /> Hoy
+                                    <span className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400">
+                                        <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" /> Horas
                                     </span>
+                                    <span className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400">
+                                        <span className="w-2.5 h-2.5 rounded-full bg-rose-400 inline-block" /> Hoy
+                                    </span>
+                                    {totalHoursSummary && (
+                                        <span className="ml-auto text-[10px] font-black text-amber-300 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
+                                            ⏱️ {totalHoursSummary}
+                                        </span>
+                                    )}
                                 </div>
+                                {/* Timeline Container */}
                                 <div className="overflow-x-auto pb-2">
-                                    <div className="relative flex items-center" style={{ minWidth: Math.max(milestones.length * 120, 600) + 'px' }}>
-                                        <div className="absolute top-1/2 left-4 right-4 h-0.5 bg-slate-700 -translate-y-1/2 z-0" />
+                                    <div className="relative" style={{ minWidth: Math.max(milestones.length * 130, 600) + 'px', paddingTop: '90px', paddingBottom: '90px' }}>
+                                        {/* Horizontal line */}
+                                        <div className="absolute left-4 right-4 h-[3px] bg-gradient-to-r from-slate-700 via-slate-600 to-slate-700 rounded-full" style={{ top: '50%', transform: 'translateY(-50%)' }} />
+                                        {/* Plan range bar */}
                                         {focusedTask.plannedStartDate && focusedTask.plannedEndDate && (() => {
                                             const startIdx = milestones.findIndex(m => m.title === 'Inicio Plan');
                                             const endIdx = milestones.findIndex(m => m.title === 'Fin Plan');
                                             if (startIdx >= 0 && endIdx >= 0) {
                                                 const leftPct = (startIdx / (milestones.length - 1)) * 100;
                                                 const widthPct = ((endIdx - startIdx) / (milestones.length - 1)) * 100;
-                                                return <div className="absolute top-1/2 -translate-y-1/2 h-2 bg-cyan-500/20 rounded-full z-0" style={{ left: `${leftPct}%`, width: `${widthPct}%` }} />;
+                                                return <div className="absolute h-[5px] bg-cyan-500/30 rounded-full" style={{ left: `${leftPct}%`, width: `${widthPct}%`, top: '50%', transform: 'translateY(-50%)' }} />;
                                             }
                                             return null;
                                         })()}
-                                        <div className="flex justify-between w-full relative z-10">
-                                            {milestones.map((ms, i) => (
-                                                <div key={i} className="flex flex-col items-center" style={{ flex: '1 1 0', maxWidth: '140px' }}>
-                                                    {i % 2 === 0 ? (
-                                                        <>
-                                                            <span className="text-[10px] font-bold mb-1 text-center leading-tight" style={{ color: ms.color }}>
-                                                                {ms.title}
-                                                            </span>
-                                                            <span className="text-[8px] font-bold text-slate-500 mb-2">{ms.label}</span>
-                                                        </>
-                                                    ) : (
-                                                        <div className="h-[34px]" />
-                                                    )}
-                                                    <div
-                                                        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm shadow-lg border-2 transition-all ${
-                                                            ms.type === 'today'
-                                                                ? 'animate-pulse border-rose-400 bg-rose-500/20'
-                                                                : ms.type === 'plan'
-                                                                    ? 'border-cyan-400/50 bg-slate-800'
-                                                                    : 'border-indigo-400/50 bg-slate-800'
-                                                        }`}
-                                                        style={{ borderColor: ms.color + '80' }}
-                                                        title={`${ms.title} — ${ms.label}`}
-                                                    >
-                                                        {ms.icon}
+                                        {/* Nodes */}
+                                        <div className="flex justify-between w-full relative" style={{ height: '0px' }}>
+                                            {milestones.map((ms, i) => {
+                                                const isAbove = i % 2 === 0;
+                                                return (
+                                                    <div key={i} className="flex flex-col items-center relative" style={{ flex: '1 1 0', maxWidth: '150px' }}>
+                                                        {/* Above content */}
+                                                        <div className="absolute flex flex-col items-center" style={{ bottom: isAbove ? '20px' : 'auto', top: isAbove ? 'auto' : '20px', width: '130px', left: '50%', transform: 'translateX(-50%)' }}>
+                                                            {/* Connector line */}
+                                                            <div className={`w-[2px] ${isAbove ? 'order-last' : 'order-first'}`} style={{ height: '20px', backgroundColor: ms.color + '60' }} />
+                                                            {/* Content card */}
+                                                            <div className={`flex flex-col items-center text-center ${isAbove ? '' : 'mt-0'}`} style={{ order: isAbove ? 0 : 1 }}>
+                                                                <span className="text-[11px] font-black leading-tight" style={{ color: ms.color }}>
+                                                                    {ms.title}
+                                                                </span>
+                                                                <span className="text-[9px] font-bold text-slate-400 mt-0.5">
+                                                                    {ms.label}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        {/* Node circle */}
+                                                        <div
+                                                            className={`w-9 h-9 rounded-full flex items-center justify-center text-sm shadow-lg border-2 transition-all z-10 ${
+                                                                ms.type === 'today'
+                                                                    ? 'animate-pulse border-rose-400 bg-rose-500/20'
+                                                                    : 'bg-slate-800'
+                                                            }`}
+                                                            style={{ borderColor: ms.color + '80', boxShadow: `0 0 12px ${ms.color}30` }}
+                                                            title={`${ms.title} — ${ms.label}`}
+                                                        >
+                                                            {ms.icon}
+                                                        </div>
                                                     </div>
-                                                    {i % 2 !== 0 ? (
-                                                        <>
-                                                            <span className="text-[8px] font-bold text-slate-500 mt-2">{ms.label}</span>
-                                                            <span className="text-[10px] font-bold text-center leading-tight" style={{ color: ms.color }}>
-                                                                {ms.title}
-                                                            </span>
-                                                        </>
-                                                    ) : (
-                                                        <div className="h-[34px]" />
-                                                    )}
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 </div>
@@ -1025,9 +1038,9 @@ export default function TaskActivityPage() {
                                 No hay eventos registrados en este período. Completa subtareas o inicia timers para ver actividad.
                             </div>
                         ) : (
-                            <div className="h-[300px] w-full">
+                            <div className="h-[340px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <ComposedChart data={analytics.trendData} margin={{ top: 10, right: 40, left: -10, bottom: 0 }} style={{ cursor: 'pointer' }}>
+                                    <ComposedChart data={analytics.trendData} margin={{ top: 15, right: 50, left: 5, bottom: 25 }} style={{ cursor: 'pointer' }}>
                                         <defs>
                                             <linearGradient id="colorHoras" x1="0" y1="0" x2="0" y2="1">
                                                 <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.6} />
@@ -1035,9 +1048,9 @@ export default function TaskActivityPage() {
                                             </linearGradient>
                                         </defs>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
-                                        <XAxis dataKey="displayName" tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 700 }} axisLine={false} tickLine={false} dy={10} />
-                                        <YAxis yAxisId="left" allowDecimals={false} tick={{ fontSize: 10, fill: '#22c55e', fontWeight: 700 }} axisLine={false} tickLine={false} label={{ value: 'Subtareas', angle: -90, position: 'insideLeft', fill: '#22c55e', fontSize: 10, fontWeight: 700, dx: -5 }} />
-                                        <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#f59e0b', fontWeight: 700 }} axisLine={false} tickLine={false} unit="h" label={{ value: 'Horas', angle: 90, position: 'insideRight', fill: '#f59e0b', fontSize: 10, fontWeight: 700, dx: 10 }} />
+                                        <XAxis dataKey="displayName" tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 700 }} axisLine={false} tickLine={false} dy={8} angle={-30} textAnchor="end" height={50} />
+                                        <YAxis yAxisId="left" allowDecimals={false} tick={{ fontSize: 11, fill: '#22c55e', fontWeight: 700 }} axisLine={false} tickLine={false} label={{ value: 'Subtareas', angle: -90, position: 'insideLeft', fill: '#22c55e', fontSize: 11, fontWeight: 700, dx: 5 }} />
+                                        <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: '#f59e0b', fontWeight: 700 }} axisLine={false} tickLine={false} unit="h" label={{ value: 'Horas', angle: 90, position: 'insideRight', fill: '#f59e0b', fontSize: 11, fontWeight: 700, dx: -5 }} />
                                         <Tooltip
                                             labelFormatter={(_, payload) => payload?.[0]?.payload?.name || ''}
                                             contentStyle={{ borderRadius: '16px', border: '1px solid #334155', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3)', backgroundColor: '#1e293b', color: '#e2e8f0', fontSize: 12, fontWeight: 700 }}
