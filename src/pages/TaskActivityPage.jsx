@@ -290,13 +290,15 @@ export default function TaskActivityPage() {
 
         let chartStart, chartEnd;
 
+        let taskCompletedDate = null;
+
         if (autoDateRange) {
             // AUTO: adjust to event range
             const eventDates = filtered.map(l => l.date).filter(Boolean).sort();
             const firstEventDay = eventDates.length > 0 ? new Date(eventDates[0] + 'T00:00:00') : today;
             const lastEventDay = eventDates.length > 0 ? new Date(eventDates[eventDates.length - 1] + 'T00:00:00') : today;
 
-            const taskCompletedDate = (() => {
+            taskCompletedDate = (() => {
                 const completedLog = filtered.find(l => l.type === 'task_completed');
                 if (completedLog?.date) return new Date(completedLog.date + 'T00:00:00');
                 const currentTask = activeTaskId ? engTasks.find(t => t.id === activeTaskId) : null;
@@ -317,6 +319,8 @@ export default function TaskActivityPage() {
         const days = eachDayOfInterval({ start: chartStart, end: chartEnd });
         const trendMap = new Map();
         let todayLabel = '';
+        const isTaskCompleted = !!taskCompletedDate;
+        const completedLabel = taskCompletedDate ? format(taskCompletedDate, 'dd MMM', { locale: es }) : null;
 
         days.forEach(day => {
             const dateStr = format(day, 'yyyy-MM-dd');
@@ -424,7 +428,7 @@ export default function TaskActivityPage() {
         const taskCreatedLog = filtered.find(l => l.type === 'task_created');
         const taskCompletedLog = filtered.find(l => l.type === 'task_completed');
 
-        return { kpis, trendData, todayRefLabel, topTasks, timelineByDay, totalEvents: filtered.length, eventTypeDistribution, taskCreatedLog, taskCompletedLog };
+        return { kpis, trendData, todayRefLabel, topTasks, timelineByDay, totalEvents: filtered.length, eventTypeDistribution, taskCreatedLog, taskCompletedLog, completedLabel, isTaskCompleted };
     }, [activityLogs, selectedPersons, selectedProjects, selectedTaskId, selectedEventType, selectedDate, engTasks, activeTaskId, dateFrom, dateTo, timeLogs, autoDateRange]);
 
     // Progress chart data (built from logs with percentComplete in meta)
@@ -619,6 +623,10 @@ export default function TaskActivityPage() {
 
         // Today label for reference line (only for non-completed tasks)
         const todayLabel = isCompleted ? null : format(today, 'dd MMM', { locale: es });
+        // Completed date label for reference line
+        const completedLabel = isCompleted && workDays.length > 0
+            ? format(lastWorkDay, 'dd MMM', { locale: es })
+            : null;
 
         return {
             points,
@@ -628,6 +636,7 @@ export default function TaskActivityPage() {
             todayLabel,
             hasPlannedDates: !!plannedStart && !!plannedEnd,
             isCompleted,
+            completedLabel,
         };
     }, [activeTaskId, timeLogs, engTasks]);
 
@@ -1277,6 +1286,17 @@ export default function TaskActivityPage() {
                                     />
                                 )}
 
+                                {/* COMPLETED marker line */}
+                                {projectionChartData.completedLabel && (
+                                    <ReferenceLine
+                                        x={projectionChartData.completedLabel}
+                                        yAxisId="left"
+                                        stroke="#22c55e"
+                                        strokeWidth={2.5}
+                                        label={{ value: '✅ COMPLETADA', position: 'top', fill: '#22c55e', fontSize: 11, fontWeight: 'bold' }}
+                                    />
+                                )}
+
                                 {/* Daily hours bars (right axis) */}
                                 <Bar yAxisId="right" name="Horas/Día" dataKey="horasDia" fill="url(#colorDailyH)" barSize={18} radius={[4, 4, 0, 0]} />
 
@@ -1334,8 +1354,8 @@ export default function TaskActivityPage() {
                                         />
                                         <Legend wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }} />
 
-                                        {/* TODAY marker line */}
-                                        {analytics.todayRefLabel && (
+                                        {/* TODAY marker line (only for active tasks) */}
+                                        {analytics.todayRefLabel && !analytics.isTaskCompleted && (
                                             <ReferenceLine
                                                 x={analytics.todayRefLabel}
                                                 yAxisId="left"
@@ -1346,6 +1366,23 @@ export default function TaskActivityPage() {
                                                     value: 'HOY',
                                                     position: 'top',
                                                     fill: '#f43f5e',
+                                                    fontSize: 11,
+                                                    fontWeight: 'bold',
+                                                }}
+                                            />
+                                        )}
+
+                                        {/* COMPLETED marker line */}
+                                        {analytics.completedLabel && (
+                                            <ReferenceLine
+                                                x={analytics.completedLabel}
+                                                yAxisId="left"
+                                                stroke="#22c55e"
+                                                strokeWidth={2.5}
+                                                label={{
+                                                    value: '✅ COMPLETADA',
+                                                    position: 'top',
+                                                    fill: '#22c55e',
                                                     fontSize: 11,
                                                     fontWeight: 'bold',
                                                 }}
