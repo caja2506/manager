@@ -1274,26 +1274,26 @@ export default function TaskActivityPage() {
                                     />
                                 )}
 
-                                {/* End Plan marker */}
+                                {/* End Plan marker — dashed thin, label at top */}
                                 {projectionChartData.points.find(p => p.isEndPlan) && (
                                     <ReferenceLine
                                         x={projectionChartData.points.find(p => p.isEndPlan).name}
                                         yAxisId="left"
                                         stroke="#d946ef"
                                         strokeWidth={1.5}
-                                        strokeDasharray="4 4"
-                                        label={{ value: 'FIN PLAN', position: 'insideTopRight', fill: '#d946ef', fontSize: 9, fontWeight: 'bold' }}
+                                        strokeDasharray="4 3"
+                                        label={{ value: 'FIN PLAN', position: 'top', fill: '#d946ef', fontSize: 9, fontWeight: 'bold' }}
                                     />
                                 )}
 
-                                {/* COMPLETED marker line */}
+                                {/* COMPLETED marker line — solid thick, label at bottom */}
                                 {projectionChartData.completedLabel && (
                                     <ReferenceLine
                                         x={projectionChartData.completedLabel}
                                         yAxisId="left"
                                         stroke="#22c55e"
-                                        strokeWidth={2.5}
-                                        label={{ value: '✅ COMPLETADA', position: 'top', fill: '#22c55e', fontSize: 11, fontWeight: 'bold' }}
+                                        strokeWidth={3}
+                                        label={{ value: '✅ COMPLETADA', position: 'insideBottomRight', fill: '#22c55e', fontSize: 10, fontWeight: 'bold', dy: -8 }}
                                     />
                                 )}
 
@@ -1372,19 +1372,20 @@ export default function TaskActivityPage() {
                                             />
                                         )}
 
-                                        {/* COMPLETED marker line */}
+                                        {/* COMPLETED marker line — solid thick, label at bottom */}
                                         {analytics.completedLabel && (
                                             <ReferenceLine
                                                 x={analytics.completedLabel}
                                                 yAxisId="left"
                                                 stroke="#22c55e"
-                                                strokeWidth={2.5}
+                                                strokeWidth={3}
                                                 label={{
                                                     value: '✅ COMPLETADA',
-                                                    position: 'top',
+                                                    position: 'insideBottomRight',
                                                     fill: '#22c55e',
-                                                    fontSize: 11,
+                                                    fontSize: 10,
                                                     fontWeight: 'bold',
+                                                    dy: -8,
                                                 }}
                                             />
                                         )}
@@ -1439,13 +1440,13 @@ export default function TaskActivityPage() {
                                                     x={label}
                                                     yAxisId="left"
                                                     stroke="#d946ef"
-                                                    strokeWidth={2}
-                                                    strokeDasharray="6 3"
+                                                    strokeWidth={1.5}
+                                                    strokeDasharray="4 3"
                                                     label={{
                                                         value: `FIN PLAN ${format(new Date(focusedTask.plannedEndDate.substring(0, 10) + 'T12:00:00'), 'dd/MM', { locale: es })}`,
                                                         position: 'top',
                                                         fill: '#d946ef',
-                                                        fontSize: 10,
+                                                        fontSize: 9,
                                                         fontWeight: 'bold',
                                                     }}
                                                 />
