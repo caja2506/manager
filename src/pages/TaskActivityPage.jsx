@@ -326,13 +326,16 @@ export default function TaskActivityPage() {
             const dateStr = format(day, 'yyyy-MM-dd');
             const label = format(day, 'dd MMM', { locale: es });
             const isFutureDay = isBefore(today, day) && !isToday(day);
+            // For completed tasks, treat days after completion as "no data"
+            const isAfterCompleted = isTaskCompleted && taskCompletedDate && isBefore(taskCompletedDate, day);
+            const noData = isFutureDay || isAfterCompleted;
             if (isToday(day)) todayLabel = label;
             trendMap.set(dateStr, {
                 name: label,
-                subtareas: isFutureDay ? null : 0,
-                horas: isFutureDay ? null : 0,
-                status: isFutureDay ? null : 0,
-                isFuture: isFutureDay,
+                subtareas: noData ? null : 0,
+                horas: noData ? null : 0,
+                status: noData ? null : 0,
+                isFuture: noData,
                 isToday: isToday(day),
             });
         });
