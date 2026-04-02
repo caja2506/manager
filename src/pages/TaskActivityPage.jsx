@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useEngineeringData } from '../hooks/useEngineeringData';
 import { useRole } from '../contexts/RoleContext';
+import TaskDetailModal from '../components/tasks/TaskDetailModal';
 import { fetchAllActivityLogs, fetchTaskActivityLog, updateActivityLog, deleteActivityLog } from '../services/activityLogService';
 import {
     AreaChart, Area, BarChart, Bar, LineChart, Line, Cell,
@@ -8,11 +9,11 @@ import {
     PieChart, Pie, ReferenceLine,
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
     Activity, TrendingUp, CheckSquare, RefreshCw, Timer, AlertTriangle,
     Calendar as CalendarIcon, CalendarDays, X, ChevronDown, Check, FolderGit2, User,
-    Pencil, Trash2, Save
+    Pencil, Trash2, Save, ExternalLink, ListTodo
 } from 'lucide-react';
 import { format, subDays, addDays, eachDayOfInterval, isToday, isBefore, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -131,8 +132,9 @@ function MultiSelect({ icon: Icon, options, selected, onChange, allLabel = 'Todo
 }
 
 export default function TaskActivityPage() {
-    const { engProjects, engTasks, teamMembers, timeLogs } = useEngineeringData();
-    const { role } = useRole();
+    const { engProjects, engTasks, engSubtasks, teamMembers, timeLogs, taskTypes } = useEngineeringData();
+    const { role, canEdit, canDelete } = useRole();
+    const navigate = useNavigate();
     const isAdmin = role === 'admin';
     const [searchParams, setSearchParams] = useSearchParams();
     const urlTaskId = searchParams.get('taskId');
@@ -151,6 +153,17 @@ export default function TaskActivityPage() {
     const actualHoursFromTimeLogs = Math.round(taskTimeLogs.reduce((sum, log) => sum + (log.totalHours || 0), 0) * 10) / 10;
 
     const [showHoursDetail, setShowHoursDetail] = useState(false);
+
+    // Task modal state
+    const [selectedTaskForModal, setSelectedTaskForModal] = useState(null);
+    const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+
+    const openTaskModal = () => {
+        if (focusedTask) {
+            setSelectedTaskForModal(focusedTask);
+            setIsTaskModalOpen(true);
+        }
+    };
 
     // Filter state
     const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
@@ -724,9 +737,23 @@ export default function TaskActivityPage() {
             <div className="flex flex-wrap items-center gap-3 relative z-20">
                 {/* Focused task label */}
                 {focusedTask && (
-                    <span className="text-sm font-black text-white bg-indigo-600/20 border border-indigo-500/30 px-3 py-1.5 rounded-xl truncate max-w-[200px]">
-                        {focusedTask.title}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                        <button
+                            onClick={openTaskModal}
+                            className="text-sm font-black text-white bg-indigo-600/20 border border-indigo-500/30 px-3 py-1.5 rounded-xl truncate max-w-[200px] hover:bg-indigo-600/30 hover:border-indigo-400/50 transition-all cursor-pointer flex items-center gap-1.5"
+                            title="Editar tarea"
+                        >
+                            <ListTodo className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                            {focusedTask.title}
+                        </button>
+                        <button
+                            onClick={() => navigate('/tasks')}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-300 hover:bg-indigo-500/10 border border-transparent hover:border-indigo-500/20 transition-all"
+                            title="Ir a Tareas"
+                        >
+                            <ExternalLink className="w-4 h-4" />
+                        </button>
+                    </div>
                 )}
 
                 {/* Active filter pills */}
@@ -1787,7 +1814,23 @@ export default function TaskActivityPage() {
                         )}
                     </div>
 
+
                 </div>
+            )}
+
+            {/* Task Detail Modal */}
+            {isTaskModalOpen && selectedTaskForModal && (
+                <TaskDetailModal
+                    task={selectedTaskForModal}
+                    isOpen={isTaskModalOpen}
+                    onClose={() => { setIsTaskModalOpen(false); setSelectedTaskForModal(null); }}
+                    projects={engProjects}
+                    subtasks={(engSubtasks || []).filter(s => s.taskId === selectedTaskForModal.id)}
+                    taskTypes={taskTypes || []}
+                    teamMembers={teamMembers || []}
+                    canEdit={canEdit}
+                    canDelete={canDelete}
+                />
             )}
 
         </div>
