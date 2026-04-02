@@ -685,6 +685,149 @@ export default function TaskActivityPage() {
                 </div>
             )}
 
+            {/* === VISUAL TASK LIFE TIMELINE (infographic) === */}
+            {activeTaskId && focusedTask && (
+                <div className="bg-slate-900/70 p-6 rounded-2xl border border-slate-800 shadow-lg">
+                    <div className="flex items-center gap-2 mb-5">
+                        <CalendarDays className="w-5 h-5 text-cyan-400" />
+                        <h3 className="font-bold text-lg text-white">Línea de Vida de la Tarea</h3>
+                        <span className="text-[9px] font-bold text-cyan-400 bg-cyan-500/15 px-2 py-0.5 rounded-full">
+                            {focusedTask.status}
+                        </span>
+                    </div>
+                    {(() => {
+                        const milestones = [];
+                        const fmtDate = (iso) => {
+                            if (!iso) return null;
+                            const d = new Date(iso.length > 10 ? iso : iso + 'T12:00:00');
+                            return { date: d, label: format(d, 'dd/MM/yy', { locale: es }) };
+                        };
+                        if (focusedTask.plannedStartDate) {
+                            const p = fmtDate(focusedTask.plannedStartDate);
+                            milestones.push({ date: p.date, label: p.label, title: 'Inicio Plan', color: '#06b6d4', icon: '🏁', type: 'plan' });
+                        }
+                        if (focusedTask.plannedEndDate) {
+                            const p = fmtDate(focusedTask.plannedEndDate);
+                            milestones.push({ date: p.date, label: p.label, title: 'Fin Plan', color: '#d946ef', icon: '🎯', type: 'plan' });
+                        }
+                        if (focusedTask.dueDate) {
+                            const p = fmtDate(focusedTask.dueDate);
+                            milestones.push({ date: p.date, label: p.label, title: 'Fecha Límite', color: '#f59e0b', icon: '⏰', type: 'plan' });
+                        }
+                        const taskLogs = activityLogs.filter(l => l.taskId === activeTaskId).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+                        const firstLog = taskLogs.find(l => l.type === 'task_created');
+                        if (firstLog) {
+                            const p = fmtDate(firstLog.timestamp);
+                            milestones.push({ date: p.date, label: p.label, title: 'Creada', color: '#64748b', icon: '📋', type: 'event' });
+                        }
+                        taskLogs.filter(l => l.type === 'status_changed').forEach(log => {
+                            const p = fmtDate(log.timestamp);
+                            const to = log.meta?.to || log.description?.split('→')[1]?.trim() || '';
+                            milestones.push({ date: p.date, label: p.label, title: to, color: '#6366f1', icon: '🔄', type: 'event' });
+                        });
+                        const subtaskLogs = taskLogs.filter(l => l.type === 'subtask_completed');
+                        if (subtaskLogs.length > 0) {
+                            const first = subtaskLogs[0];
+                            const last = subtaskLogs[subtaskLogs.length - 1];
+                            const p1 = fmtDate(first.timestamp);
+                            milestones.push({ date: p1.date, label: p1.label, title: `1ª Subtarea`, color: '#22c55e', icon: '✅', type: 'event' });
+                            if (subtaskLogs.length > 1) {
+                                const p2 = fmtDate(last.timestamp);
+                                milestones.push({ date: p2.date, label: p2.label, title: `Última (#${subtaskLogs.length})`, color: '#22c55e', icon: '✅', type: 'event' });
+                            }
+                        }
+                        const timerLogs = taskLogs.filter(l => l.type === 'timer_stopped' && l.meta?.totalHours);
+                        if (timerLogs.length > 0) {
+                            const totalH = Math.round(timerLogs.reduce((s, l) => s + (l.meta.totalHours || 0), 0) * 10) / 10;
+                            const lastTimer = timerLogs[timerLogs.length - 1];
+                            const p = fmtDate(lastTimer.timestamp);
+                            milestones.push({ date: p.date, label: p.label, title: `${totalH}h timer`, color: '#f59e0b', icon: '⏱️', type: 'event' });
+                        }
+                        const completedLog = taskLogs.find(l => l.type === 'task_completed');
+                        if (completedLog) {
+                            const p = fmtDate(completedLog.timestamp);
+                            milestones.push({ date: p.date, label: p.label, title: 'Completada', color: '#22c55e', icon: '🏆', type: 'event' });
+                        }
+                        const now = new Date();
+                        const isCompleted = focusedTask.status === 'completed' || focusedTask.status === 'closed';
+                        if (!isCompleted) {
+                            milestones.push({ date: now, label: format(now, 'dd/MM/yy'), title: 'HOY', color: '#f43f5e', icon: '📍', type: 'today' });
+                        }
+                        milestones.sort((a, b) => a.date - b.date);
+                        if (milestones.length === 0) return <div className="text-slate-400 font-bold text-center py-8">Sin fechas configuradas</div>;
+                        return (
+                            <div className="relative">
+                                <div className="flex gap-4 mb-4 flex-wrap">
+                                    <span className="flex items-center gap-1 text-[9px] font-bold text-slate-400">
+                                        <span className="w-3 h-0.5 bg-cyan-400 inline-block rounded" /> Fechas Plan
+                                    </span>
+                                    <span className="flex items-center gap-1 text-[9px] font-bold text-slate-400">
+                                        <span className="w-3 h-0.5 bg-indigo-400 inline-block rounded" /> Eventos Reales
+                                    </span>
+                                    <span className="flex items-center gap-1 text-[9px] font-bold text-slate-400">
+                                        <span className="w-3 h-0.5 bg-rose-400 inline-block rounded" /> Hoy
+                                    </span>
+                                </div>
+                                <div className="overflow-x-auto pb-2">
+                                    <div className="relative flex items-center" style={{ minWidth: Math.max(milestones.length * 120, 600) + 'px' }}>
+                                        <div className="absolute top-1/2 left-4 right-4 h-0.5 bg-slate-700 -translate-y-1/2 z-0" />
+                                        {focusedTask.plannedStartDate && focusedTask.plannedEndDate && (() => {
+                                            const startIdx = milestones.findIndex(m => m.title === 'Inicio Plan');
+                                            const endIdx = milestones.findIndex(m => m.title === 'Fin Plan');
+                                            if (startIdx >= 0 && endIdx >= 0) {
+                                                const leftPct = (startIdx / (milestones.length - 1)) * 100;
+                                                const widthPct = ((endIdx - startIdx) / (milestones.length - 1)) * 100;
+                                                return <div className="absolute top-1/2 -translate-y-1/2 h-2 bg-cyan-500/20 rounded-full z-0" style={{ left: `${leftPct}%`, width: `${widthPct}%` }} />;
+                                            }
+                                            return null;
+                                        })()}
+                                        <div className="flex justify-between w-full relative z-10">
+                                            {milestones.map((ms, i) => (
+                                                <div key={i} className="flex flex-col items-center" style={{ flex: '1 1 0', maxWidth: '140px' }}>
+                                                    {i % 2 === 0 ? (
+                                                        <>
+                                                            <span className="text-[10px] font-bold mb-1 text-center leading-tight" style={{ color: ms.color }}>
+                                                                {ms.title}
+                                                            </span>
+                                                            <span className="text-[8px] font-bold text-slate-500 mb-2">{ms.label}</span>
+                                                        </>
+                                                    ) : (
+                                                        <div className="h-[34px]" />
+                                                    )}
+                                                    <div
+                                                        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm shadow-lg border-2 transition-all ${
+                                                            ms.type === 'today'
+                                                                ? 'animate-pulse border-rose-400 bg-rose-500/20'
+                                                                : ms.type === 'plan'
+                                                                    ? 'border-cyan-400/50 bg-slate-800'
+                                                                    : 'border-indigo-400/50 bg-slate-800'
+                                                        }`}
+                                                        style={{ borderColor: ms.color + '80' }}
+                                                        title={`${ms.title} — ${ms.label}`}
+                                                    >
+                                                        {ms.icon}
+                                                    </div>
+                                                    {i % 2 !== 0 ? (
+                                                        <>
+                                                            <span className="text-[8px] font-bold text-slate-500 mt-2">{ms.label}</span>
+                                                            <span className="text-[10px] font-bold text-center leading-tight" style={{ color: ms.color }}>
+                                                                {ms.title}
+                                                            </span>
+                                                        </>
+                                                    ) : (
+                                                        <div className="h-[34px]" />
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
+                </div>
+            )}
+
             {/* --- PROGRESS CHART (when a task is selected) --- */}
             {activeTaskId && progressChartData.points.length > 0 && (
                 <div className="bg-slate-900/70 p-6 rounded-2xl border border-slate-800 shadow-lg">
@@ -1102,182 +1245,6 @@ export default function TaskActivityPage() {
                             </div>
                         )}
                     </div>
-
-                    {/* === VISUAL TASK LIFE TIMELINE (infographic) === */}
-                    {activeTaskId && focusedTask && (
-                        <div className="bg-slate-900/70 p-6 rounded-2xl border border-slate-800 shadow-lg lg:col-span-2">
-                            <div className="flex items-center gap-2 mb-5">
-                                <CalendarDays className="w-5 h-5 text-cyan-400" />
-                                <h3 className="font-bold text-lg text-white">Línea de Vida de la Tarea</h3>
-                                <span className="text-[9px] font-bold text-cyan-400 bg-cyan-500/15 px-2 py-0.5 rounded-full">
-                                    {focusedTask.status}
-                                </span>
-                            </div>
-                            {(() => {
-                                // Build milestone array from task dates + events
-                                const milestones = [];
-                                const fmtDate = (iso) => {
-                                    if (!iso) return null;
-                                    const d = new Date(iso.length > 10 ? iso : iso + 'T12:00:00');
-                                    return { date: d, label: format(d, 'dd/MM/yy', { locale: es }) };
-                                };
-
-                                // Planned dates
-                                if (focusedTask.plannedStartDate) {
-                                    const p = fmtDate(focusedTask.plannedStartDate);
-                                    milestones.push({ date: p.date, label: p.label, title: 'Inicio Plan', color: '#06b6d4', icon: '🏁', type: 'plan' });
-                                }
-                                if (focusedTask.plannedEndDate) {
-                                    const p = fmtDate(focusedTask.plannedEndDate);
-                                    milestones.push({ date: p.date, label: p.label, title: 'Fin Plan', color: '#d946ef', icon: '🎯', type: 'plan' });
-                                }
-                                if (focusedTask.dueDate) {
-                                    const p = fmtDate(focusedTask.dueDate);
-                                    milestones.push({ date: p.date, label: p.label, title: 'Fecha Límite', color: '#f59e0b', icon: '⏰', type: 'plan' });
-                                }
-
-                                // Key events from activity logs
-                                const taskLogs = activityLogs.filter(l => l.taskId === activeTaskId).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-                                const firstLog = taskLogs.find(l => l.type === 'task_created');
-                                if (firstLog) {
-                                    const p = fmtDate(firstLog.timestamp);
-                                    milestones.push({ date: p.date, label: p.label, title: 'Creada', color: '#64748b', icon: '📋', type: 'event' });
-                                }
-
-                                // Status changes
-                                taskLogs.filter(l => l.type === 'status_changed').forEach(log => {
-                                    const p = fmtDate(log.timestamp);
-                                    const to = log.meta?.to || log.description?.split('→')[1]?.trim() || '';
-                                    milestones.push({ date: p.date, label: p.label, title: to, color: '#6366f1', icon: '🔄', type: 'event' });
-                                });
-
-                                // Subtask milestones (first and last only)
-                                const subtaskLogs = taskLogs.filter(l => l.type === 'subtask_completed');
-                                if (subtaskLogs.length > 0) {
-                                    const first = subtaskLogs[0];
-                                    const last = subtaskLogs[subtaskLogs.length - 1];
-                                    const p1 = fmtDate(first.timestamp);
-                                    milestones.push({ date: p1.date, label: p1.label, title: `1ª Subtarea`, color: '#22c55e', icon: '✅', type: 'event' });
-                                    if (subtaskLogs.length > 1) {
-                                        const p2 = fmtDate(last.timestamp);
-                                        milestones.push({ date: p2.date, label: p2.label, title: `Última (#${subtaskLogs.length})`, color: '#22c55e', icon: '✅', type: 'event' });
-                                    }
-                                }
-
-                                // Timer sessions (aggregate)
-                                const timerLogs = taskLogs.filter(l => l.type === 'timer_stopped' && l.meta?.totalHours);
-                                if (timerLogs.length > 0) {
-                                    const totalH = Math.round(timerLogs.reduce((s, l) => s + (l.meta.totalHours || 0), 0) * 10) / 10;
-                                    const lastTimer = timerLogs[timerLogs.length - 1];
-                                    const p = fmtDate(lastTimer.timestamp);
-                                    milestones.push({ date: p.date, label: p.label, title: `${totalH}h timer`, color: '#f59e0b', icon: '⏱️', type: 'event' });
-                                }
-
-                                // Completed
-                                const completedLog = taskLogs.find(l => l.type === 'task_completed');
-                                if (completedLog) {
-                                    const p = fmtDate(completedLog.timestamp);
-                                    milestones.push({ date: p.date, label: p.label, title: 'Completada', color: '#22c55e', icon: '🏆', type: 'event' });
-                                }
-
-                                // TODAY
-                                const now = new Date();
-                                const isCompleted = focusedTask.status === 'completed' || focusedTask.status === 'closed';
-                                if (!isCompleted) {
-                                    milestones.push({ date: now, label: format(now, 'dd/MM/yy'), title: 'HOY', color: '#f43f5e', icon: '📍', type: 'today' });
-                                }
-
-                                // Sort by date
-                                milestones.sort((a, b) => a.date - b.date);
-
-                                if (milestones.length === 0) return <div className="text-slate-400 font-bold text-center py-8">Sin fechas configuradas</div>;
-
-                                return (
-                                    <div className="relative">
-                                        {/* Legend */}
-                                        <div className="flex gap-4 mb-4 flex-wrap">
-                                            <span className="flex items-center gap-1 text-[9px] font-bold text-slate-400">
-                                                <span className="w-3 h-0.5 bg-cyan-400 inline-block rounded" /> Fechas Plan
-                                            </span>
-                                            <span className="flex items-center gap-1 text-[9px] font-bold text-slate-400">
-                                                <span className="w-3 h-0.5 bg-indigo-400 inline-block rounded" /> Eventos Reales
-                                            </span>
-                                            <span className="flex items-center gap-1 text-[9px] font-bold text-slate-400">
-                                                <span className="w-3 h-0.5 bg-rose-400 inline-block rounded" /> Hoy
-                                            </span>
-                                        </div>
-
-                                        {/* Horizontal timeline */}
-                                        <div className="overflow-x-auto pb-2">
-                                            <div className="relative flex items-center" style={{ minWidth: Math.max(milestones.length * 120, 600) + 'px' }}>
-                                                {/* Main line */}
-                                                <div className="absolute top-1/2 left-4 right-4 h-0.5 bg-slate-700 -translate-y-1/2 z-0" />
-
-                                                {/* Planned range highlight */}
-                                                {focusedTask.plannedStartDate && focusedTask.plannedEndDate && (() => {
-                                                    const startIdx = milestones.findIndex(m => m.title === 'Inicio Plan');
-                                                    const endIdx = milestones.findIndex(m => m.title === 'Fin Plan');
-                                                    if (startIdx >= 0 && endIdx >= 0) {
-                                                        const leftPct = (startIdx / (milestones.length - 1)) * 100;
-                                                        const widthPct = ((endIdx - startIdx) / (milestones.length - 1)) * 100;
-                                                        return <div className="absolute top-1/2 -translate-y-1/2 h-2 bg-cyan-500/20 rounded-full z-0" style={{ left: `${leftPct}%`, width: `${widthPct}%` }} />;
-                                                    }
-                                                    return null;
-                                                })()}
-
-                                                {/* Milestone nodes */}
-                                                <div className="flex justify-between w-full relative z-10">
-                                                    {milestones.map((ms, i) => (
-                                                        <div key={i} className="flex flex-col items-center" style={{ flex: '1 1 0', maxWidth: '140px' }}>
-                                                            {/* Top label: alternating above/below */}
-                                                            {i % 2 === 0 ? (
-                                                                <>
-                                                                    <span className="text-[10px] font-bold mb-1 text-center leading-tight" style={{ color: ms.color }}>
-                                                                        {ms.title}
-                                                                    </span>
-                                                                    <span className="text-[8px] font-bold text-slate-500 mb-2">{ms.label}</span>
-                                                                </>
-                                                            ) : (
-                                                                <div className="h-[34px]" />
-                                                            )}
-
-                                                            {/* Node circle */}
-                                                            <div
-                                                                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm shadow-lg border-2 transition-all ${
-                                                                    ms.type === 'today'
-                                                                        ? 'animate-pulse border-rose-400 bg-rose-500/20'
-                                                                        : ms.type === 'plan'
-                                                                            ? 'border-cyan-400/50 bg-slate-800'
-                                                                            : 'border-indigo-400/50 bg-slate-800'
-                                                                }`}
-                                                                style={{ borderColor: ms.color + '80' }}
-                                                                title={`${ms.title} — ${ms.label}`}
-                                                            >
-                                                                {ms.icon}
-                                                            </div>
-
-                                                            {/* Bottom label (alternating) */}
-                                                            {i % 2 !== 0 ? (
-                                                                <>
-                                                                    <span className="text-[8px] font-bold text-slate-500 mt-2">{ms.label}</span>
-                                                                    <span className="text-[10px] font-bold text-center leading-tight" style={{ color: ms.color }}>
-                                                                        {ms.title}
-                                                                    </span>
-                                                                </>
-                                                            ) : (
-                                                                <div className="h-[34px]" />
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })()}
-                        </div>
-                    )}
-
                     {/* Timeline (detailed events) */}
                     <div className="bg-slate-900/70 p-6 rounded-2xl border border-slate-800 shadow-lg">
                         <div className="flex items-center gap-2 mb-5">
