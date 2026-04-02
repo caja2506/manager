@@ -539,9 +539,13 @@ export default function TaskActivityPage() {
                 : addDays(plannedStart, -1))
             : (workDays.length > 0 ? addDays(new Date(workDays[0] + 'T00:00:00'), -1) : addDays(today, -7));
 
+        // For completed tasks, end at last work day + 1
+        const lastWorkDay = workDays.length > 0 ? new Date(workDays[workDays.length - 1] + 'T00:00:00') : today;
         const rangeEnd = isCompleted
-            ? (workDays.length > 0 ? addDays(new Date(workDays[workDays.length - 1] + 'T00:00:00'), 1) : today)
+            ? addDays(lastWorkDay, 1)
             : (plannedEnd && isBefore(today, plannedEnd) ? addDays(plannedEnd, 1) : addDays(today, 3));
+        // effectiveToday: for completed tasks, treat last work day as "today" so future days don't appear
+        const effectiveToday = isCompleted ? lastWorkDay : today;
 
         const days = eachDayOfInterval({ start: rangeStart, end: rangeEnd });
 
@@ -556,7 +560,7 @@ export default function TaskActivityPage() {
         const points = days.map(day => {
             const dateStr = format(day, 'yyyy-MM-dd');
             const label = format(day, 'dd MMM', { locale: es });
-            const isFutureDay = isBefore(today, day) && !isToday(day);
+            const isFutureDay = isBefore(effectiveToday, day) && !isToday(day);
             const dailyH = hoursByDay[dateStr] || 0;
 
             if (!isFutureDay) {
@@ -595,18 +599,26 @@ export default function TaskActivityPage() {
         });
 
         // Calculate tracking status
-        const todayProjection = points.find(p => p.isToday)?.proyeccion;
-        const todayAccumulated = points.find(p => p.isToday)?.acumuladas ?? accumulated;
         let trackingStatus = 'none';
-        if (todayProjection && todayProjection > 0) {
-            const ratio = todayAccumulated / todayProjection;
+        if (isCompleted && estimatedHours > 0) {
+            // For completed tasks, compare final accumulated vs estimated
+            const ratio = accumulated / estimatedHours;
             if (ratio >= 0.9) trackingStatus = 'on-track';
             else if (ratio >= 0.7) trackingStatus = 'at-risk';
             else trackingStatus = 'behind';
+        } else {
+            const todayProjection = points.find(p => p.isToday)?.proyeccion;
+            const todayAccumulated = points.find(p => p.isToday)?.acumuladas ?? accumulated;
+            if (todayProjection && todayProjection > 0) {
+                const ratio = todayAccumulated / todayProjection;
+                if (ratio >= 0.9) trackingStatus = 'on-track';
+                else if (ratio >= 0.7) trackingStatus = 'at-risk';
+                else trackingStatus = 'behind';
+            }
         }
 
-        // Today label for reference line
-        const todayLabel = format(today, 'dd MMM', { locale: es });
+        // Today label for reference line (only for non-completed tasks)
+        const todayLabel = isCompleted ? null : format(today, 'dd MMM', { locale: es });
 
         return {
             points,
@@ -615,6 +627,7 @@ export default function TaskActivityPage() {
             trackingStatus,
             todayLabel,
             hasPlannedDates: !!plannedStart && !!plannedEnd,
+            isCompleted,
         };
     }, [activeTaskId, timeLogs, engTasks]);
 
@@ -1164,6 +1177,11 @@ export default function TaskActivityPage() {
                         {!projectionChartData.hasPlannedDates && (
                             <span className="text-[9px] font-bold text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">
                                 Sin fechas plan — sin proyección
+                            </span>
+                        )}
+                        {projectionChartData.isCompleted && (
+                            <span className="text-[9px] font-black text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                                ✅ Completada
                             </span>
                         )}
                     </div>
