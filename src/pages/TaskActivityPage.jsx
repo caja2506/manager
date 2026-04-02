@@ -818,11 +818,31 @@ export default function TaskActivityPage() {
                                 milestones.push({ date: p2.date, label: p2.label, title: `Última (#${subtaskLogs.length})`, color: '#22c55e', icon: '✅', type: 'event' });
                             }
                         }
-                        // Timer hours from timeLogs (source of truth)
+                        // Timer hours from timeLogs (source of truth) — show each day individually
                         if (taskTimeLogs.length > 0) {
-                            const lastTimer = taskTimeLogs[0]; // sorted desc by startTime
-                            const p = fmtDate(lastTimer.startTime || lastTimer.endTime);
-                            milestones.push({ date: p.date, label: p.label, title: `${actualHoursFromTimeLogs}h registradas`, color: '#f59e0b', icon: '⏱️', type: 'event' });
+                            // Group by day
+                            const hoursByDay = {};
+                            taskTimeLogs.forEach(tl => {
+                                if (!tl.startTime) return;
+                                const day = tl.startTime.substring(0, 10);
+                                hoursByDay[day] = (hoursByDay[day] || 0) + (tl.totalHours || 0);
+                            });
+                            // Add a milestone for each work day
+                            Object.entries(hoursByDay)
+                                .sort(([a], [b]) => a.localeCompare(b))
+                                .forEach(([day, hours]) => {
+                                    const p = fmtDate(day);
+                                    if (p) {
+                                        milestones.push({
+                                            date: p.date,
+                                            label: p.label,
+                                            title: `${Math.round(hours * 10) / 10}h`,
+                                            color: '#f59e0b',
+                                            icon: '⏱️',
+                                            type: 'event',
+                                        });
+                                    }
+                                });
                         }
                         const completedLog = taskLogs.find(l => l.type === 'task_completed');
                         if (completedLog) {
