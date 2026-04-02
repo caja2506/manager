@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useEngineeringData } from '../../hooks/useEngineeringData';
-import { Clock, FileText, BarChart3, LineChart, Activity, ArrowLeft } from 'lucide-react';
+import { Clock, FileText, BarChart3, LineChart, Activity, ArrowLeft, ListTodo } from 'lucide-react';
 
 const REPORT_TABS = [
     { to: '/work-logs', label: 'Registro Horas', icon: Clock },
@@ -10,6 +10,7 @@ const REPORT_TABS = [
     { to: '/reports/weekly', label: 'Reporte Semanal', icon: BarChart3 },
     { to: '/analytics', label: 'Analítica', icon: LineChart },
     { to: '/reports/activity', label: 'Actividad', icon: Activity },
+    { to: '/tasks', label: 'Tareas', icon: ListTodo },
 ];
 
 export default function ReportsLayout() {
