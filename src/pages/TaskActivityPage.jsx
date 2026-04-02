@@ -800,6 +800,48 @@ export default function TaskActivityPage() {
                                         {/* Status changes - subtle line (left axis) */}
                                         <Line yAxisId="left" type="monotone" name="Cambios Status" dataKey="status" stroke="#6366f1" strokeWidth={2} strokeDasharray="4 2" dot={{ fill: '#6366f1', r: 3, strokeWidth: 0 }} connectNulls={false} />
 
+                                        {/* PLANNED START DATE marker line */}
+                                        {focusedTask?.plannedStartDate && (() => {
+                                            const label = format(new Date(focusedTask.plannedStartDate.substring(0, 10) + 'T12:00:00'), 'dd MMM', { locale: es });
+                                            return (
+                                                <ReferenceLine
+                                                    x={label}
+                                                    yAxisId="left"
+                                                    stroke="#06b6d4"
+                                                    strokeWidth={2}
+                                                    strokeDasharray="6 3"
+                                                    label={{
+                                                        value: `INICIO ${format(new Date(focusedTask.plannedStartDate.substring(0, 10) + 'T12:00:00'), 'dd/MM', { locale: es })}`,
+                                                        position: 'top',
+                                                        fill: '#06b6d4',
+                                                        fontSize: 10,
+                                                        fontWeight: 'bold',
+                                                    }}
+                                                />
+                                            );
+                                        })()}
+
+                                        {/* PLANNED END DATE marker line */}
+                                        {focusedTask?.plannedEndDate && (() => {
+                                            const label = format(new Date(focusedTask.plannedEndDate.substring(0, 10) + 'T12:00:00'), 'dd MMM', { locale: es });
+                                            return (
+                                                <ReferenceLine
+                                                    x={label}
+                                                    yAxisId="left"
+                                                    stroke="#d946ef"
+                                                    strokeWidth={2}
+                                                    strokeDasharray="6 3"
+                                                    label={{
+                                                        value: `FIN PLAN ${format(new Date(focusedTask.plannedEndDate.substring(0, 10) + 'T12:00:00'), 'dd/MM', { locale: es })}`,
+                                                        position: 'top',
+                                                        fill: '#d946ef',
+                                                        fontSize: 10,
+                                                        fontWeight: 'bold',
+                                                    }}
+                                                />
+                                            );
+                                        })()}
+
                                         {/* DUE DATE marker line */}
                                         {focusedTask?.dueDate && (() => {
                                             const dueDateLabel = format(new Date(focusedTask.dueDate.substring(0, 10) + 'T12:00:00'), 'dd MMM', { locale: es });
