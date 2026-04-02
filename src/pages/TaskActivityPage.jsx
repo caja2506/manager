@@ -155,6 +155,7 @@ export default function TaskActivityPage() {
     // Filter state
     const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
     const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
+    const [autoDateRange, setAutoDateRange] = useState(true);
     const [selectedPersons, setSelectedPersons] = useState([]);
     const [selectedProjects, setSelectedProjects] = useState([]);
 
@@ -284,31 +285,34 @@ export default function TaskActivityPage() {
             delaysReported: filtered.filter(l => l.type === 'delay_reported').length,
         };
 
-        // Trend data — auto-adjusted range + correlation data
+        // Trend data — date range for chart
         const today = startOfDay(new Date());
 
-        // Find first and last day with actual activity
-        const eventDates = filtered.map(l => l.date).filter(Boolean).sort();
-        const firstEventDay = eventDates.length > 0 ? new Date(eventDates[0] + 'T00:00:00') : today;
-        const lastEventDay = eventDates.length > 0 ? new Date(eventDates[eventDates.length - 1] + 'T00:00:00') : today;
+        let chartStart, chartEnd;
 
-        // Check if task is completed (no future extension needed)
-        const taskCompletedDate = (() => {
-            const completedLog = filtered.find(l => l.type === 'task_completed');
-            if (completedLog?.date) return new Date(completedLog.date + 'T00:00:00');
-            // Also check task status
-            const currentTask = activeTaskId ? engTasks.find(t => t.id === activeTaskId) : null;
-            if (currentTask?.status === 'completed' || currentTask?.status === 'closed') {
-                return lastEventDay;
-            }
-            return null;
-        })();
+        if (autoDateRange) {
+            // AUTO: adjust to event range
+            const eventDates = filtered.map(l => l.date).filter(Boolean).sort();
+            const firstEventDay = eventDates.length > 0 ? new Date(eventDates[0] + 'T00:00:00') : today;
+            const lastEventDay = eventDates.length > 0 ? new Date(eventDates[eventDates.length - 1] + 'T00:00:00') : today;
 
-        // Auto-adjust: if task completed, end at completion date +1; otherwise end 3 days after today
-        const chartStart = addDays(firstEventDay, -2);
-        const chartEnd = taskCompletedDate
-            ? addDays(taskCompletedDate, 1)
-            : addDays(isBefore(lastEventDay, today) ? today : lastEventDay, 3);
+            const taskCompletedDate = (() => {
+                const completedLog = filtered.find(l => l.type === 'task_completed');
+                if (completedLog?.date) return new Date(completedLog.date + 'T00:00:00');
+                const currentTask = activeTaskId ? engTasks.find(t => t.id === activeTaskId) : null;
+                if (currentTask?.status === 'completed' || currentTask?.status === 'closed') return lastEventDay;
+                return null;
+            })();
+
+            chartStart = addDays(firstEventDay, -2);
+            chartEnd = taskCompletedDate
+                ? addDays(taskCompletedDate, 1)
+                : addDays(isBefore(lastEventDay, today) ? today : lastEventDay, 3);
+        } else {
+            // MANUAL: respect dateFrom / dateTo
+            chartStart = new Date(dateFrom + 'T00:00:00');
+            chartEnd = new Date(dateTo + 'T00:00:00');
+        }
 
         const days = eachDayOfInterval({ start: chartStart, end: chartEnd });
         const trendMap = new Map();
@@ -347,6 +351,9 @@ export default function TaskActivityPage() {
                 if (selectedProjects.length > 0 && !selectedProjects.includes(tl.projectId)) return false;
                 if (activeTaskId && tl.taskId !== activeTaskId) return false;
                 if (selectedTaskId && tl.taskId !== selectedTaskId) return false;
+                // Date range filter (always applied — timeLogs respect chosen range)
+                const tlDate = tl.startTime.substring(0, 10);
+                if (tlDate < format(chartStart, 'yyyy-MM-dd') || tlDate > format(chartEnd, 'yyyy-MM-dd')) return false;
                 return true;
             });
             filteredTimeLogs.forEach(tl => {
@@ -418,7 +425,7 @@ export default function TaskActivityPage() {
         const taskCompletedLog = filtered.find(l => l.type === 'task_completed');
 
         return { kpis, trendData, todayRefLabel, topTasks, timelineByDay, totalEvents: filtered.length, eventTypeDistribution, taskCreatedLog, taskCompletedLog };
-    }, [activityLogs, selectedPersons, selectedProjects, selectedTaskId, selectedEventType, selectedDate, engTasks, activeTaskId, dateFrom, dateTo, timeLogs]);
+    }, [activityLogs, selectedPersons, selectedProjects, selectedTaskId, selectedEventType, selectedDate, engTasks, activeTaskId, dateFrom, dateTo, timeLogs, autoDateRange]);
 
     // Progress chart data (built from logs with percentComplete in meta)
     const progressChartData = useMemo(() => {
@@ -503,6 +510,7 @@ export default function TaskActivityPage() {
     const clearFilters = () => {
         setDateFrom(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
         setDateTo(format(new Date(), 'yyyy-MM-dd'));
+        setAutoDateRange(true);
         setSelectedPersons([]);
         setSelectedProjects([]);
         setSelectedTaskId(null);
@@ -531,6 +539,16 @@ export default function TaskActivityPage() {
     const applyPreset = (days) => {
         setDateTo(format(new Date(), 'yyyy-MM-dd'));
         setDateFrom(format(subDays(new Date(), days), 'yyyy-MM-dd'));
+        setAutoDateRange(false);
+    };
+
+    const handleDateFromChange = (e) => {
+        setDateFrom(e.target.value);
+        setAutoDateRange(false);
+    };
+    const handleDateToChange = (e) => {
+        setDateTo(e.target.value);
+        setAutoDateRange(false);
     };
 
     const formatDayLabel = (dateStr) => {
@@ -611,12 +629,23 @@ export default function TaskActivityPage() {
                 {/* Date Range */}
                 <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-xl p-1 pl-3">
                     <CalendarIcon className="w-4 h-4 text-slate-400 shrink-0" />
-                    <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                    <input type="date" value={dateFrom} onChange={handleDateFromChange}
                         className="bg-transparent border-none text-sm font-bold text-slate-200 py-1 px-1 focus:ring-0 outline-none w-[120px]" />
                     <span className="text-slate-500 text-xs font-bold">→</span>
-                    <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                    <input type="date" value={dateTo} onChange={handleDateToChange}
                         max={format(new Date(), 'yyyy-MM-dd')}
                         className="bg-transparent border-none text-sm font-bold text-slate-200 py-1 px-1 focus:ring-0 outline-none w-[120px]" />
+                    <button
+                        onClick={() => setAutoDateRange(!autoDateRange)}
+                        className={`ml-1 px-2 py-1 rounded-lg text-[10px] font-black tracking-wider transition-all border ${
+                            autoDateRange
+                                ? 'text-cyan-300 bg-cyan-500/15 border-cyan-500/30 hover:bg-cyan-500/25'
+                                : 'text-amber-300 bg-amber-500/15 border-amber-500/30 hover:bg-amber-500/25'
+                        }`}
+                        title={autoDateRange ? 'Rango automático: ajusta al rango de eventos' : 'Rango manual: usa las fechas seleccionadas'}
+                    >
+                        {autoDateRange ? 'AUTO' : 'MANUAL'}
+                    </button>
                 </div>
 
                 {/* Quick presets */}
