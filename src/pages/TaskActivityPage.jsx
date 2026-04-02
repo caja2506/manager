@@ -145,9 +145,12 @@ export default function TaskActivityPage() {
     const focusedTask = activeTaskId ? engTasks?.find(t => t.id === activeTaskId) : null;
 
     // Actual hours from timeLogs (same source as TaskControlPanel — source of truth)
-    const actualHoursFromTimeLogs = activeTaskId && timeLogs
-        ? Math.round(timeLogs.filter(log => log.taskId === activeTaskId && log.totalHours).reduce((sum, log) => sum + (log.totalHours || 0), 0) * 10) / 10
-        : 0;
+    const taskTimeLogs = activeTaskId && timeLogs
+        ? timeLogs.filter(log => log.taskId === activeTaskId && log.totalHours).sort((a, b) => new Date(b.startTime || 0) - new Date(a.startTime || 0))
+        : [];
+    const actualHoursFromTimeLogs = Math.round(taskTimeLogs.reduce((sum, log) => sum + (log.totalHours || 0), 0) * 10) / 10;
+
+    const [showHoursDetail, setShowHoursDetail] = useState(false);
 
     // Filter state
     const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
@@ -643,8 +646,15 @@ export default function TaskActivityPage() {
                         </div>
                     </div>
 
-                    <div className="bg-slate-900/70 p-5 rounded-2xl border border-slate-800 shadow-lg">
-                        <span className="text-[10px] font-black tracking-wider text-amber-400 uppercase">Horas Plan vs Real</span>
+                    <div className="bg-slate-900/70 p-5 rounded-2xl border border-slate-800 shadow-lg cursor-pointer transition-all hover:border-amber-500/30"
+                        onClick={() => setShowHoursDetail(!showHoursDetail)}
+                    >
+                        <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black tracking-wider text-amber-400 uppercase">Horas Plan vs Real</span>
+                            {taskTimeLogs.length > 0 && (
+                                <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${showHoursDetail ? 'rotate-180' : ''}`} />
+                            )}
+                        </div>
                         <div className="flex items-center gap-3 mt-2">
                             <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${
                                 focusedTask?.estimatedHours && actualHoursFromTimeLogs > Number(focusedTask.estimatedHours)
@@ -671,6 +681,33 @@ export default function TaskActivityPage() {
                                 )}
                             </div>
                         </div>
+
+                        {/* Expandable detail */}
+                        {showHoursDetail && taskTimeLogs.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-slate-700/50">
+                                <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-2">Detalle de {taskTimeLogs.length} registros</div>
+                                <div className="max-h-[200px] overflow-y-auto space-y-1 pr-1">
+                                    {taskTimeLogs.map((log, i) => {
+                                        const d = log.startTime ? new Date(log.startTime) : null;
+                                        const dateLabel = d ? format(d, 'dd/MM/yy HH:mm', { locale: es }) : '—';
+                                        const userName = log.userName || (log.userId ? (teamMembers?.find(m => m.uid === log.userId)?.displayName || log.userId.substring(0, 8)) : '—');
+                                        return (
+                                            <div key={log.id || i} className="flex items-center justify-between py-1 px-2 rounded bg-slate-800/50 text-[10px]">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <span className="text-slate-400 font-mono shrink-0">{dateLabel}</span>
+                                                    <span className="text-slate-300 truncate">{userName}</span>
+                                                </div>
+                                                <span className="font-black text-amber-300 shrink-0 ml-2">{Math.round((log.totalHours || 0) * 100) / 100}h</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <div className="flex justify-between mt-2 pt-2 border-t border-slate-700/30 text-[10px] font-black">
+                                    <span className="text-slate-400">TOTAL</span>
+                                    <span className="text-amber-300">{actualHoursFromTimeLogs}h</span>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="bg-slate-900/70 p-5 rounded-2xl border border-slate-800 shadow-lg">
