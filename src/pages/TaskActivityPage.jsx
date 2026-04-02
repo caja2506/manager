@@ -282,8 +282,6 @@ export default function TaskActivityPage() {
             statusChanges: filtered.filter(l => l.type === 'status_changed').length,
             timerSessions: filtered.filter(l => l.type === 'timer_started').length,
             delaysReported: filtered.filter(l => l.type === 'delay_reported').length,
-            // Total real hours from timer_stopped logs
-            totalRealHours: Math.round(filtered.filter(l => l.type === 'timer_stopped' && l.meta?.totalHours).reduce((sum, l) => sum + (l.meta.totalHours || 0), 0) * 10) / 10,
         };
 
         // Trend data — auto-adjusted range + correlation data
@@ -337,12 +335,30 @@ export default function TaskActivityPage() {
                 const d = trendMap.get(dateStr);
                 if (d.isFuture) return;
                 if (log.type === 'subtask_completed') d.subtareas++;
-                if (log.type === 'timer_stopped' && log.meta?.totalHours) {
-                    d.horas = Math.round(((d.horas || 0) + log.meta.totalHours) * 10) / 10;
-                }
                 if (log.type === 'status_changed') d.status++;
             }
         });
+
+        // Hours from timeLogs (source of truth) — grouped by day, with same filters
+        if (timeLogs) {
+            const filteredTimeLogs = timeLogs.filter(tl => {
+                if (!tl.totalHours || !tl.startTime) return false;
+                if (selectedPersons.length > 0 && !selectedPersons.includes(tl.userId)) return false;
+                if (selectedProjects.length > 0 && !selectedProjects.includes(tl.projectId)) return false;
+                if (activeTaskId && tl.taskId !== activeTaskId) return false;
+                if (selectedTaskId && tl.taskId !== selectedTaskId) return false;
+                return true;
+            });
+            filteredTimeLogs.forEach(tl => {
+                const dateStr = tl.startTime.substring(0, 10);
+                if (trendMap.has(dateStr)) {
+                    const d = trendMap.get(dateStr);
+                    if (!d.isFuture) {
+                        d.horas = Math.round(((d.horas || 0) + tl.totalHours) * 10) / 10;
+                    }
+                }
+            });
+        }
 
         const trendData = Array.from(trendMap.values()).map((d, i, arr) => {
             // Always show today's label for the reference line
@@ -402,7 +418,7 @@ export default function TaskActivityPage() {
         const taskCompletedLog = filtered.find(l => l.type === 'task_completed');
 
         return { kpis, trendData, todayRefLabel, topTasks, timelineByDay, totalEvents: filtered.length, eventTypeDistribution, taskCreatedLog, taskCompletedLog };
-    }, [activityLogs, selectedPersons, selectedProjects, selectedTaskId, selectedEventType, selectedDate, engTasks, activeTaskId, dateFrom, dateTo]);
+    }, [activityLogs, selectedPersons, selectedProjects, selectedTaskId, selectedEventType, selectedDate, engTasks, activeTaskId, dateFrom, dateTo, timeLogs]);
 
     // Progress chart data (built from logs with percentComplete in meta)
     const progressChartData = useMemo(() => {
@@ -773,12 +789,11 @@ export default function TaskActivityPage() {
                                 milestones.push({ date: p2.date, label: p2.label, title: `Última (#${subtaskLogs.length})`, color: '#22c55e', icon: '✅', type: 'event' });
                             }
                         }
-                        const timerLogs = taskLogs.filter(l => l.type === 'timer_stopped' && l.meta?.totalHours);
-                        if (timerLogs.length > 0) {
-                            const totalH = Math.round(timerLogs.reduce((s, l) => s + (l.meta.totalHours || 0), 0) * 10) / 10;
-                            const lastTimer = timerLogs[timerLogs.length - 1];
-                            const p = fmtDate(lastTimer.timestamp);
-                            milestones.push({ date: p.date, label: p.label, title: `${totalH}h timer`, color: '#f59e0b', icon: '⏱️', type: 'event' });
+                        // Timer hours from timeLogs (source of truth)
+                        if (taskTimeLogs.length > 0) {
+                            const lastTimer = taskTimeLogs[0]; // sorted desc by startTime
+                            const p = fmtDate(lastTimer.startTime || lastTimer.endTime);
+                            milestones.push({ date: p.date, label: p.label, title: `${actualHoursFromTimeLogs}h registradas`, color: '#f59e0b', icon: '⏱️', type: 'event' });
                         }
                         const completedLog = taskLogs.find(l => l.type === 'task_completed');
                         if (completedLog) {
