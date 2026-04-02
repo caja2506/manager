@@ -569,12 +569,6 @@ export default function TaskActivityPage() {
 
         const days = eachDayOfInterval({ start: rangeStart, end: rangeEnd });
 
-        // Calculate planned days count for projection rate
-        const plannedDays = plannedStart && plannedEnd
-            ? eachDayOfInterval({ start: plannedStart, end: plannedEnd }).length
-            : days.length;
-        const dailyRate = estimatedHours > 0 ? estimatedHours / plannedDays : 0;
-
         // Build data points
         let accumulated = 0;
         const points = days.map(day => {
@@ -587,21 +581,22 @@ export default function TaskActivityPage() {
                 accumulated += dailyH;
             }
 
-            // Projection: linear from plannedStart to plannedEnd
+            // Projection: linear from 0 at plannedStart to estimatedHours at plannedEnd
             let proyeccion = null;
             if (estimatedHours > 0 && plannedStart && plannedEnd) {
-                if (isBefore(day, plannedStart) || format(day, 'yyyy-MM-dd') === format(plannedStart, 'yyyy-MM-dd')) {
-                    // Before or at start
-                    if (format(day, 'yyyy-MM-dd') === format(plannedStart, 'yyyy-MM-dd')) {
-                        proyeccion = dailyRate;
-                    }
+                const totalSpan = eachDayOfInterval({ start: plannedStart, end: plannedEnd }).length - 1; // 0-based
+                if (isBefore(day, plannedStart)) {
+                    // Before start — no projection
+                    proyeccion = null;
                 } else if (isBefore(plannedEnd, day)) {
                     // After end — cap at estimated
                     proyeccion = estimatedHours;
                 } else {
-                    // Between start and end
-                    const daysSinceStart = eachDayOfInterval({ start: plannedStart, end: day }).length;
-                    proyeccion = Math.round(Math.min(dailyRate * daysSinceStart, estimatedHours) * 10) / 10;
+                    // Between start and end (inclusive)
+                    const dayIndex = eachDayOfInterval({ start: plannedStart, end: day }).length - 1; // 0-based
+                    proyeccion = totalSpan > 0
+                        ? Math.round(Math.min(estimatedHours * (dayIndex / totalSpan), estimatedHours) * 10) / 10
+                        : estimatedHours; // single day plan
                 }
             }
 
