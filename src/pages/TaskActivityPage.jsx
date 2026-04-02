@@ -504,6 +504,120 @@ export default function TaskActivityPage() {
         return { points, todayLabel };
     }, [activeTaskId, activityLogs, engTasks]);
 
+    // Projection chart: daily hours, accumulated, and projected hours
+    const projectionChartData = useMemo(() => {
+        if (!activeTaskId || !timeLogs) return null;
+        const task = engTasks?.find(t => t.id === activeTaskId);
+        if (!task) return null;
+
+        const estimatedHours = Number(task.estimatedHours) || 0;
+        const plannedStart = task.plannedStartDate ? new Date(task.plannedStartDate + 'T00:00:00') : null;
+        const plannedEnd = task.plannedEndDate ? new Date(task.plannedEndDate + 'T00:00:00') : null;
+
+        // Get all timeLogs for this task
+        const taskTLs = timeLogs
+            .filter(tl => tl.taskId === activeTaskId && tl.totalHours && tl.startTime)
+            .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+        if (taskTLs.length === 0 && !plannedStart) return null;
+
+        // Group hours by day
+        const hoursByDay = {};
+        taskTLs.forEach(tl => {
+            const day = tl.startTime.substring(0, 10);
+            hoursByDay[day] = (hoursByDay[day] || 0) + tl.totalHours;
+        });
+
+        // Determine chart range
+        const workDays = Object.keys(hoursByDay).sort();
+        const today = startOfDay(new Date());
+        const isCompleted = task.status === 'completed' || task.status === 'closed';
+
+        const rangeStart = plannedStart
+            ? (workDays.length > 0 && new Date(workDays[0] + 'T00:00:00') < plannedStart
+                ? new Date(workDays[0] + 'T00:00:00')
+                : addDays(plannedStart, -1))
+            : (workDays.length > 0 ? addDays(new Date(workDays[0] + 'T00:00:00'), -1) : addDays(today, -7));
+
+        const rangeEnd = isCompleted
+            ? (workDays.length > 0 ? addDays(new Date(workDays[workDays.length - 1] + 'T00:00:00'), 1) : today)
+            : (plannedEnd && isBefore(today, plannedEnd) ? addDays(plannedEnd, 1) : addDays(today, 3));
+
+        const days = eachDayOfInterval({ start: rangeStart, end: rangeEnd });
+
+        // Calculate planned days count for projection rate
+        const plannedDays = plannedStart && plannedEnd
+            ? eachDayOfInterval({ start: plannedStart, end: plannedEnd }).length
+            : days.length;
+        const dailyRate = estimatedHours > 0 ? estimatedHours / plannedDays : 0;
+
+        // Build data points
+        let accumulated = 0;
+        const points = days.map(day => {
+            const dateStr = format(day, 'yyyy-MM-dd');
+            const label = format(day, 'dd MMM', { locale: es });
+            const isFutureDay = isBefore(today, day) && !isToday(day);
+            const dailyH = hoursByDay[dateStr] || 0;
+
+            if (!isFutureDay) {
+                accumulated += dailyH;
+            }
+
+            // Projection: linear from plannedStart to plannedEnd
+            let proyeccion = null;
+            if (estimatedHours > 0 && plannedStart && plannedEnd) {
+                if (isBefore(day, plannedStart) || format(day, 'yyyy-MM-dd') === format(plannedStart, 'yyyy-MM-dd')) {
+                    // Before or at start
+                    if (format(day, 'yyyy-MM-dd') === format(plannedStart, 'yyyy-MM-dd')) {
+                        proyeccion = dailyRate;
+                    }
+                } else if (isBefore(plannedEnd, day)) {
+                    // After end — cap at estimated
+                    proyeccion = estimatedHours;
+                } else {
+                    // Between start and end
+                    const daysSinceStart = eachDayOfInterval({ start: plannedStart, end: day }).length;
+                    proyeccion = Math.round(Math.min(dailyRate * daysSinceStart, estimatedHours) * 10) / 10;
+                }
+            }
+
+            return {
+                name: label,
+                dateStr,
+                horasDia: isFutureDay ? null : Math.round(dailyH * 10) / 10,
+                acumuladas: isFutureDay ? null : Math.round(accumulated * 10) / 10,
+                proyeccion,
+                isFuture: isFutureDay,
+                isToday: isToday(day),
+                isStartPlan: plannedStart && format(day, 'yyyy-MM-dd') === format(plannedStart, 'yyyy-MM-dd'),
+                isEndPlan: plannedEnd && format(day, 'yyyy-MM-dd') === format(plannedEnd, 'yyyy-MM-dd'),
+            };
+        });
+
+        // Calculate tracking status
+        const todayProjection = points.find(p => p.isToday)?.proyeccion;
+        const todayAccumulated = points.find(p => p.isToday)?.acumuladas ?? accumulated;
+        let trackingStatus = 'none';
+        if (todayProjection && todayProjection > 0) {
+            const ratio = todayAccumulated / todayProjection;
+            if (ratio >= 0.9) trackingStatus = 'on-track';
+            else if (ratio >= 0.7) trackingStatus = 'at-risk';
+            else trackingStatus = 'behind';
+        }
+
+        // Today label for reference line
+        const todayLabel = format(today, 'dd MMM', { locale: es });
+
+        return {
+            points,
+            estimatedHours,
+            accumulated: Math.round(accumulated * 10) / 10,
+            trackingStatus,
+            todayLabel,
+            hasPlannedDates: !!plannedStart && !!plannedEnd,
+        };
+    }, [activeTaskId, timeLogs, engTasks]);
+
     // Helpers
     const hasActiveFilters = selectedPersons.length > 0 || selectedProjects.length > 0 || selectedTaskId || selectedEventType || selectedDate;
 
@@ -1014,6 +1128,145 @@ export default function TaskActivityPage() {
 
                                 {/* Progress line on left axis */}
                                 <Line yAxisId="left" type="stepAfter" name="Progreso" dataKey="progreso" stroke="#6366f1" strokeWidth={3} dot={{ fill: '#6366f1', r: 5 }} activeDot={{ r: 7 }} connectNulls={false} />
+                            </ComposedChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            )}
+
+            {/* --- PROJECTION CHART: Daily Hours + Accumulated + Projection --- */}
+            {activeTaskId && projectionChartData && projectionChartData.points.length > 0 && (
+                <div className="bg-slate-900/70 p-6 rounded-2xl border border-slate-800 shadow-lg">
+                    <div className="flex items-center gap-2 mb-5 flex-wrap">
+                        <CalendarDays className="w-5 h-5 text-amber-400" />
+                        <h3 className="font-bold text-lg text-white">Proyección de Horas</h3>
+                        {projectionChartData.estimatedHours > 0 && (
+                            <span className="text-[9px] font-bold text-slate-300 bg-slate-700/50 px-2 py-0.5 rounded-full">
+                                Meta: {projectionChartData.estimatedHours}h
+                            </span>
+                        )}
+                        <span className="text-[9px] font-bold text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                            Real: {projectionChartData.accumulated}h
+                        </span>
+                        {projectionChartData.trackingStatus !== 'none' && (
+                            <span className={`text-[9px] font-black px-2.5 py-0.5 rounded-full border ${
+                                projectionChartData.trackingStatus === 'on-track'
+                                    ? 'text-emerald-300 bg-emerald-500/15 border-emerald-500/30'
+                                    : projectionChartData.trackingStatus === 'at-risk'
+                                        ? 'text-amber-300 bg-amber-500/15 border-amber-500/30'
+                                        : 'text-rose-300 bg-rose-500/15 border-rose-500/30'
+                            }`}>
+                                {projectionChartData.trackingStatus === 'on-track' ? '🟢 En camino'
+                                    : projectionChartData.trackingStatus === 'at-risk' ? '🟡 En riesgo'
+                                    : '🔴 Atrasado'}
+                            </span>
+                        )}
+                        {!projectionChartData.hasPlannedDates && (
+                            <span className="text-[9px] font-bold text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">
+                                Sin fechas plan — sin proyección
+                            </span>
+                        )}
+                    </div>
+                    <div className="h-[340px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <ComposedChart data={projectionChartData.points} margin={{ top: 15, right: 50, left: 5, bottom: 25 }}>
+                                <defs>
+                                    <linearGradient id="colorDailyH" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.7} />
+                                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.05} />
+                                    </linearGradient>
+                                    <linearGradient id="colorAccum" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
+                                <XAxis
+                                    dataKey="name"
+                                    tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 700 }}
+                                    axisLine={false} tickLine={false} dy={8}
+                                    angle={-30} textAnchor="end" height={50}
+                                />
+                                <YAxis
+                                    yAxisId="left"
+                                    tick={{ fontSize: 11, fill: '#10b981', fontWeight: 700 }}
+                                    axisLine={false} tickLine={false}
+                                    unit="h"
+                                    label={{ value: 'Acumuladas', angle: -90, position: 'insideLeft', fill: '#10b981', fontSize: 10, fontWeight: 700, dx: 5 }}
+                                />
+                                <YAxis
+                                    yAxisId="right"
+                                    orientation="right"
+                                    tick={{ fontSize: 11, fill: '#f59e0b', fontWeight: 700 }}
+                                    axisLine={false} tickLine={false}
+                                    unit="h"
+                                    label={{ value: 'Por día', angle: 90, position: 'insideRight', fill: '#f59e0b', fontSize: 10, fontWeight: 700, dx: -5 }}
+                                />
+                                <Tooltip
+                                    contentStyle={{ borderRadius: '16px', border: '1px solid #334155', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3)', backgroundColor: '#1e293b', color: '#e2e8f0', fontSize: 12, fontWeight: 700 }}
+                                    formatter={(value, name) => {
+                                        if (value === null) return ['—', ''];
+                                        return [`${value}h`, name];
+                                    }}
+                                />
+                                <Legend wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }} />
+
+                                {/* TODAY marker line */}
+                                {projectionChartData.todayLabel && (
+                                    <ReferenceLine
+                                        x={projectionChartData.todayLabel}
+                                        yAxisId="left"
+                                        stroke="#f43f5e"
+                                        strokeWidth={2}
+                                        strokeDasharray="6 3"
+                                        label={{ value: 'HOY', position: 'top', fill: '#f43f5e', fontSize: 11, fontWeight: 'bold' }}
+                                    />
+                                )}
+
+                                {/* Estimated hours target line */}
+                                {projectionChartData.estimatedHours > 0 && (
+                                    <ReferenceLine
+                                        y={projectionChartData.estimatedHours}
+                                        yAxisId="left"
+                                        stroke="#64748b"
+                                        strokeWidth={1}
+                                        strokeDasharray="4 4"
+                                        label={{ value: `Meta ${projectionChartData.estimatedHours}h`, position: 'right', fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }}
+                                    />
+                                )}
+
+                                {/* Start Plan marker */}
+                                {projectionChartData.points.find(p => p.isStartPlan) && (
+                                    <ReferenceLine
+                                        x={projectionChartData.points.find(p => p.isStartPlan).name}
+                                        yAxisId="left"
+                                        stroke="#06b6d4"
+                                        strokeWidth={1.5}
+                                        strokeDasharray="4 4"
+                                        label={{ value: 'INICIO', position: 'insideTopLeft', fill: '#06b6d4', fontSize: 9, fontWeight: 'bold' }}
+                                    />
+                                )}
+
+                                {/* End Plan marker */}
+                                {projectionChartData.points.find(p => p.isEndPlan) && (
+                                    <ReferenceLine
+                                        x={projectionChartData.points.find(p => p.isEndPlan).name}
+                                        yAxisId="left"
+                                        stroke="#d946ef"
+                                        strokeWidth={1.5}
+                                        strokeDasharray="4 4"
+                                        label={{ value: 'FIN PLAN', position: 'insideTopRight', fill: '#d946ef', fontSize: 9, fontWeight: 'bold' }}
+                                    />
+                                )}
+
+                                {/* Daily hours bars (right axis) */}
+                                <Bar yAxisId="right" name="Horas/Día" dataKey="horasDia" fill="url(#colorDailyH)" barSize={18} radius={[4, 4, 0, 0]} />
+
+                                {/* Accumulated hours area+line (left axis) */}
+                                <Area yAxisId="left" name="Acumuladas" dataKey="acumuladas" type="monotone" stroke="#10b981" strokeWidth={3} fill="url(#colorAccum)" dot={{ fill: '#10b981', r: 3 }} activeDot={{ r: 6 }} connectNulls={false} />
+
+                                {/* Projection line (left axis) */}
+                                <Line yAxisId="left" name="Proyección" dataKey="proyeccion" type="monotone" stroke="#06b6d4" strokeWidth={2} strokeDasharray="8 4" dot={false} connectNulls={true} />
                             </ComposedChart>
                         </ResponsiveContainer>
                     </div>
