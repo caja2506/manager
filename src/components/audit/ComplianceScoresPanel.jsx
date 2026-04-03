@@ -1,5 +1,30 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Shield, TrendingUp, Clock, Database, Activity } from 'lucide-react';
+
+// ============================================================
+// ANIMATED COUNT UP HOOK
+// ============================================================
+
+function useCountUp(end, duration = 1400) {
+    const [val, setVal] = useState(0);
+    useEffect(() => {
+        const numEnd = typeof end === 'number' ? end : parseFloat(end) || 0;
+        if (numEnd === 0) return;
+        let cancelled = false;
+        let startTs = null;
+        const step = (ts) => {
+            if (cancelled) return;
+            if (!startTs) startTs = ts;
+            const p = Math.min((ts - startTs) / duration, 1);
+            const eased = 1 - Math.pow(1 - p, 3);
+            setVal(Math.round(eased * numEnd));
+            if (p < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+        return () => { cancelled = true; };
+    }, [end, duration]);
+    return val;
+}
 
 // ============================================================
 // SCORE GAUGE COMPONENT
@@ -9,7 +34,8 @@ function ScoreGauge({ label, score, icon: Icon, color, size = 'default', classNa
     const radius = size === 'compact' ? 28 : 36;
     const stroke = size === 'compact' ? 4 : 5;
     const circumference = 2 * Math.PI * radius;
-    const progress = (score / 100) * circumference;
+    const animatedScore = useCountUp(score, 1400);
+    const progress = (animatedScore / 100) * circumference;
     const svgSize = (radius + stroke) * 2;
 
     const getColor = (s) => {
@@ -44,11 +70,11 @@ function ScoreGauge({ label, score, icon: Icon, color, size = 'default', classNa
                         strokeLinecap="round"
                         strokeDasharray={circumference}
                         strokeDashoffset={circumference - progress}
-                        className={`${colors.ring} transition-all duration-1000 ease-out`}
+                        className={colors.ring}
                     />
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
-                    <span className={`text-lg font-black ${colors.text}`}>{score}</span>
+                    <span className={`text-lg font-black ${colors.text}`}>{animatedScore}</span>
                 </div>
             </div>
             <div className="flex items-center gap-1.5 justify-center">
