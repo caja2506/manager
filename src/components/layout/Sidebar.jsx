@@ -4,8 +4,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useRole } from '../../contexts/RoleContext';
 import { useAppData, APP_VERSION } from '../../contexts/AppDataContext';
 import { useEngineeringData } from '../../hooks/useEngineeringData';
+import AnalyzeOpsLogo from '../brand/AnalyzeOpsLogo';
 import {
-    BrainCircuit, Activity, LayoutDashboard, User, FolderGit2,
+    Activity, LayoutDashboard, User, FolderGit2,
     ListTodo, Database, Clock, FileText, BarChart3, Users,
     Bell, Settings, LogOut, Shield, LayoutList, Briefcase, LineChart, CalendarDays, GanttChartSquare, Radar, Zap,
     ChevronRight, X, Target, Map
@@ -175,8 +176,8 @@ export default function Sidebar() {
                 <div className="w-[60px] h-full bg-slate-950 border-r border-slate-800/50 flex flex-col items-center py-3 flex-shrink-0">
 
                     {/* Logo */}
-                    <div className="mb-4 p-1.5">
-                        <BrainCircuit className="w-7 h-7 text-indigo-400" />
+                    <div className="mb-4 p-0.5">
+                        <AnalyzeOpsLogo size={34} />
                     </div>
 
                     <div className="w-8 h-px bg-slate-800 mb-3" />

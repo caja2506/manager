@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { BrainCircuit, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import AnalyzeOpsLogo from '../brand/AnalyzeOpsLogo';
 
 export default function LoginPage() {
     const { signInWithGoogle } = useAuth();
@@ -19,40 +20,50 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 p-4">
+        <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #0c0a1a 0%, #1a1035 35%, #0f172a 70%, #0c0a1a 100%)' }}>
             {/* Noise Texture Overlay */}
             <div className="fixed inset-0 opacity-[0.03] pointer-events-none"
                 style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\'/%3E%3C/svg%3E")' }}
             />
 
             {/* Ambient Glow */}
-            <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" />
-            <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-purple-600/15 rounded-full blur-[100px] pointer-events-none" />
+            <div className="absolute rounded-full pointer-events-none" style={{ width: 400, height: 400, top: '15%', left: '50%', transform: 'translateX(-50%)', background: 'radial-gradient(circle, rgba(107,63,160,0.2) 0%, transparent 70%)', filter: 'blur(100px)' }} />
+            <div className="absolute rounded-full pointer-events-none" style={{ width: 300, height: 300, bottom: '20%', right: '20%', background: 'radial-gradient(circle, rgba(0,207,255,0.12) 0%, transparent 70%)', filter: 'blur(80px)' }} />
+            <div className="absolute rounded-full pointer-events-none" style={{ width: 250, height: 250, bottom: '30%', left: '15%', background: 'radial-gradient(circle, rgba(196,149,106,0.1) 0%, transparent 70%)', filter: 'blur(60px)' }} />
 
             <div className="relative z-10 w-full max-w-md">
                 {/* Card */}
-                <div className="bg-slate-900/80 backdrop-blur-2xl rounded-3xl border border-slate-700/50 shadow-2xl shadow-black/50 p-8 sm:p-10">
+                <div className="backdrop-blur-2xl rounded-3xl border shadow-2xl shadow-black/50 p-8 sm:p-10" style={{ background: 'rgba(15,12,30,0.8)', borderColor: 'rgba(107,63,160,0.25)' }}>
                     {/* Logo */}
                     <div className="flex flex-col items-center mb-8">
-                        <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mb-5 shadow-lg shadow-indigo-900/40 rotate-3 hover:rotate-0 transition-transform duration-300">
-                            <BrainCircuit className="w-10 h-10 text-white" />
+                        <div className="relative mb-2">
+                            <AnalyzeOpsLogo size={110} interactive showName />
                         </div>
-                        <h1 className="text-3xl font-black text-white tracking-tight">AutoBOM Pro</h1>
-                        <p className="text-sm text-slate-400 mt-2 text-center">
-                            Gestión inteligente de Bill of Materials
+
+                        {/* Slogan */}
+                        <div className="flex items-center gap-2 mt-3 mb-1">
+                            <div className="w-8 h-px" style={{ background: 'linear-gradient(90deg, transparent, #6B3FA0)' }} />
+                            <div className="w-1 h-1 rounded-full" style={{ background: '#00CFFF', boxShadow: '0 0 6px #00CFFF' }} />
+                            <div className="w-8 h-px" style={{ background: 'linear-gradient(90deg, #6B3FA0, transparent)' }} />
+                        </div>
+                        <p className="text-[11px] font-medium tracking-[0.15em] uppercase mt-1" style={{ color: '#C4956A', textShadow: '0 0 15px rgba(196,149,106,0.2)' }}>
+                            Lo que no se mide, no se controla
+                        </p>
+                        <p className="text-xs text-slate-500 mt-3 text-center">
+                            Engineering Management Platform
                         </p>
                     </div>
 
                     {/* Divider */}
                     <div className="flex items-center gap-3 mb-8">
-                        <div className="flex-1 h-px bg-slate-700/50" />
-                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Iniciar Sesión</span>
-                        <div className="flex-1 h-px bg-slate-700/50" />
+                        <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(107,63,160,0.3), transparent)' }} />
+                        <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: '#6B3FA0' }}>Iniciar Sesión</span>
+                        <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(107,63,160,0.3), transparent)' }} />
                     </div>
 
                     {/* Error */}
                     {error && (
-                        <div className="mb-6 bg-red-950/50 border border-red-500/30 rounded-xl p-3 text-sm text-red-300 text-center">
+                        <div className="mb-6 rounded-xl p-3 text-sm text-center" style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', color: '#fca5a5' }}>
                             {error}
                         </div>
                     )}
@@ -61,7 +72,11 @@ export default function LoginPage() {
                     <button
                         onClick={handleGoogleLogin}
                         disabled={isLoading}
-                        className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-50 text-slate-800 font-bold py-3.5 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                        className="w-full flex items-center justify-center gap-3 font-bold py-3.5 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                        style={{
+                            background: 'linear-gradient(135deg, #ffffff, #f0ecf5)',
+                            color: '#2D1B4E',
+                        }}
                     >
                         {isLoading ? (
                             <Loader2 className="w-5 h-5 animate-spin" />
@@ -85,8 +100,8 @@ export default function LoginPage() {
                 </div>
 
                 {/* Footer */}
-                <p className="text-[10px] text-slate-600 text-center mt-6">
-                    © 2025 AutoBOM Pro — Powered by Firebase
+                <p className="text-[10px] text-center mt-6" style={{ color: 'rgba(107,63,160,0.5)' }}>
+                    © 2025 AnalyzeOps — Powered by Firebase
                 </p>
             </div>
         </div>

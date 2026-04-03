@@ -80,10 +80,15 @@ async function executeRoutine(adminDb, token, routineKey, triggerType, options =
         targets = await resolveTargetsByRole(adminDb, routine.allowedRoles);
     }
 
-    if (targets.length === 0) {
+    // Email-based routines (like daily_performance_report) get recipients
+    // from settings/emailReportConfig instead of the target resolver.
+    const EMAIL_ROUTINES = new Set(["daily_performance_report"]);
+
+    if (targets.length === 0 && !EMAIL_ROUTINES.has(routineKey)) {
         console.log(`${tag} No targets resolved`);
         return { success: false, runId: null, status: "no_targets", error: "No targets resolved" };
     }
+
 
     // ── 3. Create run ──
     const runId = await createRun(adminDb, {

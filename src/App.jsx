@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import SplashScreen from './components/brand/SplashScreen';
+import AnalyzeOpsLogo from './components/brand/AnalyzeOpsLogo';
 
 // --- Auth & Roles ---
 import { useAuth } from './contexts/AuthContext';
@@ -53,14 +55,31 @@ export default function App() {
   const { user, loading: authLoading } = useAuth();
   const { roleLoading } = useRole();
 
+  // --- Splash Screen (once per session) ---
+  const [splashDone, setSplashDone] = useState(() => {
+    return sessionStorage.getItem('analyzeops-splash-done') === 'true';
+  });
+  const handleSplashComplete = useCallback(() => {
+    sessionStorage.setItem('analyzeops-splash-done', 'true');
+    setSplashDone(true);
+  }, []);
+
+  // Show splash on first session load
+  if (!splashDone) {
+    return <SplashScreen onComplete={handleSplashComplete} />;
+  }
+
   // --- Loading State ---
   if (authLoading || (user && roleLoading)) {
     return (
-      <div className="h-screen flex items-center justify-center bg-slate-900">
+      <div className="h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #0c0a1a 0%, #1a1035 35%, #0f172a 70%, #0c0a1a 100%)' }}>
         <div className="text-center space-y-4">
-          <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mx-auto" />
-          <p className="text-sm text-slate-400 font-bold animate-pulse">
-            Cargando AutoBOM Pro...
+          <div className="flex justify-center mb-2">
+            <AnalyzeOpsLogo size={48} animate />
+          </div>
+          <Loader2 className="w-8 h-8 animate-spin mx-auto" style={{ color: '#6B3FA0' }} />
+          <p className="text-sm font-bold animate-pulse" style={{ color: '#C4956A' }}>
+            Cargando AnalyzeOps...
           </p>
         </div>
       </div>
