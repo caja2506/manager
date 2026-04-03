@@ -595,9 +595,6 @@ export default function TeamScoresPage() {
     }, [teamScores]);
 
     // Scroll reveal
-    const [heroRef, heroVis] = useScrollReveal();
-    const [kpiRef, kpiVis] = useScrollReveal();
-    const [gridRef, gridVis] = useScrollReveal();
     const [analyticsRef, analyticsVis] = useScrollReveal();
 
     // Weekly averages for analytics section
@@ -633,7 +630,7 @@ export default function TeamScoresPage() {
         <div className="min-h-screen pb-24" style={{ background: '#0c0a1a' }}>
 
             {/* ── Hero Header ── */}
-            <div ref={heroRef} className="relative overflow-hidden" style={{
+            <div className="relative overflow-hidden" style={{
                 background: 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(16,185,129,0.05) 50%, rgba(245,158,11,0.05) 100%)',
                 borderBottom: '1px solid rgba(255,255,255,0.06)',
             }}>
@@ -641,11 +638,7 @@ export default function TeamScoresPage() {
                 <div className="absolute -top-20 -left-20 w-60 h-60 rounded-full opacity-20" style={{ background: 'radial-gradient(circle, #6366f1, transparent)', animation: 'pulse 4s ease-in-out infinite' }} />
                 <div className="absolute -bottom-20 -right-20 w-60 h-60 rounded-full opacity-15" style={{ background: 'radial-gradient(circle, #10b981, transparent)', animation: 'pulse 5s ease-in-out infinite 1s' }} />
 
-                <div className="relative px-4 sm:px-6 py-8" style={{
-                    opacity: heroVis ? 1 : 0,
-                    transform: heroVis ? 'translateY(0)' : 'translateY(30px)',
-                    transition: 'all 0.8s ease-out',
-                }}>
+                <div className="relative px-4 sm:px-6 py-8 animate-fadeIn">
                     <div className="flex items-center gap-3 mb-2">
                         <button onClick={() => navigate(-1)} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-white/50">
                             <ArrowLeft size={18} />
@@ -660,16 +653,12 @@ export default function TeamScoresPage() {
             </div>
 
             {/* ── KPI Row ── */}
-            <div ref={kpiRef} className="px-4 sm:px-6 -mt-1 mb-6" style={{
-                opacity: kpiVis ? 1 : 0,
-                transform: kpiVis ? 'translateY(0)' : 'translateY(20px)',
-                transition: 'all 0.6s ease-out 0.15s',
-            }}>
+            <div className="px-4 sm:px-6 -mt-1 mb-6 animate-fadeIn" style={{ animationDelay: '0.15s' }}>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
-                    <SummaryKPI label="Promedio Equipo"    value={summary.avg}            Icon={Target}         color="#6366f1" visible={kpiVis} />
-                    <SummaryKPI label="Excelente"          value={summary.excellent}      Icon={Star}           color="#10b981" visible={kpiVis} />
-                    <SummaryKPI label="Bueno"              value={summary.good}           Icon={CheckCircle}    color="#818cf8" visible={kpiVis} />
-                    <SummaryKPI label="Necesita Atención"  value={summary.needsAttention} Icon={AlertTriangle}  color="#ef4444" visible={kpiVis} />
+                    <SummaryKPI label="Promedio Equipo"    value={summary.avg}            Icon={Target}         color="#6366f1" visible={true} />
+                    <SummaryKPI label="Excelente"          value={summary.excellent}      Icon={Star}           color="#10b981" visible={true} />
+                    <SummaryKPI label="Bueno"              value={summary.good}           Icon={CheckCircle}    color="#818cf8" visible={true} />
+                    <SummaryKPI label="Necesita Atención"  value={summary.needsAttention} Icon={AlertTriangle}  color="#ef4444" visible={true} />
                 </div>
             </div>
 
@@ -693,11 +682,7 @@ export default function TeamScoresPage() {
             </div>
 
             {/* ── Team Grid ── */}
-            <div ref={gridRef} className="px-4 sm:px-6" style={{
-                opacity: gridVis ? 1 : 0,
-                transform: gridVis ? 'translateY(0)' : 'translateY(20px)',
-                transition: 'all 0.6s ease-out 0.3s',
-            }}>
+            <div className="px-4 sm:px-6 animate-fadeIn" style={{ animationDelay: '0.3s' }}>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                     {filtered.map((person, i) => (
                         <ScoreCard
@@ -765,6 +750,8 @@ export default function TeamScoresPage() {
             {/* Keyframes */}
             <style>{`
                 @keyframes pulse { 0%, 100% { opacity: 0.15; transform: scale(1); } 50% { opacity: 0.25; transform: scale(1.1); } }
+                @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+                .animate-fadeIn { animation: fadeIn 0.6s ease-out forwards; }
             `}</style>
         </div>
     );
