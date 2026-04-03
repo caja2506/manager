@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useEngineeringData } from '../hooks/useEngineeringData';
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
@@ -18,12 +18,43 @@ import PageHeader from '../components/layout/PageHeader';
 import { resolveDelay } from '../services/delayService';
 
 // ============================================================
+// ANIMATED COUNT UP HOOK
+// ============================================================
+
+function useCountUp(end, duration = 1200) {
+    const [val, setVal] = useState(0);
+    const prevEnd = useRef(0);
+    useEffect(() => {
+        if (end === prevEnd.current) return;
+        prevEnd.current = end;
+        const numEnd = typeof end === 'number' ? end : parseFloat(end) || 0;
+        if (numEnd === 0) { requestAnimationFrame(() => setVal(0)); return; }
+        const isDecimal = !Number.isInteger(numEnd);
+        let start = null;
+        const step = (ts) => {
+            if (!start) start = ts;
+            const p = Math.min((ts - start) / duration, 1);
+            // easeOutCubic
+            const eased = 1 - Math.pow(1 - p, 3);
+            const current = eased * numEnd;
+            setVal(isDecimal ? parseFloat(current.toFixed(1)) : Math.round(current));
+            if (p < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+    }, [end, duration]);
+    return val;
+}
+
+// ============================================================
 // EXPANDABLE KPI CARD
 // ============================================================
 
-function KpiCard({ label, value, icon: KpiIcon, color, children, badge, onClick }) {
+function KpiCard({ label, value, suffix, icon: KpiIcon, color, children, badge, onClick }) {
     const [expanded, setExpanded] = useState(false);
     const hasChildren = !!children;
+    // Animate numeric values
+    const numericValue = typeof value === 'number' ? value : parseFloat(value) || 0;
+    const animatedValue = useCountUp(numericValue);
 
     const colorMap = {
         indigo: { bg: 'bg-indigo-600/15', border: 'border-indigo-500/30', text: 'text-indigo-400', iconBg: 'bg-indigo-600/20', hoverBorder: 'hover:border-indigo-500/50' },
@@ -54,7 +85,7 @@ function KpiCard({ label, value, icon: KpiIcon, color, children, badge, onClick 
                     </div>
                 </div>
                 <div className="flex items-end justify-between">
-                    <span className="text-4xl font-black text-white">{value}</span>
+                    <span className="text-4xl font-black text-white">{typeof value === 'number' ? animatedValue : value}{suffix || ''}</span>
                     {hasChildren && (
                         <ChevronDown className={`w-5 h-5 text-slate-500 transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`} />
                     )}
@@ -616,7 +647,7 @@ export default function Dashboard() {
                 </KpiCard>
 
                 {/* Overtime Semanal */}
-                <KpiCard label="Overtime Semana" value={`${kpis.weekOvertime}h`} icon={Zap} color="orange">
+                <KpiCard label="Overtime Semana" value={kpis.weekOvertime} suffix="h" icon={Zap} color="orange">
                     {(() => {
                         const ws = startOfWeek(new Date(), { weekStartsOn: 1 });
                         const we = endOfWeek(new Date(), { weekStartsOn: 1 });
