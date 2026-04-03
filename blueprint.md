@@ -1,8 +1,8 @@
 # AutoBOM Pro — Engineering Management Platform Blueprint
 
-> **Version:** 4.1 — Full Platform + Modularization Phase 1  
-> **Last Updated:** 2026-03-20  
-> **Status:** All core modules implemented — modularization and hardening in progress
+> **Version:** 4.2 — Individual Performance Score (IPS) System  
+> **Last Updated:** 2026-04-03  
+> **Status:** All core modules implemented + IPS scoring system deployed
 
 ---
 
@@ -265,6 +265,7 @@ The existing RBAC system (`admin`, `editor`, `viewer`) will be extended to suppo
 | **Team Overview** | ✅ Complete | Phase 14 |
 | **Notifications** (Firestore-based, user-scoped) | ✅ Complete | Phase 14 |
 | **Settings** | ⚠️ Placeholder | — |
+| **Individual Performance Score (IPS)** | ✅ Complete | Phase IPS |
 
 ### Remediation & Hardening (2026-03-14)
 
@@ -503,6 +504,7 @@ riskScore =
 | `taskTypes` | Configurable task types | name, icon, color |
 | `settings` | System configuration | key, value, updatedAt |
 | `auditLogs` | System audit trail | action, userId, collection, documentId, changes, timestamp |
+| `dailyScoreLogs` | Daily IPS snapshots | userId, date, score, levelCode, dimensions, delta, rawMetrics |
 
 ---
 
@@ -717,6 +719,18 @@ The system must support **Excel export** for:
 - [ ] Phase R.4 — schemas.js Modularization
 - [ ] Phase R.5 — Cloud Functions Modularization & Testing
 - [ ] Phase R.6 — CI/CD & Build Verification
+
+### Phase IPS — Individual Performance Score System ✅
+> **Status:** COMPLETE (2026-04-03) — 17 tests passing, 6 etapas deployed
+
+- [x] Pure function IPS engine (`src/core/analytics/performanceScore.js`) — 6 dimensions, 3 roles
+- [x] Team Scorecard page (`/team-scores`) — score rings, filters, animations
+- [x] IPS badges in Dashboard TeamWorkloadPanel
+- [x] Daily score log service (`src/services/scoreLogService.js`) — idempotent Firestore persistence
+- [x] Sparklines + delta indicators for historical trends
+- [x] Admin configuration panel for IPS weights (`Settings > IPSWeightConfigPanel`)
+- [x] Temporal analytics: team overlay chart, weekly bar chart, role comparison table
+- [x] Firestore collection: `dailyScoreLogs` with native types (Timestamp, number)
 
 ---
 
