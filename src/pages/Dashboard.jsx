@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useEngineeringData } from '../hooks/useEngineeringData';
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
@@ -515,36 +515,50 @@ export default function Dashboard() {
         return _alerts.sort((a, b) => new Date(b.time) - new Date(a.time)).slice(0, 12);
     }, [engTasks, engProjects, delays, teamMembers, navigate]);
 
+    // ── Scroll Reveal refs (same tech as Overview) ──
+    const useScrollReveal = (opts = {}) => {
+        const ref = useRef(null);
+        const [isVisible, setIsVisible] = useState(false);
+        useEffect(() => {
+            const el = ref.current;
+            if (!el) return;
+            const obs = new IntersectionObserver(
+                ([entry]) => { if (entry.isIntersecting) { setIsVisible(true); obs.unobserve(el); } },
+                { threshold: 0.12, rootMargin: '0px 0px -40px 0px', ...opts }
+            );
+            obs.observe(el);
+            return () => obs.disconnect();
+        }, []); // eslint-disable-line react-hooks/exhaustive-deps
+        return [ref, isVisible];
+    };
+
+    const [headerRef, headerVis] = useScrollReveal();
+    const [kpiRef, kpiVis] = useScrollReveal();
+    const [compRef, compVis] = useScrollReveal();
+    const [pipeRef, pipeVis] = useScrollReveal();
+    const [teamRef, teamVis] = useScrollReveal();
+    const [alertRef, alertVis] = useScrollReveal();
+
     return (
-        <div className="relative min-h-screen">
+        <div className="relative min-h-screen pb-20">
             {/* ═══════════ ANIMATED BACKGROUND ═══════════ */}
             <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-                <div className="absolute top-1/4 left-1/3 w-[500px] h-[500px] rounded-full bg-indigo-600/5 blur-3xl animate-pulse" style={{ animationDuration: '6s' }} />
-                <div className="absolute top-2/3 right-1/4 w-[400px] h-[400px] rounded-full bg-violet-600/5 blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
-                <div className="absolute bottom-1/4 left-1/6 w-[300px] h-[300px] rounded-full bg-emerald-600/4 blur-3xl animate-pulse" style={{ animationDuration: '10s' }} />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-indigo-600/5 blur-3xl" />
+                <div className="absolute top-1/4 right-1/4 w-[300px] h-[300px] rounded-full bg-violet-600/5 blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
+                <div className="absolute bottom-1/3 left-1/4 w-[200px] h-[200px] rounded-full bg-emerald-600/5 blur-3xl animate-pulse" style={{ animationDuration: '6s' }} />
+                <div className="absolute top-2/3 right-1/3 w-[250px] h-[250px] rounded-full bg-amber-600/4 blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
             </div>
 
-            {/* Inline keyframes for stagger animation */}
+            {/* CSS Animations */}
             <style>{`
-                @keyframes obeya-fade-up {
-                    from { opacity: 0; transform: translateY(24px); }
-                    to { opacity: 1; transform: translateY(0); }
+                @keyframes orbit-float {
+                    0%, 100% { transform: translate(-50%, -50%) translateY(0px); }
+                    50% { transform: translate(-50%, -50%) translateY(-12px); }
                 }
-                .obeya-stagger > * {
-                    opacity: 0;
-                    animation: obeya-fade-up 0.6s ease-out forwards;
-                }
-                .obeya-stagger > *:nth-child(1) { animation-delay: 0.05s; }
-                .obeya-stagger > *:nth-child(2) { animation-delay: 0.12s; }
-                .obeya-stagger > *:nth-child(3) { animation-delay: 0.2s; }
-                .obeya-stagger > *:nth-child(4) { animation-delay: 0.28s; }
-                .obeya-stagger > *:nth-child(5) { animation-delay: 0.36s; }
-                .obeya-stagger > *:nth-child(6) { animation-delay: 0.44s; }
-                .obeya-stagger > *:nth-child(7) { animation-delay: 0.52s; }
-                .obeya-stagger > *:nth-child(8) { animation-delay: 0.6s; }
             `}</style>
 
-            <div className="relative z-10 space-y-6 obeya-stagger">
+            <div className="relative z-10 space-y-8">
+
                 <TaskDetailModal
                     isOpen={isModalOpen} onClose={closeModal} task={selectedTask}
                     projects={engProjects} teamMembers={teamMembers}
@@ -554,177 +568,203 @@ export default function Dashboard() {
 
                 <PageHeader title="" showBack={true} />
 
-                {/* Header */}
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                    <div>
-                        <h1 className="text-3xl md:text-4xl font-black tracking-tight flex items-center gap-3">
-                            <span className="bg-gradient-to-r from-indigo-400 via-violet-400 to-purple-400 bg-clip-text text-transparent">Sala Obeya</span>
-                            <span className="bg-indigo-500/20 text-indigo-400 text-xs px-2.5 py-1 rounded-lg uppercase tracking-widest leading-none border border-indigo-500/30 animate-pulse" style={{ animationDuration: '3s' }}>En vivo</span>
-                        </h1>
-                        <p className="text-sm font-bold text-slate-400 mt-1">Tablero de Control y Salud de Ingeniería</p>
-                    </div>
-                    <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800/50 border border-slate-700/50">
-                        <Clock className="w-4 h-4 text-indigo-400" />
-                        <span className="text-sm font-bold text-slate-300 capitalize">{format(now, "EEEE, d 'de' MMMM", { locale: es })}</span>
-                    </div>
-                </div>
-
-            {/* ═══════════ KPI ROW — EXPANDABLE ═══════════ */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-                {/* Proyectos Activos */}
-                <KpiCard label="Proyectos Activos" value={kpis.activeProjects.length} icon={LayoutDashboard} color="indigo">
-                    {kpis.activeProjects.map(p => {
-                        const pTasks = engTasks.filter(t => t.projectId === p.id);
-                        const done = pTasks.filter(t => t.status === 'completed').length;
-                        const progress = pTasks.length > 0 ? Math.round((done / pTasks.length) * 100) : 0;
-                        const rCfg = RISK_LEVEL_CONFIG[p.riskLevel || 'low'] || {};
-                        return (
-                            <button key={p.id} onClick={() => navigate(`/projects/${p.id}`)} className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-slate-800/60 transition-colors text-left">
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-bold text-slate-200 truncate">{p.name}</p>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <div className="w-16 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                                            <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${progress}%` }} />
-                                        </div>
-                                        <span className="text-[10px] font-bold text-slate-400">{progress}% · {done}/{pTasks.length}</span>
-                                    </div>
+                {/* ═══════════ HEADER ═══════════ */}
+                <section ref={headerRef} className="relative overflow-hidden">
+                    {/* Floating icons */}
+                    <div className="absolute inset-0 pointer-events-none">
+                        {[LayoutDashboard, Target, Clock, Shield, Activity].map((FloatIcon, i) => (
+                            <div
+                                key={i}
+                                className={`absolute transition-all duration-1000 ${headerVis ? 'opacity-60' : 'opacity-0'}`}
+                                style={{
+                                    top: `${20 + 60 * Math.sin((i / 5) * 2 * Math.PI)}%`,
+                                    left: `${50 + 42 * Math.cos((i / 5) * 2 * Math.PI)}%`,
+                                    transform: 'translate(-50%, -50%)',
+                                    transitionDelay: `${i * 150}ms`,
+                                    animation: headerVis ? `orbit-float 8s ease-in-out infinite ${i * 1.3}s` : 'none',
+                                }}
+                            >
+                                <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-slate-800/60 backdrop-blur-sm border border-slate-700/40 flex items-center justify-center shadow-lg shadow-black/20">
+                                    <FloatIcon className="w-4 h-4 md:w-5 md:h-5 text-indigo-400/50" />
                                 </div>
-                                <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
-                                    p.riskLevel === 'high' ? 'bg-rose-500/20 text-rose-400' :
-                                    p.riskLevel === 'medium' ? 'bg-amber-500/20 text-amber-400' :
-                                    'bg-emerald-500/20 text-emerald-400'
-                                }`}>{rCfg.label || 'Bajo'}</span>
-                            </button>
-                        );
-                    })}
-                    {kpis.activeProjects.length === 0 && <p className="text-xs text-slate-600 text-center py-2">Sin proyectos activos</p>}
-                </KpiCard>
-
-                {/* Proy. en Riesgo */}
-                <KpiCard label="Proy. en Riesgo" value={kpis.projectsAtRisk.length} icon={Flame} color="amber">
-                    {kpis.projectsAtRisk.map(p => {
-                        const blocked = engTasks.filter(t => t.projectId === p.id && t.status === 'blocked').length;
-                        const activeD = delays?.filter(d => d.projectId === p.id && !d.resolved).length || 0;
-                        return (
-                            <button key={p.id} onClick={() => navigate(`/projects/${p.id}`)} className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-slate-800/60 transition-colors text-left">
-                                <Flame className={`w-4 h-4 shrink-0 ${p.riskLevel === 'high' ? 'text-rose-400' : 'text-amber-400'}`} />
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-bold text-slate-200 truncate">{p.name}</p>
-                                    <p className="text-[10px] text-slate-500">
-                                        {p.riskLevel === 'high' ? 'Alto riesgo' : 'Riesgo medio'}
-                                        {blocked > 0 && ` · ${blocked} bloqueadas`}
-                                        {activeD > 0 && ` · ${activeD} retrasos`}
-                                    </p>
-                                </div>
-                            </button>
-                        );
-                    })}
-                    {kpis.projectsAtRisk.length === 0 && <p className="text-xs text-emerald-500 text-center py-2 flex items-center justify-center gap-1"><CheckCircle className="w-3.5 h-3.5" /> Sin proyectos en riesgo</p>}
-                </KpiCard>
-
-                {/* Tareas Bloqueadas */}
-                <KpiCard label="Bloqueadas" value={kpis.blockedTasks.length} icon={AlertOctagon} color="rose">
-                    {kpis.blockedTasks.map(t => {
-                        const project = engProjects.find(p => p.id === t.projectId);
-                        const assignee = teamMembers.find(u => u.uid === t.assignedTo);
-                        return (
-                            <button key={t.id} onClick={() => openTask(t)} className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-slate-800/60 transition-colors text-left">
-                                <AlertOctagon className="w-4 h-4 text-rose-400 shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-bold text-slate-200 truncate">{t.title}</p>
-                                    <p className="text-[10px] text-slate-500">{project?.name || ''} · {assignee?.displayName || 'Sin asignar'}</p>
-                                </div>
-                            </button>
-                        );
-                    })}
-                    {kpis.blockedTasks.length === 0 && <p className="text-xs text-emerald-500 text-center py-2 flex items-center justify-center gap-1"><CheckCircle className="w-3.5 h-3.5" /> Sin bloqueos</p>}
-                </KpiCard>
-
-                {/* Overtime Semanal */}
-                <KpiCard label="Overtime Semana" value={kpis.weekOvertime} suffix="h" icon={Zap} color="orange">
-                    {(() => {
-                        const ws = startOfWeek(new Date(), { weekStartsOn: 1 });
-                        const we = endOfWeek(new Date(), { weekStartsOn: 1 });
-                        const weekLogs = timeLogs?.filter(l => {
-                            if (!l.startTime || !l.overtimeHours || l.overtimeHours <= 0) return false;
-                            const d = new Date(l.startTime);
-                            return isWithinInterval(d, { start: ws, end: we });
-                        }) || [];
-                        // Group by user
-                        const byUser = {};
-                        weekLogs.forEach(l => {
-                            if (!byUser[l.userId]) byUser[l.userId] = { total: 0, logs: [] };
-                            byUser[l.userId].total += l.overtimeHours;
-                            byUser[l.userId].logs.push(l);
-                        });
-                        const entries = Object.entries(byUser).sort((a, b) => b[1].total - a[1].total);
-
-                        if (entries.length === 0) return <p className="text-xs text-slate-600 text-center py-2">Sin overtime esta semana</p>;
-
-                        return entries.map(([uid, data]) => {
-                            const member = teamMembers.find(u => u.uid === uid);
-                            return (
-                                <div key={uid} className="flex items-center gap-3 p-2 rounded-xl bg-orange-500/5">
-                                    <Zap className="w-4 h-4 text-orange-400 shrink-0" />
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-bold text-slate-200 truncate">{member?.displayName || uid}</p>
-                                    </div>
-                                    <span className="text-sm font-black text-orange-400">{data.total.toFixed(1)}h</span>
-                                </div>
-                            );
-                        });
-                    })()}
-                </KpiCard>
-
-                {/* Retrasos Activos */}
-                <KpiCard label="Retrasos Activos" value={kpis.activeDelays.length} icon={AlertTriangle} color="violet">
-                    {kpis.activeDelays.map(d => {
-                        const project = engProjects.find(p => p.id === d.projectId);
-                        const task = d.taskId ? engTasks.find(t => t.id === d.taskId) : null;
-                        return (
-                            <div key={d.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-800/60 transition-colors">
-                                <AlertTriangle className="w-4 h-4 text-violet-400 shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-bold text-slate-200 truncate">{d.causeName || 'Sin causa'}</p>
-                                    <p className="text-[10px] text-slate-500">{project?.name || ''}{task ? ` · ${task.title}` : ''}</p>
-                                </div>
-                                <button
-                                    onClick={(e) => handleResolveClick(e, { delayId: d.id, projectId: d.projectId, taskId: d.taskId })}
-                                    disabled={resolvingDelayId === d.id}
-                                    className={`text-[10px] font-black px-2 py-1 rounded-lg transition-all ${
-                                        confirmingDelayId === d.id ? 'bg-red-600 text-white animate-pulse' :
-                                        resolvingDelayId === d.id ? 'bg-slate-700 text-slate-400' :
-                                        'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30'
-                                    }`}
-                                >
-                                    <CheckCheck className="w-3.5 h-3.5" />
-                                </button>
                             </div>
-                        );
-                    })}
-                    {kpis.activeDelays.length === 0 && <p className="text-xs text-emerald-500 text-center py-2 flex items-center justify-center gap-1"><CheckCircle className="w-3.5 h-3.5" /> Sin retrasos</p>}
-                </KpiCard>
-            </div>
+                        ))}
+                    </div>
 
-            {/* ═══════════ COMPLIANCE SCORES ═══════════ */}
-            <ComplianceScoresPanel
-                scores={scores} summary={summary}
-                isAuditing={isAuditing} onRunAudit={runClientAudit}
-            />
+                    <div className={`relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-all duration-700 ${headerVis ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
+                        <div>
+                            <h1 className="text-3xl md:text-4xl font-black tracking-tight flex items-center gap-3">
+                                <span className="bg-linear-to-r from-indigo-400 via-violet-400 to-purple-400 bg-clip-text text-transparent">Sala Obeya</span>
+                                <span className="bg-indigo-500/20 text-indigo-400 text-xs px-2.5 py-1 rounded-lg uppercase tracking-widest leading-none border border-indigo-500/30 animate-pulse" style={{ animationDuration: '3s' }}>En vivo</span>
+                            </h1>
+                            <p className="text-sm font-bold text-slate-400 mt-1">Tablero de Control y Salud de Ingeniería</p>
+                        </div>
+                        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800/50 border border-slate-700/50 transition-all duration-700 delay-200 ${headerVis ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                            <Clock className="w-4 h-4 text-indigo-400" />
+                            <span className="text-sm font-bold text-slate-300 capitalize">{format(now, "EEEE, d 'de' MMMM", { locale: es })}</span>
+                        </div>
+                    </div>
+                </section>
 
-            {/* ═══════════ PIPELINE ═══════════ */}
-            <TaskPipeline tasks={enrichedTasks} onTaskClick={openTask} />
+                {/* ═══════════ KPI ROW — EXPANDABLE ═══════════ */}
+                <section ref={kpiRef}>
+                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                        {[
+                            <KpiCard key="proj" label="Proyectos Activos" value={kpis.activeProjects.length} icon={LayoutDashboard} color="indigo">
+                                {kpis.activeProjects.map(p => {
+                                    const pTasks = engTasks.filter(t => t.projectId === p.id);
+                                    const done = pTasks.filter(t => t.status === 'completed').length;
+                                    const progress = pTasks.length > 0 ? Math.round((done / pTasks.length) * 100) : 0;
+                                    const rCfg = RISK_LEVEL_CONFIG[p.riskLevel || 'low'] || {};
+                                    return (
+                                        <button key={p.id} onClick={() => navigate(`/projects/${p.id}`)} className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-slate-800/60 transition-colors text-left">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-bold text-slate-200 truncate">{p.name}</p>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <div className="w-16 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                                                        <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${progress}%` }} />
+                                                    </div>
+                                                    <span className="text-[10px] font-bold text-slate-400">{progress}% · {done}/{pTasks.length}</span>
+                                                </div>
+                                            </div>
+                                            <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                                p.riskLevel === 'high' ? 'bg-rose-500/20 text-rose-400' :
+                                                p.riskLevel === 'medium' ? 'bg-amber-500/20 text-amber-400' :
+                                                'bg-emerald-500/20 text-emerald-400'
+                                            }`}>{rCfg.label || 'Bajo'}</span>
+                                        </button>
+                                    );
+                                })}
+                                {kpis.activeProjects.length === 0 && <p className="text-xs text-slate-600 text-center py-2">Sin proyectos activos</p>}
+                            </KpiCard>,
+                            <KpiCard key="risk" label="Proy. en Riesgo" value={kpis.projectsAtRisk.length} icon={Flame} color="amber">
+                                {kpis.projectsAtRisk.map(p => {
+                                    const blocked = engTasks.filter(t => t.projectId === p.id && t.status === 'blocked').length;
+                                    const activeD = delays?.filter(d => d.projectId === p.id && !d.resolved).length || 0;
+                                    return (
+                                        <button key={p.id} onClick={() => navigate(`/projects/${p.id}`)} className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-slate-800/60 transition-colors text-left">
+                                            <Flame className={`w-4 h-4 shrink-0 ${p.riskLevel === 'high' ? 'text-rose-400' : 'text-amber-400'}`} />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-bold text-slate-200 truncate">{p.name}</p>
+                                                <p className="text-[10px] text-slate-500">
+                                                    {p.riskLevel === 'high' ? 'Alto riesgo' : 'Riesgo medio'}
+                                                    {blocked > 0 && ` · ${blocked} bloqueadas`}
+                                                    {activeD > 0 && ` · ${activeD} retrasos`}
+                                                </p>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                                {kpis.projectsAtRisk.length === 0 && <p className="text-xs text-emerald-500 text-center py-2 flex items-center justify-center gap-1"><CheckCircle className="w-3.5 h-3.5" /> Sin proyectos en riesgo</p>}
+                            </KpiCard>,
+                            <KpiCard key="blocked" label="Bloqueadas" value={kpis.blockedTasks.length} icon={AlertOctagon} color="rose">
+                                {kpis.blockedTasks.map(t => {
+                                    const project = engProjects.find(p => p.id === t.projectId);
+                                    const assignee = teamMembers.find(u => u.uid === t.assignedTo);
+                                    return (
+                                        <button key={t.id} onClick={() => openTask(t)} className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-slate-800/60 transition-colors text-left">
+                                            <AlertOctagon className="w-4 h-4 text-rose-400 shrink-0" />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-bold text-slate-200 truncate">{t.title}</p>
+                                                <p className="text-[10px] text-slate-500">{project?.name || ''} · {assignee?.displayName || 'Sin asignar'}</p>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                                {kpis.blockedTasks.length === 0 && <p className="text-xs text-emerald-500 text-center py-2 flex items-center justify-center gap-1"><CheckCircle className="w-3.5 h-3.5" /> Sin bloqueos</p>}
+                            </KpiCard>,
+                            <KpiCard key="ot" label="Overtime Semana" value={kpis.weekOvertime} suffix="h" icon={Zap} color="orange">
+                                {(() => {
+                                    const ws = startOfWeek(new Date(), { weekStartsOn: 1 });
+                                    const we = endOfWeek(new Date(), { weekStartsOn: 1 });
+                                    const weekLogs = timeLogs?.filter(l => {
+                                        if (!l.startTime || !l.overtimeHours || l.overtimeHours <= 0) return false;
+                                        const d = new Date(l.startTime);
+                                        return isWithinInterval(d, { start: ws, end: we });
+                                    }) || [];
+                                    const byUser = {};
+                                    weekLogs.forEach(l => {
+                                        if (!byUser[l.userId]) byUser[l.userId] = { total: 0 };
+                                        byUser[l.userId].total += l.overtimeHours;
+                                    });
+                                    const entries = Object.entries(byUser).sort((a, b) => b[1].total - a[1].total);
+                                    if (entries.length === 0) return <p className="text-xs text-slate-600 text-center py-2">Sin overtime esta semana</p>;
+                                    return entries.map(([uid, data]) => {
+                                        const member = teamMembers.find(u => u.uid === uid);
+                                        return (
+                                            <div key={uid} className="flex items-center gap-3 p-2 rounded-xl bg-orange-500/5">
+                                                <Zap className="w-4 h-4 text-orange-400 shrink-0" />
+                                                <div className="flex-1 min-w-0"><p className="text-sm font-bold text-slate-200 truncate">{member?.displayName || uid}</p></div>
+                                                <span className="text-sm font-black text-orange-400">{data.total.toFixed(1)}h</span>
+                                            </div>
+                                        );
+                                    });
+                                })()}
+                            </KpiCard>,
+                            <KpiCard key="delays" label="Retrasos Activos" value={kpis.activeDelays.length} icon={AlertTriangle} color="violet">
+                                {kpis.activeDelays.map(d => {
+                                    const project = engProjects.find(p => p.id === d.projectId);
+                                    const task = d.taskId ? engTasks.find(t => t.id === d.taskId) : null;
+                                    return (
+                                        <div key={d.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-800/60 transition-colors">
+                                            <AlertTriangle className="w-4 h-4 text-violet-400 shrink-0" />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-bold text-slate-200 truncate">{d.causeName || 'Sin causa'}</p>
+                                                <p className="text-[10px] text-slate-500">{project?.name || ''}{task ? ` · ${task.title}` : ''}</p>
+                                            </div>
+                                            <button
+                                                onClick={(e) => handleResolveClick(e, { delayId: d.id, projectId: d.projectId, taskId: d.taskId })}
+                                                disabled={resolvingDelayId === d.id}
+                                                className={`text-[10px] font-black px-2 py-1 rounded-lg transition-all ${
+                                                    confirmingDelayId === d.id ? 'bg-red-600 text-white animate-pulse' :
+                                                    resolvingDelayId === d.id ? 'bg-slate-700 text-slate-400' :
+                                                    'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30'
+                                                }`}
+                                            >
+                                                <CheckCheck className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                                {kpis.activeDelays.length === 0 && <p className="text-xs text-emerald-500 text-center py-2 flex items-center justify-center gap-1"><CheckCircle className="w-3.5 h-3.5" /> Sin retrasos</p>}
+                            </KpiCard>,
+                        ].map((card, i) => (
+                            <div
+                                key={i}
+                                className={`transition-all duration-500 ${kpiVis ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+                                style={{ transitionDelay: kpiVis ? `${i * 80}ms` : '0ms' }}
+                            >
+                                {card}
+                            </div>
+                        ))}
+                    </div>
+                </section>
 
-            {/* ═══════════ TEAM WORKLOAD ═══════════ */}
-            <TeamWorkloadPanel
-                workload={workload} timeLogs={timeLogs}
-                engTasks={engTasks} engProjects={engProjects}
-                onTaskClick={openTask}
-            />
+                {/* ═══════════ COMPLIANCE SCORES ═══════════ */}
+                <section ref={compRef} className={`transition-all duration-700 ${compVis ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+                    <ComplianceScoresPanel
+                        scores={scores} summary={summary}
+                        isAuditing={isAuditing} onRunAudit={runClientAudit}
+                    />
+                </section>
 
-            {/* ═══════════ ALERTS ═══════════ */}
-            <div className="space-y-6">
-                    <div className="bg-slate-900/70 backdrop-blur-sm rounded-2xl border border-slate-800 shadow-lg p-6 sticky top-6">
+                {/* ═══════════ PIPELINE ═══════════ */}
+                <section ref={pipeRef} className={`transition-all duration-700 ${pipeVis ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+                    <TaskPipeline tasks={enrichedTasks} onTaskClick={openTask} />
+                </section>
+
+                {/* ═══════════ TEAM WORKLOAD ═══════════ */}
+                <section ref={teamRef} className={`transition-all duration-700 ${teamVis ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+                    <TeamWorkloadPanel
+                        workload={workload} timeLogs={timeLogs}
+                        engTasks={engTasks} engProjects={engProjects}
+                        onTaskClick={openTask}
+                    />
+                </section>
+
+                {/* ═══════════ ALERTS ═══════════ */}
+                <section ref={alertRef} className={`transition-all duration-700 ${alertVis ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+                    <div className="bg-slate-900/70 backdrop-blur-sm rounded-2xl border border-slate-800 shadow-lg p-6">
                         <div className="flex items-center justify-between mb-5">
                             <h3 className="font-bold text-lg text-white flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-amber-400" /> Alertas</h3>
                             <span className="text-xs font-bold text-slate-500">{alerts.length}</span>
@@ -735,10 +775,11 @@ export default function Dashboard() {
                                 <div
                                     key={i}
                                     onClick={alert.action}
-                                    className={`p-3 rounded-xl border-l-4 cursor-pointer transition-transform hover:translate-x-1 ${
+                                    className={`p-3 rounded-xl border-l-4 cursor-pointer transition-all duration-500 hover:translate-x-1 ${
                                         alert.type === 'danger' ? 'bg-rose-500/10 border-rose-500' :
                                         'bg-amber-500/10 border-amber-500'
-                                    }`}
+                                    } ${alertVis ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'}`}
+                                    style={{ transitionDelay: alertVis ? `${i * 60}ms` : '0ms' }}
                                 >
                                     <div className="flex items-start gap-2">
                                         <alert.icon className={`w-4 h-4 shrink-0 mt-0.5 ${alert.type === 'danger' ? 'text-rose-400' : 'text-amber-400'}`} />
@@ -776,7 +817,8 @@ export default function Dashboard() {
                             )}
                         </div>
                     </div>
-                </div>
+                </section>
+
             </div>
         </div>
     );
