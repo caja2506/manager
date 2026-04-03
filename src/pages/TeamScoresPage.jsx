@@ -7,6 +7,7 @@ import {
     buildRawMetrics,
 } from '../core/analytics/performanceScore';
 import { saveTeamScoreLogs, getScoreLogs } from '../services/scoreLogService';
+import { loadCustomWeights, mergeWeights } from '../components/admin/IPSWeightConfigPanel';
 import {
     Users, Target, Award, ChevronDown, TrendingUp, TrendingDown, Minus,
     ChevronRight, Zap, CheckCircle, AlertTriangle, Shield, Eye,
@@ -325,13 +326,15 @@ export default function TeamScoresPage() {
     const [roleFilter, setRoleFilter] = useState('all');
     const [historyMap, setHistoryMap] = useState({});   // userId -> [{score, dateKey, delta}]
     const persistDoneRef = useRef(false);
+    const [customWeights, setCustomWeights] = useState(null);
 
-    // Load assignments
+    // Load assignments + custom weights
     useEffect(() => {
         getActiveAssignments().then(setAssignments).catch(console.error);
+        loadCustomWeights().then(w => { if (w) setCustomWeights(mergeWeights(w)); });
     }, []);
 
-    // Calculate scores
+    // Calculate scores (with custom weights if available)
     const teamScores = useMemo(() => {
         if (!isReady || teamMembers.length === 0) return [];
         return calculateTeamScores(teamMembers, {
@@ -342,8 +345,8 @@ export default function TeamScoresPage() {
             assignments,
             plannerSlots: [],
             auditScores: null,
-        });
-    }, [isReady, teamMembers, engTasks, timeLogs, delays, assignments]);
+        }, customWeights);
+    }, [isReady, teamMembers, engTasks, timeLogs, delays, assignments, customWeights]);
 
     // Auto-persist daily logs (once per session)
     useEffect(() => {

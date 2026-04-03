@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useRole } from '../contexts/RoleContext';
 import UserAdminPanel from '../components/admin/UserAdminPanel';
+import IPSWeightConfigPanel from '../components/admin/IPSWeightConfigPanel';
 import PageHeader from '../components/layout/PageHeader';
 import { backfillTimeLogNames } from '../services/backfillService';
 
@@ -56,6 +57,7 @@ export default function SettingsPage() {
                 </div>
             </div>
             <UserAdminPanel />
+            <IPSWeightConfigPanel />
 
             {/* Migration Tools */}
             <div className="bg-slate-900/70 backdrop-blur-sm p-6 rounded-2xl border border-amber-500/20 shadow-lg">
