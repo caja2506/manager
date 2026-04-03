@@ -173,8 +173,8 @@ function ScoreCard({ person, index, isExpanded, onToggle, history }) {
     if (person.isManager) {
         return (
             <div className="rounded-2xl p-5 border" style={{
-                background: 'rgba(139,92,246,0.05)',
-                borderColor: 'rgba(139,92,246,0.15)',
+                background: 'rgba(139,92,246,0.08)',
+                borderColor: 'rgba(139,92,246,0.25)',
                 animationDelay: `${index * 80}ms`,
             }}>
                 <div className="flex items-center gap-3">
@@ -195,8 +195,8 @@ function ScoreCard({ person, index, isExpanded, onToggle, history }) {
     if (person.insufficientData) {
         return (
             <div className="rounded-2xl p-5 border" style={{
-                background: 'rgba(255,255,255,0.02)',
-                borderColor: 'rgba(255,255,255,0.08)',
+                background: 'rgba(245,158,11,0.06)',
+                borderColor: 'rgba(245,158,11,0.20)',
                 animationDelay: `${index * 80}ms`,
             }}>
                 <div className="flex items-center gap-3">
@@ -207,9 +207,9 @@ function ScoreCard({ person, index, isExpanded, onToggle, history }) {
                         <div style={{ color: roleCfg.color }} className="text-xs font-medium">{roleCfg.label}</div>
                     </div>
                 </div>
-                <div className="mt-3 text-xs text-white/40 italic flex items-center gap-1.5">
+                <div className="mt-3 text-xs text-amber-400/70 flex items-center gap-1.5">
                     <AlertTriangle size={12} className="text-amber-400" />
-                    Datos insuficientes — necesita actividad reciente
+                    Datos insuficientes — necesita tareas asignadas y registros de tiempo recientes
                 </div>
             </div>
         );
