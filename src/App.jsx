@@ -63,7 +63,7 @@ const LOADING_QUOTES = [
 function AuthLoadingScreen() {
     const [quote] = useState(() => LOADING_QUOTES[Math.floor(Math.random() * LOADING_QUOTES.length)]);
     return (
-        <div className="fixed inset-0 z-9998 flex items-center justify-center overflow-hidden" style={{ background: 'linear-gradient(135deg, #0c0a1a 0%, #1a1035 35%, #0f172a 70%, #0c0a1a 100%)' }}>
+        <div className="fixed inset-0 z-9998 flex items-center justify-center overflow-hidden" style={{ background: 'linear-gradient(135deg, #0f0b2e 0%, #1a1050 30%, #0d1a3a 60%, #1a0f40 100%)' }}>
             {/* Ambient glow */}
             <div className="absolute rounded-full pointer-events-none" style={{
                 width: 600, height: 600, top: '10%', left: '50%', transform: 'translateX(-50%)',

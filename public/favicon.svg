@@ -1,0 +1,51 @@
+<svg width="32" height="32" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="fp" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6B3FA0"/>
+      <stop offset="100%" stop-color="#5B2D8E"/>
+    </linearGradient>
+    <linearGradient id="fc" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#D4A574"/>
+      <stop offset="100%" stop-color="#C4956A"/>
+    </linearGradient>
+    <linearGradient id="fy" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00E5FF"/>
+      <stop offset="100%" stop-color="#00CFFF"/>
+    </linearGradient>
+    <linearGradient id="fpc" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#5B2D8E"/>
+      <stop offset="100%" stop-color="#00CFFF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="60" cy="60" r="58" fill="#0f0b2e"/>
+  <circle cx="60" cy="60" r="58" stroke="url(#fp)" stroke-width="2" opacity="0.4"/>
+
+  <!-- Orbital rings -->
+  <ellipse cx="60" cy="60" rx="50" ry="20" stroke="url(#fp)" stroke-width="1.2" opacity="0.3" fill="none" transform="rotate(-30 60 60)"/>
+  <ellipse cx="60" cy="60" rx="44" ry="16" stroke="url(#fc)" stroke-width="1" opacity="0.25" fill="none" transform="rotate(40 60 60)" stroke-dasharray="3 5"/>
+
+  <!-- Analytics bars -->
+  <rect x="35" y="48" width="7" height="26" rx="3.5" fill="url(#fp)" opacity="0.9"/>
+  <rect x="45" y="38" width="7" height="36" rx="3.5" fill="url(#fc)" opacity="0.9"/>
+  <rect x="55" y="44" width="7" height="30" rx="3.5" fill="url(#fp)" opacity="0.9"/>
+  <rect x="65" y="32" width="7" height="42" rx="3.5" fill="url(#fy)" opacity="0.85"/>
+  <rect x="75" y="42" width="7" height="32" rx="3.5" fill="url(#fc)" opacity="0.9"/>
+
+  <!-- Pulse line -->
+  <path d="M25 58 L36 58 L42 42 L50 62 L58 30 L66 54 L72 46 L78 58 L84 38 L92 58 L100 58"
+        stroke="url(#fy)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- Corner nodes -->
+  <circle cx="25" cy="25" r="5" fill="url(#fp)"/>
+  <circle cx="95" cy="25" r="4" fill="url(#fc)"/>
+  <circle cx="25" cy="95" r="4" fill="url(#fc)"/>
+  <circle cx="95" cy="95" r="5" fill="url(#fy)"/>
+
+  <!-- Node connections -->
+  <line x1="28" y1="28" x2="42" y2="42" stroke="url(#fp)" stroke-width="1.5" opacity="0.4"/>
+  <line x1="92" y1="28" x2="78" y2="42" stroke="url(#fc)" stroke-width="1.5" opacity="0.4"/>
+  <line x1="28" y1="92" x2="42" y2="78" stroke="url(#fc)" stroke-width="1.5" opacity="0.4"/>
+  <line x1="92" y1="92" x2="78" y2="78" stroke="url(#fp)" stroke-width="1.5" opacity="0.4"/>
+</svg>

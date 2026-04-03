@@ -32,7 +32,7 @@ export default function SplashScreen({ onComplete }) {
         <div
             className="fixed inset-0 z-9999 flex items-center justify-center"
             style={{
-                background: 'linear-gradient(135deg, #0c0a1a 0%, #1a1035 35%, #0f172a 70%, #0c0a1a 100%)',
+                background: 'linear-gradient(135deg, #0f0b2e 0%, #1a1050 30%, #0d1a3a 60%, #1a0f40 100%)',
                 opacity: phase === 'exit' ? 0 : 1,
                 transition: 'opacity 800ms ease-out',
             }}
@@ -52,7 +52,7 @@ export default function SplashScreen({ onComplete }) {
                 style={{
                     width: 500, height: 500,
                     top: '10%', left: '50%', transform: 'translateX(-50%)',
-                    background: 'radial-gradient(circle, rgba(107,63,160,0.25) 0%, transparent 70%)',
+                    background: 'radial-gradient(circle, rgba(99,102,241,0.20) 0%, transparent 70%)',
                     filter: 'blur(80px)',
                     animation: phase !== 'enter' ? 'splash-pulse 3s ease-in-out infinite' : undefined,
                 }}
@@ -62,7 +62,7 @@ export default function SplashScreen({ onComplete }) {
                 style={{
                     width: 400, height: 400,
                     bottom: '5%', right: '15%',
-                    background: 'radial-gradient(circle, rgba(0,207,255,0.15) 0%, transparent 70%)',
+                    background: 'radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 70%)',
                     filter: 'blur(80px)',
                     animation: phase !== 'enter' ? 'splash-pulse 3s ease-in-out 0.5s infinite' : undefined,
                 }}
@@ -72,7 +72,7 @@ export default function SplashScreen({ onComplete }) {
                 style={{
                     width: 300, height: 300,
                     top: '40%', left: '10%',
-                    background: 'radial-gradient(circle, rgba(196,149,106,0.12) 0%, transparent 70%)',
+                    background: 'radial-gradient(circle, rgba(52,211,153,0.10) 0%, transparent 70%)',
                     filter: 'blur(60px)',
                     animation: phase !== 'enter' ? 'splash-pulse 3s ease-in-out 1s infinite' : undefined,
                 }}
