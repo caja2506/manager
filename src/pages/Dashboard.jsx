@@ -16,6 +16,8 @@ import ComplianceScoresPanel from '../components/audit/ComplianceScoresPanel';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
 import PageHeader from '../components/layout/PageHeader';
 import { resolveDelay } from '../services/delayService';
+import { calculateTeamScores } from '../core/analytics/performanceScore';
+import { getActiveAssignments } from '../services/resourceAssignmentService';
 
 // ============================================================
 // ANIMATED COUNT UP HOOK
@@ -208,7 +210,7 @@ function TaskPipeline({ tasks, onTaskClick }) {
 // TEAM WORKLOAD PANEL — Module card grid style
 // ============================================================
 
-function TeamWorkloadPanel({ workload, timeLogs, engTasks, engProjects, onTaskClick }) {
+function TeamWorkloadPanel({ workload, timeLogs, engTasks, engProjects, onTaskClick, scoreMap, navigate }) {
     const [expandedUser, setExpandedUser] = useState(null);
     const now = new Date();
     const weekStart = startOfWeek(now, { weekStartsOn: 1 });
@@ -245,7 +247,12 @@ function TeamWorkloadPanel({ workload, timeLogs, engTasks, engProjects, onTaskCl
                 <h3 className="font-bold text-lg text-white flex items-center gap-2">
                     <Users className="w-5 h-5 text-indigo-400" /> Equipo
                 </h3>
-                <span className="text-xs font-bold text-slate-500">{workload.length} miembros</span>
+                <div className="flex items-center gap-3">
+                    <button onClick={() => navigate('/team-scores')} className="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1">
+                        <Target className="w-3 h-3" /> Scorecard
+                    </button>
+                    <span className="text-xs font-bold text-slate-500">{workload.length} miembros</span>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -286,6 +293,21 @@ function TeamWorkloadPanel({ workload, timeLogs, engTasks, engProjects, onTaskCl
                             {/* Name */}
                             <h4 className="text-sm font-black text-slate-200 truncate">{name}</h4>
                             <p className={`text-[10px] font-black uppercase tracking-wider ${rc.text} mb-2`}>{roleLabels[role] || 'Ingeniero'}</p>
+
+                            {/* IPS Badge */}
+                            {scoreMap?.[user.uid] && (() => {
+                                const ips = scoreMap[user.uid];
+                                const badgeColor = ips.score >= 90 ? '#10b981' : ips.score >= 75 ? '#6366f1' : ips.score >= 60 ? '#f59e0b' : '#ef4444';
+                                return (
+                                    <div className="flex items-center gap-1.5 mb-2">
+                                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black text-white"
+                                            style={{ background: `${badgeColor}30`, border: `1.5px solid ${badgeColor}`, color: badgeColor }}>
+                                            {Math.round(ips.score)}
+                                        </div>
+                                        <span className="text-[9px] font-bold" style={{ color: badgeColor }}>IPS</span>
+                                    </div>
+                                );
+                            })()}
 
                             {/* Description */}
                             <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-2 mb-3">{desc}</p>
@@ -443,6 +465,22 @@ export default function Dashboard() {
             return { ...eng, totalAssigned: assignedTasks.length };
         }).sort((a, b) => b.totalAssigned - a.totalAssigned);
     }, [engTasks, teamMembers]);
+
+    // ── IPS Scores (for badge in team cards) ──
+    const [ipsAssignments, setIpsAssignments] = useState([]);
+    useEffect(() => {
+        getActiveAssignments().then(setIpsAssignments).catch(() => {});
+    }, []);
+    const ipsScoreMap = useMemo(() => {
+        if (!isReady || teamMembers.length === 0) return {};
+        const scores = calculateTeamScores(teamMembers, {
+            tasks: engTasks, timeLogs, delays, teamMembers,
+            assignments: ipsAssignments, plannerSlots: [], auditScores: null,
+        });
+        const map = {};
+        scores.forEach(s => { if (s.score !== null) map[s.userId] = s; });
+        return map;
+    }, [isReady, teamMembers, engTasks, timeLogs, delays, ipsAssignments]);
 
     // ── Alerts ──
     const alerts = useMemo(() => {
@@ -733,6 +771,8 @@ export default function Dashboard() {
                         workload={workload} timeLogs={timeLogs}
                         engTasks={engTasks} engProjects={engProjects}
                         onTaskClick={openTask}
+                        scoreMap={ipsScoreMap}
+                        navigate={navigate}
                     />
                 </section>
 
