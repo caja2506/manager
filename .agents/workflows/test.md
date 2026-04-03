@@ -5,10 +5,10 @@ description: Run tests with Vitest
 
 1. Run all tests once
    ```
-   npm run test
+   $env:PATH = "c:\Users\CJ00083620\.gemini\antigravity\scratch\autobom-pro\node_bin\node-v20.11.1-win-x64;$env:PATH"; npm run test
    ```
 
 2. If a specific test file needs to run, use:
    ```
-   npx vitest run <test-file-path>
+   $env:PATH = "c:\Users\CJ00083620\.gemini\antigravity\scratch\autobom-pro\node_bin\node-v20.11.1-win-x64;$env:PATH"; npx vitest run <test-file-path>
    ```

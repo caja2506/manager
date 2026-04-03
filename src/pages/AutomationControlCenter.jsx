@@ -25,6 +25,7 @@ import { fetchAnalyticsDashboard } from '../automation/analyticsService.js';
 import { fetchOptimizationDashboard, runOptimizationScan as scanOptimization } from '../automation/optimizationService.js';
 import AutomationControlShell from '../components/automation/AutomationControlShell.jsx';
 import DayScheduleSettings from '../components/settings/DayScheduleSettings.jsx';
+import EmailReportSettings from '../components/settings/EmailReportSettings.jsx';
 
 /**
  * AutomationControlCenter
@@ -395,7 +396,8 @@ export default function AutomationControlCenter() {
                 onOptimizationScan={handleOptimizationScan}
                 onSimulate={handleSimulateFromOpportunity}
             />
-            <div className="mt-6">
+            <div className="mt-6 space-y-4">
+                <EmailReportSettings />
                 <DayScheduleSettings />
             </div>
         </div>

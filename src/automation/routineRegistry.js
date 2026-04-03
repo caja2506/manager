@@ -193,6 +193,25 @@ export const DEFAULT_ROUTINES = [
         ],
         priority: 1,
     }),
+
+    createAutomationRoutineDocument({
+        key: ROUTINE_KEYS.DAILY_PERFORMANCE_REPORT,
+        name: 'Reporte de Rendimiento — Email + Telegram',
+        description: 'Genera reporte completo del equipo con KPIs, riesgos, scorecards y recomendaciones. Envía por email (Resend/AnalyzeOps) y resumen por Telegram.',
+        channel: AUTOMATION_CHANNELS.EMAIL,
+        provider: 'resend',
+        enabled: false,
+        scheduleType: SCHEDULE_TYPE.DAILY,
+        scheduleConfig: { cron: '15 18 * * 1-5', timezone: 'America/Mexico_City' },
+        delayMinutes: 0,
+        gracePeriodMinutes: 0,
+        personalityMode: PERSONALITY_MODES.PROFESSIONAL,
+        allowedRoles: [
+            OPERATIONAL_ROLES.MANAGER,
+            OPERATIONAL_ROLES.TEAM_LEAD,
+        ],
+        priority: 3,
+    }),
 ];
 
 /**

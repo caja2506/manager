@@ -24,6 +24,7 @@ const HANDLER_REGISTRY = {
     block_incident_alert: () => require("../handlers/genericDigestHandler").blockIncidentAlert,
     close_day_report: () => require("../handlers/closeDayReportHandler"),
     open_day: () => require("../handlers/openDayHandler"),
+    daily_performance_report: () => require("../handlers/dailyPerformanceReportHandler"),
 };
 
 /**

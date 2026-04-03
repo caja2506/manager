@@ -5,12 +5,12 @@ description: Build and deploy to Firebase Hosting and push to GitHub
 
 1. Run production build
    ```
-   npm run build
+   $env:PATH = "c:\Users\CJ00083620\.gemini\antigravity\scratch\autobom-pro\node_bin\node-v20.11.1-win-x64;$env:PATH"; npm run build
    ```
 
 2. Deploy to Firebase Hosting
    ```
-   npx firebase deploy --only hosting
+   $env:PATH = "c:\Users\CJ00083620\.gemini\antigravity\scratch\autobom-pro\node_bin\node-v20.11.1-win-x64;$env:PATH"; npx -y firebase-tools deploy --only hosting
    ```
 
 3. Stage all changes for Git

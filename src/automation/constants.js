@@ -214,7 +214,9 @@ export const ROUTINE_KEYS = {
     MANUAL_TEST_MESSAGE: 'manual_test_message',
     CLOSE_DAY_REPORT: 'close_day_report',
     OPEN_DAY: 'open_day',
+    DAILY_PERFORMANCE_REPORT: 'daily_performance_report',
 };
+
 
 // ============================================================
 // PERSONALITY MODES (for AI-generated messages)

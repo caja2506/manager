@@ -57,6 +57,9 @@ module.exports = {
     TELEGRAM_DELIVERIES: "telegramDeliveries",
     TELEGRAM_LINK_CODES: "telegramLinkCodes",
 
+    // ── Email ──
+    EMAIL_DELIVERIES: "emailDeliveries",
+
     // ── Analytics Engine ──
     OPERATIONAL_KPI_SNAPSHOTS: "operationalKpiSnapshots",
     USER_OPERATIONAL_SCORES: "userOperationalScores",

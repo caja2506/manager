@@ -84,14 +84,17 @@ const ROUTINE_KEYS = {
     MANAGER_SUMMARY: "manager_summary",
     ENGINEER_RISK_DIGEST: "engineer_risk_digest",
     MANUAL_TEST_MESSAGE: "manual_test_message",
+    DAILY_PERFORMANCE_REPORT: "daily_performance_report",
 };
 
 const AUTOMATION_CHANNELS = {
     TELEGRAM: "telegram",
+    EMAIL: "email",
 };
 
 const AUTOMATION_PROVIDERS = {
     TELEGRAM_BOT: "telegram_bot",
+    RESEND: "resend",
 };
 
 // Telegram session states (mirror)

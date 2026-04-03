@@ -5,15 +5,15 @@ description: Full check - lint, test, and build to verify everything works
 
 1. Run ESLint with auto-fix
    ```
-   npx eslint . --fix
+   $env:PATH = "c:\Users\CJ00083620\.gemini\antigravity\scratch\autobom-pro\node_bin\node-v20.11.1-win-x64;$env:PATH"; npx eslint . --fix
    ```
 
 2. Run all tests
    ```
-   npm run test
+   $env:PATH = "c:\Users\CJ00083620\.gemini\antigravity\scratch\autobom-pro\node_bin\node-v20.11.1-win-x64;$env:PATH"; npm run test
    ```
 
 3. Run production build to check for errors
    ```
-   npm run build
+   $env:PATH = "c:\Users\CJ00083620\.gemini\antigravity\scratch\autobom-pro\node_bin\node-v20.11.1-win-x64;$env:PATH"; npm run build
    ```

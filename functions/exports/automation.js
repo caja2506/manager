@@ -6,10 +6,10 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 
 function createAutomationExports(adminDb, secrets) {
-    const { telegramBotToken, geminiApiKey } = secrets;
+    const { telegramBotToken, geminiApiKey, resendApiKey } = secrets;
 
     const unifiedRoutineScheduler = onSchedule(
-        { schedule: "*/15 * * * *", timeZone: "America/Mexico_City", timeoutSeconds: 180, secrets: [telegramBotToken, geminiApiKey] },
+        { schedule: "*/15 * * * *", timeZone: "America/Mexico_City", timeoutSeconds: 180, secrets: [telegramBotToken, geminiApiKey, resendApiKey] },
         async () => {
             console.log("[scheduler] Unified scheduler tick...");
             try {
@@ -66,6 +66,7 @@ function createAutomationExports(adminDb, secrets) {
                     try {
                         const options = {};
                         if (key === "morning_digest_all") options.apiKey = geminiApiKey.value();
+                        if (key === "daily_performance_report") options.resendApiKey = resendApiKey.value();
                         const result = await executeRoutine(adminDb, token, key, "scheduled", options);
                         console.log(`[scheduler] ${key} result:`, JSON.stringify(result));
                     } catch (routineErr) {
@@ -74,8 +75,6 @@ function createAutomationExports(adminDb, secrets) {
                 }
 
                 // ── Day Schedule: close_day_report + open_day ──
-                // These are controlled by settings/daySchedule (admin UI)
-                // instead of static cron expressions.
                 try {
                     const dayScheduleSnap = await adminDb
                         .collection(routinePaths.SETTINGS)
@@ -94,9 +93,7 @@ function createAutomationExports(adminDb, secrets) {
 
                             console.log(`[scheduler] daySchedule check: ${dsHour}:${String(dsMin).padStart(2, '0')} day=${dsDay} tz=${dsTz}`);
 
-                            // Only on weekdays (Mon-Fri)
                             if (dsDay >= 1 && dsDay <= 5) {
-                                // ⏹ Close Day
                                 if (ds.closeTime) {
                                     const [cH, cM] = ds.closeTime.split(":").map(Number);
                                     const closeTotal = cH * 60 + cM;
@@ -112,7 +109,6 @@ function createAutomationExports(adminDb, secrets) {
                                     }
                                 }
 
-                                // ▶ Open Day
                                 if (ds.openTime) {
                                     const [oH, oM] = ds.openTime.split(":").map(Number);
                                     const openTotal = oH * 60 + oM;
@@ -150,7 +146,7 @@ function createAutomationExports(adminDb, secrets) {
     const { requireAdmin } = require("../middleware/authGuard");
 
     const executeRoutineManually = onCall(
-        { secrets: [telegramBotToken], timeoutSeconds: 120 },
+        { secrets: [telegramBotToken, resendApiKey], timeoutSeconds: 120 },
         async (request) => {
             await requireAdmin(adminDb, request);
             const { routineKey } = request.data;
@@ -158,7 +154,11 @@ function createAutomationExports(adminDb, secrets) {
             try {
                 const { executeRoutine } = require("../automation/routineExecutor");
                 const token = telegramBotToken.value();
-                const result = await executeRoutine(adminDb, token, routineKey, "manual", { forceDryRun: false });
+                const options = { forceDryRun: false };
+                if (routineKey === "daily_performance_report") {
+                    options.resendApiKey = resendApiKey.value();
+                }
+                const result = await executeRoutine(adminDb, token, routineKey, "manual", options);
                 return result;
             } catch (err) {
                 throw new HttpsError("internal", `Routine execution failed: ${err.message}`);
@@ -185,7 +185,26 @@ function createAutomationExports(adminDb, secrets) {
         }
     );
 
-    return { unifiedRoutineScheduler, executeRoutineManually, sendTestMessage };
+    // Manual performance report execution (callable from UI)
+    const executePerformanceReport = onCall(
+        { secrets: [telegramBotToken, resendApiKey], timeoutSeconds: 120 },
+        async (request) => {
+            await requireAdmin(adminDb, request);
+            try {
+                const { executeRoutine } = require("../automation/routineExecutor");
+                const token = telegramBotToken.value();
+                const result = await executeRoutine(adminDb, token, "daily_performance_report", "manual", {
+                    forceDryRun: false,
+                    resendApiKey: resendApiKey.value(),
+                });
+                return result;
+            } catch (err) {
+                throw new HttpsError("internal", `Performance report failed: ${err.message}`);
+            }
+        }
+    );
+
+    return { unifiedRoutineScheduler, executeRoutineManually, sendTestMessage, executePerformanceReport };
 }
 
 module.exports = { createAutomationExports };

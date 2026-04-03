@@ -29,8 +29,9 @@ const geminiApiKey = defineSecret("GEMINI_API_KEY");
 const googleCseKey = defineSecret("GOOGLE_CSE_KEY");
 const googleCx = defineSecret("GOOGLE_CX");
 const telegramBotToken = defineSecret("TELEGRAM_BOT_TOKEN");
+const resendApiKey = defineSecret("RESEND_API_KEY");
 
-const secrets = { geminiApiKey, googleCseKey, googleCx, telegramBotToken };
+const secrets = { geminiApiKey, googleCseKey, googleCx, telegramBotToken, resendApiKey };
 
 // ── Domain: AI ──
 const { createAiExports } = require("./exports/ai");
@@ -63,6 +64,7 @@ const automationExports = createAutomationExports(adminDb, secrets);
 exports.unifiedRoutineScheduler = automationExports.unifiedRoutineScheduler;
 exports.executeRoutineManually = automationExports.executeRoutineManually;
 exports.sendTestMessage = automationExports.sendTestMessage;
+exports.executePerformanceReport = automationExports.executePerformanceReport;
 
 // ── Domain: Telegram ──
 const { createTelegramExports } = require("./exports/telegram");
