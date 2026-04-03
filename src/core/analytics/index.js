@@ -10,3 +10,8 @@ export {
     calculateMemberUtilization, calculateTeamUtilization,
     getUtilizationLevel,
 } from './teamUtilization';
+export {
+    IPS_LEVEL, IPS_LEVEL_CODE, IPS_LEVEL_CONFIG, DEFAULT_WEIGHTS,
+    calculateIndividualScore, calculateTeamScores, buildRawMetrics,
+} from './performanceScore';
+
