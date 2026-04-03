@@ -4,9 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import { getActiveAssignments } from '../services/resourceAssignmentService';
 import {
     calculateTeamScores,
+    buildRawMetrics,
 } from '../core/analytics/performanceScore';
+import { saveTeamScoreLogs, getScoreLogs } from '../services/scoreLogService';
 import {
-    Users, Target, Award, ChevronDown,
+    Users, Target, Award, ChevronDown, TrendingUp, TrendingDown, Minus,
     ChevronRight, Zap, CheckCircle, AlertTriangle, Shield, Eye,
     Gauge, Star, ArrowLeft, Filter,
 } from 'lucide-react';
@@ -72,6 +74,48 @@ const DIMENSION_META = {
     oversight:     { label: 'Supervisión',    icon: Eye,           desc: 'Compliance y calidad de datos del equipo' },
 };
 
+// ── Sparkline (mini SVG chart) ──
+function Sparkline({ data, width = 100, height = 28, color = '#6366f1' }) {
+    if (!data || data.length < 2) return null;
+    const min = Math.min(...data);
+    const max = Math.max(...data);
+    const range = max - min || 1;
+    const points = data.map((v, i) => {
+        const x = (i / (data.length - 1)) * width;
+        const y = height - ((v - min) / range) * (height - 4) - 2;
+        return `${x},${y}`;
+    }).join(' ');
+
+    return (
+        <svg width={width} height={height} className="shrink-0">
+            <polyline fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round"
+                strokeLinejoin="round" points={points} opacity="0.7" />
+            {/* Last point dot */}
+            {data.length > 0 && (() => {
+                const lastX = width;
+                const lastY = height - ((data[data.length - 1] - min) / range) * (height - 4) - 2;
+                return <circle cx={lastX} cy={lastY} r="2.5" fill={color} />;
+            })()}
+        </svg>
+    );
+}
+
+// ── Delta Badge ──
+function DeltaBadge({ delta }) {
+    if (!delta || delta.score === 0) {
+        return <span className="text-[9px] text-white/20 flex items-center gap-0.5"><Minus size={10} /> 0</span>;
+    }
+    const isUp = delta.directionCode === 1;
+    const color = isUp ? '#10b981' : '#ef4444';
+    const Icon = isUp ? TrendingUp : TrendingDown;
+    return (
+        <span className="text-[9px] font-bold flex items-center gap-0.5" style={{ color }}>
+            <Icon size={10} />
+            {isUp ? '+' : ''}{delta.score}
+        </span>
+    );
+}
+
 // ── Score ring (SVG) ──
 function ScoreRing({ score, size = 80, strokeWidth = 6, color }) {
     const radius = (size - strokeWidth) / 2;
@@ -120,7 +164,7 @@ function DimensionBar({ dimKey, dim }) {
 }
 
 // ── Score Card ──
-function ScoreCard({ person, index, isExpanded, onToggle }) {
+function ScoreCard({ person, index, isExpanded, onToggle, history }) {
     const roleCfg = ROLE_CONFIG[person.teamRole] || ROLE_CONFIG.engineer;
     const lvl = person.levelConfig || {};
     const lvlColor = lvl.color === 'emerald' ? '#10b981' : lvl.color === 'indigo' ? '#6366f1' : lvl.color === 'amber' ? '#f59e0b' : '#ef4444';
@@ -196,6 +240,19 @@ function ScoreCard({ person, index, isExpanded, onToggle }) {
                     </div>
                 </div>
 
+                {/* Sparkline + delta */}
+                <div className="flex flex-col items-center gap-0.5 shrink-0">
+                    <Sparkline
+                        data={history.map(h => h.score)}
+                        width={70}
+                        height={22}
+                        color={lvlColor}
+                    />
+                    {history.length > 0 && (
+                        <DeltaBadge delta={history[history.length - 1]?.delta} />
+                    )}
+                </div>
+
                 {/* Score ring */}
                 <div className="shrink-0">
                     <ScoreRing score={person.score} size={64} strokeWidth={5} color={lvlColor} />
@@ -266,6 +323,8 @@ export default function TeamScoresPage() {
     const [assignments, setAssignments] = useState([]);
     const [expandedId, setExpandedId] = useState(null);
     const [roleFilter, setRoleFilter] = useState('all');
+    const [historyMap, setHistoryMap] = useState({});   // userId -> [{score, dateKey, delta}]
+    const persistDoneRef = useRef(false);
 
     // Load assignments
     useEffect(() => {
@@ -285,6 +344,42 @@ export default function TeamScoresPage() {
             auditScores: null,
         });
     }, [isReady, teamMembers, engTasks, timeLogs, delays, assignments]);
+
+    // Auto-persist daily logs (once per session)
+    useEffect(() => {
+        if (teamScores.length === 0 || persistDoneRef.current) return;
+        persistDoneRef.current = true;
+        const rawMap = {};
+        for (const s of teamScores) {
+            if (s.score !== null) {
+                rawMap[s.userId] = buildRawMetrics(s.userId, s.teamRole, {
+                    tasks: engTasks, timeLogs, delays, assignments,
+                });
+            }
+        }
+        saveTeamScoreLogs(teamScores, rawMap)
+            .then(r => console.log(`[IPS] Saved ${r.saved}, skipped ${r.skipped}`))
+            .catch(e => console.warn('[IPS] Persist error:', e.message));
+    }, [teamScores, engTasks, timeLogs, delays, assignments]);
+
+    // Load 14-day history for all members
+    useEffect(() => {
+        if (teamScores.length === 0) return;
+        const loadHistory = async () => {
+            const map = {};
+            for (const s of teamScores) {
+                if (s.score === null) continue;
+                try {
+                    const logs = await getScoreLogs(s.userId, 14);
+                    map[s.userId] = logs;
+                } catch (e) {
+                    console.warn(`[IPS] History error for ${s.userId}:`, e.message);
+                }
+            }
+            setHistoryMap(map);
+        };
+        loadHistory();
+    }, [teamScores]);
 
     // Filtered
     const filtered = useMemo(() => {
@@ -399,6 +494,7 @@ export default function TeamScoresPage() {
                             index={i}
                             isExpanded={expandedId === person.userId}
                             onToggle={() => setExpandedId(expandedId === person.userId ? null : person.userId)}
+                            history={historyMap[person.userId] || []}
                         />
                     ))}
                 </div>

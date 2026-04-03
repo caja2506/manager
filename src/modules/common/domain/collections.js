@@ -82,6 +82,7 @@ export const COLLECTIONS = {
     AI_GOVERNANCE: 'aiGovernance',
     SCORE_SNAPSHOTS: 'scoreSnapshots',
     RESOURCE_ASSIGNMENTS: 'resourceAssignments',
+    DAILY_SCORE_LOGS: 'dailyScoreLogs',
 };
 
 
