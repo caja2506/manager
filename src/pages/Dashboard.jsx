@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useEngineeringData } from '../hooks/useEngineeringData';
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
@@ -23,24 +23,23 @@ import { resolveDelay } from '../services/delayService';
 
 function useCountUp(end, duration = 1200) {
     const [val, setVal] = useState(0);
-    const prevEnd = useRef(0);
     useEffect(() => {
-        if (end === prevEnd.current) return;
-        prevEnd.current = end;
         const numEnd = typeof end === 'number' ? end : parseFloat(end) || 0;
-        if (numEnd === 0) { requestAnimationFrame(() => setVal(0)); return; }
+        if (numEnd === 0) return;
         const isDecimal = !Number.isInteger(numEnd);
-        let start = null;
+        let cancelled = false;
+        let startTs = null;
         const step = (ts) => {
-            if (!start) start = ts;
-            const p = Math.min((ts - start) / duration, 1);
-            // easeOutCubic
+            if (cancelled) return;
+            if (!startTs) startTs = ts;
+            const p = Math.min((ts - startTs) / duration, 1);
             const eased = 1 - Math.pow(1 - p, 3);
             const current = eased * numEnd;
             setVal(isDecimal ? parseFloat(current.toFixed(1)) : Math.round(current));
             if (p < 1) requestAnimationFrame(step);
         };
         requestAnimationFrame(step);
+        return () => { cancelled = true; };
     }, [end, duration]);
     return val;
 }
