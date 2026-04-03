@@ -21,7 +21,7 @@ import { resolveDelay } from '../services/delayService';
 // EXPANDABLE KPI CARD
 // ============================================================
 
-function KpiCard({ label, value, icon: Icon, color, children, badge, onClick }) {
+function KpiCard({ label, value, icon: KpiIcon, color, children, badge, onClick }) {
     const [expanded, setExpanded] = useState(false);
     const hasChildren = !!children;
 
@@ -49,7 +49,7 @@ function KpiCard({ label, value, icon: Icon, color, children, badge, onClick }) 
                     <div className="flex items-center gap-2">
                         {badge && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${badge.className}`}>{badge.text}</span>}
                         <div className={`w-8 h-8 rounded-xl ${c.iconBg} border ${c.border} flex items-center justify-center ${c.text}`}>
-                            <Icon className="w-4 h-4" />
+                            <KpiIcon className="w-4 h-4" />
                         </div>
                     </div>
                 </div>
@@ -192,17 +192,17 @@ function TeamWorkloadPanel({ workload, timeLogs, engTasks, engProjects, onTaskCl
 
     const getUserStats = useCallback((uid) => {
         // Today's logs
-        const userTodayLogs = timeLogs.filter(l => l.userId === uid && l.startTime?.startsWith(todayStr));
-        const hoursToday = userTodayLogs.reduce((sum, l) => sum + (l.hours || 0), 0);
+        const userTodayLogs = timeLogs.filter(l => l.userId === uid && l.startTime?.startsWith(todayStr) && l.endTime);
+        const hoursToday = userTodayLogs.reduce((sum, l) => sum + (l.totalHours || 0), 0);
         const overtimeToday = userTodayLogs.reduce((sum, l) => sum + (l.overtimeHours || 0), 0);
 
         // Week's logs
         const userWeekLogs = timeLogs.filter(l => {
-            if (l.userId !== uid || !l.startTime) return false;
+            if (l.userId !== uid || !l.startTime || !l.endTime) return false;
             const d = new Date(l.startTime);
             return isWithinInterval(d, { start: weekStart, end: weekEnd });
         });
-        const hoursWeek = userWeekLogs.reduce((sum, l) => sum + (l.hours || 0), 0);
+        const hoursWeek = userWeekLogs.reduce((sum, l) => sum + (l.totalHours || 0), 0);
         const overtimeWeek = userWeekLogs.reduce((sum, l) => sum + (l.overtimeHours || 0), 0);
 
         // Active timer
@@ -250,7 +250,7 @@ function TeamWorkloadPanel({ workload, timeLogs, engTasks, engProjects, onTaskCl
                                 </div>
 
                                 {/* Name + Role */}
-                                <div className="min-w-0 flex-shrink">
+                                <div className="min-w-0 shrink">
                                     <span className="text-sm font-bold text-slate-200 block truncate">{name}</span>
                                     <span className="text-[10px] font-bold text-slate-500 uppercase">{roleLabels[user.teamRole] || 'Ingeniero'}</span>
                                 </div>
@@ -399,9 +399,6 @@ export default function Dashboard() {
 
     // ── Date helpers ──
     const now = new Date();
-    const todayStr = format(now, 'yyyy-MM-dd');
-    const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-    const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
 
     // ── KPIs ──
     const kpis = useMemo(() => {
@@ -412,10 +409,12 @@ export default function Dashboard() {
         const activeDelays = delays?.filter(d => !d.resolved) || [];
 
         // Weekly overtime
+        const ws = startOfWeek(new Date(), { weekStartsOn: 1 });
+        const we = endOfWeek(new Date(), { weekStartsOn: 1 });
         const weekLogs = timeLogs?.filter(l => {
             if (!l.startTime) return false;
             const d = new Date(l.startTime);
-            return isWithinInterval(d, { start: weekStart, end: weekEnd });
+            return isWithinInterval(d, { start: ws, end: we });
         }) || [];
         const weekOvertime = weekLogs.reduce((acc, l) => acc + (l.overtimeHours || 0), 0);
 
@@ -427,7 +426,7 @@ export default function Dashboard() {
             activeDelays,
             weekOvertime: parseFloat(weekOvertime.toFixed(1)),
         };
-    }, [engProjects, engTasks, timeLogs, delays, weekStart, weekEnd]);
+    }, [engProjects, engTasks, timeLogs, delays]);
 
     // ── Enrich tasks with project names ──
     const enrichedTasks = useMemo(() => {
@@ -590,10 +589,12 @@ export default function Dashboard() {
                 {/* Overtime Semanal */}
                 <KpiCard label="Overtime Semana" value={`${kpis.weekOvertime}h`} icon={Zap} color="orange">
                     {(() => {
+                        const ws = startOfWeek(new Date(), { weekStartsOn: 1 });
+                        const we = endOfWeek(new Date(), { weekStartsOn: 1 });
                         const weekLogs = timeLogs?.filter(l => {
                             if (!l.startTime || !l.overtimeHours || l.overtimeHours <= 0) return false;
                             const d = new Date(l.startTime);
-                            return isWithinInterval(d, { start: weekStart, end: weekEnd });
+                            return isWithinInterval(d, { start: ws, end: we });
                         }) || [];
                         // Group by user
                         const byUser = {};
