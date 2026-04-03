@@ -6,12 +6,12 @@ import {
     calculateTeamScores,
     buildRawMetrics,
 } from '../core/analytics/performanceScore';
-import { saveTeamScoreLogs, getScoreLogs } from '../services/scoreLogService';
+import { saveTeamScoreLogs, getScoreLogs, getWeeklyAverages } from '../services/scoreLogService';
 import { loadCustomWeights, mergeWeights } from '../components/admin/IPSWeightConfigPanel';
 import {
     Users, Target, Award, ChevronDown, TrendingUp, TrendingDown, Minus,
     ChevronRight, Zap, CheckCircle, AlertTriangle, Shield, Eye,
-    Gauge, Star, ArrowLeft, Filter,
+    Gauge, Star, ArrowLeft, Filter, BarChart3, Calendar,
 } from 'lucide-react';
 
 // ── Scroll reveal ──
@@ -315,8 +315,197 @@ function SummaryKPI({ label, value, Icon: KpiIcon, color, visible }) {
 }
 
 // ============================================================
+// ANALYTICS — Team Overlay Chart (14-day multi-line)
+// ============================================================
+
+const MEMBER_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+
+function TeamOverlayChart({ historyMap, teamScores }) {
+    const members = teamScores.filter(s => s.score !== null);
+    if (members.length === 0 || Object.keys(historyMap).length === 0) {
+        return <div className="text-[10px] text-white/20 text-center py-6">Sin datos históricos — se acumulan al visitar esta página</div>;
+    }
+
+    const W = 280, H = 100, PAD = 24;
+    // Find global date range
+    const allDates = new Set();
+    Object.values(historyMap).forEach(logs => logs.forEach(l => allDates.add(l.dateKey)));
+    const sortedDates = [...allDates].sort();
+    if (sortedDates.length < 2) {
+        return <div className="text-[10px] text-white/20 text-center py-6">Mínimo 2 días de datos requeridos</div>;
+    }
+
+    return (
+        <div className="relative">
+            <svg viewBox={`0 0 ${W} ${H + PAD}`} className="w-full" style={{ maxHeight: 160 }}>
+                {/* Grid lines */}
+                {[0, 25, 50, 75, 100].map(v => {
+                    const y = H - (v / 100) * H;
+                    return (
+                        <g key={v}>
+                            <line x1={0} x2={W} y1={y} y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth="0.5" />
+                            <text x={-2} y={y + 3} fill="rgba(255,255,255,0.15)" fontSize="6" textAnchor="end">{v}</text>
+                        </g>
+                    );
+                })}
+
+                {/* Lines per member */}
+                {members.map((m, mi) => {
+                    const logs = historyMap[m.userId] || [];
+                    if (logs.length < 2) return null;
+                    const color = MEMBER_COLORS[mi % MEMBER_COLORS.length];
+                    const points = logs.map((l) => {
+                        const x = (sortedDates.indexOf(l.dateKey) / (sortedDates.length - 1)) * W;
+                        const y = H - (l.score / 100) * H;
+                        return `${x},${y}`;
+                    }).join(' ');
+                    return (
+                        <polyline key={m.userId} fill="none" stroke={color} strokeWidth="1.5"
+                            strokeLinecap="round" strokeLinejoin="round" points={points} opacity="0.6" />
+                    );
+                })}
+
+                {/* Date labels */}
+                {sortedDates.filter((_, i) => i === 0 || i === sortedDates.length - 1 || i === Math.floor(sortedDates.length / 2)).map((d, i) => {
+                    const x = (sortedDates.indexOf(d) / (sortedDates.length - 1)) * W;
+                    return <text key={i} x={x} y={H + 12} fill="rgba(255,255,255,0.2)" fontSize="6" textAnchor="middle">{d.slice(5)}</text>;
+                })}
+            </svg>
+
+            {/* Legend */}
+            <div className="flex flex-wrap gap-2 mt-2">
+                {members.slice(0, 6).map((m, i) => (
+                    <div key={m.userId} className="flex items-center gap-1">
+                        <div className="w-2 h-2 rounded-full" style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }} />
+                        <span className="text-[9px] text-white/40">{m.displayName?.split(' ')[0] || '?'}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+// ============================================================
+// ANALYTICS — Weekly Bars Chart
+// ============================================================
+
+function WeeklyBarsChart({ weeklyData, teamScores }) {
+    const members = teamScores.filter(s => s.score !== null);
+    if (members.length === 0 || Object.keys(weeklyData).length === 0) {
+        return <div className="text-[10px] text-white/20 text-center py-6">Sin datos semanales — se generan automáticamente</div>;
+    }
+
+    // Merge all weeks
+    const allWeeks = new Set();
+    Object.values(weeklyData).forEach(wks => wks.forEach(w => allWeeks.add(w.weekNumber)));
+    const sortedWeeks = [...allWeeks].sort((a, b) => a - b);
+    if (sortedWeeks.length === 0) {
+        return <div className="text-[10px] text-white/20 text-center py-6">Sin semanas disponibles</div>;
+    }
+
+    // Team avg per week
+    const weekAvgs = sortedWeeks.map(wk => {
+        let total = 0, count = 0;
+        Object.values(weeklyData).forEach(wks => {
+            const found = wks.find(w => w.weekNumber === wk);
+            if (found) { total += found.avgScore; count++; }
+        });
+        return { week: wk, avg: count > 0 ? parseFloat((total / count).toFixed(1)) : 0 };
+    });
+
+    const maxScore = Math.max(...weekAvgs.map(w => w.avg), 50);
+    const W = 280, H = 80;
+    const barW = Math.min(30, (W - 20) / sortedWeeks.length - 4);
+
+    return (
+        <svg viewBox={`0 0 ${W} ${H + 20}`} className="w-full" style={{ maxHeight: 140 }}>
+            {weekAvgs.map((w, i) => {
+                const x = 10 + i * ((W - 20) / sortedWeeks.length);
+                const barH = (w.avg / maxScore) * H;
+                const color = w.avg >= 90 ? '#10b981' : w.avg >= 75 ? '#6366f1' : w.avg >= 60 ? '#f59e0b' : '#ef4444';
+                return (
+                    <g key={w.week}>
+                        <rect x={x} y={H - barH} width={barW} height={barH} rx={3}
+                            fill={color} opacity="0.5" />
+                        <text x={x + barW / 2} y={H - barH - 4} fill={color} fontSize="7"
+                            textAnchor="middle" fontWeight="bold">{w.avg}</text>
+                        <text x={x + barW / 2} y={H + 12} fill="rgba(255,255,255,0.2)" fontSize="6"
+                            textAnchor="middle">S{w.week}</text>
+                    </g>
+                );
+            })}
+        </svg>
+    );
+}
+
+// ============================================================
+// ANALYTICS — Role Comparison Table
+// ============================================================
+
+function RoleComparisonTable({ teamScores }) {
+    const roleGroups = {};
+    teamScores.forEach(s => {
+        if (s.score === null || s.isManager) return;
+        const r = s.teamRole || 'engineer';
+        if (!roleGroups[r]) roleGroups[r] = { scores: [], dims: {} };
+        roleGroups[r].scores.push(s.score);
+        Object.entries(s.dimensions || {}).forEach(([dim, d]) => {
+            if (!roleGroups[r].dims[dim]) roleGroups[r].dims[dim] = [];
+            roleGroups[r].dims[dim].push(d.score);
+        });
+    });
+
+    const roles = Object.entries(roleGroups);
+    if (roles.length === 0) {
+        return <div className="text-[10px] text-white/20 text-center py-4">Sin datos de roles</div>;
+    }
+
+    const avg = (arr) => arr.length > 0 ? parseFloat((arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1)) : 0;
+    const roleMeta = ROLE_CONFIG;
+
+    return (
+        <div className="overflow-x-auto">
+            <table className="w-full text-[10px]">
+                <thead>
+                    <tr>
+                        <th className="text-left py-1.5 px-2 text-white/40 font-bold">Rol</th>
+                        <th className="text-center py-1.5 px-2 text-white/40 font-bold">N</th>
+                        <th className="text-center py-1.5 px-2 text-white/40 font-bold">Score Prom.</th>
+                        {Object.keys(DIMENSION_META).map(dim => (
+                            <th key={dim} className="text-center py-1.5 px-1 text-white/30 font-medium">{DIMENSION_META[dim].label.slice(0, 5)}</th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody>
+                    {roles.map(([role, data]) => {
+                        const rc = roleMeta[role] || roleMeta.engineer;
+                        const avgScore = avg(data.scores);
+                        const scoreColor = avgScore >= 90 ? '#10b981' : avgScore >= 75 ? '#6366f1' : avgScore >= 60 ? '#f59e0b' : '#ef4444';
+                        return (
+                            <tr key={role} className="border-t border-slate-800/50">
+                                <td className="py-2 px-2 font-bold" style={{ color: rc.color }}>{rc.icon} {rc.label}</td>
+                                <td className="text-center text-white/40">{data.scores.length}</td>
+                                <td className="text-center font-black" style={{ color: scoreColor }}>{avgScore}</td>
+                                {Object.keys(DIMENSION_META).map(dim => {
+                                    const dimScores = data.dims[dim];
+                                    if (!dimScores || dimScores.length === 0) return <td key={dim} className="text-center text-white/15">—</td>;
+                                    const dimAvg = avg(dimScores);
+                                    const dc = dimAvg >= 90 ? '#10b981' : dimAvg >= 75 ? '#6366f1' : dimAvg >= 60 ? '#f59e0b' : '#ef4444';
+                                    return <td key={dim} className="text-center font-bold" style={{ color: dc }}>{dimAvg}</td>;
+                                })}
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+// ============================================================
 // MAIN PAGE
 // ============================================================
+
 
 export default function TeamScoresPage() {
     const navigate = useNavigate();
@@ -409,6 +598,26 @@ export default function TeamScoresPage() {
     const [heroRef, heroVis] = useScrollReveal();
     const [kpiRef, kpiVis] = useScrollReveal();
     const [gridRef, gridVis] = useScrollReveal();
+    const [analyticsRef, analyticsVis] = useScrollReveal();
+
+    // Weekly averages for analytics section
+    const [weeklyData, setWeeklyData] = useState({});   // userId -> [{weekNumber, avgScore, count}]
+    useEffect(() => {
+        if (teamScores.length === 0) return;
+        const loadWeekly = async () => {
+            const map = {};
+            for (const s of teamScores) {
+                if (s.score === null) continue;
+                try {
+                    map[s.userId] = await getWeeklyAverages(s.userId, 6);
+                } catch (e) {
+                    console.warn(`[IPS] Weekly error for ${s.userId}:`, e.message);
+                }
+            }
+            setWeeklyData(map);
+        };
+        loadWeekly();
+    }, [teamScores]);
 
     const roles = ['all', 'engineer', 'team_lead', 'technician', 'manager'];
 
@@ -507,6 +716,51 @@ export default function TeamScoresPage() {
                     </div>
                 )}
             </div>
+
+            {/* ── Analytics Section ── */}
+            <section ref={analyticsRef} className="px-4 sm:px-6 mt-6" style={{
+                opacity: analyticsVis ? 1 : 0,
+                transform: analyticsVis ? 'translateY(0)' : 'translateY(20px)',
+                transition: 'all 0.6s ease-out 0.4s',
+            }}>
+                <div className="bg-slate-900/70 backdrop-blur-sm rounded-2xl border border-slate-800 shadow-lg p-6">
+                    <div className="flex items-center gap-2 mb-5">
+                        <BarChart3 size={18} className="text-indigo-400" />
+                        <h3 className="font-bold text-lg text-white">Analítica Temporal</h3>
+                        <span className="text-[10px] text-white/30 ml-auto">Últimas 6 semanas</span>
+                    </div>
+
+                    {/* Team Trend Overview */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+                        {/* Historical Daily Chart — all members overlaid */}
+                        <div className="rounded-xl border border-slate-700/50 p-4" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                            <div className="flex items-center gap-2 mb-3">
+                                <Calendar size={14} className="text-indigo-400" />
+                                <span className="text-xs font-bold text-white/70">Historial Diario (14 días)</span>
+                            </div>
+                            <TeamOverlayChart historyMap={historyMap} teamScores={teamScores} />
+                        </div>
+
+                        {/* Weekly Averages — bar chart */}
+                        <div className="rounded-xl border border-slate-700/50 p-4" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                            <div className="flex items-center gap-2 mb-3">
+                                <BarChart3 size={14} className="text-amber-400" />
+                                <span className="text-xs font-bold text-white/70">Promedios Semanales</span>
+                            </div>
+                            <WeeklyBarsChart weeklyData={weeklyData} teamScores={teamScores} />
+                        </div>
+                    </div>
+
+                    {/* Role Comparison Table */}
+                    <div className="rounded-xl border border-slate-700/50 p-4" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                        <div className="flex items-center gap-2 mb-3">
+                            <Users size={14} className="text-emerald-400" />
+                            <span className="text-xs font-bold text-white/70">Comparación por Rol</span>
+                        </div>
+                        <RoleComparisonTable teamScores={teamScores} />
+                    </div>
+                </div>
+            </section>
 
             {/* Keyframes */}
             <style>{`
