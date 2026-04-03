@@ -42,6 +42,7 @@ import ProjectDetailPage from './pages/ProjectDetailPage';
 import DailyScrumPage from './pages/DailyScrumPage';
 import PlatformOverview from './pages/PlatformOverview';
 import DailyBriefing from './pages/DailyBriefing';
+import DataFlowPage from './pages/DataFlowPage';
 
 
 // ========================================================
@@ -125,6 +126,7 @@ export default function App() {
           {/* Admin */}
           <Route path="/automation" element={<ErrorBoundary module="Automatización"><AutomationControlCenter /></ErrorBoundary>} />
           <Route path="/settings" element={<ErrorBoundary module="Configuración"><SettingsPage /></ErrorBoundary>} />
+          <Route path="/system/data-flow" element={<ErrorBoundary module="Arquitectura de Datos"><DataFlowPage /></ErrorBoundary>} />
 
           {/* Catch-all redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />
