@@ -1,25 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import AnalyzeOpsLogo from './AnalyzeOpsLogo';
+import { selectedQuote } from './quotes';
 
 /**
  * Animated splash screen with AnalyzeOps brand identity.
- * Shows for ~2.5s then fades out smoothly.
+ * Shows for ~7s with a randomly selected inspirational quote.
  */
+
 export default function SplashScreen({ onComplete }) {
-    const [phase, setPhase] = useState('enter'); // enter → show → exit → done
+    const [phase, setPhase] = useState('enter'); // enter → show → quote → exit → done
+
+    const quote = selectedQuote;
 
     useEffect(() => {
         const timers = [];
-        timers.push(setTimeout(() => setPhase('show'), 100));     // trigger entrance
-        timers.push(setTimeout(() => setPhase('exit'), 2200));    // start fade out
+        timers.push(setTimeout(() => setPhase('show'), 200));      // logo entrance
+        timers.push(setTimeout(() => setPhase('quote'), 1500));    // show quote
+        timers.push(setTimeout(() => setPhase('exit'), 6000));     // start fade out
         timers.push(setTimeout(() => {
             setPhase('done');
             onComplete?.();
-        }, 2900)); // fully done
+        }, 7000)); // fully done
         return () => timers.forEach(clearTimeout);
     }, [onComplete]);
 
     if (phase === 'done') return null;
+
+    const showingQuote = phase === 'quote' || phase === 'exit';
 
     return (
         <div
@@ -27,7 +34,7 @@ export default function SplashScreen({ onComplete }) {
             style={{
                 background: 'linear-gradient(135deg, #0c0a1a 0%, #1a1035 35%, #0f172a 70%, #0c0a1a 100%)',
                 opacity: phase === 'exit' ? 0 : 1,
-                transition: 'opacity 700ms ease-out',
+                transition: 'opacity 800ms ease-out',
             }}
         >
             {/* Noise Texture */}
@@ -47,7 +54,7 @@ export default function SplashScreen({ onComplete }) {
                     top: '10%', left: '50%', transform: 'translateX(-50%)',
                     background: 'radial-gradient(circle, rgba(107,63,160,0.25) 0%, transparent 70%)',
                     filter: 'blur(80px)',
-                    animation: phase === 'show' ? 'splash-pulse 3s ease-in-out infinite' : undefined,
+                    animation: phase !== 'enter' ? 'splash-pulse 3s ease-in-out infinite' : undefined,
                 }}
             />
             <div
@@ -57,7 +64,7 @@ export default function SplashScreen({ onComplete }) {
                     bottom: '5%', right: '15%',
                     background: 'radial-gradient(circle, rgba(0,207,255,0.15) 0%, transparent 70%)',
                     filter: 'blur(80px)',
-                    animation: phase === 'show' ? 'splash-pulse 3s ease-in-out 0.5s infinite' : undefined,
+                    animation: phase !== 'enter' ? 'splash-pulse 3s ease-in-out 0.5s infinite' : undefined,
                 }}
             />
             <div
@@ -67,12 +74,12 @@ export default function SplashScreen({ onComplete }) {
                     top: '40%', left: '10%',
                     background: 'radial-gradient(circle, rgba(196,149,106,0.12) 0%, transparent 70%)',
                     filter: 'blur(60px)',
-                    animation: phase === 'show' ? 'splash-pulse 3s ease-in-out 1s infinite' : undefined,
+                    animation: phase !== 'enter' ? 'splash-pulse 3s ease-in-out 1s infinite' : undefined,
                 }}
             />
 
             {/* Particle Lines (decorative) */}
-            <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: phase === 'show' ? 0.15 : 0, transition: 'opacity 1s ease' }}>
+            <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: phase !== 'enter' ? 0.15 : 0, transition: 'opacity 1s ease' }}>
                 <line x1="10%" y1="20%" x2="40%" y2="50%" stroke="#6B3FA0" strokeWidth="0.5" opacity="0.4">
                     <animate attributeName="opacity" values="0;0.4;0" dur="4s" repeatCount="indefinite" />
                 </line>
@@ -85,7 +92,6 @@ export default function SplashScreen({ onComplete }) {
                 <line x1="80%" y1="75%" x2="55%" y2="45%" stroke="#6B3FA0" strokeWidth="0.5" opacity="0.4">
                     <animate attributeName="opacity" values="0;0.4;0" dur="4s" begin="0.5s" repeatCount="indefinite" />
                 </line>
-                {/* Particle dots */}
                 <circle cx="25%" cy="30%" r="1.5" fill="#00CFFF" opacity="0">
                     <animate attributeName="opacity" values="0;0.6;0" dur="3s" repeatCount="indefinite" />
                 </circle>
@@ -102,34 +108,35 @@ export default function SplashScreen({ onComplete }) {
 
             {/* Center Content */}
             <div
-                className="relative z-10 flex flex-col items-center"
+                className="relative z-10 flex flex-col items-center px-6"
                 style={{
                     opacity: phase === 'enter' ? 0 : 1,
                     transform: phase === 'enter' ? 'scale(0.8) translateY(20px)' : 'scale(1) translateY(0)',
                     transition: 'all 800ms cubic-bezier(0.16, 1, 0.3, 1)',
+                    maxWidth: 560,
                 }}
             >
-                {/* Logo with name */}
+                {/* Logo with name — BIGGER */}
                 <div
-                    className="relative mb-8"
+                    className="relative mb-6"
                     style={{
-                        animation: phase === 'show' ? 'splash-float 3s ease-in-out infinite' : undefined,
+                        animation: phase !== 'enter' ? 'splash-float 3s ease-in-out infinite' : undefined,
                     }}
                 >
                     {/* Outer glow ring */}
                     <div
                         className="absolute inset-0 rounded-full"
                         style={{
-                            width: 160, height: 160,
-                            top: '30%', left: '50%',
+                            width: 200, height: 200,
+                            top: '28%', left: '50%',
                             transform: 'translate(-50%, -50%)',
                             background: 'conic-gradient(from 0deg, #4A1D6E, #00CFFF, #C4956A, #6B3FA0, #4A1D6E)',
-                            filter: 'blur(25px)',
+                            filter: 'blur(30px)',
                             opacity: 0.3,
-                            animation: phase === 'show' ? 'splash-rotate 8s linear infinite' : undefined,
+                            animation: phase !== 'enter' ? 'splash-rotate 8s linear infinite' : undefined,
                         }}
                     />
-                    <AnalyzeOpsLogo size={140} animate={phase === 'show'} interactive={false} showName />
+                    <AnalyzeOpsLogo size={180} animate={phase !== 'enter'} interactive={false} showName />
                 </div>
 
                 {/* Tagline separator */}
@@ -145,20 +152,49 @@ export default function SplashScreen({ onComplete }) {
                     <div className="w-12 h-px" style={{ background: 'linear-gradient(90deg, #6B3FA0, transparent)' }} />
                 </div>
 
-                {/* Slogan */}
-                <p
-                    className="text-sm sm:text-base font-medium tracking-wider uppercase"
+                {/* Quote — fades in after logo */}
+                <div
+                    className="text-center"
                     style={{
-                        color: '#C4956A',
-                        letterSpacing: '0.2em',
-                        opacity: phase === 'enter' ? 0 : 1,
-                        transform: phase === 'enter' ? 'translateY(10px)' : 'translateY(0)',
-                        transition: 'all 600ms cubic-bezier(0.16, 1, 0.3, 1) 600ms',
-                        textShadow: '0 0 20px rgba(196,149,106,0.3)',
+                        opacity: showingQuote ? 1 : 0,
+                        transform: showingQuote ? 'translateY(0)' : 'translateY(12px)',
+                        transition: 'all 800ms cubic-bezier(0.16, 1, 0.3, 1)',
                     }}
                 >
-                    Lo que no se mide, no se controla
-                </p>
+                    {/* Quote text */}
+                    <p
+                        className="text-sm sm:text-base font-light italic leading-relaxed"
+                        style={{
+                            color: 'rgba(255,255,255,0.75)',
+                            whiteSpace: 'pre-line',
+                        }}
+                    >
+                        "{quote.text}"
+                    </p>
+
+                    {/* Translation (for Drucker's English quote) */}
+                    {quote.translation && (
+                        <p
+                            className="text-xs sm:text-sm mt-2 italic"
+                            style={{ color: 'rgba(196,149,106,0.6)' }}
+                        >
+                            ({quote.translation})
+                        </p>
+                    )}
+
+                    {/* Author */}
+                    <p
+                        className="mt-3 text-xs font-semibold tracking-widest uppercase"
+                        style={{ color: '#C4956A', textShadow: '0 0 15px rgba(196,149,106,0.2)' }}
+                    >
+                        — {quote.author}
+                        {quote.authorFull && (
+                            <span className="font-normal opacity-60 ml-1">
+                                ({quote.authorFull})
+                            </span>
+                        )}
+                    </p>
+                </div>
 
                 {/* Loading bar */}
                 <div
@@ -173,8 +209,8 @@ export default function SplashScreen({ onComplete }) {
                         className="h-full rounded-full"
                         style={{
                             background: 'linear-gradient(90deg, #4A1D6E, #00CFFF, #C4956A)',
-                            width: phase === 'show' || phase === 'exit' ? '100%' : '0%',
-                            transition: 'width 1800ms cubic-bezier(0.4, 0, 0.2, 1) 400ms',
+                            width: phase !== 'enter' ? '100%' : '0%',
+                            transition: 'width 3500ms cubic-bezier(0.4, 0, 0.2, 1) 400ms',
                         }}
                     />
                 </div>

@@ -1,6 +1,5 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
 import SplashScreen from './components/brand/SplashScreen';
 import AnalyzeOpsLogo from './components/brand/AnalyzeOpsLogo';
 
@@ -46,6 +45,73 @@ import PlatformOverview from './pages/PlatformOverview';
 import DailyBriefing from './pages/DailyBriefing';
 import DataFlowPage from './pages/DataFlowPage';
 
+// ========================================================
+// AUTH LOADING SCREEN
+// ========================================================
+const LOADING_QUOTES = [
+    {
+        text: 'Lo que no se define no se puede medir.\nLo que no se mide, no se puede mejorar.\nLo que no se mejora, se degrada siempre.',
+        author: 'Lord Kelvin',
+    },
+    {
+        text: 'What gets measured gets managed.',
+        sub: 'Lo que se mide, se gestiona.',
+        author: 'Peter Drucker',
+    },
+];
+
+function AuthLoadingScreen() {
+    const [quote] = useState(() => LOADING_QUOTES[Math.floor(Math.random() * LOADING_QUOTES.length)]);
+    return (
+        <div className="fixed inset-0 z-9998 flex items-center justify-center overflow-hidden" style={{ background: 'linear-gradient(135deg, #0c0a1a 0%, #1a1035 35%, #0f172a 70%, #0c0a1a 100%)' }}>
+            {/* Ambient glow */}
+            <div className="absolute rounded-full pointer-events-none" style={{
+                width: 600, height: 600, top: '10%', left: '50%', transform: 'translateX(-50%)',
+                background: 'radial-gradient(circle, rgba(107,63,160,0.25) 0%, transparent 70%)', filter: 'blur(100px)',
+            }} />
+            <div className="absolute rounded-full pointer-events-none" style={{
+                width: 400, height: 400, bottom: '10%', right: '20%',
+                background: 'radial-gradient(circle, rgba(0,207,255,0.12) 0%, transparent 70%)', filter: 'blur(80px)',
+            }} />
+            <div className="relative z-10 flex flex-col items-center text-center px-6" style={{ maxWidth: 700 }}>
+                <div className="mb-8" style={{ animation: 'authload-float 3s ease-in-out infinite' }}>
+                    <AnalyzeOpsLogo size={360} animate showName />
+                </div>
+
+                {/* Quote */}
+                <p className="text-2xl sm:text-3xl font-light italic leading-relaxed mb-2" style={{ color: 'rgba(255,255,255,0.7)', whiteSpace: 'pre-line' }}>
+                    &ldquo;{quote.text}&rdquo;
+                </p>
+                {quote.sub && (
+                    <p className="text-lg italic mb-3" style={{ color: 'rgba(196,149,106,0.55)' }}>({quote.sub})</p>
+                )}
+                <p className="text-sm font-semibold tracking-widest uppercase mb-8" style={{ color: '#C4956A' }}>
+                    — {quote.author}
+                </p>
+
+                {/* Loading bar */}
+                <div className="w-64 h-[3px] rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                    <div className="h-full rounded-full" style={{
+                        background: 'linear-gradient(90deg, #4A1D6E, #00CFFF, #C4956A)',
+                        animation: 'authload-bar 3s ease-in-out infinite',
+                    }} />
+                </div>
+            </div>
+            <style>{`
+                @keyframes authload-float {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-10px); }
+                }
+                @keyframes authload-bar {
+                    0% { width: 0%; margin-left: 0; }
+                    50% { width: 60%; margin-left: 20%; }
+                    100% { width: 0%; margin-left: 100%; }
+                }
+            `}</style>
+        </div>
+    );
+}
+
 
 // ========================================================
 // APLICACIÓN PRINCIPAL
@@ -64,31 +130,36 @@ export default function App() {
     setSplashDone(true);
   }, []);
 
-  // Show splash on first session load
-  if (!splashDone) {
-    return <SplashScreen onComplete={handleSplashComplete} />;
-  }
+  const isLoading = authLoading || (user && roleLoading);
 
-  // --- Loading State ---
-  if (authLoading || (user && roleLoading)) {
+  // --- Minimum loading display time (3 seconds) ---
+  const [minDelayDone, setMinDelayDone] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMinDelayDone(true), 5000);
+    return () => clearTimeout(t);
+  }, []);
+  const showLoading = isLoading || !minDelayDone;
+
+  // If not authenticated and done loading → show login
+  if (!showLoading && !user) {
     return (
-      <div className="h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #0c0a1a 0%, #1a1035 35%, #0f172a 70%, #0c0a1a 100%)' }}>
-        <div className="text-center space-y-4">
-          <div className="flex justify-center mb-2">
-            <AnalyzeOpsLogo size={48} animate />
-          </div>
-          <Loader2 className="w-8 h-8 animate-spin mx-auto" style={{ color: '#6B3FA0' }} />
-          <p className="text-sm font-bold animate-pulse" style={{ color: '#C4956A' }}>
-            Cargando AnalyzeOps...
-          </p>
-        </div>
-      </div>
+      <>
+        {!splashDone && <SplashScreen onComplete={handleSplashComplete} />}
+        <LoginPage />
+      </>
     );
   }
 
-  // --- Auth Gate ---
-  if (!user) {
-    return <LoginPage />;
+  // If still loading (auth or minimum delay)
+  if (showLoading) {
+    return (
+      <>
+        {!splashDone && <SplashScreen onComplete={handleSplashComplete} />}
+        {splashDone && <AuthLoadingScreen />}
+        {/* Dark background underneath */}
+        <div className="h-screen" style={{ background: '#0c0a1a' }} />
+      </>
+    );
   }
 
   // --- Authenticated App ---
@@ -154,4 +225,3 @@ export default function App() {
     </ErrorBoundary>
   );
 }
-
