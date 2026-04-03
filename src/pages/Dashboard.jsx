@@ -205,7 +205,7 @@ function TaskPipeline({ tasks, onTaskClick }) {
 }
 
 // ============================================================
-// TEAM WORKLOAD PANEL (REDESIGNED)
+// TEAM WORKLOAD PANEL — Module card grid style
 // ============================================================
 
 function TeamWorkloadPanel({ workload, timeLogs, engTasks, engProjects, onTaskClick }) {
@@ -216,33 +216,28 @@ function TeamWorkloadPanel({ workload, timeLogs, engTasks, engProjects, onTaskCl
     const todayStr = format(now, 'yyyy-MM-dd');
 
     const getUserStats = useCallback((uid) => {
-        // Today's logs
         const userTodayLogs = timeLogs.filter(l => l.userId === uid && l.startTime?.startsWith(todayStr) && l.endTime);
         const hoursToday = userTodayLogs.reduce((sum, l) => sum + (l.totalHours || 0), 0);
-        const overtimeToday = userTodayLogs.reduce((sum, l) => sum + (l.overtimeHours || 0), 0);
-
-        // Week's logs
         const userWeekLogs = timeLogs.filter(l => {
             if (l.userId !== uid || !l.startTime || !l.endTime) return false;
-            const d = new Date(l.startTime);
-            return isWithinInterval(d, { start: weekStart, end: weekEnd });
+            return isWithinInterval(new Date(l.startTime), { start: weekStart, end: weekEnd });
         });
         const hoursWeek = userWeekLogs.reduce((sum, l) => sum + (l.totalHours || 0), 0);
         const overtimeWeek = userWeekLogs.reduce((sum, l) => sum + (l.overtimeHours || 0), 0);
-
-        // Active timer
         const activeTimer = timeLogs.find(l => l.userId === uid && !l.endTime);
-
-        // Tasks breakdown
         const userTasks = engTasks.filter(t => t.assignedTo === uid && !['completed', 'cancelled'].includes(t.status));
         const inProgress = userTasks.filter(t => t.status === 'in_progress');
         const blocked = userTasks.filter(t => t.status === 'blocked');
-        const inReview = userTasks.filter(t => t.status === 'in_review');
-
-        return { hoursToday, overtimeToday, hoursWeek, overtimeWeek, activeTimer, userTasks, inProgress, blocked, inReview };
+        return { hoursToday, hoursWeek, overtimeWeek, activeTimer, userTasks, inProgress, blocked };
     }, [timeLogs, engTasks, todayStr, weekStart, weekEnd]);
 
     const roleLabels = { manager: 'Manager', team_lead: 'Team Lead', engineer: 'Ingeniero', technician: 'Técnico' };
+    const roleColors = {
+        manager: { text: 'text-violet-400', iconBg: 'bg-violet-500/15', iconBorder: 'border-violet-500/30', activeBorder: 'border-violet-500/50', bg: 'bg-violet-500/5' },
+        team_lead: { text: 'text-amber-400', iconBg: 'bg-amber-500/15', iconBorder: 'border-amber-500/30', activeBorder: 'border-amber-500/50', bg: 'bg-amber-500/5' },
+        engineer: { text: 'text-indigo-400', iconBg: 'bg-indigo-500/15', iconBorder: 'border-indigo-500/30', activeBorder: 'border-indigo-500/50', bg: 'bg-indigo-500/5' },
+        technician: { text: 'text-emerald-400', iconBg: 'bg-emerald-500/15', iconBorder: 'border-emerald-500/30', activeBorder: 'border-emerald-500/50', bg: 'bg-emerald-500/5' },
+    };
 
     return (
         <div className="bg-slate-900/70 backdrop-blur-sm rounded-2xl border border-slate-800 shadow-lg p-6">
@@ -253,124 +248,103 @@ function TeamWorkloadPanel({ workload, timeLogs, engTasks, engProjects, onTaskCl
                 <span className="text-xs font-bold text-slate-500">{workload.length} miembros</span>
             </div>
 
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {workload.map(user => {
                     const stats = getUserStats(user.uid);
                     const isExpanded = expandedUser === user.uid;
                     const name = user.displayName || user.email || '?';
+                    const role = user.teamRole || 'engineer';
+                    const rc = roleColors[role] || roleColors.engineer;
+
+                    // Build description
+                    const descParts = [];
+                    if (stats.hoursToday > 0) descParts.push(`${stats.hoursToday.toFixed(1)}h hoy`);
+                    if (stats.hoursWeek > 0) descParts.push(`${stats.hoursWeek.toFixed(1)}h semana`);
+                    if (stats.overtimeWeek > 0) descParts.push(`${stats.overtimeWeek.toFixed(1)}h overtime`);
+                    if (stats.inProgress.length > 0) descParts.push(`${stats.inProgress.length} en progreso`);
+                    if (stats.blocked.length > 0) descParts.push(`${stats.blocked.length} bloqueadas`);
+                    const desc = descParts.length > 0 ? descParts.join(', ') : 'Sin actividad registrada';
 
                     return (
-                        <div key={user.uid} className={`rounded-xl border transition-all ${isExpanded ? 'border-indigo-500/30 bg-slate-800/50' : 'border-transparent bg-slate-800/30 hover:bg-slate-800/50'}`}>
-                            {/* Compact Row */}
-                            <button
-                                onClick={() => setExpandedUser(isExpanded ? null : user.uid)}
-                                className="w-full flex items-center gap-3 p-3 text-left"
-                            >
-                                {/* Avatar */}
-                                <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
-                                    stats.activeTimer ? 'bg-emerald-600/30 border border-emerald-500/50 text-emerald-400' : 'bg-indigo-600/20 border border-indigo-500/30 text-indigo-400'
-                                }`}>
-                                    {stats.activeTimer && <div className="absolute w-2.5 h-2.5 bg-emerald-500 rounded-full -top-0.5 -right-0.5 animate-pulse" />}
-                                    {name[0].toUpperCase()}
-                                </div>
+                        <div
+                            key={user.uid}
+                            className={`rounded-2xl border p-5 transition-all duration-300 cursor-pointer ${
+                                isExpanded
+                                    ? `${rc.activeBorder} ${rc.bg} shadow-lg`
+                                    : 'border-slate-800 bg-slate-900/40 hover:bg-slate-800/40 hover:border-slate-700'
+                            }`}
+                            onClick={() => setExpandedUser(isExpanded ? null : user.uid)}
+                        >
+                            {/* Avatar Icon */}
+                            <div className={`w-11 h-11 rounded-xl ${rc.iconBg} border ${rc.iconBorder} flex items-center justify-center mb-3 relative`}>
+                                <span className={`text-base font-black ${rc.text}`}>{name[0].toUpperCase()}</span>
+                                {stats.activeTimer && (
+                                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-slate-900 animate-pulse" />
+                                )}
+                            </div>
 
-                                {/* Name + Role */}
-                                <div className="min-w-0 shrink">
-                                    <span className="text-sm font-bold text-slate-200 block truncate">{name}</span>
-                                    <span className="text-[10px] font-bold text-slate-500 uppercase">{roleLabels[user.teamRole] || 'Ingeniero'}</span>
-                                </div>
+                            {/* Name */}
+                            <h4 className="text-sm font-black text-slate-200 truncate">{name}</h4>
+                            <p className={`text-[10px] font-black uppercase tracking-wider ${rc.text} mb-2`}>{roleLabels[role] || 'Ingeniero'}</p>
 
-                                {/* Quick Stats Badges */}
-                                <div className="flex items-center gap-1.5 flex-wrap ml-auto">
-                                    {stats.inProgress.length > 0 && (
-                                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 border border-indigo-500/25">
-                                            ▶ {stats.inProgress.length}
-                                        </span>
-                                    )}
-                                    {stats.blocked.length > 0 && (
-                                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/25">
-                                            ⛔ {stats.blocked.length}
-                                        </span>
-                                    )}
-                                    {stats.hoursToday > 0 && (
-                                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/25">
-                                            ⏱ {stats.hoursToday.toFixed(1)}h
-                                        </span>
-                                    )}
-                                    {stats.overtimeWeek > 0 && (
-                                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400 border border-orange-500/25">
-                                            ⚡ {stats.overtimeWeek.toFixed(1)}h extra
-                                        </span>
-                                    )}
-                                    {stats.activeTimer && (
-                                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 animate-pulse">
-                                            🟢 Activo
-                                        </span>
-                                    )}
-                                    <span className="text-xs font-bold text-slate-500">{user.totalAssigned}</span>
-                                    <ChevronDown className={`w-4 h-4 text-slate-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                                </div>
+                            {/* Description */}
+                            <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-2 mb-3">{desc}</p>
+
+                            {/* Expand toggle */}
+                            <button className={`text-[11px] font-bold ${rc.text} flex items-center gap-1 hover:underline`}>
+                                {isExpanded ? 'Menos detalles' : 'Ver detalles'}
+                                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                             </button>
 
-                            {/* Expanded Detail */}
+                            {/* Expanded Details */}
                             {isExpanded && (
-                                <div className="px-3 pb-3 animate-in slide-in-from-top-1 duration-200">
-                                    {/* Week summary */}
-                                    <div className="flex gap-3 mb-3 flex-wrap">
-                                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/70 border border-slate-700">
-                                            <Clock className="w-3.5 h-3.5 text-blue-400" />
-                                            <span className="text-xs font-bold text-slate-300">{stats.hoursWeek.toFixed(1)}h esta semana</span>
-                                        </div>
-                                        {stats.overtimeWeek > 0 && (
-                                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20">
-                                                <Zap className="w-3.5 h-3.5 text-orange-400" />
-                                                <span className="text-xs font-bold text-orange-300">{stats.overtimeWeek.toFixed(1)}h overtime</span>
-                                            </div>
-                                        )}
+                                <div className="mt-4 pt-3 border-t border-slate-700/50 space-y-2 animate-in slide-in-from-top-1 duration-200" onClick={e => e.stopPropagation()}>
+                                    {/* Quick stat badges */}
+                                    <div className="flex flex-wrap gap-1.5 mb-2">
                                         {stats.activeTimer && (
-                                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                                                <Timer className="w-3.5 h-3.5 text-emerald-400" />
-                                                <span className="text-xs font-bold text-emerald-300">Timer activo: {engTasks.find(t => t.id === stats.activeTimer.taskId)?.title || 'Tarea'}</span>
-                                            </div>
+                                            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">🟢 Timer activo</span>
+                                        )}
+                                        {stats.overtimeWeek > 0 && (
+                                            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400 border border-orange-500/25">⚡ {stats.overtimeWeek.toFixed(1)}h extra</span>
                                         )}
                                     </div>
 
                                     {/* Task list */}
-                                    {stats.userTasks.length > 0 ? (
-                                        <div className="space-y-1">
-                                            {stats.userTasks.map(task => {
-                                                const project = engProjects.find(p => p.id === task.projectId);
-                                                const statusCfg = TASK_STATUS_CONFIG[task.status] || {};
-                                                return (
-                                                    <button
-                                                        key={task.id}
-                                                        onClick={() => onTaskClick(task)}
-                                                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900/50 hover:bg-slate-800 transition-colors text-left"
-                                                    >
-                                                        <div className={`w-2 h-2 rounded-full shrink-0 ${
-                                                            task.status === 'blocked' ? 'bg-rose-500' :
-                                                            task.status === 'in_progress' ? 'bg-indigo-500' :
-                                                            task.status === 'in_review' ? 'bg-amber-500' :
-                                                            'bg-slate-500'
-                                                        }`} />
-                                                        <div className="flex-1 min-w-0">
-                                                            <p className="text-xs font-bold text-slate-200 truncate">{task.title}</p>
-                                                            <p className="text-[10px] text-slate-500">{project?.name || 'Sin proyecto'} · {statusCfg.label || task.status}</p>
-                                                        </div>
-                                                        <ArrowRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    ) : (
-                                        <p className="text-xs text-slate-600 py-2 text-center">Sin tareas asignadas activas</p>
+                                    {stats.userTasks.length > 0 ? stats.userTasks.map(task => {
+                                        const project = engProjects.find(p => p.id === task.projectId);
+                                        const statusCfg = TASK_STATUS_CONFIG[task.status] || {};
+                                        return (
+                                            <button
+                                                key={task.id}
+                                                onClick={() => onTaskClick(task)}
+                                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-800/60 transition-colors text-left"
+                                            >
+                                                <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                                    task.status === 'blocked' ? 'bg-rose-500' :
+                                                    task.status === 'in_progress' ? 'bg-indigo-500' :
+                                                    task.status === 'in_review' ? 'bg-amber-500' :
+                                                    'bg-slate-500'
+                                                }`} />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-[11px] font-bold text-slate-300 truncate">{task.title}</p>
+                                                    <p className="text-[9px] text-slate-600">{project?.name || ''} · {statusCfg.label || task.status}</p>
+                                                </div>
+                                            </button>
+                                        );
+                                    }) : (
+                                        <p className="text-[10px] text-slate-600 text-center py-1">Sin tareas activas</p>
                                     )}
                                 </div>
                             )}
                         </div>
                     );
                 })}
-                {workload.length === 0 && <p className="text-sm font-medium text-slate-500 py-4 text-center">No hay ingenieros en el equipo.</p>}
+                {workload.length === 0 && (
+                    <div className="col-span-full text-center py-6">
+                        <Users className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                        <p className="text-sm font-medium text-slate-500">No hay ingenieros en el equipo.</p>
+                    </div>
+                )}
             </div>
         </div>
     );
