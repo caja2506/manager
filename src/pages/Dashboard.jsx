@@ -102,7 +102,7 @@ function KpiCard({ label, value, suffix, icon: KpiIcon, color, children, badge, 
 }
 
 // ============================================================
-// TASK PIPELINE
+// TASK PIPELINE — Card-based (Overview style)
 // ============================================================
 
 function TaskPipeline({ tasks, onTaskClick }) {
@@ -110,28 +110,26 @@ function TaskPipeline({ tasks, onTaskClick }) {
 
     const pipeline = useMemo(() => {
         const statuses = [
-            { key: 'backlog', label: 'Backlog', icon: Inbox, color: 'slate' },
-            { key: 'planned', label: 'Planificado', icon: ListTodo, color: 'blue' },
-            { key: 'in_progress', label: 'En Progreso', icon: Play, color: 'indigo' },
-            { key: 'in_review', label: 'En Revisión', icon: Eye, color: 'amber' },
-            { key: 'completed', label: 'Completado', icon: CheckCircle, color: 'emerald' },
+            { key: 'backlog', label: 'Backlog', subtitle: 'Pendientes', icon: Inbox, color: 'slate', desc: 'Tareas registradas pendientes de planificación y asignación.' },
+            { key: 'planned', label: 'Planificado', subtitle: 'Listo para iniciar', icon: ListTodo, color: 'blue', desc: 'Tareas asignadas y planificadas, listas para comenzar trabajo.' },
+            { key: 'in_progress', label: 'En Progreso', subtitle: 'Trabajo activo', icon: Play, color: 'indigo', desc: 'Tareas con trabajo activo y timer de horas en tiempo real.' },
+            { key: 'in_review', label: 'En Revisión', subtitle: 'Validación', icon: Eye, color: 'amber', desc: 'Tareas completadas esperando validación del responsable.' },
+            { key: 'completed', label: 'Completado', subtitle: 'Finalizado', icon: CheckCircle, color: 'emerald', desc: 'Tareas terminadas y registradas en métricas.' },
         ];
 
-        const total = tasks.length || 1;
         return statuses.map(s => ({
             ...s,
             count: tasks.filter(t => t.status === s.key).length,
             tasks: tasks.filter(t => t.status === s.key),
-            pct: Math.round((tasks.filter(t => t.status === s.key).length / total) * 100),
         }));
     }, [tasks]);
 
-    const statusColors = {
-        slate: { bar: 'bg-slate-500', text: 'text-slate-400', bg: 'bg-slate-500/10' },
-        blue: { bar: 'bg-blue-500', text: 'text-blue-400', bg: 'bg-blue-500/10' },
-        indigo: { bar: 'bg-indigo-500', text: 'text-indigo-400', bg: 'bg-indigo-500/10' },
-        amber: { bar: 'bg-amber-500', text: 'text-amber-400', bg: 'bg-amber-500/10' },
-        emerald: { bar: 'bg-emerald-500', text: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+    const cardColors = {
+        slate: { bg: 'bg-slate-500/8', border: 'border-slate-700/50', activeBorder: 'border-slate-500/60', text: 'text-slate-400', iconBg: 'bg-slate-500/15', iconBorder: 'border-slate-500/30', dot: 'bg-slate-500' },
+        blue: { bg: 'bg-blue-500/8', border: 'border-slate-700/50', activeBorder: 'border-blue-500/60', text: 'text-blue-400', iconBg: 'bg-blue-500/15', iconBorder: 'border-blue-500/30', dot: 'bg-blue-500' },
+        indigo: { bg: 'bg-indigo-500/8', border: 'border-slate-700/50', activeBorder: 'border-indigo-500/60', text: 'text-indigo-400', iconBg: 'bg-indigo-500/15', iconBorder: 'border-indigo-500/30', dot: 'bg-indigo-500' },
+        amber: { bg: 'bg-amber-500/8', border: 'border-slate-700/50', activeBorder: 'border-amber-500/60', text: 'text-amber-400', iconBg: 'bg-amber-500/15', iconBorder: 'border-amber-500/30', dot: 'bg-amber-500' },
+        emerald: { bg: 'bg-emerald-500/8', border: 'border-slate-700/50', activeBorder: 'border-emerald-500/60', text: 'text-emerald-400', iconBg: 'bg-emerald-500/15', iconBorder: 'border-emerald-500/30', dot: 'bg-emerald-500' },
     };
 
     return (
@@ -143,63 +141,60 @@ function TaskPipeline({ tasks, onTaskClick }) {
                 <span className="text-xs font-bold text-slate-500">{tasks.length} total</span>
             </div>
 
-            <div className="space-y-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                 {pipeline.map(stage => {
-                    const sc = statusColors[stage.color];
+                    const cc = cardColors[stage.color];
                     const isExpanded = expandedStatus === stage.key;
-                    const Icon = stage.icon;
+                    const StageIcon = stage.icon;
+
                     return (
-                        <div key={stage.key}>
-                            <button
-                                onClick={() => setExpandedStatus(isExpanded ? null : stage.key)}
-                                className="w-full group"
-                            >
-                                <div className="flex items-center gap-3 mb-1">
-                                    <Icon className={`w-4 h-4 ${sc.text} shrink-0`} />
-                                    <span className={`text-xs font-black ${sc.text} uppercase tracking-wider w-28 text-left`}>{stage.label}</span>
-                                    <div className="flex-1 h-5 bg-slate-800 rounded-full overflow-hidden relative">
-                                        <div
-                                            className={`h-full ${sc.bar} rounded-full transition-all duration-700 flex items-center justify-end pr-2`}
-                                            style={{ width: `${Math.max(stage.pct, stage.count > 0 ? 8 : 0)}%` }}
-                                        >
-                                            {stage.count > 2 && <span className="text-[10px] font-black text-white">{stage.count}</span>}
-                                        </div>
-                                    </div>
-                                    <span className="text-sm font-black text-slate-300 w-8 text-right">{stage.count}</span>
-                                    <ChevronRight className={`w-4 h-4 text-slate-600 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                                </div>
+                        <div
+                            key={stage.key}
+                            className={`rounded-2xl border p-4 transition-all duration-300 cursor-pointer ${
+                                isExpanded
+                                    ? `${cc.activeBorder} ${cc.bg} shadow-lg`
+                                    : `${cc.border} bg-slate-900/40 hover:bg-slate-800/40 hover:${cc.activeBorder}`
+                            }`}
+                            onClick={() => setExpandedStatus(isExpanded ? null : stage.key)}
+                        >
+                            {/* Icon */}
+                            <div className={`w-10 h-10 rounded-xl ${cc.iconBg} border ${cc.iconBorder} flex items-center justify-center mb-3`}>
+                                <StageIcon className={`w-5 h-5 ${cc.text}`} />
+                            </div>
+
+                            {/* Title + Count */}
+                            <h4 className="text-sm font-black text-slate-200">{stage.label}</h4>
+                            <p className={`text-[10px] font-black uppercase tracking-wider ${cc.text} mb-2`}>{stage.count} tareas</p>
+
+                            {/* Description */}
+                            <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-2 mb-3">{stage.desc}</p>
+
+                            {/* Expand toggle */}
+                            <button className={`text-[11px] font-bold ${cc.text} flex items-center gap-1 hover:underline`}>
+                                {isExpanded ? 'Menos detalles' : 'Ver detalles'}
+                                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                             </button>
 
-                            {/* Drill-down: task list */}
-                            {isExpanded && stage.tasks.length > 0 && (
-                                <div className="ml-7 mt-2 mb-3 space-y-1.5 animate-in slide-in-from-top-1 duration-200">
-                                    {stage.tasks.slice(0, 10).map(task => (
+                            {/* Expanded task list */}
+                            {isExpanded && (
+                                <div className="mt-3 pt-3 border-t border-slate-700/50 space-y-1.5 animate-in slide-in-from-top-1 duration-200">
+                                    {stage.tasks.slice(0, 6).map(task => (
                                         <button
                                             key={task.id}
-                                            onClick={() => onTaskClick(task)}
-                                            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl ${sc.bg} hover:bg-slate-800/60 transition-colors text-left`}
+                                            onClick={(e) => { e.stopPropagation(); onTaskClick(task); }}
+                                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-800/60 transition-colors text-left"
                                         >
-                                            <div className={`w-2 h-2 rounded-full ${sc.bar} shrink-0`} />
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-bold text-slate-200 truncate">{task.title}</p>
-                                                <p className="text-[10px] text-slate-500">{task.projectName || 'Sin proyecto'}</p>
-                                            </div>
-                                            {task.priority && (
-                                                <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
-                                                    task.priority === 'critical' ? 'bg-rose-500/20 text-rose-400' :
-                                                    task.priority === 'high' ? 'bg-amber-500/20 text-amber-400' :
-                                                    'bg-slate-700 text-slate-400'
-                                                }`}>{task.priority}</span>
-                                            )}
+                                            <div className={`w-1.5 h-1.5 rounded-full ${cc.dot} shrink-0`} />
+                                            <p className="text-[11px] font-bold text-slate-300 truncate flex-1">{task.title}</p>
                                         </button>
                                     ))}
-                                    {stage.tasks.length > 10 && (
-                                        <p className="text-[10px] text-slate-500 text-center py-1">+ {stage.tasks.length - 10} más</p>
+                                    {stage.tasks.length > 6 && (
+                                        <p className="text-[10px] text-slate-600 text-center">+ {stage.tasks.length - 6} más</p>
+                                    )}
+                                    {stage.tasks.length === 0 && (
+                                        <p className="text-[10px] text-slate-600 text-center py-1">Sin tareas</p>
                                     )}
                                 </div>
-                            )}
-                            {isExpanded && stage.tasks.length === 0 && (
-                                <p className="ml-7 text-xs text-slate-600 py-2">Sin tareas en este estado.</p>
                             )}
                         </div>
                     );
