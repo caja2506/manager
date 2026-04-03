@@ -712,21 +712,18 @@ export default function Dashboard() {
                 isAuditing={isAuditing} onRunAudit={runClientAudit}
             />
 
-            {/* ═══════════ MAIN SPLIT ═══════════ */}
-            <div className="grid lg:grid-cols-3 gap-6">
+            {/* ═══════════ PIPELINE ═══════════ */}
+            <TaskPipeline tasks={enrichedTasks} onTaskClick={openTask} />
 
-                {/* LEFT: Pipeline + Workload */}
-                <div className="lg:col-span-2 space-y-6">
-                    <TaskPipeline tasks={enrichedTasks} onTaskClick={openTask} />
-                    <TeamWorkloadPanel
-                        workload={workload} timeLogs={timeLogs}
-                        engTasks={engTasks} engProjects={engProjects}
-                        onTaskClick={openTask}
-                    />
-                </div>
+            {/* ═══════════ TEAM WORKLOAD ═══════════ */}
+            <TeamWorkloadPanel
+                workload={workload} timeLogs={timeLogs}
+                engTasks={engTasks} engProjects={engProjects}
+                onTaskClick={openTask}
+            />
 
-                {/* RIGHT: Alerts */}
-                <div className="space-y-6">
+            {/* ═══════════ ALERTS ═══════════ */}
+            <div className="space-y-6">
                     <div className="bg-slate-900/70 backdrop-blur-sm rounded-2xl border border-slate-800 shadow-lg p-6 sticky top-6">
                         <div className="flex items-center justify-between mb-5">
                             <h3 className="font-bold text-lg text-white flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-amber-400" /> Alertas</h3>
@@ -780,7 +777,6 @@ export default function Dashboard() {
                         </div>
                     </div>
                 </div>
-            </div>
             </div>
         </div>
     );
