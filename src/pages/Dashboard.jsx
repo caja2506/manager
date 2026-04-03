@@ -491,29 +491,58 @@ export default function Dashboard() {
     }, [engTasks, engProjects, delays, teamMembers, navigate]);
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-300">
-            <TaskDetailModal
-                isOpen={isModalOpen} onClose={closeModal} task={selectedTask}
-                projects={engProjects} teamMembers={teamMembers}
-                subtasks={selectedTask ? engSubtasks.filter(s => s.taskId === selectedTask.id) : []}
-                taskTypes={taskTypes} userId={user?.uid} canEdit={canEdit} canDelete={canDelete}
-            />
-
-            <PageHeader title="" showBack={true} />
-
-            {/* Header */}
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
-                        Sala Obeya <span className="bg-indigo-500/20 text-indigo-400 text-xs px-2.5 py-1 rounded-lg uppercase tracking-widest leading-none mt-1 border border-indigo-500/30">En vivo</span>
-                    </h1>
-                    <p className="text-sm font-bold text-slate-400 mt-1">Tablero de Control y Salud de Ingeniería</p>
-                </div>
-                <div className="text-right flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-slate-500" />
-                    <span className="text-sm font-bold text-slate-400 capitalize">{format(now, "EEEE, d 'de' MMMM", { locale: es })}</span>
-                </div>
+        <div className="relative min-h-screen">
+            {/* ═══════════ ANIMATED BACKGROUND ═══════════ */}
+            <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+                <div className="absolute top-1/4 left-1/3 w-[500px] h-[500px] rounded-full bg-indigo-600/5 blur-3xl animate-pulse" style={{ animationDuration: '6s' }} />
+                <div className="absolute top-2/3 right-1/4 w-[400px] h-[400px] rounded-full bg-violet-600/5 blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
+                <div className="absolute bottom-1/4 left-1/6 w-[300px] h-[300px] rounded-full bg-emerald-600/4 blur-3xl animate-pulse" style={{ animationDuration: '10s' }} />
             </div>
+
+            {/* Inline keyframes for stagger animation */}
+            <style>{`
+                @keyframes obeya-fade-up {
+                    from { opacity: 0; transform: translateY(24px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                .obeya-stagger > * {
+                    opacity: 0;
+                    animation: obeya-fade-up 0.6s ease-out forwards;
+                }
+                .obeya-stagger > *:nth-child(1) { animation-delay: 0.05s; }
+                .obeya-stagger > *:nth-child(2) { animation-delay: 0.12s; }
+                .obeya-stagger > *:nth-child(3) { animation-delay: 0.2s; }
+                .obeya-stagger > *:nth-child(4) { animation-delay: 0.28s; }
+                .obeya-stagger > *:nth-child(5) { animation-delay: 0.36s; }
+                .obeya-stagger > *:nth-child(6) { animation-delay: 0.44s; }
+                .obeya-stagger > *:nth-child(7) { animation-delay: 0.52s; }
+                .obeya-stagger > *:nth-child(8) { animation-delay: 0.6s; }
+            `}</style>
+
+            <div className="relative z-10 space-y-6 obeya-stagger">
+                <TaskDetailModal
+                    isOpen={isModalOpen} onClose={closeModal} task={selectedTask}
+                    projects={engProjects} teamMembers={teamMembers}
+                    subtasks={selectedTask ? engSubtasks.filter(s => s.taskId === selectedTask.id) : []}
+                    taskTypes={taskTypes} userId={user?.uid} canEdit={canEdit} canDelete={canDelete}
+                />
+
+                <PageHeader title="" showBack={true} />
+
+                {/* Header */}
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div>
+                        <h1 className="text-3xl md:text-4xl font-black tracking-tight flex items-center gap-3">
+                            <span className="bg-gradient-to-r from-indigo-400 via-violet-400 to-purple-400 bg-clip-text text-transparent">Sala Obeya</span>
+                            <span className="bg-indigo-500/20 text-indigo-400 text-xs px-2.5 py-1 rounded-lg uppercase tracking-widest leading-none border border-indigo-500/30 animate-pulse" style={{ animationDuration: '3s' }}>En vivo</span>
+                        </h1>
+                        <p className="text-sm font-bold text-slate-400 mt-1">Tablero de Control y Salud de Ingeniería</p>
+                    </div>
+                    <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800/50 border border-slate-700/50">
+                        <Clock className="w-4 h-4 text-indigo-400" />
+                        <span className="text-sm font-bold text-slate-300 capitalize">{format(now, "EEEE, d 'de' MMMM", { locale: es })}</span>
+                    </div>
+                </div>
 
             {/* ═══════════ KPI ROW — EXPANDABLE ═══════════ */}
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
@@ -726,6 +755,7 @@ export default function Dashboard() {
                         </div>
                     </div>
                 </div>
+            </div>
             </div>
         </div>
     );
