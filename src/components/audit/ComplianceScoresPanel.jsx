@@ -5,7 +5,7 @@ import { Shield, TrendingUp, Clock, Database, Activity } from 'lucide-react';
 // SCORE GAUGE COMPONENT
 // ============================================================
 
-function ScoreGauge({ label, score, icon: Icon, color, size = 'default' }) {
+function ScoreGauge({ label, score, icon: Icon, color, size = 'default', className = '' }) {
     const radius = size === 'compact' ? 28 : 36;
     const stroke = size === 'compact' ? 4 : 5;
     const circumference = 2 * Math.PI * radius;
@@ -21,7 +21,7 @@ function ScoreGauge({ label, score, icon: Icon, color, size = 'default' }) {
     const colors = color || getColor(score);
 
     return (
-        <div className={`flex flex-col items-center gap-2 p-4 rounded-2xl border ${colors.bg} ${colors.border} transition-all hover:scale-[1.02]`}>
+        <div className={`flex flex-col items-center gap-2 p-4 rounded-2xl border ${colors.bg} ${colors.border} transition-all hover:scale-[1.02] ${className}`}>
             <div className="relative">
                 <svg width={svgSize} height={svgSize} className="-rotate-90">
                     {/* Background track */}
@@ -51,8 +51,8 @@ function ScoreGauge({ label, score, icon: Icon, color, size = 'default' }) {
                     <span className={`text-lg font-black ${colors.text}`}>{score}</span>
                 </div>
             </div>
-            <div className="flex items-center gap-1.5">
-                {Icon && <Icon className={`w-3.5 h-3.5 ${colors.text}`} />}
+            <div className="flex items-center gap-1.5 justify-center">
+                {Icon && <Icon className={`w-3.5 h-3.5 ${colors.text} hidden sm:block`} />}
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider text-center leading-tight">{label}</span>
             </div>
         </div>
@@ -120,17 +120,17 @@ export default function ComplianceScoresPanel({ scores, summary, isAuditing, onR
     return (
         <div className="bg-slate-900/70 backdrop-blur-sm rounded-2xl border border-slate-800 shadow-lg p-6">
             {/* Header */}
-            <div className="flex items-center justify-between mb-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
                 <h3 className="font-bold text-lg text-white flex items-center gap-2">
                     <Shield className="w-5 h-5 text-indigo-400" /> Salud Metodológica
                 </h3>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 flex-wrap">
                     {summary && (
-                        <div className="flex items-center gap-2">
+                        <>
                             <SeveritySummaryPill count={summary.bySeverity.critical} severity="critical" />
                             <SeveritySummaryPill count={summary.bySeverity.warning} severity="warning" />
                             <SeveritySummaryPill count={summary.bySeverity.info} severity="info" />
-                        </div>
+                        </>
                     )}
                     <button
                         onClick={onRunAudit}
@@ -142,7 +142,7 @@ export default function ComplianceScoresPanel({ scores, summary, isAuditing, onR
             </div>
 
             {/* Score Gauges */}
-            <div className={`grid ${compact ? 'grid-cols-3 lg:grid-cols-5' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'} gap-3`}>
+            <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3`}>
                 <ScoreGauge
                     label="Metodología"
                     score={scores.methodologyCompliance}
@@ -172,6 +172,7 @@ export default function ComplianceScoresPanel({ scores, summary, isAuditing, onR
                     score={scores.projectHealth}
                     icon={Activity}
                     size={compact ? 'compact' : 'default'}
+                    className="col-span-2 sm:col-span-1 mx-auto w-full max-w-[180px] sm:max-w-none"
                 />
             </div>
 
