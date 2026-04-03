@@ -9,7 +9,7 @@ import {
     Activity, LayoutDashboard, User, FolderGit2,
     ListTodo, Database, Clock, FileText, BarChart3, Users,
     Bell, Settings, LogOut, Shield, LayoutList, Briefcase, LineChart, CalendarDays, GanttChartSquare, Radar, Zap,
-    ChevronRight, X, Target, Map
+    ChevronRight, X, Target, Map, Award
 } from 'lucide-react';
 
 // ─── Section Definitions ───
@@ -54,6 +54,7 @@ const SECTIONS = [
         items: [
             { to: '/control-tower', label: 'Control Tower', icon: Radar },
             { to: '/audit', label: 'Auditoría', icon: Shield },
+            { to: '/team-scores', label: 'Scorecard', icon: Award },
         ],
     },
     {

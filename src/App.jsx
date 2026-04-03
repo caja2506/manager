@@ -43,6 +43,7 @@ import ProjectDetailPage from './pages/ProjectDetailPage';
 import DailyScrumPage from './pages/DailyScrumPage';
 import PlatformOverview from './pages/PlatformOverview';
 import DailyBriefing from './pages/DailyBriefing';
+import TeamScoresPage from './pages/TeamScoresPage';
 import DataFlowPage from './pages/DataFlowPage';
 
 // ========================================================
@@ -211,6 +212,7 @@ export default function App() {
           {/* Team */}
           <Route path="/team" element={<ErrorBoundary module="Equipo"><Team /></ErrorBoundary>} />
           <Route path="/notifications" element={<ErrorBoundary module="Notificaciones"><Notifications /></ErrorBoundary>} />
+          <Route path="/team-scores" element={<ErrorBoundary module="Team Scores"><TeamScoresPage /></ErrorBoundary>} />
           <Route path="/listas" element={<ErrorBoundary module="Listas"><ManagedListsPage /></ErrorBoundary>} />
 
           {/* Admin */}

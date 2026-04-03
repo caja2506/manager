@@ -5,7 +5,7 @@ import {
     LayoutDashboard, User, ListTodo, Shield, FolderGit2,
     Database, Clock, FileText, BarChart3, Users, Bell, Settings,
     Briefcase, LineChart, CalendarDays, GanttChartSquare, Radar, Zap,
-    LayoutList, Activity, Map, Menu, X, ChevronRight
+    LayoutList, Activity, Map, Menu, X, ChevronRight, Award
 } from 'lucide-react';
 
 // ─── Quick Access (bottom bar — always visible) ───
@@ -42,6 +42,7 @@ const FULL_SECTIONS = [
         items: [
             { to: '/control-tower', label: 'Control Tower', icon: Radar },
             { to: '/audit', label: 'Auditoría', icon: Shield },
+            { to: '/team-scores', label: 'Scorecard', icon: Award },
         ],
     },
     {
