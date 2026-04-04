@@ -485,62 +485,62 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                     )}
                 </div>
 
-                {/* Progress — clean bar, no chevron here */}
-                <div className="flex items-center gap-1.5 px-1" onClick={e => e.stopPropagation()}>
+                {/* Progress — clean bar */}
+                <div className="min-w-0 overflow-hidden flex items-center gap-1.5 px-1" onClick={e => e.stopPropagation()}>
                     {totalSubs > 0 ? (
-                        <div className="flex items-center gap-1.5 w-full">
-                            <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div className="flex items-center gap-1.5 w-full min-w-0">
+                            <div className="flex-1 min-w-0 h-1.5 bg-slate-800 rounded-full overflow-hidden">
                                 <div className="h-full rounded-full transition-all duration-500" style={{ width: `${subsPct}%`, background: subsColor }} />
                             </div>
-                            <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap">{doneSubs}/{totalSubs}</span>
+                            <span className="text-[11px] font-bold text-slate-400 whitespace-nowrap shrink-0">{doneSubs}/{totalSubs}</span>
                         </div>
                     ) : (
-                        <span className="text-[10px] text-slate-600 px-1">—</span>
+                        <span className="text-[11px] text-slate-600">—</span>
                     )}
                 </div>
 
-                {/* Timeline — dates + bar + days badge */}
-                <div className="flex flex-col gap-1 py-0.5" onClick={e => e.stopPropagation()}>
-                    <div className="flex items-center gap-1.5 text-[11px]">
+                {/* Timeline — dates + bar */}
+                <div className="min-w-0 overflow-hidden flex flex-col gap-1 py-1 px-1" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center gap-1 text-[11px] min-w-0">
                         {canEdit ? (
                             <>
                                 <InlineDatePicker value={startRaw} onSave={v => saveField('plannedStartDate', v)} />
-                                <span className="text-slate-600">→</span>
+                                <span className="text-slate-600 shrink-0">→</span>
                                 <InlineDatePicker value={endRaw} onSave={v => saveField('dueDate', v)} />
                             </>
                         ) : (
-                            <span className="text-slate-400">{fmtDate(startDate)} → {fmtDate(endDate)}</span>
+                            <span className="text-slate-400 truncate">{fmtDate(startDate)} → {fmtDate(endDate)}</span>
                         )}
                         {daysLeft !== null && (
-                            <span className={`text-[10px] font-bold ml-auto px-1.5 py-0.5 rounded ${
+                            <span className={`text-[11px] font-bold ml-auto shrink-0 px-1 rounded ${
                                 daysLeft < 0 && task.status !== 'completed' ? 'text-rose-400 bg-rose-500/15' :
-                                daysLeft <= 3 ? 'text-amber-400 bg-amber-500/10' : 'text-slate-500'
+                                daysLeft <= 3 ? 'text-amber-400' : 'text-slate-500'
                             }`}>
                                 {task.status === 'completed' ? '✓' : daysLeft < 0 ? `${Math.abs(daysLeft)}d late` : `${daysLeft}d`}
                             </span>
                         )}
                     </div>
                     {startDate && endDate && (
-                        <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                        <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
                             <div className="h-full rounded-full transition-all duration-700" style={{ width: `${timelinePct}%`, background: timelineColor }} />
                         </div>
                     )}
                 </div>
 
                 {/* Hours — own column with bar */}
-                <div className="flex flex-col gap-1 py-0.5" onClick={e => e.stopPropagation()}>
+                <div className="min-w-0 overflow-hidden flex flex-col gap-1 py-1 px-1" onClick={e => e.stopPropagation()}>
                     {(actual > 0 || estimated > 0) ? (
                         <>
-                            <div className="flex items-center gap-1 text-[11px]">
-                                <span className="text-white font-bold">{actual.toFixed(1)}h</span>
-                                <span className="text-slate-600">/</span>
+                            <div className="flex items-center gap-1 text-[11px] min-w-0">
+                                <span className="text-white font-bold shrink-0">{actual.toFixed(1)}h</span>
+                                <span className="text-slate-600 shrink-0">/</span>
                                 {canEdit ? (
                                     <InlineEditNumber value={estimated} onSave={v => saveField('estimatedHours', v)} />
                                 ) : (
-                                    <span className="text-slate-400">{estimated}h</span>
+                                    <span className="text-slate-400 shrink-0">{estimated}h</span>
                                 )}
                                 {estimated > 0 && (
-                                    <span className={`text-[10px] font-bold ml-auto ${
+                                    <span className={`text-[11px] font-bold ml-auto shrink-0 ${
                                         hoursPct > 100 ? 'text-rose-400' : hoursPct > 80 ? 'text-amber-400' : 'text-emerald-400'
                                     }`}>
                                         {hoursPct}%
@@ -548,7 +548,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                                 )}
                             </div>
                             {estimated > 0 && (
-                                <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                                <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
                                     <div className="h-full rounded-full transition-all duration-500" style={{
                                         width: `${Math.min(hoursPct, 100)}%`,
                                         background: hoursPct > 100 ? '#ef4444' : hoursPct > 80 ? '#f59e0b' : '#22c55e',
