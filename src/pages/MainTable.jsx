@@ -1036,7 +1036,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                 style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${color}` }}
                             >
                                 <div></div>
-                                <div className="col-span-9">
+                                <div className="col-span-11">
                                     {addingTask ? (
                                         <div className="flex items-center gap-2">
                                             <input
@@ -1091,6 +1091,10 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                     })}
                                 </div>
                                 <div></div>
+                                <div></div>
+                                {/* Avance placeholder */}
+                                <div></div>
+                                {/* Health placeholder */}
                                 <div></div>
                                 {/* Date range */}
                                 <div className="flex items-center justify-center">
