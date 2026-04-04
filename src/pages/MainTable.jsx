@@ -1174,7 +1174,11 @@ export default function MainTable() {
     const [filterProject, setFilterProject] = useState('');
     const [filterAssignee, setFilterAssignee] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
-    const [collapsedGroups, setCollapsedGroups] = useState({});
+    const [collapsedGroups, setCollapsedGroups] = useState(() => {
+        const init = {};
+        STATUS_GROUPS.forEach(g => { init[g.status] = true; });
+        return init;
+    });
     const { savedField, show: showSaved } = useSaveFeedback();
 
     const openNew = () => { setSelectedTask(null); setIsModalOpen(true); };
@@ -1256,19 +1260,7 @@ export default function MainTable() {
                 )}
             </div>
 
-            <div className="flex justify-end px-6 py-1">
-                <button
-                    onClick={() => {
-                        const allExpanded = STATUS_GROUPS.every(g => !collapsedGroups[g.status]);
-                        const ns = {};
-                        STATUS_GROUPS.forEach(g => { ns[g.status] = allExpanded; });
-                        setCollapsedGroups(ns);
-                    }}
-                    className="text-[10px] text-slate-600 hover:text-slate-300 font-semibold px-2 py-1 rounded-lg hover:bg-slate-800/60 transition-colors"
-                >
-                    {STATUS_GROUPS.every(g => !collapsedGroups[g.status]) ? 'Colapsar todo' : 'Expandir todo'}
-                </button>
-            </div>
+
 
             <div className="flex-1 overflow-y-auto pb-4 px-6 pt-1">
                 {STATUS_GROUPS.map(group => {
