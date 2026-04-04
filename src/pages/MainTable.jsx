@@ -31,8 +31,8 @@ const STATUS_GROUPS = [
     { status: TASK_STATUS.CANCELLED,   label: 'Cancelado',   color: '#6b7280' },
 ];
 
-// 14-column grid: ☐ | Task | Owner | Asig. | Status | Área | Tipo | Avance | Health | Score | Timeline | Hours | Priority | Project
-const GRID_COLS = '28px minmax(110px,240px) 36px 36px 86px 68px 68px 56px 48px 48px minmax(90px,140px) minmax(65px,95px) 76px 68px';
+// 14-column grid: ☐ | Task | Owner | Status | Área | Tipo | Avance | Health | Score | Timeline | Hours | Priority | Project | Asig.
+const GRID_COLS = '28px minmax(110px,250px) 36px 86px 68px 68px 56px 48px 48px minmax(90px,140px) minmax(65px,95px) 76px 68px 36px';
 
 // ============================================================
 // SAVE FEEDBACK HOOK
@@ -643,20 +643,6 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                     )}
                 </div>
 
-                {/* Assigned By (who assigned this task) */}
-                <div className="flex items-center justify-center">
-                    {(() => {
-                        const assigner = teamMembers.find(m => m.uid === task.assignedBy);
-                        if (!assigner) return <span className="text-[9px] text-slate-700">—</span>;
-                        const initials = (assigner.displayName || assigner.email || '??').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-                        return (
-                            <div className="w-7 h-7 rounded-full bg-purple-600/20 border border-purple-500/30 flex items-center justify-center" title={`Asignado por: ${assigner.displayName || assigner.email}`}>
-                                <span className="text-[9px] font-bold text-purple-400">{initials}</span>
-                            </div>
-                        );
-                    })()}
-                </div>
-
                 {/* Status — Monday.com full-width colored cell */}
                 <div className="flex items-stretch p-0.5" onClick={e => e.stopPropagation()}>
                     {canEdit ? (
@@ -919,6 +905,20 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                     ) : (
                         <span className="text-[11px] text-slate-400 italic truncate block text-center">{project?.name || '—'}</span>
                     )}
+                </div>
+
+                {/* Assigned By (who assigned — far right) */}
+                <div className="flex items-center justify-center">
+                    {(() => {
+                        const assigner = teamMembers.find(m => m.uid === task.assignedBy);
+                        if (!assigner) return <span className="text-[9px] text-slate-700">—</span>;
+                        const initials = (assigner.displayName || assigner.email || '??').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                        return (
+                            <div className="w-7 h-7 rounded-full bg-purple-600/20 border border-purple-500/30 flex items-center justify-center" title={`Asignado por: ${assigner.displayName || assigner.email}`}>
+                                <span className="text-[9px] font-bold text-purple-400">{initials}</span>
+                            </div>
+                        );
+                    })()}
                 </div>
             </div>
 
@@ -1184,7 +1184,6 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                             <div></div>
                             <div className="text-left">Tarea</div>
                             <div>Resp</div>
-                            <div>Asig.</div>
                             <div>Estado</div>
                             <div>Área</div>
                             <div>Tipo</div>
@@ -1195,6 +1194,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                             <div>Horas</div>
                             <div>Prioridad</div>
                             <div>Proyecto</div>
+                            <div>Asig.</div>
                         </div>
 
                         {tasks.length === 0 ? (
