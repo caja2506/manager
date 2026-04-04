@@ -32,7 +32,7 @@ const STATUS_GROUPS = [
 ];
 
 // 14-column grid: ☐ | Task | Owner | Status | Área | Tipo | Avance | Health | Score | Timeline | Hours | Priority | Project | Asig.
-const GRID_COLS = '28px minmax(110px,250px) 36px 86px 68px 68px 56px 48px 48px minmax(90px,140px) minmax(65px,95px) 76px 68px 36px';
+const GRID_COLS = '28px minmax(110px,250px) 36px 86px 68px 68px 56px 48px 48px minmax(105px,150px) minmax(65px,95px) 76px 68px 36px';
 
 // ============================================================
 // SAVE FEEDBACK HOOK
@@ -216,7 +216,7 @@ function InlineDatePicker({ value, onSave }) {
 
     return (
         <span className="relative" onClick={e => e.stopPropagation()}>
-            <button onClick={() => inputRef.current?.showPicker?.()} className="text-[10px] text-slate-400 hover:text-white hover:bg-slate-800/60 rounded px-0.5 transition-colors">
+            <button onClick={() => inputRef.current?.showPicker?.()} className="text-[10px] text-slate-400 hover:text-white hover:bg-slate-800/60 rounded px-0.5 transition-colors whitespace-nowrap">
                 {display}
             </button>
             <input
@@ -801,17 +801,17 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                                 {(canEditDates || !startRaw) ? (
                                     <InlineDatePicker value={startRaw} onSave={v => saveField('plannedStartDate', v)} />
                                 ) : (
-                                    <span className="text-slate-400 text-[11px]">{fmtDate(startDate)}</span>
+                                    <span className="text-slate-400 text-[11px] whitespace-nowrap">{fmtDate(startDate)}</span>
                                 )}
                                 <span className="text-slate-600 shrink-0">→</span>
                                 {(canEditDates || !endRaw) ? (
                                     <InlineDatePicker value={endRaw} onSave={v => saveField('dueDate', v)} />
                                 ) : (
-                                    <span className="text-slate-400 text-[11px]">{fmtDate(endDate)}</span>
+                                    <span className="text-slate-400 text-[11px] whitespace-nowrap">{fmtDate(endDate)}</span>
                                 )}
                             </>
                         ) : (
-                            <span className="text-slate-400 truncate">{fmtDate(startDate)} → {fmtDate(endDate)}</span>
+                            <span className="text-slate-400 truncate whitespace-nowrap">{fmtDate(startDate)} → {fmtDate(endDate)}</span>
                         )}
                         {daysLeft !== null && (
                             <span className={`text-[11px] font-bold shrink-0 px-1 rounded ${
