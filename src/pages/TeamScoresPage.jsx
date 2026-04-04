@@ -216,13 +216,18 @@ function getDimensionInsight(key, dim) {
             const techs = raw.techniciansManaged || 0;
             const noTasks = raw.techsWithoutTasks || 0;
             const techBlocked = raw.techsBlockedUnresolved || 0;
+            const noPlan = raw.techsWithoutPlan || 0;
+            const penalty = 100 - score;
 
             if (techs === 0) return { icon: '⭐', title: 'Liderazgo', message: 'Sin técnicos asignados actualmente.' };
-            if (score >= 90) return { icon: '⭐', title: 'Liderazgo', message: `${techs} técnico(s) supervisados. Todos con tareas activas y sin bloqueos.` };
+            if (score >= 90) return { icon: '⭐', title: 'Liderazgo', message: `${techs} técnico(s) supervisados. Todos con tareas activas, planificación y sin bloqueos. ¡Excelente!` };
             const parts = [];
-            if (noTasks > 0) parts.push(`${noTasks} técnico(s) sin tareas — asigna trabajo`);
-            if (techBlocked > 0) parts.push(`${techBlocked} técnico(s) con tareas bloqueadas — resuelve los bloqueos`);
-            return { icon: '⭐', title: 'Liderazgo', message: `${techs} técnicos supervisados. ${parts.join('. ')}.` };
+            if (noTasks > 0) parts.push(`${noTasks} sin tareas en progreso (-20pts c/u)`);
+            if (techBlocked > 0) parts.push(`${techBlocked} con tareas bloqueadas sin resolver (-25pts c/u)`);
+            if (noPlan > 0) parts.push(`${noPlan} sin planificación semanal (-15pts c/u)`);
+            // If no specific issues found but score < 90, it's due to missing timeLogs
+            if (parts.length === 0 && penalty > 0) parts.push(`algunos técnicos no registran tiempo en los últimos 3 días (-15pts c/u)`);
+            return { icon: '⭐', title: 'Liderazgo', message: `${techs} técnicos supervisados. Penalización de ${penalty}pts porque: ${parts.join('; ')}.` };
         }
 
         case 'oversight': {
