@@ -612,7 +612,165 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
 }
 
 // ============================================================
-// TABLE GROUP
+// MOBILE TASK CARD (Monday.com style)
+// ============================================================
+
+function MobileTaskCard({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModal, groupColor }) {
+    const [expandedSubs, setExpandedSubs] = useState(false);
+
+    const project = engProjects.find(p => p.id === task.projectId);
+    const statusCfg = TASK_STATUS_CONFIG[task.status] || {};
+    const priorityCfg = TASK_PRIORITY_CONFIG[task.priority] || {};
+    const priorityColors = { low: '#94a3b8', medium: '#60a5fa', high: '#fbbf24', critical: '#f87171' };
+    const pColor = priorityColors[task.priority] || '#94a3b8';
+
+    const totalSubs = subtasks.length;
+    const doneSubs = subtasks.filter(s => s.completed || s.done).length;
+    const subsPct = totalSubs > 0 ? Math.round((doneSubs / totalSubs) * 100) : 0;
+    const subsColor = subsPct === 100 ? '#22c55e' : subsPct >= 50 ? '#f59e0b' : subsPct > 0 ? '#6366f1' : '#334155';
+
+    const startRaw = task.plannedStartDate || task.createdAt;
+    const endRaw = task.dueDate || task.plannedEndDate;
+    const startDate = startRaw ? new Date(startRaw) : null;
+    const endDate = endRaw ? new Date(endRaw) : null;
+    const now = new Date();
+
+    let timelinePct = 0, timelineColor = '#6366f1', daysLeft = null;
+    if (startDate && endDate) {
+        const total = Math.max(1, (endDate - startDate) / (1000 * 60 * 60 * 24));
+        const elapsed = Math.max(0, (now - startDate) / (1000 * 60 * 60 * 24));
+        timelinePct = Math.min(100, Math.max(0, (elapsed / total) * 100));
+        daysLeft = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
+        if (daysLeft < 0 && task.status !== 'completed') timelineColor = '#ef4444';
+        else if (timelinePct > 80) timelineColor = '#f59e0b';
+    }
+
+    const actual = task.actualHours || 0;
+    const estimated = task.estimatedHours || 0;
+    const hoursPct = estimated > 0 ? Math.round((actual / estimated) * 100) : 0;
+    const hoursBarColor = hoursPct > 100 ? '#ef4444' : hoursPct > 80 ? '#f59e0b' : '#22c55e';
+
+    const fmtDate = (d) => d ? d.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' }) : '—';
+
+    const owner = teamMembers.find(m => m.uid === task.assignedTo);
+
+    return (
+        <div
+            className="bg-slate-900/60 border border-slate-800/60 rounded-xl p-4 space-y-3"
+            style={{ borderLeft: `4px solid ${groupColor}` }}
+            onClick={() => onOpenModal(task)}
+        >
+            {/* Row 1: Title + Priority badge */}
+            <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                    {totalSubs > 0 && (
+                        <button onClick={e => { e.stopPropagation(); setExpandedSubs(!expandedSubs); }} className="text-slate-500 shrink-0">
+                            {expandedSubs ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                        </button>
+                    )}
+                    <h4 className="text-sm font-bold text-slate-100 truncate">{task.title || 'Sin título'}</h4>
+                </div>
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0"
+                    style={{ backgroundColor: pColor + '18', color: pColor, border: `1px solid ${pColor}30` }}>
+                    {priorityCfg.label || task.priority}
+                </span>
+            </div>
+
+            {/* Row 2: Owner + Status */}
+            <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                    {owner?.photoURL ? (
+                        <img src={owner.photoURL} alt="" className="w-7 h-7 rounded-full border border-slate-700" />
+                    ) : (
+                        <div className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center text-[11px] font-bold text-white shrink-0">
+                            {(owner?.displayName || task.assignedTo || '?')[0]?.toUpperCase()}
+                        </div>
+                    )}
+                    <span className="text-xs text-slate-300 truncate">{owner?.displayName || 'Sin asignar'}</span>
+                </div>
+                <span className="inline-flex items-center px-2.5 py-1 rounded text-[10px] font-bold uppercase whitespace-nowrap"
+                    style={{ backgroundColor: (statusCfg.color || '#64748b') + '20', color: statusCfg.color, border: `1px solid ${(statusCfg.color || '#64748b')}33` }}>
+                    {statusCfg.label || task.status}
+                </span>
+            </div>
+
+            {/* Row 3: Progress bar */}
+            {totalSubs > 0 && (
+                <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500">Progreso</span>
+                        <span className="font-bold text-slate-300">{doneSubs}/{totalSubs} <span className="text-slate-500">({subsPct}%)</span></span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${subsPct}%`, background: subsColor }} />
+                    </div>
+                </div>
+            )}
+
+            {/* Row 4: Timeline */}
+            {startDate && endDate && (
+                <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500">Timeline</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-slate-300">{fmtDate(startDate)} → {fmtDate(endDate)}</span>
+                            {daysLeft !== null && (
+                                <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
+                                    daysLeft < 0 && task.status !== 'completed' ? 'text-rose-400 bg-rose-500/15' :
+                                    daysLeft <= 3 ? 'text-amber-400' : 'text-slate-500'
+                                }`}>
+                                    {task.status === 'completed' ? '✓' : daysLeft < 0 ? `${Math.abs(daysLeft)}d late` : `${daysLeft}d`}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${timelinePct}%`, background: timelineColor }} />
+                    </div>
+                </div>
+            )}
+
+            {/* Row 5: Hours */}
+            {(actual > 0 || estimated > 0) && (
+                <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500">Horas</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-white font-bold">{actual.toFixed(1)}h</span>
+                            <span className="text-slate-600">/</span>
+                            <span className="text-slate-400">{estimated}h</span>
+                            {estimated > 0 && (
+                                <span className={`text-[11px] font-bold ${hoursPct > 100 ? 'text-rose-400' : hoursPct > 80 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                    {hoursPct}%
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    {estimated > 0 && (
+                        <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(hoursPct, 100)}%`, background: hoursBarColor }} />
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Project tag */}
+            {project && (
+                <div className="text-[11px] text-slate-500 italic">{project.name}</div>
+            )}
+
+            {/* Subtasks expansion */}
+            {expandedSubs && totalSubs > 0 && (
+                <div onClick={e => e.stopPropagation()}>
+                    <SubtaskExpander subtasks={subtasks} taskId={task.id} canEdit={canEdit} />
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ============================================================
+// TABLE GROUP (responsive: grid on desktop, cards on mobile)
 // ============================================================
 
 function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers, canEdit, onOpenModal, isExpanded, onToggle, savedField, onSaved }) {
@@ -630,45 +788,72 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
             </button>
 
             {isExpanded && (
-                <div className="mt-1 rounded-xl overflow-hidden border border-slate-800/50 bg-slate-900/30">
-                    {/* Header */}
-                    <div
-                        className="grid items-center px-3 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-900/50"
-                        style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${color}` }}
-                    >
-                        <div></div>
-                        <div>Tarea</div>
-                        <div className="text-center">Resp</div>
-                        <div className="text-center">Estado</div>
-                        <div>Progreso</div>
-                        <div>Timeline</div>
-                        <div>Horas</div>
-                        <div className="text-center">Prior</div>
-                        <div>Proyecto</div>
+                <>
+                    {/* Desktop: grid table (hidden on mobile) */}
+                    <div className="mt-1 rounded-xl overflow-hidden border border-slate-800/50 bg-slate-900/30 hidden md:block">
+                        {/* Header */}
+                        <div
+                            className="grid items-center px-3 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-900/50"
+                            style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${color}` }}
+                        >
+                            <div></div>
+                            <div>Tarea</div>
+                            <div className="text-center">Resp</div>
+                            <div className="text-center">Estado</div>
+                            <div>Progreso</div>
+                            <div>Timeline</div>
+                            <div>Horas</div>
+                            <div className="text-center">Prior</div>
+                            <div>Proyecto</div>
+                        </div>
+
+                        {tasks.length === 0 ? (
+                            <div className="px-4 py-5 text-center text-sm text-slate-600" style={{ borderLeft: `3px solid ${color}` }}>
+                                Sin tareas
+                            </div>
+                        ) : (
+                            tasks.map((task, idx) => (
+                                <TaskRow
+                                    key={task.id}
+                                    task={task}
+                                    engProjects={engProjects}
+                                    teamMembers={teamMembers}
+                                    subtasks={engSubtasks.filter(s => s.taskId === task.id)}
+                                    canEdit={canEdit}
+                                    onOpenModal={onOpenModal}
+                                    groupColor={color}
+                                    isLast={idx === tasks.length - 1}
+                                    savedField={savedField}
+                                    onSaved={onSaved}
+                                />
+                            ))
+                        )}
                     </div>
 
-                    {tasks.length === 0 ? (
-                        <div className="px-4 py-5 text-center text-sm text-slate-600" style={{ borderLeft: `3px solid ${color}` }}>
-                            Sin tareas
-                        </div>
-                    ) : (
-                        tasks.map((task, idx) => (
-                            <TaskRow
-                                key={task.id}
-                                task={task}
-                                engProjects={engProjects}
-                                teamMembers={teamMembers}
-                                subtasks={engSubtasks.filter(s => s.taskId === task.id)}
-                                canEdit={canEdit}
-                                onOpenModal={onOpenModal}
-                                groupColor={color}
-                                isLast={idx === tasks.length - 1}
-                                savedField={savedField}
-                                onSaved={onSaved}
-                            />
-                        ))
-                    )}
-                </div>
+                    {/* Mobile: card stack (hidden on desktop) */}
+                    <div className="mt-2 space-y-3 md:hidden">
+                        {tasks.length === 0 ? (
+                            <div className="px-4 py-5 text-center text-sm text-slate-600 bg-slate-900/30 rounded-xl border border-slate-800/50">
+                                Sin tareas en esta sección
+                            </div>
+                        ) : (
+                            tasks.map(task => (
+                                <MobileTaskCard
+                                    key={task.id}
+                                    task={task}
+                                    engProjects={engProjects}
+                                    teamMembers={teamMembers}
+                                    subtasks={engSubtasks.filter(s => s.taskId === task.id)}
+                                    canEdit={canEdit}
+                                    onOpenModal={onOpenModal}
+                                    groupColor={color}
+                                    savedField={savedField}
+                                    onSaved={onSaved}
+                                />
+                            ))
+                        )}
+                    </div>
+                </>
             )}
         </div>
     );
