@@ -30,8 +30,8 @@ const STATUS_GROUPS = [
     { status: TASK_STATUS.CANCELLED,   label: 'Cancelado',   color: '#6b7280' },
 ];
 
-// 10-column grid: ☐ | Task | Owner | Status | Área | Tipo | Timeline | Hours | Priority | Project
-const GRID_COLS = '28px minmax(120px,280px) 36px 90px 72px 72px minmax(100px,150px) minmax(70px,100px) 80px 72px';
+// 12-column grid: ☐ | Task | Owner | Status | Área | Tipo | Avance | Health | Timeline | Hours | Priority | Project
+const GRID_COLS = '28px minmax(120px,280px) 36px 90px 72px 72px 64px 64px minmax(100px,150px) minmax(70px,100px) 80px 72px';
 
 // ============================================================
 // SAVE FEEDBACK HOOK
@@ -402,6 +402,35 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
 
     const fmtDate = (d) => d ? d.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' }) : '—';
 
+    // ──── % Avance ────
+    // Usa progressPct del task si existe, si no lo calcula de subtareas
+    const progressPct = task.progressPct != null
+        ? Math.round(task.progressPct)
+        : (task.status === 'completed' ? 100 : subsPct);
+    const progressColor = progressPct === 100 ? '#22c55e' : progressPct >= 60 ? '#6366f1' : progressPct >= 30 ? '#f59e0b' : '#ef4444';
+
+    // ──── Health Score ────
+    // Composite 0-100 basado en: timeline, horas vs estimado, estado
+    const calcHealth = () => {
+        if (task.status === 'completed') return 100;
+        if (task.status === 'cancelled') return null;
+        let score = 100;
+        // Penalizar si está atrasado
+        if (daysLeft !== null && daysLeft < 0) score -= Math.min(40, Math.abs(daysLeft) * 4);
+        else if (daysLeft !== null && daysLeft <= 2) score -= 15;
+        // Penalizar si se está pasando del presupuesto de horas
+        if (hoursPct > 120) score -= 25;
+        else if (hoursPct > 100) score -= 15;
+        else if (hoursPct > 85) score -= 5;
+        // Penalizar si timeline avanzó pero progress está muy bajo
+        if (timelinePct > 70 && progressPct < 30) score -= 20;
+        else if (timelinePct > 50 && progressPct < 20) score -= 10;
+        return Math.max(0, Math.min(100, Math.round(score)));
+    };
+    const healthScore = calcHealth();
+    const healthColor = healthScore === null ? '#475569' : healthScore >= 80 ? '#22c55e' : healthScore >= 60 ? '#f59e0b' : '#ef4444';
+    const healthLabel = healthScore === null ? '—' : healthScore >= 80 ? 'OK' : healthScore >= 60 ? 'Risk' : 'Critical';
+
     return (
         <>
             <div
@@ -562,9 +591,41 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                     })()}
                 </div>
 
+                {/* ── Avance %% ── */}
+                <div className="flex items-center justify-center" onClick={e => e.stopPropagation()}>
+                    <div className="flex flex-col items-center gap-0.5 w-full px-1">
+                        <span className="text-[11px] font-black" style={{ color: progressColor }}>{progressPct}%</span>
+                        <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progressPct}%`, background: progressColor }} />
+                        </div>
+                    </div>
+                </div>
 
+                {/* ── Health Score ── */}
+                <div className="flex items-center justify-center" onClick={e => e.stopPropagation()}>
+                    {healthScore !== null ? (
+                        <div className="relative flex items-center justify-center" title={`${healthLabel} (${healthScore}/100)`}>
+                            <svg width="36" height="36" viewBox="0 0 36 36" className="-rotate-90">
+                                <circle cx="18" cy="18" r="14" fill="none" stroke="#1e293b" strokeWidth="4" />
+                                <circle
+                                    cx="18" cy="18" r="14" fill="none"
+                                    stroke={healthColor}
+                                    strokeWidth="4"
+                                    strokeDasharray={`${(healthScore / 100) * 87.96} 87.96`}
+                                    strokeLinecap="round"
+                                    className="transition-all duration-700"
+                                />
+                            </svg>
+                            <div className="absolute flex flex-col items-center leading-none">
+                                <span className="text-[9px] font-black" style={{ color: healthColor }}>{healthScore}</span>
+                            </div>
+                        </div>
+                    ) : (
+                        <span className="text-[11px] text-slate-600">—</span>
+                    )}
+                </div>
 
-                {/* Timeline — dates + bar */}
+                {/* Timeline */}
                 <div className="min-w-0 overflow-hidden flex flex-col items-center gap-1 py-1 px-1" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center gap-1 text-[11px] min-w-0">
                         {canEdit ? (
@@ -936,6 +997,8 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                             <div>Estado</div>
                             <div>Área</div>
                             <div>Tipo</div>
+                            <div>Avance</div>
+                            <div>Health</div>
                             <div>Timeline</div>
                             <div>Horas</div>
                             <div>Prioridad</div>
