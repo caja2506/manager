@@ -132,8 +132,12 @@ function InlineEditNumber({ value, onSave, suffix = 'h' }) {
     const [draft, setDraft] = useState(value || 0);
     const inputRef = useRef(null);
 
-    useEffect(() => { setDraft(value || 0); }, [value]);
-    useEffect(() => { if (editing && inputRef.current) { inputRef.current.focus(); inputRef.current.select(); } }, [editing]);
+    useEffect(() => {
+        if (editing && inputRef.current) {
+            inputRef.current.focus();
+            inputRef.current.select();
+        }
+    }, [editing]);
 
     const handleSave = () => {
         setEditing(false);
@@ -143,7 +147,10 @@ function InlineEditNumber({ value, onSave, suffix = 'h' }) {
 
     if (!editing) {
         return (
-            <span onClick={e => { e.stopPropagation(); setEditing(true); }} className="cursor-text hover:bg-slate-800/60 rounded px-0.5 transition-colors text-slate-500">
+            <span
+                onClick={e => { e.stopPropagation(); setDraft(value || 0); setEditing(true); }}
+                className="cursor-text hover:bg-slate-800/60 rounded px-0.5 transition-colors text-slate-500"
+            >
                 {value ? `${value}${suffix}` : '—'}
             </span>
         );
@@ -360,7 +367,6 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
     const actual = task.actualHours || 0;
     const estimated = task.estimatedHours || 0;
     const hoursPct = estimated > 0 ? Math.min(100, Math.round((actual / estimated) * 100)) : 0;
-    const hoursColor = hoursPct > 100 ? '#ef4444' : hoursPct > 80 ? '#f59e0b' : '#22c55e';
 
     const fmtDate = (d) => d ? d.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' }) : '—';
 
@@ -371,23 +377,40 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                 className={`grid items-center px-3 py-2 transition-all duration-150 hover:bg-indigo-500/[.06] group/row ${!isLast ? 'border-b border-slate-800/30' : ''}`}
                 style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${groupColor}` }}
             >
-                {/* Open detail button */}
-                <button onClick={(e) => { e.stopPropagation(); onOpenModal(task); }} className="text-slate-700 hover:text-indigo-400 transition-colors" title="Abrir detalle">
+                {/* Open detail icon */}
+                <button onClick={(e) => { e.stopPropagation(); onOpenModal(task); }} className="text-slate-700 hover:text-indigo-400 transition-colors shrink-0" title="Abrir detalle">
                     <Maximize2 className="w-3.5 h-3.5" />
                 </button>
 
-                {/* Task Name */}
-                <div className="pr-2 min-w-0">
-                    {canEdit ? (
-                        <InlineEditText
-                            value={task.title || ''}
-                            onSave={v => saveField('title', v)}
-                            className={`text-sm font-semibold text-slate-200 truncate ${isSaved('title') ? 'bg-emerald-500/10' : ''}`}
-                            placeholder="Sin título"
-                        />
+                {/* Task Name + subtask expand chevron */}
+                <div className="pr-2 min-w-0 flex items-center gap-1">
+                    {/* Chevron — solo si tiene subtareas */}
+                    {totalSubs > 0 ? (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setExpandedSubs(!expandedSubs); }}
+                            className="shrink-0 text-slate-500 hover:text-slate-200 transition-colors"
+                            title={expandedSubs ? 'Ocultar subtareas' : 'Ver subtareas'}
+                        >
+                            {expandedSubs
+                                ? <ChevronDown className="w-3.5 h-3.5" />
+                                : <ChevronRight className="w-3.5 h-3.5" />
+                            }
+                        </button>
                     ) : (
-                        <p className="text-sm font-semibold text-slate-200 truncate">{task.title || 'Sin título'}</p>
+                        <span className="w-3.5 shrink-0" />
                     )}
+                    <div className="min-w-0 flex-1">
+                        {canEdit ? (
+                            <InlineEditText
+                                value={task.title || ''}
+                                onSave={v => saveField('title', v)}
+                                className={`text-sm font-semibold text-slate-200 truncate ${isSaved('title') ? 'bg-emerald-500/10' : ''}`}
+                                placeholder="Sin título"
+                            />
+                        ) : (
+                            <p className="text-sm font-semibold text-slate-200 truncate">{task.title || 'Sin título'}</p>
+                        )}
+                    </div>
                 </div>
 
                 {/* Owner */}
@@ -429,19 +452,15 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                     )}
                 </div>
 
-                {/* Progress — subtasks bar with expandable chevron */}
-                <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                {/* Progress — clean bar, no chevron here */}
+                <div className="flex items-center gap-1.5 px-1" onClick={e => e.stopPropagation()}>
                     {totalSubs > 0 ? (
-                        <button onClick={() => setExpandedSubs(!expandedSubs)} className="flex items-center gap-1.5 w-full hover:bg-slate-800/40 rounded px-1 py-0.5 transition-colors group/prog">
-                            {expandedSubs
-                                ? <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
-                                : <ChevronRight className="w-3 h-3 text-slate-500 shrink-0" />
-                            }
+                        <div className="flex items-center gap-1.5 w-full">
                             <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
                                 <div className="h-full rounded-full transition-all duration-500" style={{ width: `${subsPct}%`, background: subsColor }} />
                             </div>
                             <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap">{doneSubs}/{totalSubs}</span>
-                        </button>
+                        </div>
                     ) : (
                         <span className="text-[10px] text-slate-600 px-1">—</span>
                     )}
