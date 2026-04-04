@@ -30,8 +30,8 @@ const STATUS_GROUPS = [
     { status: TASK_STATUS.CANCELLED,   label: 'Cancelado',   color: '#6b7280' },
 ];
 
-// 10-column grid: Open | Task | Owner | Status | Tipo | Progress | Timeline | Hours | Priority | Project
-const GRID_COLS = '28px 1fr 40px 100px 80px 85px minmax(130px,170px) minmax(95px,120px) 70px 90px';
+// 11-column grid: Open | Task | Owner | Status | Área | Tipo | Progress | Timeline | Hours | Priority | Project
+const GRID_COLS = '28px 1fr 40px 95px 80px 80px 80px minmax(120px,160px) minmax(80px,110px) 65px 80px';
 
 // ============================================================
 // SAVE FEEDBACK HOOK
@@ -334,7 +334,7 @@ function SubtaskExpander({ subtasks, taskId, canEdit }) {
 // TASK ROW
 // ============================================================
 
-function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModal, groupColor, isLast, savedField, onSaved, taskTypes }) {
+function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModal, groupColor, isLast, savedField, onSaved, taskTypes, workAreaTypes }) {
     const [expandedSubs, setExpandedSubs] = useState(false);
 
     const saveField = useCallback(async (field, value) => {
@@ -485,13 +485,53 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                     )}
                 </div>
 
-                {/* Tipo */}
+                {/* Área */}
                 <div className="min-w-0 overflow-hidden" onClick={e => e.stopPropagation()}>
                     {(() => {
+                        const wa = (workAreaTypes || []).find(a => a.id === task.workAreaTypeId);
+                        const areaOptions = [
+                            { value: '', label: 'Sin área' },
+                            ...(workAreaTypes || []).map(a => ({ value: a.id, label: a.name })),
+                        ];
+                        return canEdit ? (
+                            <InlineDropdown
+                                value={task.workAreaTypeId || ''}
+                                options={areaOptions}
+                                onSelect={v => {
+                                    saveField('workAreaTypeId', v || null);
+                                    // Clear taskTypeId if incompatible with new area
+                                    if (v && task.taskTypeId) {
+                                        const newArea = (workAreaTypes || []).find(a => a.id === v);
+                                        const allowedNames = newArea?.defaultTaskTypes || [];
+                                        const currentType = (taskTypes || []).find(t => t.id === task.taskTypeId);
+                                        if (currentType && allowedNames.length > 0 && !allowedNames.includes(currentType.name)) {
+                                            saveField('taskTypeId', null);
+                                        }
+                                    }
+                                }}
+                                renderValue={() => (
+                                    <span className="text-[10px] text-slate-400 truncate block">{wa?.name || '—'}</span>
+                                )}
+                            />
+                        ) : (
+                            <span className="text-[10px] text-slate-400 truncate block">{wa?.name || '—'}</span>
+                        );
+                    })()}
+                </div>
+
+                {/* Tipo (filtered by area) */}
+                <div className="min-w-0 overflow-hidden" onClick={e => e.stopPropagation()}>
+                    {(() => {
+                        const selectedArea = (workAreaTypes || []).find(a => a.id === task.workAreaTypeId);
+                        const allowedValues = selectedArea?.defaultTaskTypes || [];
+                        // Support both ID-based (V6) and name-based (legacy) values
+                        const filteredTypes = allowedValues.length > 0
+                            ? (taskTypes || []).filter(t => allowedValues.includes(t.id) || allowedValues.includes(t.name))
+                            : (taskTypes || []);
                         const tt = (taskTypes || []).find(t => t.id === task.taskTypeId);
                         const typeOptions = [
                             { value: '', label: 'Sin tipo' },
-                            ...(taskTypes || []).map(t => ({ value: t.id, label: t.name })),
+                            ...filteredTypes.map(t => ({ value: t.id, label: t.name })),
                         ];
                         return canEdit ? (
                             <InlineDropdown
@@ -638,7 +678,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
 // MOBILE TASK CARD (Monday.com style)
 // ============================================================
 
-function MobileTaskCard({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModal, groupColor, taskTypes }) {
+function MobileTaskCard({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModal, groupColor, taskTypes, workAreaTypes }) {
     const [expandedSubs, setExpandedSubs] = useState(false);
 
     const project = engProjects.find(p => p.id === task.projectId);
@@ -717,13 +757,24 @@ function MobileTaskCard({ task, engProjects, teamMembers, subtasks, canEdit, onO
                 </span>
             </div>
 
-            {/* Row 2.5: Task Type */}
+            {/* Row 2.5: Area + Task Type */}
             {(() => {
+                const wa = (workAreaTypes || []).find(a => a.id === task.workAreaTypeId);
                 const tt = (taskTypes || []).find(t => t.id === task.taskTypeId);
-                return tt ? (
-                    <div className="flex items-center gap-2 text-xs">
-                        <span className="text-slate-500">Tipo</span>
-                        <span className="text-slate-300 font-medium">{tt.name}</span>
+                return (wa || tt) ? (
+                    <div className="flex items-center gap-3 text-xs">
+                        {wa && (
+                            <div className="flex items-center gap-1">
+                                <span className="text-slate-500">Área</span>
+                                <span className="text-teal-400 font-medium">{wa.name}</span>
+                            </div>
+                        )}
+                        {tt && (
+                            <div className="flex items-center gap-1">
+                                <span className="text-slate-500">Tipo</span>
+                                <span className="text-slate-300 font-medium">{tt.name}</span>
+                            </div>
+                        )}
                     </div>
                 ) : null;
             })()}
@@ -807,7 +858,7 @@ function MobileTaskCard({ task, engProjects, teamMembers, subtasks, canEdit, onO
 // TABLE GROUP (responsive: grid on desktop, cards on mobile)
 // ============================================================
 
-function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers, canEdit, onOpenModal, isExpanded, onToggle, savedField, onSaved, taskTypes }) {
+function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers, canEdit, onOpenModal, isExpanded, onToggle, savedField, onSaved, taskTypes, workAreaTypes }) {
     return (
         <div className="mb-4 animate-in fade-in duration-200">
             <button onClick={onToggle} className="flex items-center gap-2.5 w-full text-left px-2 py-2 rounded-lg hover:bg-slate-800/50 transition-colors group">
@@ -834,6 +885,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                             <div>Tarea</div>
                             <div className="text-center">Resp</div>
                             <div className="text-center">Estado</div>
+                            <div>Área</div>
                             <div>Tipo</div>
                             <div>Progreso</div>
                             <div>Timeline</div>
@@ -861,6 +913,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                     savedField={savedField}
                                     onSaved={onSaved}
                                     taskTypes={taskTypes}
+                                    workAreaTypes={workAreaTypes}
                                 />
                             ))
                         )}
@@ -884,6 +937,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                     onOpenModal={onOpenModal}
                                     groupColor={color}
                                     taskTypes={taskTypes}
+                                    workAreaTypes={workAreaTypes}
                                     onSaved={onSaved}
                                 />
                             ))
@@ -902,7 +956,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
 export default function MainTable() {
     const { user } = useAuth();
     const { canEdit, canDelete } = useRole();
-    const { engProjects, engTasks, engSubtasks, teamMembers, taskTypes } = useEngineeringData();
+    const { engProjects, engTasks, engSubtasks, teamMembers, taskTypes, workAreaTypes } = useEngineeringData();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
@@ -1039,6 +1093,7 @@ export default function MainTable() {
                             savedField={savedField}
                             onSaved={showSaved}
                             taskTypes={taskTypes}
+                            workAreaTypes={workAreaTypes}
                         />
                     );
                 })}

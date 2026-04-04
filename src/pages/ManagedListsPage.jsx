@@ -304,21 +304,28 @@ function AreaTaskTypeRelationSection({ workAreaTypes, taskTypes }) {
                 {/* Quick summary */}
                 <div className="p-4">
                     <div className="space-y-1">
-                        {(workAreaTypes || []).map(area => {
-                            const types = area.defaultTaskTypes || [];
+                    {(workAreaTypes || []).map(area => {
+                            const rawTypes = area.defaultTaskTypes || [];
+                            // Resolve: if value is an ID, find name; if it's already a name, show it
+                            const resolvedTypes = rawTypes.map(val => {
+                                const byId = (taskTypes || []).find(t => t.id === val);
+                                if (byId) return byId.name;
+                                // Legacy: value is already a name
+                                return val;
+                            });
                             return (
                                 <div key={area.id} className="flex items-center gap-3 px-3 py-2 bg-slate-800/30 rounded-lg">
                                     <div className="w-2 h-2 bg-teal-500 rounded-full flex-shrink-0" />
                                     <span className="text-sm font-semibold text-slate-200 min-w-[90px]">{area.name}</span>
                                     <div className="flex flex-wrap gap-1 flex-1 min-w-0">
-                                        {types.length > 0 ? types.map(tt => (
+                                        {resolvedTypes.length > 0 ? resolvedTypes.map(tt => (
                                             <span key={tt} className="px-2 py-0.5 text-[10px] font-semibold rounded border border-teal-500/30 bg-teal-500/10 text-teal-300 whitespace-nowrap">{tt}</span>
                                         )) : (
                                             <span className="text-[10px] text-slate-500 italic">sin asignar</span>
                                         )}
                                     </div>
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded flex-shrink-0 ${types.length > 0 ? 'text-teal-400 bg-teal-500/10' : 'text-amber-400 bg-amber-500/10'}`}>
-                                        {types.length}
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded flex-shrink-0 ${resolvedTypes.length > 0 ? 'text-teal-400 bg-teal-500/10' : 'text-amber-400 bg-amber-500/10'}`}>
+                                        {resolvedTypes.length}
                                     </span>
                                 </div>
                             );

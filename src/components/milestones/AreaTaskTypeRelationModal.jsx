@@ -2,36 +2,63 @@
  * AreaTaskTypeRelationModal — Shared popup for configuring
  * Area ↔ Task Type relationships.
  *
- * V5: Now writes to per-milestone workAreas.taskTypeIds[] (persisted mapping).
- * Falls back to global workAreaTypes.defaultTaskTypes if no per-milestone areas.
+ * V6: CRITICAL FIX — Now stores TASK TYPE IDs instead of names.
+ * This ensures renaming a task type doesn't break relationships.
+ * All internal logic uses IDs; names are resolved only for display.
  *
  * Used from: ManagedListsPage and MilestoneDetailPage.
  */
 import React, { useState, useEffect } from 'react';
-import { X, Search, Compass, ChevronDown } from 'lucide-react';
+import { X, Search, Compass, ChevronDown, AlertTriangle } from 'lucide-react';
 import { updateWorkAreaTypeMapping, updateWorkAreaTaskTypes } from '../../services/workAreaService';
+
+/**
+ * Migrate legacy name-based mappings to ID-based.
+ * If a stored value is NOT found in taskType IDs but IS found as a name,
+ * it's a legacy name entry → replace with the corresponding ID.
+ */
+function migrateToIds(storedValues, taskTypes) {
+    if (!storedValues || storedValues.length === 0) return [];
+    const idSet = new Set(taskTypes.map(t => t.id));
+    const nameToId = {};
+    taskTypes.forEach(t => { nameToId[t.name] = t.id; });
+
+    return storedValues.map(val => {
+        if (idSet.has(val)) return val;           // Already an ID
+        if (nameToId[val]) return nameToId[val];   // Legacy name → convert to ID
+        return null;                                // Orphan — discard
+    }).filter(Boolean);
+}
 
 export default function AreaTaskTypeRelationModal({ open, onClose, workAreaTypes, workAreas, taskTypes }) {
     const [localMapping, setLocalMapping] = useState({});
     const [isSaving, setIsSaving] = useState(false);
     const [expandedArea, setExpandedArea] = useState(null);
     const [searchByArea, setSearchByArea] = useState({});
+    const [migrated, setMigrated] = useState(false);
 
-    const allTaskTypeNames = (taskTypes || []).map(t => t.name);
+    const allTypes = taskTypes || [];
 
     // V5: Prefer per-milestone workAreas, fall back to global workAreaTypes
     const areas = (workAreas && workAreas.length > 0) ? workAreas : (workAreaTypes || []);
     const isPerMilestone = !!(workAreas && workAreas.length > 0);
 
-    // Init mapping when opened
+    // Init mapping when opened — migrate names → IDs
     useEffect(() => {
         if (open) {
             const mapping = {};
+            let didMigrate = false;
             areas.forEach(area => {
-                // V5: Prefer taskTypeIds, fall back to defaultTaskTypes or taskFilter.typeMatch
-                mapping[area.id] = area.taskTypeIds || area.defaultTaskTypes || area.taskFilter?.typeMatch || [];
+                const raw = area.taskTypeIds || area.defaultTaskTypes || area.taskFilter?.typeMatch || [];
+                const ids = migrateToIds(raw, allTypes);
+                mapping[area.id] = ids;
+                // Detect if migration happened
+                if (raw.length > 0 && JSON.stringify(raw.sort()) !== JSON.stringify(ids.sort())) {
+                    didMigrate = true;
+                }
             });
             setLocalMapping(mapping);
+            setMigrated(didMigrate);
             setExpandedArea(null);
             setSearchByArea({});
         }
@@ -39,27 +66,31 @@ export default function AreaTaskTypeRelationModal({ open, onClose, workAreaTypes
 
     if (!open) return null;
 
-    const toggleType = (areaId, typeName) => {
+    const toggleType = (areaId, typeId) => {
         setLocalMapping(prev => {
             const current = prev[areaId] || [];
-            const updated = current.includes(typeName)
-                ? current.filter(t => t !== typeName)
-                : [...current, typeName];
+            const updated = current.includes(typeId)
+                ? current.filter(t => t !== typeId)
+                : [...current, typeId];
             return { ...prev, [areaId]: updated };
         });
+    };
+
+    const resolveTypeName = (typeId) => {
+        const t = allTypes.find(tt => tt.id === typeId);
+        return t?.name || typeId;
     };
 
     const handleSave = async () => {
         setIsSaving(true);
         try {
             for (const area of areas) {
-                const types = localMapping[area.id] || [];
+                const typeIds = localMapping[area.id] || [];
                 if (isPerMilestone) {
-                    // V5: Write to per-milestone work area
-                    await updateWorkAreaTaskTypes(area.id, types);
+                    await updateWorkAreaTaskTypes(area.id, typeIds);
                 } else {
-                    // Global fallback
-                    await updateWorkAreaTypeMapping(area.id, types);
+                    // V6: Save IDs, not names
+                    await updateWorkAreaTypeMapping(area.id, typeIds);
                 }
             }
             onClose();
@@ -137,6 +168,25 @@ export default function AreaTaskTypeRelationModal({ open, onClose, workAreaTypes
                     </button>
                 </div>
 
+                {/* Migration banner */}
+                {migrated && (
+                    <div style={{
+                        margin: '12px 24px 0',
+                        padding: '10px 14px',
+                        background: 'rgba(245,158,11,0.1)',
+                        border: '1px solid rgba(245,158,11,0.3)',
+                        borderRadius: '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                    }}>
+                        <AlertTriangle size={16} color="#f59e0b" style={{ flexShrink: 0 }} />
+                        <p style={{ color: '#fbbf24', fontSize: '11px', fontWeight: 500, margin: 0 }}>
+                            Se detectaron relaciones por nombre (texto plano). Al guardar se migrarán a <b>IDs</b> para mantener integridad referencial.
+                        </p>
+                    </div>
+                )}
+
                 {/* Body — scrollable */}
                 <div style={{
                     padding: '16px 24px',
@@ -150,11 +200,11 @@ export default function AreaTaskTypeRelationModal({ open, onClose, workAreaTypes
                     )}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         {areas.map(area => {
-                            const currentTypes = localMapping[area.id] || [];
+                            const currentTypeIds = localMapping[area.id] || [];
                             const isOpen = expandedArea === area.id;
                             const search = getSearch(area.id);
-                            const filteredTypes = allTaskTypeNames.filter(t =>
-                                t.toLowerCase().includes(search.toLowerCase())
+                            const filteredTypes = allTypes.filter(t =>
+                                t.name.toLowerCase().includes(search.toLowerCase())
                             );
 
                             return (
@@ -184,13 +234,13 @@ export default function AreaTaskTypeRelationModal({ open, onClose, workAreaTypes
                                             {area.name}
                                         </span>
 
-                                        {/* Inline summary chips */}
+                                        {/* Inline summary chips — resolved from IDs */}
                                         <div style={{
                                             display: 'flex', flexWrap: 'wrap', gap: '4px',
                                             flex: 1, minWidth: 0,
                                         }}>
-                                            {currentTypes.length > 0 ? currentTypes.map(tt => (
-                                                <span key={tt} style={{
+                                            {currentTypeIds.length > 0 ? currentTypeIds.map(tid => (
+                                                <span key={tid} style={{
                                                     padding: '2px 8px',
                                                     fontSize: '10px',
                                                     fontWeight: 600,
@@ -200,7 +250,7 @@ export default function AreaTaskTypeRelationModal({ open, onClose, workAreaTypes
                                                     color: '#5eead4',
                                                     whiteSpace: 'nowrap',
                                                 }}>
-                                                    {tt}
+                                                    {resolveTypeName(tid)}
                                                 </span>
                                             )) : (
                                                 <span style={{ fontSize: '10px', color: '#64748b', fontStyle: 'italic' }}>
@@ -213,10 +263,10 @@ export default function AreaTaskTypeRelationModal({ open, onClose, workAreaTypes
                                         <span style={{
                                             fontSize: '10px', fontWeight: 700,
                                             padding: '2px 8px', borderRadius: '4px', flexShrink: 0,
-                                            background: currentTypes.length > 0 ? 'rgba(20,184,166,0.1)' : 'rgba(245,158,11,0.1)',
-                                            color: currentTypes.length > 0 ? '#14b8a6' : '#f59e0b',
+                                            background: currentTypeIds.length > 0 ? 'rgba(20,184,166,0.1)' : 'rgba(245,158,11,0.1)',
+                                            color: currentTypeIds.length > 0 ? '#14b8a6' : '#f59e0b',
                                         }}>
-                                            {currentTypes.length}
+                                            {currentTypeIds.length}
                                         </span>
 
                                         {/* Chevron */}
@@ -243,7 +293,7 @@ export default function AreaTaskTypeRelationModal({ open, onClose, workAreaTypes
                                             border: '1px solid rgba(20,184,166,0.1)',
                                         }}>
                                             {/* Search filter */}
-                                            {allTaskTypeNames.length > 0 && (
+                                            {allTypes.length > 0 && (
                                                 <div style={{ position: 'relative', marginBottom: '10px' }}>
                                                     <Search
                                                         size={12}
@@ -282,11 +332,11 @@ export default function AreaTaskTypeRelationModal({ open, onClose, workAreaTypes
 
                                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                                                 {filteredTypes.map(tt => {
-                                                    const isOn = currentTypes.includes(tt);
+                                                    const isOn = currentTypeIds.includes(tt.id);
                                                     return (
                                                         <button
-                                                            key={tt}
-                                                            onClick={e => { e.stopPropagation(); toggleType(area.id, tt); }}
+                                                            key={tt.id}
+                                                            onClick={e => { e.stopPropagation(); toggleType(area.id, tt.id); }}
                                                             style={{
                                                                 padding: '5px 12px',
                                                                 fontSize: '11px',
@@ -299,7 +349,7 @@ export default function AreaTaskTypeRelationModal({ open, onClose, workAreaTypes
                                                                 color: isOn ? '#5eead4' : '#94a3b8',
                                                             }}
                                                         >
-                                                            {isOn && '✓ '}{tt}
+                                                            {isOn && '✓ '}{tt.name}
                                                         </button>
                                                     );
                                                 })}
@@ -310,7 +360,7 @@ export default function AreaTaskTypeRelationModal({ open, onClose, workAreaTypes
                                                 )}
                                             </div>
 
-                                            {currentTypes.length === 0 && (
+                                            {currentTypeIds.length === 0 && (
                                                 <p style={{
                                                     color: '#f59e0b', fontSize: '10px', fontStyle: 'italic',
                                                     margin: '8px 0 0',
