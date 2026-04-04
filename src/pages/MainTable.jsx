@@ -31,7 +31,7 @@ const STATUS_GROUPS = [
 ];
 
 // 10-column grid: ☐ | Task | Owner | Status | Área | Tipo | Timeline | Hours | Priority | Project
-const GRID_COLS = '28px minmax(120px,1fr) 36px 90px 72px 72px minmax(100px,150px) minmax(70px,100px) 80px 72px';
+const GRID_COLS = '28px minmax(120px,280px) 36px 90px 72px 72px minmax(100px,150px) minmax(70px,100px) 80px 72px';
 
 // ============================================================
 // SAVE FEEDBACK HOOK
