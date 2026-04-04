@@ -31,7 +31,7 @@ const STATUS_GROUPS = [
 ];
 
 // 9-column grid: Open | Task | Owner | Status | Progress | Timeline | Hours | Priority | Project
-const GRID_COLS = '28px 1fr 44px 110px 100px minmax(140px,180px) 90px 75px 100px';
+const GRID_COLS = '28px 1fr 44px 110px 95px minmax(150px,200px) minmax(100px,130px) 75px 100px';
 
 // ============================================================
 // SAVE FEEDBACK HOOK
@@ -499,55 +499,65 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                     )}
                 </div>
 
-                {/* Timeline — dates + bar + days */}
-                <div className="flex flex-col gap-0.5" onClick={e => e.stopPropagation()}>
-                    <div className="flex items-center gap-1 text-[10px]">
+                {/* Timeline — dates + bar + days badge */}
+                <div className="flex flex-col gap-1 py-0.5" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center gap-1.5 text-[11px]">
                         {canEdit ? (
                             <>
                                 <InlineDatePicker value={startRaw} onSave={v => saveField('plannedStartDate', v)} />
-                                <span className="text-slate-700">→</span>
+                                <span className="text-slate-600">→</span>
                                 <InlineDatePicker value={endRaw} onSave={v => saveField('dueDate', v)} />
                             </>
                         ) : (
-                            <span className="text-slate-500">{fmtDate(startDate)} → {fmtDate(endDate)}</span>
+                            <span className="text-slate-400">{fmtDate(startDate)} → {fmtDate(endDate)}</span>
                         )}
                         {daysLeft !== null && (
-                            <span className={`text-[9px] font-bold ml-auto px-1 rounded ${
-                                daysLeft < 0 && task.status !== 'completed' ? 'text-rose-400 bg-rose-500/10' :
-                                daysLeft <= 3 ? 'text-amber-400' : 'text-slate-600'
+                            <span className={`text-[10px] font-bold ml-auto px-1.5 py-0.5 rounded ${
+                                daysLeft < 0 && task.status !== 'completed' ? 'text-rose-400 bg-rose-500/15' :
+                                daysLeft <= 3 ? 'text-amber-400 bg-amber-500/10' : 'text-slate-500'
                             }`}>
                                 {task.status === 'completed' ? '✓' : daysLeft < 0 ? `${Math.abs(daysLeft)}d late` : `${daysLeft}d`}
                             </span>
                         )}
                     </div>
                     {startDate && endDate && (
-                        <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
                             <div className="h-full rounded-full transition-all duration-700" style={{ width: `${timelinePct}%`, background: timelineColor }} />
                         </div>
                     )}
                 </div>
 
-                {/* Hours — separate column */}
-                <div className="flex flex-col gap-0.5 justify-center" onClick={e => e.stopPropagation()}>
+                {/* Hours — own column with bar */}
+                <div className="flex flex-col gap-1 py-0.5" onClick={e => e.stopPropagation()}>
                     {(actual > 0 || estimated > 0) ? (
                         <>
-                            <div className="flex items-center gap-0.5 text-[10px]">
-                                <span className="text-slate-300 font-bold">{actual.toFixed(1)}</span>
-                                <span className="text-slate-700">/</span>
+                            <div className="flex items-center gap-1 text-[11px]">
+                                <span className="text-white font-bold">{actual.toFixed(1)}h</span>
+                                <span className="text-slate-600">/</span>
                                 {canEdit ? (
                                     <InlineEditNumber value={estimated} onSave={v => saveField('estimatedHours', v)} />
                                 ) : (
-                                    <span className="text-slate-500">{estimated}h</span>
+                                    <span className="text-slate-400">{estimated}h</span>
+                                )}
+                                {estimated > 0 && (
+                                    <span className={`text-[10px] font-bold ml-auto ${
+                                        hoursPct > 100 ? 'text-rose-400' : hoursPct > 80 ? 'text-amber-400' : 'text-emerald-400'
+                                    }`}>
+                                        {hoursPct}%
+                                    </span>
                                 )}
                             </div>
                             {estimated > 0 && (
-                                <span className={`text-[9px] font-bold ${hoursPct > 100 ? 'text-rose-400' : hoursPct > 80 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                                    ({hoursPct}%)
-                                </span>
+                                <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                                    <div className="h-full rounded-full transition-all duration-500" style={{
+                                        width: `${Math.min(hoursPct, 100)}%`,
+                                        background: hoursPct > 100 ? '#ef4444' : hoursPct > 80 ? '#f59e0b' : '#22c55e',
+                                    }} />
+                                </div>
                             )}
                         </>
                     ) : (
-                        <span className="text-[10px] text-slate-600">—</span>
+                        <span className="text-[11px] text-slate-600">—</span>
                     )}
                 </div>
 
