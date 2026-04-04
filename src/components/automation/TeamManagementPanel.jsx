@@ -11,7 +11,7 @@ import {
     createInitialAssignment,
     reassignTechnician,
 } from '../../services/resourceAssignmentService';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '../../contexts/AuthContext';
 
 const functions = getFunctions();
 
