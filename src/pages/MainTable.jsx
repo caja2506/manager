@@ -366,7 +366,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
     // Hours
     const actual = task.actualHours || 0;
     const estimated = task.estimatedHours || 0;
-    const hoursPct = estimated > 0 ? Math.min(100, Math.round((actual / estimated) * 100)) : 0;
+    const hoursPct = estimated > 0 ? Math.round((actual / estimated) * 100) : 0;
 
     const fmtDate = (d) => d ? d.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' }) : '—';
 
