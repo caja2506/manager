@@ -1256,11 +1256,7 @@ export default function MainTable() {
                 )}
             </div>
 
-            <div className="flex items-center justify-between px-6 py-1.5">
-                <p className="text-[11px] text-slate-500">
-                    {filteredTasks.length} tareas
-                    {activeFilterCount > 0 && <span className="text-indigo-400 ml-1">({activeFilterCount} filtros activos)</span>}
-                </p>
+            <div className="flex justify-end px-6 py-1">
                 <button
                     onClick={() => {
                         const allExpanded = STATUS_GROUPS.every(g => !collapsedGroups[g.status]);
@@ -1268,9 +1264,9 @@ export default function MainTable() {
                         STATUS_GROUPS.forEach(g => { ns[g.status] = allExpanded; });
                         setCollapsedGroups(ns);
                     }}
-                    className="text-[10px] text-slate-500 hover:text-slate-300 font-semibold px-2 py-1 rounded-lg hover:bg-slate-800/60"
+                    className="text-[10px] text-slate-600 hover:text-slate-300 font-semibold px-2 py-1 rounded-lg hover:bg-slate-800/60 transition-colors"
                 >
-                    {STATUS_GROUPS.every(g => !collapsedGroups[g.status]) ? 'Colapsar' : 'Expandir'}
+                    {STATUS_GROUPS.every(g => !collapsedGroups[g.status]) ? 'Colapsar todo' : 'Expandir todo'}
                 </button>
             </div>
 
