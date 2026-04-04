@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
 import { useEngineeringData } from '../hooks/useEngineeringData';
@@ -90,34 +91,66 @@ function InlineEditText({ value, onSave, className = '', placeholder = '' }) {
 
 function InlineDropdown({ value, options, onSelect, renderValue, className = '' }) {
     const [open, setOpen] = useState(false);
-    const ref = useRef(null);
+    const triggerRef = useRef(null);
+    const menuRef = useRef(null);
+    const [pos, setPos] = useState({ top: 0, left: 0, openUp: false });
 
     useEffect(() => {
         if (!open) return;
-        const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+        const handler = (e) => {
+            if (triggerRef.current?.contains(e.target)) return;
+            if (menuRef.current?.contains(e.target)) return;
+            setOpen(false);
+        };
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
     }, [open]);
 
+    const handleOpen = () => {
+        if (open) { setOpen(false); return; }
+        if (triggerRef.current) {
+            const rect = triggerRef.current.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const openUp = spaceBelow < 220;
+            setPos({
+                top: openUp ? rect.top : rect.bottom + 4,
+                left: rect.left,
+                openUp,
+            });
+        }
+        setOpen(true);
+    };
+
     return (
-        <div ref={ref} className={`relative ${className}`} onClick={e => e.stopPropagation()}>
-            <button onClick={() => setOpen(!open)} className="w-full hover:bg-slate-800/60 rounded transition-colors">
+        <div className={`relative ${className}`} onClick={e => e.stopPropagation()}>
+            <button ref={triggerRef} onClick={handleOpen} className="w-full hover:bg-slate-800/60 rounded transition-colors">
                 {renderValue(value)}
             </button>
-            {open && (
-                <div className="absolute z-50 top-full left-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-2xl py-1 min-w-[140px] max-h-[200px] overflow-auto animate-in fade-in zoom-in-95 duration-150">
+            {open && createPortal(
+                <div
+                    ref={menuRef}
+                    className="fixed bg-slate-800 border border-slate-700 rounded-lg shadow-2xl py-1 min-w-[160px] max-h-[220px] overflow-auto animate-in fade-in zoom-in-95 duration-150"
+                    style={{
+                        zIndex: 9999,
+                        left: pos.left,
+                        ...(pos.openUp
+                            ? { bottom: window.innerHeight - pos.top + 4 }
+                            : { top: pos.top }),
+                    }}
+                >
                     {options.map(opt => (
                         <button
                             key={opt.value}
                             onClick={() => { onSelect(opt.value); setOpen(false); }}
-                            className={`w-full text-left px-3 py-1.5 text-xs font-medium hover:bg-slate-700/80 flex items-center gap-2 transition-colors ${opt.value === value ? 'text-indigo-400 bg-indigo-500/10' : 'text-slate-300'}`}
+                            className={`w-full text-left px-3 py-2 text-xs font-medium hover:bg-slate-700/80 flex items-center gap-2 transition-colors ${opt.value === value ? 'text-indigo-400 bg-indigo-500/10' : 'text-slate-300'}`}
                         >
                             {opt.color && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: opt.color }} />}
                             {opt.label}
                             {opt.value === value && <Check className="w-3 h-3 ml-auto text-indigo-400" />}
                         </button>
                     ))}
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
