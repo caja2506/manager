@@ -577,5 +577,14 @@ service cloud.firestore {
       // NO update or delete — immutable history
     }
 
+    // --- resourceAssignments ---
+    // Engineer→Technician assignments managed by admin/editors
+    // Any authenticated user can read (global rule)
+    match /resourceAssignments/{docId} {
+      allow create: if isEditor();
+      allow update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
   }
 }
