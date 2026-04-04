@@ -140,6 +140,101 @@ function ScoreRing({ score, size = 80, strokeWidth = 6, color }) {
     );
 }
 
+// ── Dimension insight generator (human-readable explanations) ──
+function getDimensionInsight(key, dim) {
+    const raw = dim.raw || {};
+    const score = dim.score;
+
+    switch (key) {
+        case 'velocity': {
+            const completed = raw.tasksCompleted || 0;
+            const expected = raw.expected || 0;
+            const progress = raw.avgProgress || 0;
+            const overrun = raw.avgOverrun || 0;
+
+            if (score >= 90) {
+                return { icon: '⚡', title: 'Velocidad', message: `Excelente ritmo. ${completed} tarea(s) completada(s) de ${expected} esperada(s) esta semana.` };
+            }
+            const parts = [];
+            if (completed === 0 && expected > 0) parts.push(`No completaste ninguna tarea de las ${expected} esperadas`);
+            else if (completed < expected) parts.push(`Solo completaste ${completed} de ${expected} tareas esperadas`);
+            if (progress > 0 && progress < 70) parts.push(`el avance promedio en subtareas es ${progress.toFixed(0)}%`);
+            if (overrun > 1.5) parts.push(`el tiempo usado es ${(overrun * 100).toFixed(0)}% del estimado`);
+            return { icon: '⚡', title: 'Velocidad', message: parts.length > 0 ? parts.join('. Además, ') + '.' : `Completaste ${completed} de ${expected} tareas. Avance en subtareas: ${progress.toFixed(0)}%.` };
+        }
+
+        case 'discipline': {
+            const missed = raw.missedTimelogs || 0;
+            const stale = raw.staleUpdates || 0;
+
+            if (score >= 90) {
+                return { icon: '🛡️', title: 'Disciplina', message: 'Registros de tiempo al día y tareas actualizadas. ¡Sigue así!' };
+            }
+            const parts = [];
+            if (missed > 0) parts.push(`${missed} tarea(s) en progreso sin registro de tiempo en los últimos 3 días`);
+            if (stale > 0) parts.push(`${stale} tarea(s) activa(s) sin actualizar en más de 5 días`);
+            return { icon: '🛡️', title: 'Disciplina', message: parts.join('. ') + '. Actualiza tus tareas y registra tu tiempo diariamente.' };
+        }
+
+        case 'capacity': {
+            const pct = raw.utilizationPct || 0;
+            const hours = raw.hoursLogged || 0;
+
+            if (score >= 90) {
+                return { icon: '📊', title: 'Capacidad', message: `Utilización óptima del ${pct.toFixed(0)}% con ${hours.toFixed(1)}h registradas esta semana.` };
+            }
+            if (pct < 50) return { icon: '📊', title: 'Capacidad', message: `Utilización baja: ${pct.toFixed(0)}% (${hours.toFixed(1)}h). El equipo puede estar subutilizado. Revisa la asignación de tareas.` };
+            if (pct > 110) return { icon: '📊', title: 'Capacidad', message: `Sobrecarga: ${pct.toFixed(0)}% de utilización (${hours.toFixed(1)}h). Riesgo de burnout. Redistribuye la carga.` };
+            return { icon: '📊', title: 'Capacidad', message: `Utilización del ${pct.toFixed(0)}% con ${hours.toFixed(1)}h. Meta ideal: 80%.` };
+        }
+
+        case 'precision': {
+            const ratio = raw.estimationRatio || 0;
+            const evaluated = raw.tasksEvaluated || 0;
+            const worst = raw.worstOverrun || 0;
+
+            if (evaluated === 0) return { icon: '🎯', title: 'Precisión', message: 'Sin tareas con datos de estimación para evaluar.' };
+            if (score >= 90) return { icon: '🎯', title: 'Precisión', message: `Excelente precisión. Ratio estimación/real: ${(ratio * 100).toFixed(0)}% en ${evaluated} tarea(s).` };
+            if (ratio > 2.0) return { icon: '🎯', title: 'Precisión', message: `Usaste ${(ratio * 100).toFixed(0)}% del tiempo estimado (${evaluated} tareas). El peor caso consumió ${(worst * 100).toFixed(0)}% del estimado. Revisa si las estimaciones son realistas o si hay bloqueos no reportados.` };
+            if (ratio > 1.3) return { icon: '🎯', title: 'Precisión', message: `Tiempo real excede el estimado por ${((ratio - 1) * 100).toFixed(0)}% en ${evaluated} tarea(s). Comunica bloqueos temprano para ajustar los planes.` };
+            if (ratio < 0.6) return { icon: '🎯', title: 'Precisión', message: `Terminaste en solo ${(ratio * 100).toFixed(0)}% del tiempo estimado. ¿Están las estimaciones infladas?` };
+            return { icon: '🎯', title: 'Precisión', message: `Ratio estimación/real: ${(ratio * 100).toFixed(0)}% en ${evaluated} tarea(s).` };
+        }
+
+        case 'collaboration': {
+            const blocked = raw.blockedTasks || 0;
+            const delays = raw.unresolvedDelays || 0;
+
+            if (score >= 90) return { icon: '🤝', title: 'Colaboración', message: 'Sin tareas bloqueadas ni retrasos pendientes. Buen trabajo de equipo.' };
+            const parts = [];
+            if (blocked > 0) parts.push(`${blocked} tarea(s) bloqueada(s) — reporta el bloqueo a tu ingeniero`);
+            if (delays > 0) parts.push(`${delays} retraso(s) sin resolver`);
+            return { icon: '🤝', title: 'Colaboración', message: parts.join('. ') + '.' };
+        }
+
+        case 'leadership': {
+            const techs = raw.techniciansManaged || 0;
+            const noTasks = raw.techsWithoutTasks || 0;
+            const techBlocked = raw.techsBlockedUnresolved || 0;
+
+            if (techs === 0) return { icon: '⭐', title: 'Liderazgo', message: 'Sin técnicos asignados actualmente.' };
+            if (score >= 90) return { icon: '⭐', title: 'Liderazgo', message: `${techs} técnico(s) supervisados. Todos con tareas activas y sin bloqueos.` };
+            const parts = [];
+            if (noTasks > 0) parts.push(`${noTasks} técnico(s) sin tareas — asigna trabajo`);
+            if (techBlocked > 0) parts.push(`${techBlocked} técnico(s) con tareas bloqueadas — resuelve los bloqueos`);
+            return { icon: '⭐', title: 'Liderazgo', message: `${techs} técnicos supervisados. ${parts.join('. ')}.` };
+        }
+
+        case 'oversight': {
+            if (score >= 90) return { icon: '👁️', title: 'Supervisión', message: 'Compliance alto. El equipo mantiene datos de calidad.' };
+            return { icon: '👁️', title: 'Supervisión', message: 'Hay oportunidades de mejora en el compliance y calidad de datos del equipo.' };
+        }
+
+        default:
+            return null;
+    }
+}
+
 // ── Dimension bar ──
 function DimensionBar({ dimKey, dim }) {
     const meta = DIMENSION_META[dimKey] || { label: dimKey, icon: Target, desc: '' };
@@ -273,18 +368,27 @@ function ScoreCard({ person, index, isExpanded, onToggle, history }) {
                             <DimensionBar key={key} dimKey={key} dim={dim} />
                         ))}
                     </div>
-                    {/* Raw metrics summary */}
-                    <div className="mt-4 pt-3 border-t flex flex-wrap gap-3" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                    {/* ── Insights: Explain each score in human-readable language ── */}
+                    <div className="mt-4 pt-3 border-t space-y-2" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                        <div className="text-[10px] uppercase font-bold text-white/30 tracking-wider mb-2 flex items-center gap-1.5">
+                            <AlertTriangle size={10} /> ¿Por qué estos resultados?
+                        </div>
                         {dims.map(([key, dim]) => {
-                            const meta = DIMENSION_META[key];
-                            if (!meta) return null;
+                            const insight = getDimensionInsight(key, dim);
+                            if (!insight) return null;
                             return (
-                                <div key={key} className="text-[10px] text-white/30 flex items-center gap-1"
-                                    title={JSON.stringify(dim.raw, null, 2)}>
-                                    <span className="text-white/50">{meta.label}:</span>
-                                    {Object.entries(dim.raw || {}).slice(0, 2).map(([k, v]) => (
-                                        <span key={k} className="text-white/40">{k}={typeof v === 'number' ? v : '…'}</span>
-                                    ))}
+                                <div key={key} className="flex items-start gap-2 text-[11px] leading-relaxed rounded-lg px-3 py-2"
+                                    style={{
+                                        background: dim.score >= 80 ? 'rgba(16,185,129,0.06)' : dim.score >= 50 ? 'rgba(245,158,11,0.06)' : 'rgba(239,68,68,0.06)',
+                                        border: `1px solid ${dim.score >= 80 ? 'rgba(16,185,129,0.15)' : dim.score >= 50 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)'}`,
+                                    }}>
+                                    <span className="font-bold shrink-0 mt-px" style={{
+                                        color: dim.score >= 80 ? '#10b981' : dim.score >= 50 ? '#f59e0b' : '#ef4444',
+                                    }}>{insight.icon}</span>
+                                    <div>
+                                        <span className="text-white/70 font-semibold">{insight.title}: </span>
+                                        <span className="text-white/50">{insight.message}</span>
+                                    </div>
                                 </div>
                             );
                         })}
