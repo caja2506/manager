@@ -123,7 +123,7 @@ function InlineDropdown({ value, options, onSelect, renderValue, className = '' 
 
     return (
         <div className={`relative w-full h-full ${className}`} onClick={e => e.stopPropagation()}>
-            <button ref={triggerRef} onClick={handleOpen} className="w-full h-full hover:bg-slate-800/60 rounded transition-colors flex items-center">
+            <button ref={triggerRef} onClick={handleOpen} className="w-full h-full hover:bg-slate-800/60 rounded transition-colors flex items-center justify-center">
                 {renderValue(value)}
             </button>
             {open && createPortal(
