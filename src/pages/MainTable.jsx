@@ -794,8 +794,8 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                 </div>
 
                 {/* Timeline */}
-                <div className="min-w-0 overflow-hidden flex flex-col items-center gap-1 py-1 px-1" onClick={e => e.stopPropagation()}>
-                    <div className="flex items-center gap-1 text-[11px] min-w-0">
+                <div className="min-w-0 overflow-hidden flex flex-col items-center justify-end gap-1.5 py-1.5 px-1" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center justify-center gap-1.5 text-[11px] min-w-0 w-full mt-auto">
                         {canEdit ? (
                             <>
                                 {(canEditDates || !startRaw) ? (
@@ -814,7 +814,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                             <span className="text-slate-400 truncate">{fmtDate(startDate)} → {fmtDate(endDate)}</span>
                         )}
                         {daysLeft !== null && (
-                            <span className={`text-[11px] font-bold ml-auto shrink-0 px-1 rounded ${
+                            <span className={`text-[11px] font-bold shrink-0 px-1 rounded ${
                                 daysLeft < 0 && task.status !== 'completed' ? 'text-rose-400 bg-rose-500/15' :
                                 daysLeft <= 3 ? 'text-amber-400' : 'text-slate-500'
                             }`}>
@@ -823,17 +823,17 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                         )}
                     </div>
                     {startDate && endDate && (
-                        <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden shrink-0">
                             <div className="h-full rounded-full transition-all duration-700" style={{ width: `${timelinePct}%`, background: timelineColor }} />
                         </div>
                     )}
                 </div>
 
                 {/* Hours — own column with bar */}
-                <div className="min-w-0 overflow-hidden flex flex-col items-center gap-1 py-1 px-1" onClick={e => e.stopPropagation()}>
+                <div className="min-w-0 overflow-hidden flex flex-col items-center justify-end gap-1.5 py-1.5 px-1" onClick={e => e.stopPropagation()}>
                     {(actual > 0 || estimated > 0) ? (
                         <>
-                            <div className="flex items-center gap-1 text-[11px] min-w-0">
+                            <div className="flex items-center justify-center gap-1 text-[11px] min-w-0 w-full mt-auto">
                                 <span className="text-white font-bold shrink-0">{actual.toFixed(1)}h</span>
                                 <span className="text-slate-600 shrink-0">/</span>
                                 {canEdit ? (
@@ -842,7 +842,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                                     <span className="text-slate-400 shrink-0">{estimated}h</span>
                                 )}
                                 {estimated > 0 && (
-                                    <span className={`text-[11px] font-bold ml-auto shrink-0 ${
+                                    <span className={`text-[11px] font-bold shrink-0 ml-1 ${
                                         hoursPct > 100 ? 'text-rose-400' : hoursPct > 80 ? 'text-amber-400' : 'text-emerald-400'
                                     }`}>
                                         {hoursPct}%
