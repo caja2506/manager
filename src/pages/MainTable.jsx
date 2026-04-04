@@ -502,7 +502,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                 </div>
 
                 {/* Área */}
-                <div className="min-w-0 overflow-hidden" onClick={e => e.stopPropagation()}>
+                <div className="min-w-0 overflow-hidden flex items-center justify-center" onClick={e => e.stopPropagation()}>
                     {(() => {
                         const wa = (workAreaTypes || []).find(a => a.id === task.workAreaTypeId);
                         const areaOptions = [
@@ -515,7 +515,6 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                                 options={areaOptions}
                                 onSelect={v => {
                                     saveField('workAreaTypeId', v || null);
-                                    // Clear taskTypeId if incompatible with new area
                                     if (v && task.taskTypeId) {
                                         const newArea = (workAreaTypes || []).find(a => a.id === v);
                                         const allowedNames = newArea?.defaultTaskTypes || [];
@@ -526,21 +525,20 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                                     }
                                 }}
                                 renderValue={() => (
-                                    <span className="text-[10px] text-slate-400 truncate block">{wa?.name || '—'}</span>
+                                    <span className="text-[10px] text-slate-400 truncate block text-center">{wa?.name || '—'}</span>
                                 )}
                             />
                         ) : (
-                            <span className="text-[10px] text-slate-400 truncate block">{wa?.name || '—'}</span>
+                            <span className="text-[10px] text-slate-400 truncate block text-center">{wa?.name || '—'}</span>
                         );
                     })()}
                 </div>
 
                 {/* Tipo (filtered by area) */}
-                <div className="min-w-0 overflow-hidden" onClick={e => e.stopPropagation()}>
+                <div className="min-w-0 overflow-hidden flex items-center justify-center" onClick={e => e.stopPropagation()}>
                     {(() => {
                         const selectedArea = (workAreaTypes || []).find(a => a.id === task.workAreaTypeId);
                         const allowedValues = selectedArea?.defaultTaskTypes || [];
-                        // Support both ID-based (V6) and name-based (legacy) values
                         const filteredTypes = allowedValues.length > 0
                             ? (taskTypes || []).filter(t => allowedValues.includes(t.id) || allowedValues.includes(t.name))
                             : (taskTypes || []);
@@ -555,11 +553,11 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                                 options={typeOptions}
                                 onSelect={v => saveField('taskTypeId', v || null)}
                                 renderValue={() => (
-                                    <span className="text-[10px] text-slate-400 truncate block">{tt?.name || '—'}</span>
+                                    <span className="text-[10px] text-slate-400 truncate block text-center">{tt?.name || '—'}</span>
                                 )}
                             />
                         ) : (
-                            <span className="text-[10px] text-slate-400 truncate block">{tt?.name || '—'}</span>
+                            <span className="text-[10px] text-slate-400 truncate block text-center">{tt?.name || '—'}</span>
                         );
                     })()}
                 </div>
@@ -567,7 +565,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
 
 
                 {/* Timeline — dates + bar */}
-                <div className="min-w-0 overflow-hidden flex flex-col gap-1 py-1 px-1" onClick={e => e.stopPropagation()}>
+                <div className="min-w-0 overflow-hidden flex flex-col items-center gap-1 py-1 px-1" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center gap-1 text-[11px] min-w-0">
                         {canEdit ? (
                             <>
@@ -595,7 +593,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                 </div>
 
                 {/* Hours — own column with bar */}
-                <div className="min-w-0 overflow-hidden flex flex-col gap-1 py-1 px-1" onClick={e => e.stopPropagation()}>
+                <div className="min-w-0 overflow-hidden flex flex-col items-center gap-1 py-1 px-1" onClick={e => e.stopPropagation()}>
                     {(actual > 0 || estimated > 0) ? (
                         <>
                             <div className="flex items-center gap-1 text-[11px] min-w-0">
@@ -656,7 +654,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                 </div>
 
                 {/* Project */}
-                <div>
+                <div className="flex items-center justify-center min-w-0">
                     {canEdit ? (
                         <InlineDropdown
                             value={task.projectId || ''}
@@ -664,11 +662,11 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                             onSelect={v => saveField('projectId', v || null)}
                             renderValue={(val) => {
                                 const p = engProjects.find(pr => pr.id === val);
-                                return <span className="text-[11px] truncate block max-w-[100px] text-slate-400 italic">{p?.name || '—'}</span>;
+                                return <span className="text-[11px] truncate block max-w-[100px] text-slate-400 italic text-center">{p?.name || '—'}</span>;
                             }}
                         />
                     ) : (
-                        <span className="text-[11px] text-slate-400 italic truncate block">{project?.name || '—'}</span>
+                        <span className="text-[11px] text-slate-400 italic truncate block text-center">{project?.name || '—'}</span>
                     )}
                 </div>
             </div>
@@ -929,18 +927,18 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                     <div className="mt-1 rounded-xl overflow-hidden border border-slate-800/50 bg-slate-900/30 hidden md:block">
                         {/* Header */}
                         <div
-                            className="grid items-center px-2 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-900/50"
+                            className="grid items-center px-2 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-900/50 text-center"
                             style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${color}` }}
                         >
                             <div></div>
-                            <div>Tarea</div>
-                            <div className="text-center">Resp</div>
-                            <div className="text-center">Estado</div>
+                            <div className="text-left">Tarea</div>
+                            <div>Resp</div>
+                            <div>Estado</div>
                             <div>Área</div>
                             <div>Tipo</div>
                             <div>Timeline</div>
                             <div>Horas</div>
-                            <div className="text-center">Prioridad</div>
+                            <div>Prioridad</div>
                             <div>Proyecto</div>
                         </div>
 
