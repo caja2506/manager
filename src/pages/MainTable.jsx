@@ -30,8 +30,8 @@ const STATUS_GROUPS = [
     { status: TASK_STATUS.CANCELLED,   label: 'Cancelado',   color: '#6b7280' },
 ];
 
-// 9-column grid: Open | Task | Owner | Status | Progress | Timeline | Hours | Priority | Project
-const GRID_COLS = '28px 1fr 44px 110px 95px minmax(150px,200px) minmax(100px,130px) 75px 100px';
+// 10-column grid: Open | Task | Owner | Status | Tipo | Progress | Timeline | Hours | Priority | Project
+const GRID_COLS = '28px 1fr 40px 100px 80px 85px minmax(130px,170px) minmax(95px,120px) 70px 90px';
 
 // ============================================================
 // SAVE FEEDBACK HOOK
@@ -334,7 +334,7 @@ function SubtaskExpander({ subtasks, taskId, canEdit }) {
 // TASK ROW
 // ============================================================
 
-function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModal, groupColor, isLast, savedField, onSaved }) {
+function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModal, groupColor, isLast, savedField, onSaved, taskTypes }) {
     const [expandedSubs, setExpandedSubs] = useState(false);
 
     const saveField = useCallback(async (field, value) => {
@@ -485,6 +485,29 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                     )}
                 </div>
 
+                {/* Tipo */}
+                <div className="min-w-0 overflow-hidden" onClick={e => e.stopPropagation()}>
+                    {(() => {
+                        const tt = (taskTypes || []).find(t => t.id === task.taskTypeId);
+                        const typeOptions = [
+                            { value: '', label: 'Sin tipo' },
+                            ...(taskTypes || []).map(t => ({ value: t.id, label: t.name })),
+                        ];
+                        return canEdit ? (
+                            <InlineDropdown
+                                value={task.taskTypeId || ''}
+                                options={typeOptions}
+                                onSelect={v => saveField('taskTypeId', v || null)}
+                                renderValue={() => (
+                                    <span className="text-[10px] text-slate-400 truncate block">{tt?.name || '—'}</span>
+                                )}
+                            />
+                        ) : (
+                            <span className="text-[10px] text-slate-400 truncate block">{tt?.name || '—'}</span>
+                        );
+                    })()}
+                </div>
+
                 {/* Progress — clean bar */}
                 <div className="min-w-0 overflow-hidden flex items-center gap-1.5 px-1" onClick={e => e.stopPropagation()}>
                     {totalSubs > 0 ? (
@@ -615,7 +638,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
 // MOBILE TASK CARD (Monday.com style)
 // ============================================================
 
-function MobileTaskCard({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModal, groupColor }) {
+function MobileTaskCard({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModal, groupColor, taskTypes }) {
     const [expandedSubs, setExpandedSubs] = useState(false);
 
     const project = engProjects.find(p => p.id === task.projectId);
@@ -693,6 +716,17 @@ function MobileTaskCard({ task, engProjects, teamMembers, subtasks, canEdit, onO
                     {statusCfg.label || task.status}
                 </span>
             </div>
+
+            {/* Row 2.5: Task Type */}
+            {(() => {
+                const tt = (taskTypes || []).find(t => t.id === task.taskTypeId);
+                return tt ? (
+                    <div className="flex items-center gap-2 text-xs">
+                        <span className="text-slate-500">Tipo</span>
+                        <span className="text-slate-300 font-medium">{tt.name}</span>
+                    </div>
+                ) : null;
+            })()}
 
             {/* Row 3: Progress bar */}
             {totalSubs > 0 && (
@@ -773,7 +807,7 @@ function MobileTaskCard({ task, engProjects, teamMembers, subtasks, canEdit, onO
 // TABLE GROUP (responsive: grid on desktop, cards on mobile)
 // ============================================================
 
-function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers, canEdit, onOpenModal, isExpanded, onToggle, savedField, onSaved }) {
+function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers, canEdit, onOpenModal, isExpanded, onToggle, savedField, onSaved, taskTypes }) {
     return (
         <div className="mb-4 animate-in fade-in duration-200">
             <button onClick={onToggle} className="flex items-center gap-2.5 w-full text-left px-2 py-2 rounded-lg hover:bg-slate-800/50 transition-colors group">
@@ -800,6 +834,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                             <div>Tarea</div>
                             <div className="text-center">Resp</div>
                             <div className="text-center">Estado</div>
+                            <div>Tipo</div>
                             <div>Progreso</div>
                             <div>Timeline</div>
                             <div>Horas</div>
@@ -825,6 +860,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                     isLast={idx === tasks.length - 1}
                                     savedField={savedField}
                                     onSaved={onSaved}
+                                    taskTypes={taskTypes}
                                 />
                             ))
                         )}
@@ -847,7 +883,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                     canEdit={canEdit}
                                     onOpenModal={onOpenModal}
                                     groupColor={color}
-                                    savedField={savedField}
+                                    taskTypes={taskTypes}
                                     onSaved={onSaved}
                                 />
                             ))
@@ -1002,6 +1038,7 @@ export default function MainTable() {
                             onToggle={() => toggleGroup(group.status)}
                             savedField={savedField}
                             onSaved={showSaved}
+                            taskTypes={taskTypes}
                         />
                     );
                 })}
