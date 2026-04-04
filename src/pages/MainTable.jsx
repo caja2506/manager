@@ -31,7 +31,7 @@ const STATUS_GROUPS = [
 ];
 
 // 10-column grid: ☐ | Task | Owner | Status | Área | Tipo | Timeline | Hours | Priority | Project
-const GRID_COLS = '28px 1fr 40px 95px 80px 80px minmax(120px,160px) minmax(80px,110px) 80px 80px';
+const GRID_COLS = '28px minmax(120px,1fr) 36px 90px 72px 72px minmax(100px,150px) minmax(70px,100px) 80px 72px';
 
 // ============================================================
 // SAVE FEEDBACK HOOK
@@ -122,8 +122,8 @@ function InlineDropdown({ value, options, onSelect, renderValue, className = '' 
     };
 
     return (
-        <div className={`relative ${className}`} onClick={e => e.stopPropagation()}>
-            <button ref={triggerRef} onClick={handleOpen} className="w-full hover:bg-slate-800/60 rounded transition-colors">
+        <div className={`relative w-full h-full ${className}`} onClick={e => e.stopPropagation()}>
+            <button ref={triggerRef} onClick={handleOpen} className="w-full h-full hover:bg-slate-800/60 rounded transition-colors flex items-center">
                 {renderValue(value)}
             </button>
             {open && createPortal(
@@ -406,18 +406,18 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
         <>
             <div
                 onDoubleClick={() => onOpenModal(task)}
-                className={`grid items-center px-3 py-2 transition-all duration-150 hover:bg-indigo-500/[.06] group/row ${!isLast ? 'border-b border-slate-800/30' : ''}`}
+                className={`grid items-stretch px-2 py-1.5 transition-all duration-150 hover:bg-indigo-500/6 group/row ${!isLast ? 'border-b border-slate-800/30' : ''}`}
                 style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${groupColor}` }}
             >
                 {/* Checkbox / Open */}
-                <div className="flex justify-center" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-center" onClick={e => e.stopPropagation()}>
                     <button onClick={(e) => { e.stopPropagation(); onOpenModal(task); }} className="text-slate-700 hover:text-indigo-400 transition-colors shrink-0" title="Abrir detalle">
                         <Maximize2 className="w-3.5 h-3.5" />
                     </button>
                 </div>
 
                 {/* Task Name + subtask chevron + subtask count badge */}
-                <div className="pr-2 min-w-0 flex items-center gap-1">
+                <div className="pr-1 min-w-0 flex items-center gap-1">
                     {/* Chevron — solo si tiene subtareas */}
                     {totalSubs > 0 ? (
                         <button
@@ -462,13 +462,14 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                 </div>
 
                 {/* Owner */}
-                <div className="flex justify-center">
+                <div className="flex items-center justify-center">
                     {canEdit ? (
                         <InlineDropdown
                             value={task.assignedTo || ''}
                             options={ownerOptions}
                             onSelect={v => saveField('assignedTo', v || null)}
                             renderValue={() => <OwnerAvatar task={task} teamMembers={teamMembers} />}
+                            className="h-auto!"
                         />
                     ) : (
                         <OwnerAvatar task={task} teamMembers={teamMembers} />
@@ -476,7 +477,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                 </div>
 
                 {/* Status — Monday.com full-width colored cell */}
-                <div className="flex items-stretch" onClick={e => e.stopPropagation()}>
+                <div className="flex items-stretch p-0.5" onClick={e => e.stopPropagation()}>
                     {canEdit ? (
                         <InlineDropdown
                             value={task.status}
@@ -485,7 +486,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                             renderValue={(val) => {
                                 const cfg = TASK_STATUS_CONFIG[val] || {};
                                 return (
-                                    <div className="w-full h-full flex items-center justify-center px-1 py-1 rounded text-[10px] font-bold text-white text-center leading-tight"
+                                    <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[26px]"
                                         style={{ background: cfg.color || '#64748b' }}>
                                         {cfg.label || val}
                                     </div>
@@ -493,7 +494,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                             }}
                         />
                     ) : (
-                        <div className="w-full flex items-center justify-center px-1 py-1 rounded text-[10px] font-bold text-white text-center leading-tight"
+                        <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[26px]"
                             style={{ background: statusCfg.color || '#64748b' }}>
                             {statusCfg.label || task.status}
                         </div>
@@ -628,7 +629,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                 </div>
 
                 {/* Priority — Monday.com full-width colored cell */}
-                <div className="flex items-stretch" onClick={e => e.stopPropagation()}>
+                <div className="flex items-stretch p-0.5" onClick={e => e.stopPropagation()}>
                     {canEdit ? (
                         <InlineDropdown
                             value={task.priority || 'medium'}
@@ -639,7 +640,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                                 const c = colors[val] || '#579bfc';
                                 const cfg = TASK_PRIORITY_CONFIG[val] || {};
                                 return (
-                                    <div className="w-full h-full flex items-center justify-center px-1 py-1 rounded text-[10px] font-bold text-white text-center leading-tight"
+                                    <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[26px]"
                                         style={{ background: c }}>
                                         {cfg.label || val}
                                     </div>
@@ -647,7 +648,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                             }}
                         />
                     ) : (
-                        <div className="w-full flex items-center justify-center px-1 py-1 rounded text-[10px] font-bold text-white text-center leading-tight"
+                        <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[26px]"
                             style={{ background: { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' }[task.priority] || '#579bfc' }}>
                             {(TASK_PRIORITY_CONFIG[task.priority] || {}).label || '—'}
                         </div>
@@ -928,7 +929,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                     <div className="mt-1 rounded-xl overflow-hidden border border-slate-800/50 bg-slate-900/30 hidden md:block">
                         {/* Header */}
                         <div
-                            className="grid items-center px-3 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-900/50"
+                            className="grid items-center px-2 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-900/50"
                             style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${color}` }}
                         >
                             <div></div>
@@ -970,7 +971,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                         {/* Inline Add Task Row — Monday.com style */}
                         {canEdit && (
                             <div
-                                className="grid items-center px-3 py-1.5 border-t border-slate-800/30"
+                                className="grid items-center px-2 py-1.5 border-t border-slate-800/30"
                                 style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${color}` }}
                             >
                                 <div></div>
@@ -1008,7 +1009,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                         {/* Group Summary Row — Monday.com style */}
                         {tasks.length > 0 && (
                             <div
-                                className="grid items-center px-3 py-2 border-t border-slate-800/40 bg-slate-950/40"
+                                className="grid items-center px-2 py-2 border-t border-slate-800/40 bg-slate-950/40"
                                 style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${color}` }}
                             >
                                 <div></div>
