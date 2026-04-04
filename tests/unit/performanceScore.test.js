@@ -148,8 +148,8 @@ describe('calculateIndividualScore', () => {
         expect(result.dimensions).not.toHaveProperty('oversight');
     });
 
-    // ── Technician has 4 dimensions ──
-    it('technician has 4 dimensions without precision/leadership', () => {
+    // ── Technician has 4 dimensions (no capacity/leadership) ──
+    it('technician has 4 dimensions: velocity, discipline, precision, collaboration', () => {
         const tech = makeMember({ uid: 'tech-1', teamRole: 'technician' });
         const data = {
             ...baseData,
@@ -160,9 +160,9 @@ describe('calculateIndividualScore', () => {
         const result = calculateIndividualScore('tech-1', 'technician', data);
         expect(result.dimensions).toHaveProperty('velocity');
         expect(result.dimensions).toHaveProperty('discipline');
-        expect(result.dimensions).toHaveProperty('capacity');
+        expect(result.dimensions).toHaveProperty('precision');
         expect(result.dimensions).toHaveProperty('collaboration');
-        expect(result.dimensions).not.toHaveProperty('precision');
+        expect(result.dimensions).not.toHaveProperty('capacity');
         expect(result.dimensions).not.toHaveProperty('leadership');
         expect(result.dimensions).not.toHaveProperty('oversight');
     });

@@ -76,9 +76,9 @@ export const DEFAULT_WEIGHTS = {
     },
     technician: {
         velocity: 0.30,
-        discipline: 0.35,
-        capacity: 0.25,
-        collaboration: 0.10,
+        discipline: 0.30,
+        precision: 0.25,
+        collaboration: 0.15,
     },
 };
 
@@ -87,9 +87,15 @@ export const DEFAULT_WEIGHTS = {
 // ============================================================
 
 /**
- * Velocity: How many tasks completed this week vs expected.
- * Expected = number of active tasks assigned (dynamic, not fixed).
- * If active tasks = 0, score = 100 (nothing to complete).
+ * Velocity: Composite of completion rate AND active-task progress.
+ * 
+ * Two sub-scores (weighted 50/50):
+ *   A) Completion ratio — how many tasks completed this week vs expected
+ *   B) Progress quality — avg subtask % on in-progress tasks, penalized by time overrun
+ *   
+ * If user has NO active tasks and NO completions → 100 (nothing to do).
+ * If user has active tasks but 0 completions → completion part = 0.
+ * Time overrun penalty: if actual hours > estimated * 1.5, apply a multiplier.
  */
 function calcVelocity(userId, tasks) {
     const now = new Date();
@@ -97,24 +103,69 @@ function calcVelocity(userId, tasks) {
 
     const userTasks = tasks.filter(t => t.assignedTo === userId);
     const activeTasks = userTasks.filter(t => !['completed', 'cancelled'].includes(t.status));
+    const inProgress = userTasks.filter(t => t.status === 'in_progress');
     const completedThisWeek = userTasks.filter(t =>
         t.status === 'completed' &&
         (t.completedDate || t.updatedAt) &&
         new Date(t.completedDate || t.updatedAt) >= sevenDaysAgo
     );
 
-    // Expected: at least 1 completion per week if you have active tasks
-    const expected = Math.max(1, Math.ceil(activeTasks.length * 0.3));
+    // Nothing assigned at all → perfect (nothing to evaluate)
+    if (userTasks.length === 0) {
+        return { score: 100, raw: { tasksCompleted: 0, expected: 0, activeTasks: 0, avgProgress: 0, avgOverrun: 0 } };
+    }
 
-    const ratio = expected > 0 ? Math.min(completedThisWeek.length / expected, 1.0) : 1.0;
-    const score = Math.round(ratio * 100);
+    // ── A) Completion ratio (50% weight) ──
+    const expected = Math.max(1, Math.ceil(activeTasks.length * 0.3));
+    const completionRatio = expected > 0 ? Math.min(completedThisWeek.length / expected, 1.0) : 1.0;
+    const completionScore = completionRatio * 100;
+
+    // ── B) Progress quality on in-progress tasks (50% weight) ──
+    let progressScore = 100;
+    let avgProgress = 0;
+    let avgOverrun = 0;
+
+    if (inProgress.length > 0) {
+        // Subtask progress: average % of subtasks completed
+        const progresses = inProgress.map(t => {
+            const subs = t.subtasks || [];
+            if (subs.length === 0) return 0.5; // No subtasks = assume 50%
+            const done = subs.filter(s => s.completed || s.done).length;
+            return done / subs.length;
+        });
+        avgProgress = progresses.reduce((a, b) => a + b, 0) / progresses.length;
+
+        // Time overrun: actual hours / estimated hours
+        const overruns = inProgress
+            .filter(t => t.estimatedHours > 0 && t.actualHours > 0)
+            .map(t => t.actualHours / t.estimatedHours);
+        avgOverrun = overruns.length > 0
+            ? overruns.reduce((a, b) => a + b, 0) / overruns.length
+            : 1.0;
+
+        // Progress score = subtask % * overrun penalty
+        // Overrun penalty: 1.0 if ratio ≤ 1.0, drops linearly after that
+        const overrunPenalty = avgOverrun <= 1.0 ? 1.0 : Math.max(0.2, 1.0 - (avgOverrun - 1.0) * 0.4);
+        progressScore = avgProgress * overrunPenalty * 100;
+    }
+
+    // If user has active tasks but ZERO completions → completion weight is dominant
+    const hasActive = activeTasks.length > 0;
+    const compWeight = hasActive ? 0.5 : 0.0;
+    const progWeight = hasActive ? 0.5 : 0.0;
+
+    const rawScore = hasActive
+        ? completionScore * compWeight + progressScore * progWeight
+        : 100; // no active tasks at all
 
     return {
-        score: clamp(score),
+        score: clamp(Math.round(rawScore)),
         raw: {
             tasksCompleted: completedThisWeek.length,
             expected,
             activeTasks: activeTasks.length,
+            avgProgress: parseFloat((avgProgress * 100).toFixed(1)),
+            avgOverrun: parseFloat(avgOverrun.toFixed(2)),
         },
     };
 }
@@ -189,32 +240,40 @@ function calcCapacity(userId, tasks, timeLogs, profile) {
 }
 
 /**
- * Precision: How close actual hours are to estimated hours on completed tasks.
- * Only for roles that estimate (Engineer, Team Lead).
+ * Precision: How close actual hours are to estimated hours.
+ * Evaluates BOTH completed AND in-progress tasks with estimates.
  * Perfect ratio (actual/estimated = 1.0) = 100 score.
+ * 257% overrun = score ~0. Under-budget is mildly penalized (indicates bad estimates).
  */
 function calcPrecision(userId, tasks) {
-    const completed = tasks.filter(t =>
+    // Include completed AND in_progress tasks with time data
+    const evaluated = tasks.filter(t =>
         t.assignedTo === userId &&
-        t.status === 'completed' &&
+        ['completed', 'in_progress', 'validation'].includes(t.status) &&
         t.estimatedHours > 0 &&
         t.actualHours > 0
     );
 
-    if (completed.length === 0) {
-        return { score: 100, raw: { estimationRatio: 0, tasksWithEstimates: 0 } };
+    if (evaluated.length === 0) {
+        return { score: 100, raw: { estimationRatio: 0, tasksEvaluated: 0, worstOverrun: 0 } };
     }
 
-    const ratios = completed.map(t => t.actualHours / t.estimatedHours);
+    const ratios = evaluated.map(t => t.actualHours / t.estimatedHours);
     const avgRatio = ratios.reduce((a, b) => a + b, 0) / ratios.length;
-    const accuracy = Math.max(0, 1 - Math.abs(1 - avgRatio));
+    const worstOverrun = Math.max(...ratios);
+
+    // Accuracy: 1.0 is perfect. Deviation in either direction penalizes.
+    // Over-budget penalized more heavily than under-budget.
+    const overPenalty = avgRatio > 1.0 ? Math.abs(1 - avgRatio) * 1.5 : Math.abs(1 - avgRatio);
+    const accuracy = Math.max(0, 1 - overPenalty);
     const score = Math.round(accuracy * 100);
 
     return {
         score: clamp(score),
         raw: {
             estimationRatio: parseFloat(avgRatio.toFixed(2)),
-            tasksWithEstimates: completed.length,
+            tasksEvaluated: evaluated.length,
+            worstOverrun: parseFloat(worstOverrun.toFixed(2)),
         },
     };
 }
@@ -437,18 +496,20 @@ export function calculateIndividualScore(userId, role, data, weights = null) {
     dimensions.discipline = { ...discipline, weight: roleWeights.discipline };
     totalScore += discipline.score * roleWeights.discipline;
 
-    // Capacity — all roles except manager
-    const capacity = calcCapacity(userId, tasks, timeLogs, profile);
-    dimensions.capacity = { ...capacity, weight: roleWeights.capacity };
-    totalScore += capacity.score * roleWeights.capacity;
+    // Capacity — only roles with capacity weight (Engineer, Team Lead)
+    if (roleWeights.capacity) {
+        const capacity = calcCapacity(userId, tasks, timeLogs, profile);
+        dimensions.capacity = { ...capacity, weight: roleWeights.capacity };
+        totalScore += capacity.score * roleWeights.capacity;
+    }
 
     // Collaboration — all roles except manager
     const collaboration = calcCollaboration(userId, tasks, delays);
     dimensions.collaboration = { ...collaboration, weight: roleWeights.collaboration };
     totalScore += collaboration.score * roleWeights.collaboration;
 
-    // Precision — only Engineer and Team Lead
-    if (role === 'engineer' || role === 'team_lead') {
+    // Precision — ALL roles (time overrun awareness)
+    if (roleWeights.precision) {
         const precision = calcPrecision(userId, tasks);
         dimensions.precision = { ...precision, weight: roleWeights.precision };
         totalScore += precision.score * roleWeights.precision;
