@@ -30,8 +30,8 @@ const STATUS_GROUPS = [
     { status: TASK_STATUS.CANCELLED,   label: 'Cancelado',   color: '#6b7280' },
 ];
 
-// 8-column grid: Open | Task | Owner | Status | Progress | Timeline | Priority | Project
-const GRID_COLS = '28px 1fr 44px 115px 110px minmax(160px,220px) 80px 110px';
+// 9-column grid: Open | Task | Owner | Status | Progress | Timeline | Hours | Priority | Project
+const GRID_COLS = '28px 1fr 44px 110px 100px minmax(140px,180px) 90px 75px 100px';
 
 // ============================================================
 // SAVE FEEDBACK HOOK
@@ -499,7 +499,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                     )}
                 </div>
 
-                {/* Timeline — dates + single bar */}
+                {/* Timeline — dates + bar + days */}
                 <div className="flex flex-col gap-0.5" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center gap-1 text-[10px]">
                         {canEdit ? (
@@ -525,18 +525,29 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                             <div className="h-full rounded-full transition-all duration-700" style={{ width: `${timelinePct}%`, background: timelineColor }} />
                         </div>
                     )}
-                    {/* Hours inline below timeline */}
-                    {(actual > 0 || estimated > 0) && (
-                        <div className="flex items-center gap-1 text-[9px] text-slate-600">
-                            <span className="text-slate-400 font-bold">{actual.toFixed(1)}h</span>
-                            <span>/</span>
-                            {canEdit ? (
-                                <InlineEditNumber value={estimated} onSave={v => saveField('estimatedHours', v)} />
-                            ) : (
-                                <span>{estimated}h</span>
+                </div>
+
+                {/* Hours — separate column */}
+                <div className="flex flex-col gap-0.5 justify-center" onClick={e => e.stopPropagation()}>
+                    {(actual > 0 || estimated > 0) ? (
+                        <>
+                            <div className="flex items-center gap-0.5 text-[10px]">
+                                <span className="text-slate-300 font-bold">{actual.toFixed(1)}</span>
+                                <span className="text-slate-700">/</span>
+                                {canEdit ? (
+                                    <InlineEditNumber value={estimated} onSave={v => saveField('estimatedHours', v)} />
+                                ) : (
+                                    <span className="text-slate-500">{estimated}h</span>
+                                )}
+                            </div>
+                            {estimated > 0 && (
+                                <span className={`text-[9px] font-bold ${hoursPct > 100 ? 'text-rose-400' : hoursPct > 80 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                    ({hoursPct}%)
+                                </span>
                             )}
-                            {estimated > 0 && <span className={`font-bold ${hoursPct > 100 ? 'text-rose-400' : hoursPct > 80 ? 'text-amber-400' : 'text-emerald-400'}`}>({hoursPct}%)</span>}
-                        </div>
+                        </>
+                    ) : (
+                        <span className="text-[10px] text-slate-600">—</span>
                     )}
                 </div>
 
@@ -620,7 +631,8 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                         <div className="text-center">Resp</div>
                         <div className="text-center">Estado</div>
                         <div>Progreso</div>
-                        <div>Timeline / Horas</div>
+                        <div>Timeline</div>
+                        <div>Horas</div>
                         <div className="text-center">Prior</div>
                         <div>Proyecto</div>
                     </div>
