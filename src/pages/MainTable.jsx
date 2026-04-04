@@ -7,7 +7,7 @@ import TaskDetailModal from '../components/tasks/TaskDetailModal';
 import TransitionConfirmModal from '../components/workflow/TransitionConfirmModal';
 import TaskModuleBanner from '../components/layout/TaskModuleBanner';
 import { useWorkflowTransition } from '../hooks/useWorkflowTransition';
-import { updateTask, updateTaskStatus, toggleSubtask, createSubtask } from '../services/taskService';
+import { updateTask, updateTaskStatus, toggleSubtask, createSubtask, createTask } from '../services/taskService';
 import {
     TASK_STATUS, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG
 } from '../models/schemas';
@@ -30,8 +30,8 @@ const STATUS_GROUPS = [
     { status: TASK_STATUS.CANCELLED,   label: 'Cancelado',   color: '#6b7280' },
 ];
 
-// 11-column grid: Open | Task | Owner | Status | Área | Tipo | Progress | Timeline | Hours | Priority | Project
-const GRID_COLS = '28px 1fr 40px 95px 80px 80px 80px minmax(120px,160px) minmax(80px,110px) 65px 80px';
+// 10-column grid: ☐ | Task | Owner | Status | Área | Tipo | Timeline | Hours | Priority | Project
+const GRID_COLS = '28px 1fr 40px 95px 80px 80px minmax(120px,160px) minmax(80px,110px) 80px 80px';
 
 // ============================================================
 // SAVE FEEDBACK HOOK
@@ -375,7 +375,6 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
     const totalSubs = subtasks.length;
     const doneSubs = subtasks.filter(s => s.completed || s.done).length;
     const subsPct = totalSubs > 0 ? Math.round((doneSubs / totalSubs) * 100) : 0;
-    const subsColor = subsPct === 100 ? '#22c55e' : subsPct >= 50 ? '#f59e0b' : subsPct > 0 ? '#6366f1' : '#334155';
 
     // Timeline
     const startRaw = task.plannedStartDate || task.createdAt;
@@ -410,12 +409,14 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                 className={`grid items-center px-3 py-2 transition-all duration-150 hover:bg-indigo-500/[.06] group/row ${!isLast ? 'border-b border-slate-800/30' : ''}`}
                 style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${groupColor}` }}
             >
-                {/* Open detail icon */}
-                <button onClick={(e) => { e.stopPropagation(); onOpenModal(task); }} className="text-slate-700 hover:text-indigo-400 transition-colors shrink-0" title="Abrir detalle">
-                    <Maximize2 className="w-3.5 h-3.5" />
-                </button>
+                {/* Checkbox / Open */}
+                <div className="flex justify-center" onClick={e => e.stopPropagation()}>
+                    <button onClick={(e) => { e.stopPropagation(); onOpenModal(task); }} className="text-slate-700 hover:text-indigo-400 transition-colors shrink-0" title="Abrir detalle">
+                        <Maximize2 className="w-3.5 h-3.5" />
+                    </button>
+                </div>
 
-                {/* Task Name + subtask expand chevron */}
+                {/* Task Name + subtask chevron + subtask count badge */}
                 <div className="pr-2 min-w-0 flex items-center gap-1">
                     {/* Chevron — solo si tiene subtareas */}
                     {totalSubs > 0 ? (
@@ -432,7 +433,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                     ) : (
                         <span className="w-3.5 shrink-0" />
                     )}
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 flex items-center gap-1.5">
                         {canEdit ? (
                             <InlineEditText
                                 value={task.title || ''}
@@ -443,6 +444,20 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                         ) : (
                             <p className="text-sm font-semibold text-slate-200 truncate">{task.title || 'Sin título'}</p>
                         )}
+                        {/* Subtask count badge — Monday.com style */}
+                        {totalSubs > 0 && (
+                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded shrink-0 ${
+                                subsPct === 100 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700/60 text-slate-400'
+                            }`}>
+                                {doneSubs}/{totalSubs}
+                            </span>
+                        )}
+                    </div>
+                    {/* Quick action icons on hover */}
+                    <div className="hidden group-hover/row:flex items-center gap-0.5 shrink-0">
+                        <button onClick={e => { e.stopPropagation(); onOpenModal(task); }} className="p-0.5 text-slate-600 hover:text-indigo-400 transition-colors" title="Agregar subtarea">
+                            <Plus className="w-3 h-3" />
+                        </button>
                     </div>
                 </div>
 
@@ -460,8 +475,8 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                     )}
                 </div>
 
-                {/* Status */}
-                <div className="flex justify-center">
+                {/* Status — Monday.com full-width colored cell */}
+                <div className="flex items-stretch" onClick={e => e.stopPropagation()}>
                     {canEdit ? (
                         <InlineDropdown
                             value={task.status}
@@ -470,18 +485,18 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                             renderValue={(val) => {
                                 const cfg = TASK_STATUS_CONFIG[val] || {};
                                 return (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide whitespace-nowrap"
-                                        style={{ backgroundColor: (cfg.color || '#64748b') + '20', color: cfg.color, border: `1px solid ${(cfg.color || '#64748b')}33` }}>
+                                    <div className="w-full h-full flex items-center justify-center px-1 py-1 rounded text-[10px] font-bold text-white text-center leading-tight"
+                                        style={{ background: cfg.color || '#64748b' }}>
                                         {cfg.label || val}
-                                    </span>
+                                    </div>
                                 );
                             }}
                         />
                     ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase"
-                            style={{ backgroundColor: (statusCfg.color || '#64748b') + '20', color: statusCfg.color }}>
+                        <div className="w-full flex items-center justify-center px-1 py-1 rounded text-[10px] font-bold text-white text-center leading-tight"
+                            style={{ background: statusCfg.color || '#64748b' }}>
                             {statusCfg.label || task.status}
-                        </span>
+                        </div>
                     )}
                 </div>
 
@@ -548,19 +563,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                     })()}
                 </div>
 
-                {/* Progress — clean bar */}
-                <div className="min-w-0 overflow-hidden flex items-center gap-1.5 px-1" onClick={e => e.stopPropagation()}>
-                    {totalSubs > 0 ? (
-                        <div className="flex items-center gap-1.5 w-full min-w-0">
-                            <div className="flex-1 min-w-0 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${subsPct}%`, background: subsColor }} />
-                            </div>
-                            <span className="text-[11px] font-bold text-slate-400 whitespace-nowrap shrink-0">{doneSubs}/{totalSubs}</span>
-                        </div>
-                    ) : (
-                        <span className="text-[11px] text-slate-600">—</span>
-                    )}
-                </div>
+
 
                 {/* Timeline — dates + bar */}
                 <div className="min-w-0 overflow-hidden flex flex-col gap-1 py-1 px-1" onClick={e => e.stopPropagation()}>
@@ -624,27 +627,30 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                     )}
                 </div>
 
-                {/* Priority */}
-                <div className="flex justify-center">
+                {/* Priority — Monday.com full-width colored cell */}
+                <div className="flex items-stretch" onClick={e => e.stopPropagation()}>
                     {canEdit ? (
                         <InlineDropdown
                             value={task.priority || 'medium'}
                             options={priorityOptions}
                             onSelect={v => saveField('priority', v)}
                             renderValue={(val) => {
-                                const colors = { low: '#94a3b8', medium: '#60a5fa', high: '#fbbf24', critical: '#f87171' };
-                                const c = colors[val] || '#94a3b8';
+                                const colors = { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' };
+                                const c = colors[val] || '#579bfc';
                                 const cfg = TASK_PRIORITY_CONFIG[val] || {};
                                 return (
-                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase"
-                                        style={{ backgroundColor: c + '18', color: c, border: `1px solid ${c}30` }}>
+                                    <div className="w-full h-full flex items-center justify-center px-1 py-1 rounded text-[10px] font-bold text-white text-center leading-tight"
+                                        style={{ background: c }}>
                                         {cfg.label || val}
-                                    </span>
+                                    </div>
                                 );
                             }}
                         />
                     ) : (
-                        <span className="text-xs text-slate-400">{(TASK_PRIORITY_CONFIG[task.priority] || {}).label || '—'}</span>
+                        <div className="w-full flex items-center justify-center px-1 py-1 rounded text-[10px] font-bold text-white text-center leading-tight"
+                            style={{ background: { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' }[task.priority] || '#579bfc' }}>
+                            {(TASK_PRIORITY_CONFIG[task.priority] || {}).label || '—'}
+                        </div>
                     )}
                 </div>
 
@@ -858,7 +864,51 @@ function MobileTaskCard({ task, engProjects, teamMembers, subtasks, canEdit, onO
 // TABLE GROUP (responsive: grid on desktop, cards on mobile)
 // ============================================================
 
-function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers, canEdit, onOpenModal, isExpanded, onToggle, savedField, onSaved, taskTypes, workAreaTypes }) {
+function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers, canEdit, onOpenModal, isExpanded, onToggle, savedField, onSaved, taskTypes, workAreaTypes, groupStatus, user }) {
+    const [addingTask, setAddingTask] = useState(false);
+    const [newTaskTitle, setNewTaskTitle] = useState('');
+    const addInputRef = useRef(null);
+
+    const handleAddTask = async () => {
+        if (!newTaskTitle.trim()) return;
+        try {
+            await createTask({ title: newTaskTitle.trim(), status: groupStatus || 'pending' }, user?.uid);
+            setNewTaskTitle('');
+            setAddingTask(false);
+        } catch (err) { console.error('Failed to create task:', err); }
+    };
+
+    // Summary calculations
+    const statusDist = useMemo(() => {
+        const dist = {};
+        tasks.forEach(t => {
+            const s = t.status || 'pending';
+            dist[s] = (dist[s] || 0) + 1;
+        });
+        return dist;
+    }, [tasks]);
+
+    const priorityDist = useMemo(() => {
+        const dist = {};
+        tasks.forEach(t => {
+            const p = t.priority || 'medium';
+            dist[p] = (dist[p] || 0) + 1;
+        });
+        return dist;
+    }, [tasks]);
+
+    const dateRange = useMemo(() => {
+        const dates = tasks
+            .map(t => t.dueDate || t.plannedEndDate)
+            .filter(Boolean)
+            .map(d => new Date(d));
+        if (dates.length === 0) return null;
+        const min = new Date(Math.min(...dates));
+        const max = new Date(Math.max(...dates));
+        const fmt = d => d.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' });
+        return `${fmt(min)} - ${fmt(max)}`;
+    }, [tasks]);
+
     return (
         <div className="mb-4 animate-in fade-in duration-200">
             <button onClick={onToggle} className="flex items-center gap-2.5 w-full text-left px-2 py-2 rounded-lg hover:bg-slate-800/50 transition-colors group">
@@ -887,10 +937,9 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                             <div className="text-center">Estado</div>
                             <div>Área</div>
                             <div>Tipo</div>
-                            <div>Progreso</div>
                             <div>Timeline</div>
                             <div>Horas</div>
-                            <div className="text-center">Prior</div>
+                            <div className="text-center">Prioridad</div>
                             <div>Proyecto</div>
                         </div>
 
@@ -909,13 +958,103 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                     canEdit={canEdit}
                                     onOpenModal={onOpenModal}
                                     groupColor={color}
-                                    isLast={idx === tasks.length - 1}
+                                    isLast={idx === tasks.length - 1 && !canEdit}
                                     savedField={savedField}
                                     onSaved={onSaved}
                                     taskTypes={taskTypes}
                                     workAreaTypes={workAreaTypes}
                                 />
                             ))
+                        )}
+
+                        {/* Inline Add Task Row — Monday.com style */}
+                        {canEdit && (
+                            <div
+                                className="grid items-center px-3 py-1.5 border-t border-slate-800/30"
+                                style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${color}` }}
+                            >
+                                <div></div>
+                                <div className="col-span-9">
+                                    {addingTask ? (
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                ref={addInputRef}
+                                                value={newTaskTitle}
+                                                onChange={e => setNewTaskTitle(e.target.value)}
+                                                onKeyDown={e => { if (e.key === 'Enter') handleAddTask(); if (e.key === 'Escape') { setAddingTask(false); setNewTaskTitle(''); } }}
+                                                placeholder="Nombre de la nueva tarea..."
+                                                className="flex-1 bg-transparent text-sm text-slate-300 placeholder:text-slate-600 outline-none"
+                                                autoFocus
+                                            />
+                                            <button onClick={handleAddTask} className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 px-2 py-1 rounded hover:bg-indigo-500/10 transition-colors">
+                                                Crear
+                                            </button>
+                                            <button onClick={() => { setAddingTask(false); setNewTaskTitle(''); }} className="text-[11px] text-slate-600 hover:text-slate-400">
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={() => { setAddingTask(true); setTimeout(() => addInputRef.current?.focus(), 50); }}
+                                            className="flex items-center gap-1.5 text-[11px] text-slate-600 hover:text-indigo-400 transition-colors py-1"
+                                        >
+                                            <Plus className="w-3 h-3" /> Agregar tarea
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Group Summary Row — Monday.com style */}
+                        {tasks.length > 0 && (
+                            <div
+                                className="grid items-center px-3 py-2 border-t border-slate-800/40 bg-slate-950/40"
+                                style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${color}` }}
+                            >
+                                <div></div>
+                                <div></div>
+                                <div></div>
+                                {/* Status distribution mini bars */}
+                                <div className="flex h-5 rounded overflow-hidden" title="Distribución de estados">
+                                    {Object.entries(statusDist).map(([status, count]) => {
+                                        const cfg = TASK_STATUS_CONFIG[status] || {};
+                                        return (
+                                            <div
+                                                key={status}
+                                                style={{ width: `${(count / tasks.length) * 100}%`, background: cfg.color || '#64748b' }}
+                                                className="h-full"
+                                                title={`${cfg.label || status}: ${count}`}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                                <div></div>
+                                <div></div>
+                                {/* Date range */}
+                                <div className="flex items-center justify-center">
+                                    {dateRange && (
+                                        <span className="text-[9px] font-bold text-slate-400 bg-slate-800 px-2 py-1 rounded-full whitespace-nowrap">
+                                            {dateRange}
+                                        </span>
+                                    )}
+                                </div>
+                                <div></div>
+                                {/* Priority distribution mini bars */}
+                                <div className="flex h-5 rounded overflow-hidden" title="Distribución de prioridades">
+                                    {Object.entries(priorityDist).map(([pri, count]) => {
+                                        const colors = { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' };
+                                        return (
+                                            <div
+                                                key={pri}
+                                                style={{ width: `${(count / tasks.length) * 100}%`, background: colors[pri] || '#579bfc' }}
+                                                className="h-full"
+                                                title={`${pri}: ${count}`}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                                <div></div>
+                            </div>
                         )}
                     </div>
 
@@ -941,6 +1080,15 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                     onSaved={onSaved}
                                 />
                             ))
+                        )}
+                        {/* Mobile add task */}
+                        {canEdit && (
+                            <button
+                                onClick={() => { setAddingTask(true); }}
+                                className="w-full py-3 text-sm text-slate-600 hover:text-indigo-400 flex items-center justify-center gap-2 bg-slate-900/20 border border-dashed border-slate-800 rounded-xl transition-colors"
+                            >
+                                <Plus className="w-4 h-4" /> Agregar tarea
+                            </button>
                         )}
                     </div>
                 </>
@@ -1094,6 +1242,8 @@ export default function MainTable() {
                             onSaved={showSaved}
                             taskTypes={taskTypes}
                             workAreaTypes={workAreaTypes}
+                            groupStatus={group.status}
+                            user={user}
                         />
                     );
                 })}
