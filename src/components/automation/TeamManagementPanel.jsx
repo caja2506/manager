@@ -2,10 +2,16 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
     Users, Link2, Unlink, Copy, Check, Loader2,
     RefreshCw, Shield, UserPlus, MessageSquare,
-    ChevronDown, Clock, Smartphone
+    ChevronDown, Clock, Smartphone, ArrowRight
 } from 'lucide-react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { subscribeToRbacUsers } from '../../services/userAdminService';
+import {
+    getActiveAssignments,
+    createInitialAssignment,
+    reassignTechnician,
+} from '../../services/resourceAssignmentService';
+import { useAuth } from '../../hooks/useAuth';
 
 const functions = getFunctions();
 
@@ -31,9 +37,16 @@ const ROLE_LABELS = {
     technician: 'Técnico',
 };
 
+const REASON_OPTIONS = [
+    { value: 'default', label: 'Asignación normal' },
+    { value: 'préstamo', label: 'Préstamo temporal' },
+    { value: 'soporte', label: 'Soporte especializado' },
+    { value: 'temporal', label: 'Cobertura temporal' },
+];
+
 /**
- * TeamManagementPanel — Admin panel for managing team members
- * and Telegram onboarding with link codes.
+ * TeamManagementPanel — Admin panel for managing team members,
+ * Telegram onboarding, and engineer→technician assignments.
  */
 export default function TeamManagementPanel() {
     const [members, setMembers] = useState([]);
@@ -46,7 +59,6 @@ export default function TeamManagementPanel() {
     const [confirmUnlink, setConfirmUnlink] = useState(null);
     const [nameMap, setNameMap] = useState({});
 
-    // Subscribe to users_roles for correct display names (client-side source of truth)
     useEffect(() => {
         const unsub = subscribeToRbacUsers((users) => {
             const map = {};
@@ -58,7 +70,6 @@ export default function TeamManagementPanel() {
         return () => unsub();
     }, []);
 
-    // Load team data from Cloud Function
     const loadTeam = useCallback(async () => {
         setLoading(true);
         setError(null);
@@ -76,10 +87,8 @@ export default function TeamManagementPanel() {
 
     useEffect(() => { loadTeam(); }, [loadTeam]);
 
-    // Resolve name: users_roles displayName > CF displayName > CF name > email
     const resolveName = (member) => nameMap[member.id] || member.displayName || member.name || member.email;
 
-    // Generate link code
     const handleGenerateCode = async (userId) => {
         setActionLoading(userId);
         setError(null);
@@ -98,7 +107,6 @@ export default function TeamManagementPanel() {
         }
     };
 
-    // Unlink user — step 1: show confirm, step 2: execute
     const handleUnlinkClick = (userId) => {
         if (confirmUnlink === userId) {
             handleUnlinkConfirmed(userId);
@@ -124,7 +132,6 @@ export default function TeamManagementPanel() {
         }
     };
 
-    // Update role
     const handleRoleChange = async (userId, newRole) => {
         setActionLoading(userId);
         try {
@@ -140,7 +147,6 @@ export default function TeamManagementPanel() {
         }
     };
 
-    // Toggle automation participation
     const handleToggleParticipation = async (userId, current) => {
         setActionLoading(userId);
         try {
@@ -156,7 +162,6 @@ export default function TeamManagementPanel() {
         }
     };
 
-    // Copy code to clipboard
     const handleCopyCode = (code) => {
         navigator.clipboard.writeText(code);
         setCopiedCode(code);
@@ -168,7 +173,6 @@ export default function TeamManagementPanel() {
         setTimeout(() => setSuccessMsg(null), 3000);
     };
 
-    // Stats
     const linked = members.filter(m => m.telegramLinked).length;
     const participants = members.filter(m => m.isAutomationParticipant).length;
 
@@ -361,6 +365,211 @@ export default function TeamManagementPanel() {
                             </div>
                         );
                     })
+                )}
+            </div>
+
+            {/* ── Engineer → Technician Assignments ── */}
+            <EngineerTechAssignments members={members} nameMap={nameMap} showSuccess={showSuccess} setError={setError} />
+        </div>
+    );
+}
+
+// ============================================================
+// Engineer → Technician Assignment Sub-Component
+// ============================================================
+
+function EngineerTechAssignments({ members, nameMap, showSuccess, setError }) {
+    const { user } = useAuth();
+    const [assignments, setAssignments] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [selectedTech, setSelectedTech] = useState('');
+    const [selectedEng, setSelectedEng] = useState('');
+    const [reason, setReason] = useState('default');
+
+    const engineers = members.filter(m => m.operationalRole === 'engineer');
+    const technicians = members.filter(m => m.operationalRole === 'technician');
+
+    const resolveName = (id) => {
+        const found = members.find(m => m.id === id);
+        return nameMap[id] || found?.displayName || found?.name || found?.email || id?.slice(0, 8);
+    };
+
+    const loadAssignments = useCallback(async () => {
+        try {
+            setLoading(true);
+            const active = await getActiveAssignments();
+            setAssignments(active);
+        } catch (err) {
+            console.error('Error loading assignments:', err);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => { loadAssignments(); }, [loadAssignments]);
+
+    const handleAssign = async () => {
+        if (!selectedTech || !selectedEng) return;
+        setSaving(true);
+        try {
+            const existing = assignments.find(a => a.technicianId === selectedTech);
+            if (existing) {
+                await reassignTechnician(selectedTech, selectedEng, reason, user?.uid);
+            } else {
+                await createInitialAssignment(selectedTech, selectedEng, user?.uid);
+            }
+            showSuccess(`${resolveName(selectedTech)} asignado a ${resolveName(selectedEng)}`);
+            setSelectedTech('');
+            setSelectedEng('');
+            setReason('default');
+            await loadAssignments();
+        } catch (err) {
+            setError(`Error en asignación: ${err.message}`);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    // Group assignments by engineer
+    const assignmentsByEngineer = {};
+    for (const eng of engineers) {
+        assignmentsByEngineer[eng.id] = assignments.filter(a => a.engineerId === eng.id);
+    }
+    const unassigned = technicians.filter(t => !assignments.find(a => a.technicianId === t.id));
+
+    return (
+        <div className="bg-slate-800/60 border border-slate-700/40 rounded-2xl overflow-hidden">
+            {/* Header */}
+            <div className="px-4 py-3 border-b border-slate-700/40">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Users className="w-4 h-4 text-cyan-400" />
+                    Asignaciones Ingeniero → Técnico
+                </h3>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                    Define qué técnicos reportan a cada ingeniero. Esto afecta el score de Liderazgo del ingeniero.
+                </p>
+            </div>
+
+            {/* Assignment form */}
+            <div className="px-4 py-3 bg-slate-900/30 border-b border-slate-700/30">
+                <div className="flex items-end gap-2 flex-wrap">
+                    <div className="flex-1 min-w-[140px]">
+                        <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Técnico</label>
+                        <select
+                            value={selectedTech}
+                            onChange={(e) => setSelectedTech(e.target.value)}
+                            className="w-full bg-slate-900/60 border border-slate-600/30 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500/50"
+                        >
+                            <option value="">Seleccionar técnico...</option>
+                            {technicians.map(t => (
+                                <option key={t.id} value={t.id}>{nameMap[t.id] || t.displayName || t.email}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="shrink-0 flex items-center justify-center py-1.5">
+                        <ArrowRight className="w-4 h-4 text-cyan-400" />
+                    </div>
+
+                    <div className="flex-1 min-w-[140px]">
+                        <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Ingeniero</label>
+                        <select
+                            value={selectedEng}
+                            onChange={(e) => setSelectedEng(e.target.value)}
+                            className="w-full bg-slate-900/60 border border-slate-600/30 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500/50"
+                        >
+                            <option value="">Seleccionar ingeniero...</option>
+                            {engineers.map(e => (
+                                <option key={e.id} value={e.id}>{nameMap[e.id] || e.displayName || e.email}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="min-w-[120px]">
+                        <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Motivo</label>
+                        <select
+                            value={reason}
+                            onChange={(e) => setReason(e.target.value)}
+                            className="w-full bg-slate-900/60 border border-slate-600/30 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500/50"
+                        >
+                            {REASON_OPTIONS.map(r => (
+                                <option key={r.value} value={r.value}>{r.label}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <button
+                        onClick={handleAssign}
+                        disabled={!selectedTech || !selectedEng || saving}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 rounded-lg text-xs font-bold transition-colors border border-cyan-500/30 disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                        {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
+                        Asignar
+                    </button>
+                </div>
+            </div>
+
+            {/* Current assignments visualization */}
+            <div className="p-4 space-y-3">
+                {loading ? (
+                    <div className="text-center py-4 text-slate-500 text-xs flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" /> Cargando asignaciones...
+                    </div>
+                ) : engineers.length === 0 ? (
+                    <div className="text-center py-4 text-amber-400/60 text-xs">
+                        ⚠️ No hay ingenieros configurados. Asigna el rol &quot;Ingeniero&quot; a los miembros del equipo primero.
+                    </div>
+                ) : (
+                    <>
+                        {engineers.map(eng => {
+                            const techAssignments = assignmentsByEngineer[eng.id] || [];
+                            return (
+                                <div key={eng.id} className="rounded-xl border border-cyan-500/15 bg-cyan-500/5 p-3">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30">
+                                            Ingeniero
+                                        </span>
+                                        <span className="text-sm font-semibold text-white">{resolveName(eng.id)}</span>
+                                        <span className="text-[10px] text-slate-500 ml-auto">
+                                            {techAssignments.length} técnico{techAssignments.length !== 1 ? 's' : ''}
+                                        </span>
+                                    </div>
+                                    {techAssignments.length === 0 ? (
+                                        <div className="text-[10px] text-slate-500 italic pl-4">Sin técnicos asignados</div>
+                                    ) : (
+                                        <div className="flex flex-wrap gap-2 pl-4">
+                                            {techAssignments.map(a => (
+                                                <div key={a.id} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                                                    <span className="text-xs text-amber-200 font-medium">{resolveName(a.technicianId)}</span>
+                                                    {a.reason && a.reason !== 'default' && (
+                                                        <span className="text-[9px] text-slate-500 italic">({a.reason})</span>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+
+                        {/* Unassigned technicians */}
+                        {unassigned.length > 0 && (
+                            <div className="rounded-xl border border-red-500/15 bg-red-500/5 p-3">
+                                <div className="text-[10px] text-red-400 font-bold uppercase tracking-wider mb-1.5">
+                                    ⚠ Técnicos sin asignar
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {unassigned.map(t => (
+                                        <span key={t.id} className="text-xs text-red-300 px-2 py-1 rounded-lg bg-red-500/10 border border-red-500/20">
+                                            {resolveName(t.id)}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
         </div>
