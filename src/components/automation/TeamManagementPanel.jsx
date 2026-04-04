@@ -375,8 +375,15 @@ export default function TeamManagementPanel() {
 }
 
 // ============================================================
-// Engineer → Technician Assignment Sub-Component
+// Supervisor → Technician Assignment Sub-Component
 // ============================================================
+
+const SUPERVISOR_ROLES = ['engineer', 'team_lead', 'manager'];
+const SUPERVISOR_BADGE = {
+    engineer: { label: 'Ingeniero', color: 'cyan' },
+    team_lead: { label: 'Team Lead', color: 'blue' },
+    manager: { label: 'Manager', color: 'purple' },
+};
 
 function EngineerTechAssignments({ members, nameMap, showSuccess, setError }) {
     const { user } = useAuth();
@@ -387,7 +394,7 @@ function EngineerTechAssignments({ members, nameMap, showSuccess, setError }) {
     const [selectedEng, setSelectedEng] = useState('');
     const [reason, setReason] = useState('default');
 
-    const engineers = members.filter(m => m.operationalRole === 'engineer');
+    const supervisors = members.filter(m => SUPERVISOR_ROLES.includes(m.operationalRole));
     const technicians = members.filter(m => m.operationalRole === 'technician');
 
     const resolveName = (id) => {
@@ -431,10 +438,10 @@ function EngineerTechAssignments({ members, nameMap, showSuccess, setError }) {
         }
     };
 
-    // Group assignments by engineer
-    const assignmentsByEngineer = {};
-    for (const eng of engineers) {
-        assignmentsByEngineer[eng.id] = assignments.filter(a => a.engineerId === eng.id);
+    // Group assignments by supervisor
+    const assignmentsBySupervisor = {};
+    for (const sup of supervisors) {
+        assignmentsBySupervisor[sup.id] = assignments.filter(a => a.engineerId === sup.id);
     }
     const unassigned = technicians.filter(t => !assignments.find(a => a.technicianId === t.id));
 
@@ -444,10 +451,10 @@ function EngineerTechAssignments({ members, nameMap, showSuccess, setError }) {
             <div className="px-4 py-3 border-b border-slate-700/40">
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
                     <Users className="w-4 h-4 text-cyan-400" />
-                    Asignaciones Ingeniero → Técnico
+                    Asignaciones Supervisor → Técnico
                 </h3>
                 <p className="text-[10px] text-slate-500 mt-0.5">
-                    Define qué técnicos reportan a cada ingeniero. Esto afecta el score de Liderazgo del ingeniero.
+                    Define qué técnicos reportan a cada supervisor (Ingeniero, Team Lead o Manager). Afecta el score de Liderazgo.
                 </p>
             </div>
 
@@ -473,15 +480,15 @@ function EngineerTechAssignments({ members, nameMap, showSuccess, setError }) {
                     </div>
 
                     <div className="flex-1 min-w-[140px]">
-                        <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Ingeniero</label>
+                        <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Supervisor</label>
                         <select
                             value={selectedEng}
                             onChange={(e) => setSelectedEng(e.target.value)}
                             className="w-full bg-slate-900/60 border border-slate-600/30 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500/50"
                         >
-                            <option value="">Seleccionar ingeniero...</option>
-                            {engineers.map(e => (
-                                <option key={e.id} value={e.id}>{nameMap[e.id] || e.displayName || e.email}</option>
+                            <option value="">Seleccionar supervisor...</option>
+                            {supervisors.map(s => (
+                                <option key={s.id} value={s.id}>{nameMap[s.id] || s.displayName || s.email} ({SUPERVISOR_BADGE[s.operationalRole]?.label})</option>
                             ))}
                         </select>
                     </div>
@@ -516,21 +523,22 @@ function EngineerTechAssignments({ members, nameMap, showSuccess, setError }) {
                     <div className="text-center py-4 text-slate-500 text-xs flex items-center justify-center gap-2">
                         <Loader2 className="w-4 h-4 animate-spin" /> Cargando asignaciones...
                     </div>
-                ) : engineers.length === 0 ? (
+                ) : supervisors.length === 0 ? (
                     <div className="text-center py-4 text-amber-400/60 text-xs">
-                        ⚠️ No hay ingenieros configurados. Asigna el rol &quot;Ingeniero&quot; a los miembros del equipo primero.
+                        ⚠️ No hay supervisores configurados. Asigna un rol (Ingeniero, Team Lead o Manager) primero.
                     </div>
                 ) : (
                     <>
-                        {engineers.map(eng => {
-                            const techAssignments = assignmentsByEngineer[eng.id] || [];
+                        {supervisors.map(sup => {
+                            const badge = SUPERVISOR_BADGE[sup.operationalRole] || { label: sup.operationalRole, color: 'slate' };
+                            const techAssignments = assignmentsBySupervisor[sup.id] || [];
                             return (
-                                <div key={eng.id} className="rounded-xl border border-cyan-500/15 bg-cyan-500/5 p-3">
+                                <div key={sup.id} className={`rounded-xl border border-${badge.color}-500/15 bg-${badge.color}-500/5 p-3`}>
                                     <div className="flex items-center gap-2 mb-2">
-                                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30">
-                                            Ingeniero
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full bg-${badge.color}-500/20 text-${badge.color}-300 font-bold border border-${badge.color}-500/30`}>
+                                            {badge.label}
                                         </span>
-                                        <span className="text-sm font-semibold text-white">{resolveName(eng.id)}</span>
+                                        <span className="text-sm font-semibold text-white">{resolveName(sup.id)}</span>
                                         <span className="text-[10px] text-slate-500 ml-auto">
                                             {techAssignments.length} técnico{techAssignments.length !== 1 ? 's' : ''}
                                         </span>
