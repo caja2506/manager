@@ -149,22 +149,20 @@ function getDimensionInsight(key, dim) {
         case 'velocity': {
             const completed = raw.tasksCompleted || 0;
             const expected = raw.expected || 0;
-            const progress = raw.avgProgress || 0;
-            const overrun = raw.avgOverrun || 0;
-            const adjusted = raw.timelineAdjusted || false;
+            const progressRate = raw.avgProgressRate || 0;
+            const overrunRate = raw.avgOverrunRate || 0;
+            const ratePercent = (progressRate * 100).toFixed(0);
 
             if (score >= 90) {
-                const note = adjusted ? ' (ajustado por tareas multi-semana)' : '';
-                return { icon: '⚡', title: 'Velocidad', message: `Excelente ritmo. ${completed} tarea(s) completada(s) de ${expected} esperada(s) esta semana${note}.` };
+                return { icon: '⚡', title: 'Velocidad', message: `Excelente ritmo. ${completed} tarea(s) completada(s). Ritmo de avance: ${ratePercent}% (proporcional al timeline).` };
             }
             const parts = [];
-            if (completed === 0 && expected > 0) parts.push(`No completaste ninguna tarea de las ${expected} esperadas`);
+            if (completed === 0 && expected > 0) parts.push(`No completaste ninguna tarea de las ${expected} que ya deberían estar listas`);
             else if (completed < expected) parts.push(`Solo completaste ${completed} de ${expected} tareas esperadas`);
-            if (expected === 0 && completed === 0 && adjusted) parts.push('Tus tareas activas son de larga duración — no se esperan completaciones esta semana');
-            if (progress > 0 && progress < 70) parts.push(`el avance promedio en subtareas es ${progress.toFixed(0)}%`);
-            if (overrun > 1.5) parts.push(`el tiempo usado es ${(overrun * 100).toFixed(0)}% del estimado`);
-            if (adjusted && parts.length > 0) parts.push('el score se ajustó proporcionalmente al timeline de tus tareas largas');
-            return { icon: '⚡', title: 'Velocidad', message: parts.length > 0 ? parts.join('. Además, ') + '.' : `Completaste ${completed} de ${expected} tareas. Avance en subtareas: ${progress.toFixed(0)}%.` };
+            else if (expected === 0) parts.push('Tus tareas aún no cumplen el 90% de su timeline — no se esperaban completaciones');
+            if (progressRate < 0.7) parts.push(`ritmo de avance: ${ratePercent}% del esperado según el timeline`);
+            if (overrunRate > 1.3) parts.push(`consumo de horas: ${(overrunRate * 100).toFixed(0)}% de lo esperado al día de hoy`);
+            return { icon: '⚡', title: 'Velocidad', message: parts.length > 0 ? parts.join('. Además, ') + '.' : `Completaste ${completed} tareas. Ritmo: ${ratePercent}%.` };
         }
 
         case 'discipline': {
@@ -196,15 +194,13 @@ function getDimensionInsight(key, dim) {
             const ratio = raw.estimationRatio || 0;
             const evaluated = raw.tasksEvaluated || 0;
             const worst = raw.worstOverrun || 0;
-            const adjusted = raw.timelineAdjusted || false;
-            const adjNote = adjusted ? ' (ajustado — tareas en progreso se miden contra el timeline, no como si estuvieran terminadas)' : '';
 
             if (evaluated === 0) return { icon: '🎯', title: 'Precisión', message: 'Sin tareas con datos de estimación para evaluar.' };
-            if (score >= 90) return { icon: '🎯', title: 'Precisión', message: `Excelente precisión. Ratio estimación/real: ${(ratio * 100).toFixed(0)}% en ${evaluated} tarea(s)${adjNote}.` };
-            if (ratio > 2.0) return { icon: '🎯', title: 'Precisión', message: `Usaste ${(ratio * 100).toFixed(0)}% del tiempo estimado (${evaluated} tareas)${adjNote}. El peor caso consumió ${(worst * 100).toFixed(0)}%. Revisa estimaciones o reporta bloqueos.` };
-            if (ratio > 1.3) return { icon: '🎯', title: 'Precisión', message: `Tiempo real excede el estimado por ${((ratio - 1) * 100).toFixed(0)}% en ${evaluated} tarea(s)${adjNote}. Comunica bloqueos temprano.` };
-            if (ratio < 0.6) return { icon: '🎯', title: 'Precisión', message: `Terminaste en solo ${(ratio * 100).toFixed(0)}% del tiempo estimado${adjNote}. ¿Están las estimaciones infladas?` };
-            return { icon: '🎯', title: 'Precisión', message: `Ratio estimación/real: ${(ratio * 100).toFixed(0)}% en ${evaluated} tarea(s)${adjNote}.` };
+            if (score >= 90) return { icon: '🎯', title: 'Precisión', message: `Excelente precisión. Consumo proporcional: ${(ratio * 100).toFixed(0)}% en ${evaluated} tarea(s). En línea con el timeline.` };
+            if (ratio > 2.0) return { icon: '🎯', title: 'Precisión', message: `Consumiendo ${(ratio * 100).toFixed(0)}% de las horas esperadas al día de hoy (${evaluated} tareas). El peor caso: ${(worst * 100).toFixed(0)}%. Revisa estimaciones o reporta bloqueos.` };
+            if (ratio > 1.3) return { icon: '🎯', title: 'Precisión', message: `Horas reales exceden lo esperado al día de hoy por ${((ratio - 1) * 100).toFixed(0)}% en ${evaluated} tarea(s). Comunica bloqueos temprano.` };
+            if (ratio < 0.6) return { icon: '🎯', title: 'Precisión', message: `Solo usaste ${(ratio * 100).toFixed(0)}% de las horas esperadas al día de hoy. ¿Estimaciones infladas o faltó registrar tiempo?` };
+            return { icon: '🎯', title: 'Precisión', message: `Consumo proporcional: ${(ratio * 100).toFixed(0)}% de lo esperado en ${evaluated} tarea(s).` };
         }
 
         case 'collaboration': {
