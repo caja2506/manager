@@ -31,6 +31,8 @@ import InterventionAlertsCard from './InterventionAlertsCard';
 import ImpactTrackingCard from './ImpactTrackingCard';
 import OptimizationInsightsCard from './OptimizationInsightsCard';
 import TeamManagementPanel from './TeamManagementPanel';
+import DayScheduleSettings from '../settings/DayScheduleSettings.jsx';
+import EmailReportSettings from '../settings/EmailReportSettings.jsx';
 
 const TABS = [
     { key: 'control', label: 'Control', icon: Settings },
@@ -174,11 +176,15 @@ export default function AutomationControlShell({
                     </div>
                 )}
                 {activeTab === 'routines' && (
-                    <RoutineListCard
-                        routines={routines}
-                        onToggleRoutine={onToggleRoutine}
-                        onUpdateSchedule={onUpdateSchedule}
-                    />
+                    <div className="space-y-4">
+                        <RoutineListCard
+                            routines={routines}
+                            onToggleRoutine={onToggleRoutine}
+                            onUpdateSchedule={onUpdateSchedule}
+                        />
+                        <DayScheduleSettings />
+                        <EmailReportSettings />
+                    </div>
                 )}
                 {activeTab === 'activity' && (
                     <div className="space-y-4">
