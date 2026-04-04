@@ -30,8 +30,8 @@ const STATUS_GROUPS = [
     { status: TASK_STATUS.CANCELLED,   label: 'Cancelado',   color: '#6b7280' },
 ];
 
-// 12-column grid: ☐ | Task | Owner | Status | Área | Tipo | Avance | Health | Timeline | Hours | Priority | Project
-const GRID_COLS = '28px minmax(120px,280px) 36px 90px 72px 72px 64px 64px minmax(100px,150px) minmax(70px,100px) 80px 72px';
+// 13-column grid: ☐ | Task | Owner | Status | Área | Tipo | Avance | Health | Score | Timeline | Hours | Priority | Project
+const GRID_COLS = '28px minmax(120px,260px) 36px 90px 72px 72px 56px 48px 48px minmax(100px,150px) minmax(70px,100px) 80px 72px';
 
 // ============================================================
 // SAVE FEEDBACK HOOK
@@ -426,27 +426,37 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
         : (task.status === 'completed' ? 100 : subsPct);
     const progressColor = progressPct === 100 ? '#22c55e' : progressPct >= 60 ? '#6366f1' : progressPct >= 30 ? '#f59e0b' : '#ef4444';
 
-    // ──── Health Score ────
-    // Composite 0-100 basado en: timeline, horas vs estimado, estado
+    // ──── Health Score (operativo — mide atrasos) → ahora se llama "Score" ────
     const calcHealth = () => {
         if (task.status === 'completed') return 100;
         if (task.status === 'cancelled') return null;
         let score = 100;
-        // Penalizar si está atrasado
         if (daysLeft !== null && daysLeft < 0) score -= Math.min(40, Math.abs(daysLeft) * 4);
         else if (daysLeft !== null && daysLeft <= 2) score -= 15;
-        // Penalizar si se está pasando del presupuesto de horas
         if (hoursPct > 120) score -= 25;
         else if (hoursPct > 100) score -= 15;
         else if (hoursPct > 85) score -= 5;
-        // Penalizar si timeline avanzó pero progress está muy bajo
         if (timelinePct > 70 && progressPct < 30) score -= 20;
         else if (timelinePct > 50 && progressPct < 20) score -= 10;
         return Math.max(0, Math.min(100, Math.round(score)));
     };
-    const healthScore = calcHealth();
-    const healthColor = healthScore === null ? '#475569' : healthScore >= 80 ? '#22c55e' : healthScore >= 60 ? '#f59e0b' : '#ef4444';
-    const healthLabel = healthScore === null ? '—' : healthScore >= 80 ? 'OK' : healthScore >= 60 ? 'Risk' : 'Critical';
+    const opScore = calcHealth();
+    const opScoreColor = opScore === null ? '#475569' : opScore >= 80 ? '#22c55e' : opScore >= 60 ? '#f59e0b' : '#ef4444';
+
+    // ──── Health (metodología — calidad de definición) ────
+    const calcMethodHealth = () => {
+        let score = 0;
+        if (totalSubs > 0) score += 15;
+        if (estimated > 0) score += 20;
+        if (task.assignedTo) score += 20;
+        if (task.dueDate || task.plannedEndDate) score += 15;
+        if (task.taskTypeId) score += 10;
+        if ((task.description || '').trim().length >= 10) score += 10;
+        if (task.priority !== 'critical' || task.milestoneId) score += 10;
+        return score;
+    };
+    const methHealth = calcMethodHealth();
+    const methColor = methHealth >= 80 ? '#22c55e' : methHealth >= 60 ? '#f59e0b' : methHealth >= 40 ? '#fb923c' : '#ef4444';
 
     return (
         <>
@@ -618,24 +628,30 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                     </div>
                 </div>
 
-                {/* ── Health Score ── */}
+                {/* ── Health (metodología) ── */}
                 <div className="flex items-center justify-center" onClick={e => e.stopPropagation()}>
-                    {healthScore !== null ? (
-                        <div className="relative flex items-center justify-center" title={`${healthLabel} (${healthScore}/100)`}>
-                            <svg width="36" height="36" viewBox="0 0 36 36" className="-rotate-90">
+                    <div className="relative flex items-center justify-center" title={`Metodología ${methHealth}/100`}>
+                        <svg width="30" height="30" viewBox="0 0 36 36" className="-rotate-90">
+                            <circle cx="18" cy="18" r="14" fill="none" stroke="#1e293b" strokeWidth="4" />
+                            <circle cx="18" cy="18" r="14" fill="none" stroke={methColor} strokeWidth="4"
+                                strokeDasharray={`${(methHealth / 100) * 87.96} 87.96`}
+                                strokeLinecap="round" className="transition-all duration-700" />
+                        </svg>
+                        <span className="absolute text-[8px] font-black" style={{ color: methColor }}>{methHealth}</span>
+                    </div>
+                </div>
+
+                {/* ── Score (operativo) ── */}
+                <div className="flex items-center justify-center" onClick={e => e.stopPropagation()}>
+                    {opScore !== null ? (
+                        <div className="relative flex items-center justify-center" title={`Score operativo ${opScore}/100`}>
+                            <svg width="30" height="30" viewBox="0 0 36 36" className="-rotate-90">
                                 <circle cx="18" cy="18" r="14" fill="none" stroke="#1e293b" strokeWidth="4" />
-                                <circle
-                                    cx="18" cy="18" r="14" fill="none"
-                                    stroke={healthColor}
-                                    strokeWidth="4"
-                                    strokeDasharray={`${(healthScore / 100) * 87.96} 87.96`}
-                                    strokeLinecap="round"
-                                    className="transition-all duration-700"
-                                />
+                                <circle cx="18" cy="18" r="14" fill="none" stroke={opScoreColor} strokeWidth="4"
+                                    strokeDasharray={`${(opScore / 100) * 87.96} 87.96`}
+                                    strokeLinecap="round" className="transition-all duration-700" />
                             </svg>
-                            <div className="absolute flex flex-col items-center leading-none">
-                                <span className="text-[9px] font-black" style={{ color: healthColor }}>{healthScore}</span>
-                            </div>
+                            <span className="absolute text-[8px] font-black" style={{ color: opScoreColor }}>{opScore}</span>
                         </div>
                     ) : (
                         <span className="text-[11px] text-slate-600">—</span>
@@ -1024,6 +1040,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                             <div>Tipo</div>
                             <div>Avance</div>
                             <div>Health</div>
+                            <div>Score</div>
                             <div>Timeline</div>
                             <div>Horas</div>
                             <div>Prioridad</div>
@@ -1062,7 +1079,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                 style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${color}` }}
                             >
                                 <div></div>
-                                <div className="col-span-11">
+                                <div className="col-span-12">
                                     {addingTask ? (
                                         <div className="flex items-center gap-2">
                                             <input
@@ -1121,6 +1138,8 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                 {/* Avance placeholder */}
                                 <div></div>
                                 {/* Health placeholder */}
+                                <div></div>
+                                {/* Score placeholder */}
                                 <div></div>
                                 {/* Date range */}
                                 <div className="flex items-center justify-center">
