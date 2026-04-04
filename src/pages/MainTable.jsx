@@ -12,11 +12,11 @@ import {
 } from '../models/schemas';
 import {
     Search, Filter, X, ChevronDown, ChevronRight, User, Calendar,
-    Check, Plus, Clock, Maximize2
+    Check, Plus, Maximize2
 } from 'lucide-react';
 
 // ============================================================
-// STATUS GROUP ORDER
+// CONSTANTS
 // ============================================================
 
 const STATUS_GROUPS = [
@@ -29,10 +29,11 @@ const STATUS_GROUPS = [
     { status: TASK_STATUS.CANCELLED,   label: 'Cancelado',   color: '#6b7280' },
 ];
 
-const GRID_COLS = '36px 1fr 50px 120px minmax(100px,140px) minmax(130px,170px) 90px 95px 95px 120px';
+// 8-column grid: Open | Task | Owner | Status | Progress | Timeline | Priority | Project
+const GRID_COLS = '28px 1fr 44px 115px 110px minmax(160px,220px) 80px 110px';
 
 // ============================================================
-// SAVE FEEDBACK — flash green on successful save
+// SAVE FEEDBACK HOOK
 // ============================================================
 
 function useSaveFeedback() {
@@ -111,7 +112,6 @@ function InlineDropdown({ value, options, onSelect, renderValue, className = '' 
                             onClick={() => { onSelect(opt.value); setOpen(false); }}
                             className={`w-full text-left px-3 py-1.5 text-xs font-medium hover:bg-slate-700/80 flex items-center gap-2 transition-colors ${opt.value === value ? 'text-indigo-400 bg-indigo-500/10' : 'text-slate-300'}`}
                         >
-                            {opt.icon && <span>{opt.icon}</span>}
                             {opt.color && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: opt.color }} />}
                             {opt.label}
                             {opt.value === value && <Check className="w-3 h-3 ml-auto text-indigo-400" />}
@@ -124,35 +124,10 @@ function InlineDropdown({ value, options, onSelect, renderValue, className = '' 
 }
 
 // ============================================================
-// INLINE EDIT: DATE
-// ============================================================
-
-function InlineDatePicker({ value, onSave, className = '' }) {
-    const inputRef = useRef(null);
-    const display = value ? new Date(value).toLocaleDateString('es-MX', { month: 'short', day: 'numeric' }) : '—';
-
-    return (
-        <div className={`relative ${className}`} onClick={e => e.stopPropagation()}>
-            <button onClick={() => inputRef.current?.showPicker?.()} className="text-xs text-slate-400 hover:text-white hover:bg-slate-800/60 rounded px-1 py-0.5 transition-colors flex items-center gap-1">
-                <Calendar className="w-3 h-3 text-slate-600" />
-                {display}
-            </button>
-            <input
-                ref={inputRef}
-                type="date"
-                value={value?.split('T')[0] || ''}
-                onChange={e => { if (e.target.value) onSave(e.target.value); }}
-                className="absolute opacity-0 w-0 h-0 pointer-events-none"
-            />
-        </div>
-    );
-}
-
-// ============================================================
 // INLINE EDIT: NUMBER
 // ============================================================
 
-function InlineEditNumber({ value, onSave, suffix = 'h', className = '' }) {
+function InlineEditNumber({ value, onSave, suffix = 'h' }) {
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState(value || 0);
     const inputRef = useRef(null);
@@ -168,8 +143,8 @@ function InlineEditNumber({ value, onSave, suffix = 'h', className = '' }) {
 
     if (!editing) {
         return (
-            <span onClick={e => { e.stopPropagation(); setEditing(true); }} className={`cursor-text hover:bg-slate-800/60 rounded px-1 py-0.5 transition-colors ${className}`}>
-                {value ? `${value}${suffix}` : <span className="text-slate-600">—</span>}
+            <span onClick={e => { e.stopPropagation(); setEditing(true); }} className="cursor-text hover:bg-slate-800/60 rounded px-0.5 transition-colors text-slate-500">
+                {value ? `${value}${suffix}` : '—'}
             </span>
         );
     }
@@ -185,145 +160,32 @@ function InlineEditNumber({ value, onSave, suffix = 'h', className = '' }) {
             onBlur={handleSave}
             onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') { setDraft(value || 0); setEditing(false); } }}
             onClick={e => e.stopPropagation()}
-            className="w-16 bg-slate-800 border border-indigo-500/50 rounded px-1.5 py-0.5 text-xs text-white outline-none focus:ring-1 focus:ring-indigo-500/50"
+            className="w-14 bg-slate-800 border border-indigo-500/50 rounded px-1 py-0.5 text-[10px] text-white outline-none focus:ring-1 focus:ring-indigo-500/50"
         />
     );
 }
 
 // ============================================================
-// PROGRESS BAR COMPONENT
+// INLINE DATE PICKER
 // ============================================================
 
-function ProgressBar({ subtasks, onClick }) {
-    const total = subtasks?.length || 0;
-    const done = subtasks?.filter(s => s.completed || s.done).length || 0;
-    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-    const barColor = pct === 100 ? '#22c55e' : pct >= 50 ? '#f59e0b' : pct > 0 ? '#3b82f6' : '#334155';
+function InlineDatePicker({ value, onSave }) {
+    const inputRef = useRef(null);
+    const display = value ? new Date(value).toLocaleDateString('es-MX', { month: 'short', day: 'numeric' }) : '—';
 
     return (
-        <button onClick={onClick} className="flex items-center gap-2 w-full hover:bg-slate-800/60 rounded px-1 py-1 transition-colors group" title={`${done}/${total} subtareas`}>
-            <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden min-w-[40px]">
-                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: barColor }} />
-            </div>
-            <span className="text-[10px] font-bold text-slate-500 group-hover:text-slate-300 whitespace-nowrap transition-colors">
-                {total > 0 ? `${done}/${total}` : '—'}
-            </span>
-        </button>
-    );
-}
-
-// ============================================================
-// GANTT TIMELINE BAR
-// ============================================================
-
-function GanttTimeline({ task, canEdit, onSave }) {
-    const start = task.plannedStartDate || task.createdAt;
-    const end = task.dueDate || task.plannedEndDate;
-    if (!start && !end) return <span className="text-slate-600 text-xs">—</span>;
-
-    const startDate = start ? new Date(start) : new Date();
-    const endDate = end ? new Date(end) : new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const now = new Date();
-    const totalDays = Math.max(1, (endDate - startDate) / (1000 * 60 * 60 * 24));
-    const elapsedDays = Math.max(0, (now - startDate) / (1000 * 60 * 60 * 24));
-    const progressPct = Math.min(100, Math.max(0, (elapsedDays / totalDays) * 100));
-
-    const isOverdue = now > endDate && task.status !== 'completed';
-    const barBg = isOverdue ? '#ef4444' : progressPct > 80 ? '#f59e0b' : '#6366f1';
-
-    const fmtShort = (d) => d.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' });
-
-    return (
-        <div className="flex flex-col gap-1 w-full" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center gap-1.5">
-                {canEdit ? (
-                    <>
-                        <InlineDatePicker value={start} onSave={v => onSave('plannedStartDate', v)} />
-                        <span className="text-slate-600 text-[10px]">→</span>
-                        <InlineDatePicker value={end} onSave={v => onSave('dueDate', v)} />
-                    </>
-                ) : (
-                    <span className="text-[10px] text-slate-500">{fmtShort(startDate)} → {fmtShort(endDate)}</span>
-                )}
-            </div>
-            <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all duration-700" style={{ width: `${progressPct}%`, background: barBg }} />
-            </div>
-        </div>
-    );
-}
-
-// ============================================================
-// HOURS CELL
-// ============================================================
-
-function HoursCell({ task, canEdit, onSave }) {
-    const actual = task.actualHours || 0;
-    const estimated = task.estimatedHours || 0;
-    const pct = estimated > 0 ? Math.round((actual / estimated) * 100) : 0;
-    const barColor = pct > 100 ? '#ef4444' : pct > 80 ? '#f59e0b' : '#22c55e';
-
-    return (
-        <div className="flex flex-col gap-0.5" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center gap-0.5 text-[10px]">
-                <span className="text-slate-400 font-bold">{actual.toFixed(1)}</span>
-                <span className="text-slate-700">/</span>
-                {canEdit ? (
-                    <InlineEditNumber value={estimated} onSave={v => onSave('estimatedHours', v)} className="text-[10px] text-slate-500" />
-                ) : (
-                    <span className="text-slate-500">{estimated}h</span>
-                )}
-            </div>
-            {estimated > 0 && (
-                <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(pct, 100)}%`, background: barColor }} />
-                </div>
-            )}
-        </div>
-    );
-}
-
-// ============================================================
-// DUE DATE BADGE
-// ============================================================
-
-function DueDateBadge({ task, canEdit, onSave }) {
-    const dueDate = task.dueDate || task.plannedEndDate;
-    if (!dueDate) {
-        if (canEdit) return <InlineDatePicker value="" onSave={v => onSave('dueDate', v)} className="text-slate-600" />;
-        return <span className="text-slate-600 text-xs">—</span>;
-    }
-
-    const due = new Date(dueDate);
-    const now = new Date();
-    const daysLeft = Math.ceil((due - now) / (1000 * 60 * 60 * 24));
-    const isCompleted = task.status === 'completed';
-
-    let color = 'text-slate-400';
-    let bg = '';
-    if (!isCompleted) {
-        if (daysLeft < 0) { color = 'text-rose-400'; bg = 'bg-rose-500/10'; }
-        else if (daysLeft <= 2) { color = 'text-amber-400'; bg = 'bg-amber-500/10'; }
-        else if (daysLeft <= 5) { color = 'text-yellow-400'; }
-        else { color = 'text-emerald-400'; }
-    }
-
-    const label = isCompleted ? '✓' : daysLeft < 0 ? `${Math.abs(daysLeft)}d late` : daysLeft === 0 ? 'Hoy' : `${daysLeft}d`;
-
-    if (canEdit) {
-        return (
-            <div className="flex flex-col items-center gap-0.5">
-                <InlineDatePicker value={dueDate} onSave={v => onSave('dueDate', v)} />
-                <span className={`text-[9px] font-bold ${color} ${bg} px-1.5 rounded`}>{label}</span>
-            </div>
-        );
-    }
-
-    return (
-        <div className="text-center">
-            <span className={`text-xs ${color}`}>{due.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' })}</span>
-            <span className={`block text-[9px] font-bold ${color} ${bg} px-1 rounded mt-0.5`}>{label}</span>
-        </div>
+        <span className="relative" onClick={e => e.stopPropagation()}>
+            <button onClick={() => inputRef.current?.showPicker?.()} className="text-[10px] text-slate-400 hover:text-white hover:bg-slate-800/60 rounded px-0.5 transition-colors">
+                {display}
+            </button>
+            <input
+                ref={inputRef}
+                type="date"
+                value={value?.split('T')[0] || ''}
+                onChange={e => { if (e.target.value) onSave(e.target.value); }}
+                className="absolute opacity-0 w-0 h-0 pointer-events-none"
+            />
+        </span>
     );
 }
 
@@ -361,7 +223,7 @@ function OwnerAvatar({ task, teamMembers }) {
 }
 
 // ============================================================
-// SUBTASK EXPANDER ROW
+// SUBTASK EXPANDER
 // ============================================================
 
 function SubtaskExpander({ subtasks, taskId, canEdit }) {
@@ -390,17 +252,17 @@ function SubtaskExpander({ subtasks, taskId, canEdit }) {
     };
 
     return (
-        <div className="px-6 py-3 bg-slate-950/80 border-t border-slate-800/40 animate-in fade-in slide-in-from-top-1 duration-200" onClick={e => e.stopPropagation()}>
-            <div className="space-y-1 max-w-xl">
+        <div className="pl-10 pr-4 py-2.5 bg-slate-950/60 border-t border-slate-800/30 animate-in fade-in slide-in-from-top-1 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="space-y-1 max-w-md">
                 {subtasks.map(sub => (
-                    <div key={sub.id} className="flex items-center gap-2.5 py-1 group/sub">
+                    <div key={sub.id} className="flex items-center gap-2 py-0.5 group/sub">
                         <button
                             onClick={() => handleToggle(sub)}
-                            className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${
+                            className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-all ${
                                 sub.completed ? 'bg-emerald-500 border-emerald-500' : 'border-slate-600 hover:border-slate-400'
                             }`}
                         >
-                            {sub.completed && <Check className="w-2.5 h-2.5 text-white" />}
+                            {sub.completed && <Check className="w-2 h-2 text-white" />}
                         </button>
                         <span className={`text-xs ${sub.completed ? 'line-through text-slate-600' : 'text-slate-300'}`}>
                             {sub.title}
@@ -409,7 +271,7 @@ function SubtaskExpander({ subtasks, taskId, canEdit }) {
                 ))}
                 {canEdit && (
                     <div className="flex items-center gap-2 pt-1">
-                        <Plus className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                        <Plus className="w-3 h-3 text-slate-600 shrink-0" />
                         <input
                             ref={inputRef}
                             value={newTitle}
@@ -419,7 +281,7 @@ function SubtaskExpander({ subtasks, taskId, canEdit }) {
                             className="flex-1 bg-transparent text-xs text-slate-400 placeholder:text-slate-700 outline-none"
                         />
                         {newTitle.trim() && (
-                            <button onClick={handleAdd} className="text-[10px] font-bold text-indigo-400 hover:text-indigo-300">Agregar</button>
+                            <button onClick={handleAdd} className="text-[10px] font-bold text-indigo-400 hover:text-indigo-300">+</button>
                         )}
                     </div>
                 )}
@@ -429,7 +291,7 @@ function SubtaskExpander({ subtasks, taskId, canEdit }) {
 }
 
 // ============================================================
-// TABLE ROW
+// TASK ROW
 // ============================================================
 
 function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModal, groupColor, isLast, savedField, onSaved }) {
@@ -451,62 +313,84 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
     const project = engProjects.find(p => p.id === task.projectId);
     const isSaved = (field) => savedField === `${task.id}-${field}`;
 
-    // Status options
+    // Options
     const statusOptions = Object.entries(TASK_STATUS_CONFIG).map(([key, cfg]) => ({
         value: key, label: cfg.label, color: cfg.color,
     }));
-
-    // Priority options
     const priorityOptions = Object.entries(TASK_PRIORITY_CONFIG).map(([key, cfg]) => ({
         value: key, label: cfg.label, color: cfg.color || '#64748b',
     }));
-
-    // Owner options
     const ownerOptions = [
-        { value: '', label: 'Sin asignar', icon: '—' },
-        ...teamMembers.map(m => ({ value: m.uid, label: m.displayName || m.email, icon: '👤' })),
+        { value: '', label: 'Sin asignar' },
+        ...teamMembers.map(m => ({ value: m.uid, label: m.displayName || m.email })),
     ];
-
-    // Project options
     const projectOptions = [
-        { value: '', label: 'Sin proyecto', icon: '—' },
-        ...engProjects.map(p => ({ value: p.id, label: p.name, icon: '📁' })),
+        { value: '', label: 'Sin proyecto' },
+        ...engProjects.map(p => ({ value: p.id, label: p.name })),
     ];
 
     const statusCfg = TASK_STATUS_CONFIG[task.status] || {};
+
+    // Subtask progress
+    const totalSubs = subtasks.length;
+    const doneSubs = subtasks.filter(s => s.completed || s.done).length;
+    const subsPct = totalSubs > 0 ? Math.round((doneSubs / totalSubs) * 100) : 0;
+    const subsColor = subsPct === 100 ? '#22c55e' : subsPct >= 50 ? '#f59e0b' : subsPct > 0 ? '#6366f1' : '#334155';
+
+    // Timeline
+    const startRaw = task.plannedStartDate || task.createdAt;
+    const endRaw = task.dueDate || task.plannedEndDate;
+    const startDate = startRaw ? new Date(startRaw) : null;
+    const endDate = endRaw ? new Date(endRaw) : null;
+    const now = new Date();
+
+    let timelinePct = 0;
+    let timelineColor = '#6366f1';
+    let daysLeft = null;
+    if (startDate && endDate) {
+        const total = Math.max(1, (endDate - startDate) / (1000 * 60 * 60 * 24));
+        const elapsed = Math.max(0, (now - startDate) / (1000 * 60 * 60 * 24));
+        timelinePct = Math.min(100, Math.max(0, (elapsed / total) * 100));
+        daysLeft = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
+        if (daysLeft < 0 && task.status !== 'completed') timelineColor = '#ef4444';
+        else if (timelinePct > 80) timelineColor = '#f59e0b';
+    }
+
+    // Hours
+    const actual = task.actualHours || 0;
+    const estimated = task.estimatedHours || 0;
+    const hoursPct = estimated > 0 ? Math.min(100, Math.round((actual / estimated) * 100)) : 0;
+    const hoursColor = hoursPct > 100 ? '#ef4444' : hoursPct > 80 ? '#f59e0b' : '#22c55e';
+
+    const fmtDate = (d) => d ? d.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' }) : '—';
 
     return (
         <>
             <div
                 onDoubleClick={() => onOpenModal(task)}
-                className={`grid items-center px-3 py-2.5 transition-all duration-150 hover:bg-indigo-500/[.06] group/row ${!isLast ? 'border-b border-slate-800/40' : ''}`}
+                className={`grid items-center px-3 py-2 transition-all duration-150 hover:bg-indigo-500/[.06] group/row ${!isLast ? 'border-b border-slate-800/30' : ''}`}
                 style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${groupColor}` }}
             >
-                {/* Checkbox */}
-                <div className="flex items-center" onClick={e => e.stopPropagation()}>
-                    <input type="checkbox" className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-800 accent-indigo-500 cursor-pointer" />
+                {/* Open detail button */}
+                <button onClick={(e) => { e.stopPropagation(); onOpenModal(task); }} className="text-slate-700 hover:text-indigo-400 transition-colors" title="Abrir detalle">
+                    <Maximize2 className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Task Name */}
+                <div className="pr-2 min-w-0">
+                    {canEdit ? (
+                        <InlineEditText
+                            value={task.title || ''}
+                            onSave={v => saveField('title', v)}
+                            className={`text-sm font-semibold text-slate-200 truncate ${isSaved('title') ? 'bg-emerald-500/10' : ''}`}
+                            placeholder="Sin título"
+                        />
+                    ) : (
+                        <p className="text-sm font-semibold text-slate-200 truncate">{task.title || 'Sin título'}</p>
+                    )}
                 </div>
 
-                {/* Task Name — inline editable */}
-                <div className="pr-2 flex items-center gap-1.5 min-w-0">
-                    <button onClick={(e) => { e.stopPropagation(); onOpenModal(task); }} className="text-slate-600 hover:text-indigo-400 transition-colors shrink-0" title="Abrir detalle">
-                        <Maximize2 className="w-3 h-3" />
-                    </button>
-                    <div className="min-w-0 flex-1">
-                        {canEdit ? (
-                            <InlineEditText
-                                value={task.title || ''}
-                                onSave={v => saveField('title', v)}
-                                className={`text-sm font-semibold text-slate-200 truncate ${isSaved('title') ? 'bg-emerald-500/10 ring-1 ring-emerald-500/30' : ''}`}
-                                placeholder="Sin título"
-                            />
-                        ) : (
-                            <p className="text-sm font-semibold text-slate-200 truncate">{task.title || 'Sin título'}</p>
-                        )}
-                    </div>
-                </div>
-
-                {/* Owner — inline dropdown */}
+                {/* Owner */}
                 <div className="flex justify-center">
                     {canEdit ? (
                         <InlineDropdown
@@ -520,7 +404,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                     )}
                 </div>
 
-                {/* Status — inline dropdown */}
+                {/* Status */}
                 <div className="flex justify-center">
                     {canEdit ? (
                         <InlineDropdown
@@ -530,8 +414,8 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                             renderValue={(val) => {
                                 const cfg = TASK_STATUS_CONFIG[val] || {};
                                 return (
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide whitespace-nowrap ${isSaved('status') ? 'ring-1 ring-emerald-500/30' : ''}`}
-                                        style={{ backgroundColor: (cfg.color || '#64748b') + '22', color: cfg.color, border: `1px solid ${(cfg.color || '#64748b')}44` }}>
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide whitespace-nowrap"
+                                        style={{ backgroundColor: (cfg.color || '#64748b') + '20', color: cfg.color, border: `1px solid ${(cfg.color || '#64748b')}33` }}>
                                         {cfg.label || val}
                                     </span>
                                 );
@@ -539,28 +423,72 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                         />
                     ) : (
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase"
-                            style={{ backgroundColor: (statusCfg.color || '#64748b') + '22', color: statusCfg.color }}>
+                            style={{ backgroundColor: (statusCfg.color || '#64748b') + '20', color: statusCfg.color }}>
                             {statusCfg.label || task.status}
                         </span>
                     )}
                 </div>
 
-                {/* Progress — subtasks bar */}
-                <div>
-                    <ProgressBar subtasks={subtasks} onClick={(e) => { e.stopPropagation(); setExpandedSubs(!expandedSubs); }} />
+                {/* Progress — subtasks bar with expandable chevron */}
+                <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                    {totalSubs > 0 ? (
+                        <button onClick={() => setExpandedSubs(!expandedSubs)} className="flex items-center gap-1.5 w-full hover:bg-slate-800/40 rounded px-1 py-0.5 transition-colors group/prog">
+                            {expandedSubs
+                                ? <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
+                                : <ChevronRight className="w-3 h-3 text-slate-500 shrink-0" />
+                            }
+                            <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${subsPct}%`, background: subsColor }} />
+                            </div>
+                            <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap">{doneSubs}/{totalSubs}</span>
+                        </button>
+                    ) : (
+                        <span className="text-[10px] text-slate-600 px-1">—</span>
+                    )}
                 </div>
 
-                {/* Gantt Timeline */}
-                <div>
-                    <GanttTimeline task={task} canEdit={canEdit} onSave={saveField} />
+                {/* Timeline — dates + single bar */}
+                <div className="flex flex-col gap-0.5" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center gap-1 text-[10px]">
+                        {canEdit ? (
+                            <>
+                                <InlineDatePicker value={startRaw} onSave={v => saveField('plannedStartDate', v)} />
+                                <span className="text-slate-700">→</span>
+                                <InlineDatePicker value={endRaw} onSave={v => saveField('dueDate', v)} />
+                            </>
+                        ) : (
+                            <span className="text-slate-500">{fmtDate(startDate)} → {fmtDate(endDate)}</span>
+                        )}
+                        {daysLeft !== null && (
+                            <span className={`text-[9px] font-bold ml-auto px-1 rounded ${
+                                daysLeft < 0 && task.status !== 'completed' ? 'text-rose-400 bg-rose-500/10' :
+                                daysLeft <= 3 ? 'text-amber-400' : 'text-slate-600'
+                            }`}>
+                                {task.status === 'completed' ? '✓' : daysLeft < 0 ? `${Math.abs(daysLeft)}d late` : `${daysLeft}d`}
+                            </span>
+                        )}
+                    </div>
+                    {startDate && endDate && (
+                        <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${timelinePct}%`, background: timelineColor }} />
+                        </div>
+                    )}
+                    {/* Hours inline below timeline */}
+                    {(actual > 0 || estimated > 0) && (
+                        <div className="flex items-center gap-1 text-[9px] text-slate-600">
+                            <span className="text-slate-400 font-bold">{actual.toFixed(1)}h</span>
+                            <span>/</span>
+                            {canEdit ? (
+                                <InlineEditNumber value={estimated} onSave={v => saveField('estimatedHours', v)} />
+                            ) : (
+                                <span>{estimated}h</span>
+                            )}
+                            {estimated > 0 && <span className={`font-bold ${hoursPct > 100 ? 'text-rose-400' : hoursPct > 80 ? 'text-amber-400' : 'text-emerald-400'}`}>({hoursPct}%)</span>}
+                        </div>
+                    )}
                 </div>
 
-                {/* Hours */}
-                <div>
-                    <HoursCell task={task} canEdit={canEdit} onSave={saveField} />
-                </div>
-
-                {/* Priority — inline dropdown */}
+                {/* Priority */}
                 <div className="flex justify-center">
                     {canEdit ? (
                         <InlineDropdown
@@ -568,12 +496,12 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                             options={priorityOptions}
                             onSelect={v => saveField('priority', v)}
                             renderValue={(val) => {
-                                const cfg = TASK_PRIORITY_CONFIG[val] || {};
                                 const colors = { low: '#94a3b8', medium: '#60a5fa', high: '#fbbf24', critical: '#f87171' };
                                 const c = colors[val] || '#94a3b8';
+                                const cfg = TASK_PRIORITY_CONFIG[val] || {};
                                 return (
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${isSaved('priority') ? 'ring-1 ring-emerald-500/30' : ''}`}
-                                        style={{ backgroundColor: c + '22', color: c, border: `1px solid ${c}44` }}>
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase"
+                                        style={{ backgroundColor: c + '18', color: c, border: `1px solid ${c}30` }}>
                                         {cfg.label || val}
                                     </span>
                                 );
@@ -584,12 +512,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                     )}
                 </div>
 
-                {/* Due Date */}
-                <div>
-                    <DueDateBadge task={task} canEdit={canEdit} onSave={saveField} />
-                </div>
-
-                {/* Project — inline dropdown */}
+                {/* Project */}
                 <div>
                     {canEdit ? (
                         <InlineDropdown
@@ -598,17 +521,17 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                             onSelect={v => saveField('projectId', v || null)}
                             renderValue={(val) => {
                                 const p = engProjects.find(pr => pr.id === val);
-                                return <span className={`text-xs truncate block max-w-[110px] ${p ? 'text-slate-400 italic' : 'text-slate-600'} ${isSaved('projectId') ? 'text-emerald-400' : ''}`}>{p?.name || '—'}</span>;
+                                return <span className="text-[11px] truncate block max-w-[100px] text-slate-400 italic">{p?.name || '—'}</span>;
                             }}
                         />
                     ) : (
-                        <span className="text-xs text-slate-400 italic truncate block">{project?.name || '—'}</span>
+                        <span className="text-[11px] text-slate-400 italic truncate block">{project?.name || '—'}</span>
                     )}
                 </div>
             </div>
 
             {/* Expanded Subtasks */}
-            {expandedSubs && (
+            {expandedSubs && totalSubs > 0 && (
                 <SubtaskExpander subtasks={subtasks} taskId={task.id} canEdit={canEdit} />
             )}
         </>
@@ -616,13 +539,12 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
 }
 
 // ============================================================
-// COLLAPSIBLE TABLE GROUP
+// TABLE GROUP
 // ============================================================
 
 function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers, canEdit, onOpenModal, isExpanded, onToggle, savedField, onSaved }) {
     return (
         <div className="mb-4 animate-in fade-in duration-200">
-            {/* Group Header */}
             <button onClick={onToggle} className="flex items-center gap-2.5 w-full text-left px-2 py-2 rounded-lg hover:bg-slate-800/50 transition-colors group">
                 {isExpanded
                     ? <ChevronDown className="w-4 h-4 text-slate-500 group-hover:text-slate-300" />
@@ -634,30 +556,26 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                 </span>
             </button>
 
-            {/* Table */}
             {isExpanded && (
-                <div className="mt-1 rounded-xl overflow-hidden border border-slate-800/60 bg-slate-900/40">
-                    {/* Column Headers */}
+                <div className="mt-1 rounded-xl overflow-hidden border border-slate-800/50 bg-slate-900/30">
+                    {/* Header */}
                     <div
-                        className="grid items-center px-3 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.15em] border-b border-slate-800/60 bg-slate-900/60"
+                        className="grid items-center px-3 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-900/50"
                         style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${color}` }}
                     >
-                        <div><input type="checkbox" className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-800 accent-indigo-500" readOnly /></div>
+                        <div></div>
                         <div>Tarea</div>
-                        <div className="text-center">Resp.</div>
+                        <div className="text-center">Resp</div>
                         <div className="text-center">Estado</div>
-                        <div className="text-center">Progreso</div>
-                        <div>Cronograma</div>
-                        <div className="text-center">Horas</div>
-                        <div className="text-center">Prior.</div>
-                        <div className="text-center">Vence</div>
+                        <div>Progreso</div>
+                        <div>Timeline / Horas</div>
+                        <div className="text-center">Prior</div>
                         <div>Proyecto</div>
                     </div>
 
-                    {/* Rows */}
                     {tasks.length === 0 ? (
-                        <div className="px-4 py-6 text-center text-sm text-slate-600" style={{ borderLeft: `3px solid ${color}` }}>
-                            Sin tareas en esta sección
+                        <div className="px-4 py-5 text-center text-sm text-slate-600" style={{ borderLeft: `3px solid ${color}` }}>
+                            Sin tareas
                         </div>
                     ) : (
                         tasks.map((task, idx) => (
@@ -691,19 +609,14 @@ export default function MainTable() {
     const { canEdit, canDelete } = useRole();
     const { engProjects, engTasks, engSubtasks, teamMembers, taskTypes } = useEngineeringData();
 
-    // Modal
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
-
-    // Filters
     const [search, setSearch] = useState('');
     const [filterProject, setFilterProject] = useState('');
     const [filterAssignee, setFilterAssignee] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
     const [showFilters, setShowFilters] = useState(false);
     const [collapsedGroups, setCollapsedGroups] = useState({});
-
-    // Save feedback
     const { savedField, show: showSaved } = useSaveFeedback();
 
     const openNew = () => { setSelectedTask(null); setIsModalOpen(true); };
@@ -712,7 +625,6 @@ export default function MainTable() {
 
     const { pendingTransition, transitionError, isTransitioning, confirmTransition, cancelTransition } = useWorkflowTransition();
 
-    // Filter tasks
     const filteredTasks = useMemo(() => {
         return engTasks.filter(task => {
             const s = search.toLowerCase();
@@ -724,7 +636,6 @@ export default function MainTable() {
         });
     }, [engTasks, search, filterProject, filterAssignee, filterPriority]);
 
-    // Group by status
     const tasksByStatus = useMemo(() => {
         const map = {};
         Object.values(TASK_STATUS).forEach(s => { map[s] = []; });
@@ -746,7 +657,6 @@ export default function MainTable() {
         <div className="-m-4 md:-m-8 flex flex-col bg-slate-950 text-white" style={{ minHeight: '100vh' }}>
             <TaskDetailModal isOpen={isModalOpen} onClose={closeModal} task={selectedTask} projects={engProjects} teamMembers={teamMembers}
                 subtasks={selectedTask ? engSubtasks.filter(s => s.taskId === selectedTask.id) : []} taskTypes={taskTypes} userId={user?.uid} canEdit={canEdit} canDelete={canDelete} />
-
             <TransitionConfirmModal isOpen={!!pendingTransition} pending={pendingTransition} isTransitioning={isTransitioning} onConfirm={confirmTransition} onCancel={cancelTransition} />
 
             {transitionError && (
@@ -755,7 +665,6 @@ export default function MainTable() {
                 </div>
             )}
 
-            {/* Banner */}
             <TaskModuleBanner onNewTask={canEdit ? openNew : null} canEdit={canEdit}>
                 <button
                     onClick={() => setShowFilters(f => !f)}
@@ -771,13 +680,12 @@ export default function MainTable() {
                 </button>
             </TaskModuleBanner>
 
-            {/* Filters */}
             {showFilters && (
                 <div className="flex flex-wrap gap-3 items-center animate-in fade-in slide-in-from-top-2 duration-200 px-6 py-3">
                     <div className="relative flex-1 min-w-[200px]">
                         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar tareas..."
-                            className="pl-10 pr-4 py-2.5 w-full border border-slate-700/60 rounded-xl text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50 bg-slate-900/60 placeholder:text-slate-600 transition-all" />
+                            className="pl-10 pr-4 py-2.5 w-full border border-slate-700/60 rounded-xl text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50 bg-slate-900/60 placeholder:text-slate-600" />
                     </div>
                     <select value={filterProject} onChange={e => setFilterProject(e.target.value)}
                         className="px-4 py-2.5 border border-slate-700/60 rounded-xl text-sm text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500/50 bg-slate-900/60 cursor-pointer">
@@ -797,27 +705,25 @@ export default function MainTable() {
                 </div>
             )}
 
-            {/* Summary Bar */}
-            <div className="flex items-center justify-between px-6 py-2">
-                <p className="text-xs text-slate-500 font-medium">
-                    {filteredTasks.length} tarea{filteredTasks.length !== 1 ? 's' : ''}
-                    {activeFilterCount > 0 && <span className="text-indigo-400 ml-1.5">({activeFilterCount} filtro{activeFilterCount !== 1 ? 's' : ''})</span>}
-                    <span className="text-slate-700 ml-2">• Doble click para abrir detalle • Click simple para editar</span>
+            <div className="flex items-center justify-between px-6 py-1.5">
+                <p className="text-[11px] text-slate-500">
+                    {filteredTasks.length} tareas
+                    {activeFilterCount > 0 && <span className="text-indigo-400 ml-1">({activeFilterCount} filtros)</span>}
+                    <span className="text-slate-700 ml-2">• Click = editar • Doble click = detalle completo</span>
                 </p>
                 <button
                     onClick={() => {
                         const allExpanded = STATUS_GROUPS.every(g => !collapsedGroups[g.status]);
-                        const newState = {};
-                        STATUS_GROUPS.forEach(g => { newState[g.status] = allExpanded; });
-                        setCollapsedGroups(newState);
+                        const ns = {};
+                        STATUS_GROUPS.forEach(g => { ns[g.status] = allExpanded; });
+                        setCollapsedGroups(ns);
                     }}
-                    className="text-[11px] text-slate-500 hover:text-slate-300 font-semibold px-2.5 py-1 rounded-lg hover:bg-slate-800/60 transition-all"
+                    className="text-[10px] text-slate-500 hover:text-slate-300 font-semibold px-2 py-1 rounded-lg hover:bg-slate-800/60"
                 >
-                    {STATUS_GROUPS.every(g => !collapsedGroups[g.status]) ? 'Colapsar todo' : 'Expandir todo'}
+                    {STATUS_GROUPS.every(g => !collapsedGroups[g.status]) ? 'Colapsar' : 'Expandir'}
                 </button>
             </div>
 
-            {/* Table Groups */}
             <div className="flex-1 overflow-y-auto pb-4 px-6 pt-1">
                 {STATUS_GROUPS.map(group => {
                     const tasks = tasksByStatus[group.status] || [];
@@ -847,7 +753,6 @@ export default function MainTable() {
                             <Search className="w-7 h-7 text-slate-600" />
                         </div>
                         <p className="text-slate-500 font-semibold text-sm">No se encontraron tareas</p>
-                        <p className="text-slate-600 text-xs mt-1">Intenta ajustar los filtros</p>
                     </div>
                 )}
             </div>
