@@ -112,11 +112,13 @@ function calcVelocity(userId, tasks) {
 
     // Nothing assigned at all → perfect (nothing to evaluate)
     if (userTasks.length === 0) {
-        return { score: 100, raw: { tasksCompleted: 0, expected: 0, activeTasks: 0, avgProgress: 0, avgOverrun: 0 } };
+        return { score: 100, raw: { tasksCompleted: 0, expected: 0, activeTasks: 0, avgProgress: 0, avgOverrun: 0, timelineAdjusted: false } };
     }
 
     // ── A) Completion ratio (50% weight) ──
-    const expected = Math.max(1, Math.ceil(activeTasks.length * 0.3));
+    // Exclude multi-week tasks from expected completions this week
+    const shortTasks = activeTasks.filter(t => !isMultiWeekTask(t));
+    const expected = Math.max(shortTasks.length > 0 ? Math.ceil(shortTasks.length * 0.3) : 0, completedThisWeek.length > 0 ? 1 : 0);
     const completionRatio = expected > 0 ? Math.min(completedThisWeek.length / expected, 1.0) : 1.0;
     const completionScore = completionRatio * 100;
 
@@ -124,6 +126,7 @@ function calcVelocity(userId, tasks) {
     let progressScore = 100;
     let avgProgress = 0;
     let avgOverrun = 0;
+    let timelineAdjusted = false;
 
     if (inProgress.length > 0) {
         // Subtask progress: average % of subtasks completed
@@ -136,17 +139,40 @@ function calcVelocity(userId, tasks) {
         avgProgress = progresses.reduce((a, b) => a + b, 0) / progresses.length;
 
         // Time overrun: actual hours / estimated hours
+        // For multi-week tasks, scale by elapsed fraction of timeline
         const overruns = inProgress
             .filter(t => t.estimatedHours > 0 && t.actualHours > 0)
-            .map(t => t.actualHours / t.estimatedHours);
+            .map(t => {
+                if (isMultiWeekTask(t)) {
+                    const elapsed = getElapsedFraction(t);
+                    // Expected hours consumed so far = estimatedHours * elapsed
+                    const expectedHoursSoFar = t.estimatedHours * elapsed;
+                    // Only overrun if actual exceeds expected-so-far
+                    return expectedHoursSoFar > 0 ? t.actualHours / expectedHoursSoFar : 1.0;
+                }
+                return t.actualHours / t.estimatedHours;
+            });
         avgOverrun = overruns.length > 0
             ? overruns.reduce((a, b) => a + b, 0) / overruns.length
             : 1.0;
 
-        // Progress score = subtask % * overrun penalty
-        // Overrun penalty: 1.0 if ratio ≤ 1.0, drops linearly after that
+        // For multi-week tasks, compare progress against timeline instead of 100%
+        const progressWithTimeline = inProgress.map((t, i) => {
+            if (isMultiWeekTask(t)) {
+                timelineAdjusted = true;
+                const elapsed = getElapsedFraction(t);
+                const taskProgress = progresses[i];
+                // If progress >= elapsed fraction, they're on track → 1.0
+                // If progress < elapsed, they're behind → ratio
+                return elapsed > 0 ? Math.min(taskProgress / elapsed, 1.0) : 1.0;
+            }
+            return progresses[i];
+        });
+        const adjustedAvgProgress = progressWithTimeline.reduce((a, b) => a + b, 0) / progressWithTimeline.length;
+
+        // Progress score = adjusted progress * overrun penalty
         const overrunPenalty = avgOverrun <= 1.0 ? 1.0 : Math.max(0.2, 1.0 - (avgOverrun - 1.0) * 0.4);
-        progressScore = avgProgress * overrunPenalty * 100;
+        progressScore = adjustedAvgProgress * overrunPenalty * 100;
     }
 
     // If user has active tasks but ZERO completions → completion weight is dominant
@@ -166,6 +192,7 @@ function calcVelocity(userId, tasks) {
             activeTasks: activeTasks.length,
             avgProgress: parseFloat((avgProgress * 100).toFixed(1)),
             avgOverrun: parseFloat(avgOverrun.toFixed(2)),
+            timelineAdjusted,
         },
     };
 }
@@ -255,12 +282,23 @@ function calcPrecision(userId, tasks) {
     );
 
     if (evaluated.length === 0) {
-        return { score: 100, raw: { estimationRatio: 0, tasksEvaluated: 0, worstOverrun: 0 } };
+        return { score: 100, raw: { estimationRatio: 0, tasksEvaluated: 0, worstOverrun: 0, timelineAdjusted: false } };
     }
 
-    const ratios = evaluated.map(t => t.actualHours / t.estimatedHours);
+    // For multi-week in-progress tasks, scale the ratio by elapsed fraction
+    // so we're comparing "hours used so far" vs "hours expected so far"
+    const ratios = evaluated.map(t => {
+        const rawRatio = t.actualHours / t.estimatedHours;
+        if (t.status !== 'completed' && isMultiWeekTask(t)) {
+            const elapsed = getElapsedFraction(t);
+            const expectedHoursSoFar = t.estimatedHours * elapsed;
+            return expectedHoursSoFar > 0 ? t.actualHours / expectedHoursSoFar : 1.0;
+        }
+        return rawRatio;
+    });
     const avgRatio = ratios.reduce((a, b) => a + b, 0) / ratios.length;
     const worstOverrun = Math.max(...ratios);
+    const hasTimelineAdj = evaluated.some(t => t.status !== 'completed' && isMultiWeekTask(t));
 
     // Accuracy: 1.0 is perfect. Deviation in either direction penalizes.
     // Over-budget penalized more heavily than under-budget.
@@ -274,6 +312,7 @@ function calcPrecision(userId, tasks) {
             estimationRatio: parseFloat(avgRatio.toFixed(2)),
             tasksEvaluated: evaluated.length,
             worstOverrun: parseFloat(worstOverrun.toFixed(2)),
+            timelineAdjusted: hasTimelineAdj,
         },
     };
 }
@@ -578,6 +617,40 @@ export function calculateTeamScores(teamMembers, data, weights = null) {
 
 function clamp(score) {
     return Math.max(0, Math.min(100, score));
+}
+
+/**
+ * Detect if a task spans multiple weeks.
+ * Criteria: estimatedHours > 40 (1 work-week) OR task has been active > 7 days.
+ */
+function isMultiWeekTask(task) {
+    if (task.estimatedHours && task.estimatedHours > 40) return true;
+    // Check if started > 7 days ago
+    const startDate = task.startedAt || task.statusChangedAt || task.createdAt;
+    if (startDate) {
+        const start = new Date(startDate);
+        const daysSinceStart = (Date.now() - start.getTime()) / (1000 * 60 * 60 * 24);
+        if (daysSinceStart > 7 && task.estimatedHours && task.estimatedHours > 20) return true;
+    }
+    return false;
+}
+
+/**
+ * Get the elapsed fraction of a task's expected timeline (0.0 to 1.0+).
+ * Uses estimatedHours converted to working days (8h/day, 5d/week).
+ */
+function getElapsedFraction(task) {
+    const startDate = task.startedAt || task.statusChangedAt || task.createdAt;
+    if (!startDate || !task.estimatedHours) return 1.0;
+
+    const start = new Date(startDate);
+    const now = new Date();
+    const elapsedDays = Math.max(1, (now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const estimatedDays = task.estimatedHours / 8; // 8 working hours per day
+    
+    // Cap at 1.0 so we don't inflate penalization when past deadline
+    // (other metrics handle overrun separately)
+    return Math.min(elapsedDays / estimatedDays, 1.5);
 }
 
 function getLevel(score) {
