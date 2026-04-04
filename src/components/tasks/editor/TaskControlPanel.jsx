@@ -49,7 +49,7 @@ function Section({ title, icon: Icon, defaultOpen = true, children, badge }) {
 
 export default function TaskControlPanel({
     form, setForm, isNew, task,
-    canEdit, subtasks, teamMembers, taskTypes,
+    canEdit, canEditDates, subtasks, teamMembers, taskTypes,
     timeLogs = [], allTasks = [], delays = [], dependencies = [], plannerItems = [],
     projectMilestones = [], milestoneWorkAreas = [],
     onStatusChange, onOpenDelayReport, onOpenListManager,
@@ -248,7 +248,7 @@ export default function TaskControlPanel({
                             value={form.dueDate}
                             onChange={e => setForm({ ...form, dueDate: e.target.value })}
                             className="w-full px-2.5 py-1.5 border border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800 text-slate-200"
-                            disabled={!canEdit}
+                            disabled={!canEditDates && !!form.dueDate}
                         />
                     </div>
                     {/* Planned Start / End Dates */}
@@ -262,7 +262,7 @@ export default function TaskControlPanel({
                                 value={form.plannedStartDate}
                                 onChange={e => setForm({ ...form, plannedStartDate: e.target.value })}
                                 className="w-full px-2.5 py-1.5 border border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800 text-slate-200"
-                                disabled={!canEdit}
+                                disabled={!canEditDates && !!form.plannedStartDate}
                             />
                         </div>
                         <div>
@@ -274,7 +274,7 @@ export default function TaskControlPanel({
                                 value={form.plannedEndDate}
                                 onChange={e => setForm({ ...form, plannedEndDate: e.target.value })}
                                 className="w-full px-2.5 py-1.5 border border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800 text-slate-200"
-                                disabled={!canEdit}
+                                disabled={!canEditDates && !!form.plannedEndDate}
                             />
                         </div>
                     </div>

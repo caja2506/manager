@@ -126,6 +126,8 @@ export function RoleProvider({ children }) {
     const isViewer = role === 'viewer';
     const canEdit = role === 'admin' || role === 'editor';
     const canDelete = role === 'admin';
+    // Technicians can edit tasks but NOT modify dates that already have values
+    const canEditDates = canEdit && (userProfile?.teamRole !== 'technician');
 
     const value = {
         // --- RBAC (unchanged API) ---
@@ -135,6 +137,7 @@ export function RoleProvider({ children }) {
         isEditor,
         isViewer,
         canEdit,
+        canEditDates,
         canDelete,
         isSuperAdmin: !!isSuperAdmin,
 

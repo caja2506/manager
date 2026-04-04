@@ -32,7 +32,7 @@ export default function TaskDetailModal({
     const {
         setIsDelayReportOpen, setDelayReportTarget, setListManager,
     } = useAppData();
-    const { role, teamRole } = useRole();
+    const { role, teamRole, canEditDates } = useRole();
     const { timeLogs, engTasks, delays } = useEngineeringData();
     const isNew = !task;
 
@@ -391,6 +391,7 @@ export default function TaskDetailModal({
                         isNew={isNew}
                         task={task}
                         canEdit={canEdit}
+                        canEditDates={canEditDates}
                         subtasks={subtasks}
                         teamMembers={teamMembers}
                         taskTypes={taskTypes}

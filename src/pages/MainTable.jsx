@@ -351,7 +351,7 @@ function SubtaskExpander({ subtasks, taskId, canEdit }) {
 // TASK ROW
 // ============================================================
 
-function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModal, groupColor, isLast, savedField, onSaved, taskTypes, workAreaTypes }) {
+function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDates, onOpenModal, groupColor, isLast, savedField, onSaved, taskTypes, workAreaTypes }) {
     const [expandedSubs, setExpandedSubs] = useState(false);
 
     const saveField = useCallback(async (field, value) => {
@@ -647,9 +647,17 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModa
                     <div className="flex items-center gap-1 text-[11px] min-w-0">
                         {canEdit ? (
                             <>
-                                <InlineDatePicker value={startRaw} onSave={v => saveField('plannedStartDate', v)} />
+                                {(canEditDates || !startRaw) ? (
+                                    <InlineDatePicker value={startRaw} onSave={v => saveField('plannedStartDate', v)} />
+                                ) : (
+                                    <span className="text-slate-400 text-[11px]">{fmtDate(startDate)}</span>
+                                )}
                                 <span className="text-slate-600 shrink-0">→</span>
-                                <InlineDatePicker value={endRaw} onSave={v => saveField('dueDate', v)} />
+                                {(canEditDates || !endRaw) ? (
+                                    <InlineDatePicker value={endRaw} onSave={v => saveField('dueDate', v)} />
+                                ) : (
+                                    <span className="text-slate-400 text-[11px]">{fmtDate(endDate)}</span>
+                                )}
                             </>
                         ) : (
                             <span className="text-slate-400 truncate">{fmtDate(startDate)} → {fmtDate(endDate)}</span>
@@ -941,7 +949,7 @@ function MobileTaskCard({ task, engProjects, teamMembers, subtasks, canEdit, onO
 // TABLE GROUP (responsive: grid on desktop, cards on mobile)
 // ============================================================
 
-function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers, canEdit, onOpenModal, isExpanded, onToggle, savedField, onSaved, taskTypes, workAreaTypes, groupStatus, user }) {
+function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers, canEdit, canEditDates, onOpenModal, isExpanded, onToggle, savedField, onSaved, taskTypes, workAreaTypes, groupStatus, user }) {
     const [addingTask, setAddingTask] = useState(false);
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const addInputRef = useRef(null);
@@ -1035,6 +1043,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                     teamMembers={teamMembers}
                                     subtasks={engSubtasks.filter(s => s.taskId === task.id)}
                                     canEdit={canEdit}
+                                    canEditDates={canEditDates}
                                     onOpenModal={onOpenModal}
                                     groupColor={color}
                                     isLast={idx === tasks.length - 1 && !canEdit}
@@ -1186,7 +1195,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
 
 export default function MainTable() {
     const { user } = useAuth();
-    const { canEdit, canDelete } = useRole();
+    const { canEdit, canEditDates, canDelete } = useRole();
     const { engProjects, engTasks, engSubtasks, teamMembers, taskTypes, workAreaTypes } = useEngineeringData();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -1310,6 +1319,7 @@ export default function MainTable() {
                             engSubtasks={engSubtasks}
                             teamMembers={teamMembers}
                             canEdit={canEdit}
+                            canEditDates={canEditDates}
                             onOpenModal={openTask}
                             isExpanded={!collapsedGroups[group.status]}
                             onToggle={() => toggleGroup(group.status)}

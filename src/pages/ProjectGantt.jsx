@@ -71,7 +71,7 @@ function formatRangeLabel(viewStart, viewMode) {
 // ---- Main Page ----
 export default function ProjectGantt() {
     const { user } = useAuth();
-    const { canEdit, canDelete } = useRole();
+    const { canEdit, canEditDates, canDelete } = useRole();
     const { engProjects, engSubtasks, teamMembers, taskTypes: appTaskTypes } = useEngineeringData();
 
     // View state
@@ -264,6 +264,7 @@ export default function ProjectGantt() {
 
     // ---- Bar drag handler ----
     const handleBarDragEnd = useCallback(async ({ taskId, newStartDate, newEndDate }) => {
+        if (!canEditDates) return; // Technicians cannot drag existing bars
         try {
             await updateTaskGanttFields(taskId, {
                 plannedStartDate: newStartDate,
