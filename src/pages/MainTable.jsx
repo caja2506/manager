@@ -1283,12 +1283,12 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                 className="grid items-center px-2 py-2 border-t border-slate-800/40 bg-slate-950/40"
                                 style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${color}` }}
                             >
-                                <div></div>
-                                <div></div>
-                                <div></div>
-                                <div></div>
-                                {/* Status distribution mini bars */}
-                                <div className="flex h-5 rounded overflow-hidden" title="Distribución de estados">
+                                <div></div> {/* 1. Checkbox */}
+                                <div></div> {/* 2. Task */}
+                                <div></div> {/* 3. Owner */}
+                                
+                                {/* 4. Status distribution mini bars */}
+                                <div className="flex h-5 rounded overflow-hidden mx-1" title="Distribución de estados">
                                     {Object.entries(statusDist).map(([status, count]) => {
                                         const cfg = TASK_STATUS_CONFIG[status] || {};
                                         return (
@@ -1301,15 +1301,14 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                         );
                                     })}
                                 </div>
-                                <div></div>
-                                <div></div>
-                                {/* Avance placeholder */}
-                                <div></div>
-                                {/* Health placeholder */}
-                                <div></div>
-                                {/* Score placeholder */}
-                                <div></div>
-                                {/* Date range */}
+                                
+                                <div></div> {/* 5. Área */}
+                                <div></div> {/* 6. Tipo */}
+                                <div></div> {/* 7. Avance placeholder */}
+                                <div></div> {/* 8. Health placeholder */}
+                                <div></div> {/* 9. Score placeholder */}
+                                
+                                {/* 10. Date range (Timeline) */}
                                 <div className="flex items-center justify-center">
                                     {dateRange && (
                                         <span className="text-[9px] font-bold text-slate-400 bg-slate-800 px-2 py-1 rounded-full whitespace-nowrap">
@@ -1317,9 +1316,11 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                         </span>
                                     )}
                                 </div>
-                                <div></div>
-                                {/* Priority distribution mini bars */}
-                                <div className="flex h-5 rounded overflow-hidden" title="Distribución de prioridades">
+                                
+                                <div></div> {/* 11. Horas placeholder */}
+                                
+                                {/* 12. Priority distribution mini bars */}
+                                <div className="flex h-5 rounded overflow-hidden mx-1" title="Distribución de prioridades">
                                     {Object.entries(priorityDist).map(([pri, count]) => {
                                         const colors = { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' };
                                         return (
@@ -1332,7 +1333,9 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                         );
                                     })}
                                 </div>
-                                <div></div>
+                                
+                                <div></div> {/* 13. Project placeholder */}
+                                <div></div> {/* 14. Asig. placeholder */}
                             </div>
                         )}
                     </div>
