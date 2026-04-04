@@ -1174,7 +1174,6 @@ export default function MainTable() {
     const [filterProject, setFilterProject] = useState('');
     const [filterAssignee, setFilterAssignee] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
-    const [showFilters, setShowFilters] = useState(false);
     const [collapsedGroups, setCollapsedGroups] = useState({});
     const { savedField, show: showSaved } = useSaveFeedback();
 
@@ -1224,51 +1223,43 @@ export default function MainTable() {
                 </div>
             )}
 
-            <TaskModuleBanner onNewTask={canEdit ? openNew : null} canEdit={canEdit}>
-                <button
-                    onClick={() => setShowFilters(f => !f)}
-                    className={`relative px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 text-xs border transition-all active:scale-95 ${
-                        showFilters ? 'bg-indigo-600/15 text-indigo-400 border-indigo-500/40' : 'bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-600'
-                    }`}
-                >
-                    {showFilters ? <X className="w-3.5 h-3.5" /> : <Filter className="w-3.5 h-3.5" />}
-                    Filtros
-                    {activeFilterCount > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-indigo-500 text-white text-[8px] font-bold flex items-center justify-center shadow">{activeFilterCount}</span>
-                    )}
-                </button>
-            </TaskModuleBanner>
+            <TaskModuleBanner onNewTask={canEdit ? openNew : null} canEdit={canEdit} />
 
-            {showFilters && (
-                <div className="flex flex-wrap gap-3 items-center animate-in fade-in slide-in-from-top-2 duration-200 px-6 py-3">
-                    <div className="relative flex-1 min-w-[200px]">
-                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar tareas..."
-                            className="pl-10 pr-4 py-2.5 w-full border border-slate-700/60 rounded-xl text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50 bg-slate-900/60 placeholder:text-slate-600" />
-                    </div>
-                    <select value={filterProject} onChange={e => setFilterProject(e.target.value)}
-                        className="px-4 py-2.5 border border-slate-700/60 rounded-xl text-sm text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500/50 bg-slate-900/60 cursor-pointer">
-                        <option value="">Todos los proyectos</option>
-                        {engProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                    <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}
-                        className="px-4 py-2.5 border border-slate-700/60 rounded-xl text-sm text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500/50 bg-slate-900/60 cursor-pointer">
-                        <option value="">Todos los miembros</option>
-                        {teamMembers.map(u => <option key={u.uid} value={u.uid}>{u.displayName || u.email}</option>)}
-                    </select>
-                    <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}
-                        className="px-4 py-2.5 border border-slate-700/60 rounded-xl text-sm text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500/50 bg-slate-900/60 cursor-pointer">
-                        <option value="">Todas las prioridades</option>
-                        {Object.entries(TASK_PRIORITY_CONFIG).map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
-                    </select>
+
+            {/* Filters — always visible */}
+            <div className="flex flex-wrap gap-2 items-center px-6 py-2 border-b border-slate-800/40">
+                <div className="relative flex-1 min-w-[160px] max-w-xs">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar..."
+                        className="pl-8 pr-3 py-1.5 w-full border border-slate-700/60 rounded-lg text-xs text-white outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-900/60 placeholder:text-slate-600" />
                 </div>
-            )}
+                <select value={filterProject} onChange={e => setFilterProject(e.target.value)}
+                    className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-900/60 cursor-pointer">
+                    <option value="">Todos los proyectos</option>
+                    {engProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}
+                    className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-900/60 cursor-pointer">
+                    <option value="">Todos los miembros</option>
+                    {teamMembers.map(u => <option key={u.uid} value={u.uid}>{u.displayName || u.email}</option>)}
+                </select>
+                <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}
+                    className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-900/60 cursor-pointer">
+                    <option value="">Todas las prioridades</option>
+                    {Object.entries(TASK_PRIORITY_CONFIG).map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
+                </select>
+                {activeFilterCount > 0 && (
+                    <button onClick={() => { setSearch(''); setFilterProject(''); setFilterAssignee(''); setFilterPriority(''); }}
+                        className="text-[11px] text-rose-400 hover:text-rose-300 px-2 py-1 rounded hover:bg-rose-500/10 transition-colors">
+                        Limpiar
+                    </button>
+                )}
+            </div>
 
             <div className="flex items-center justify-between px-6 py-1.5">
                 <p className="text-[11px] text-slate-500">
                     {filteredTasks.length} tareas
-                    {activeFilterCount > 0 && <span className="text-indigo-400 ml-1">({activeFilterCount} filtros)</span>}
-                    <span className="text-slate-700 ml-2">• Click = editar • Doble click = detalle completo</span>
+                    {activeFilterCount > 0 && <span className="text-indigo-400 ml-1">({activeFilterCount} filtros activos)</span>}
                 </p>
                 <button
                     onClick={() => {
