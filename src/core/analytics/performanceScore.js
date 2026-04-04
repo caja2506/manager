@@ -139,10 +139,12 @@ function calcVelocity(userId, tasks) {
                 ? subs.filter(s => s.completed || s.done).length / subs.length
                 : 0.5;
             const elapsed = getElapsedFraction(t);
-            // Expected progress = how far along the timeline we are
-            const expectedProgress = Math.max(elapsed, 0.05); // min 5% to avoid div/0
-            // Rate: 1.0 = on pace, 0.5 = half pace, 1.5 = ahead
-            return Math.min(actualProgress / expectedProgress, 1.0);
+            const expectedProgress = Math.max(elapsed, 0.05);
+            const rawRate = Math.min(actualProgress / expectedProgress, 1.0);
+
+            // Maturity: blend toward 1.0 when early in timeline (<30% elapsed)
+            const maturity = Math.min(elapsed / 0.30, 1.0);
+            return rawRate * maturity + 1.0 * (1 - maturity);
         });
         avgProgressRate = rates.reduce((a, b) => a + b, 0) / rates.length;
 
@@ -152,7 +154,11 @@ function calcVelocity(userId, tasks) {
             .map(t => {
                 const elapsed = getElapsedFraction(t);
                 const expectedHoursNow = t.estimatedHours * Math.max(elapsed, 0.05);
-                return t.actualHours / expectedHoursNow;
+                const rawRate = t.actualHours / expectedHoursNow;
+
+                // Maturity: blend toward 1.0 when early in timeline
+                const maturity = Math.min(elapsed / 0.30, 1.0);
+                return rawRate * maturity + 1.0 * (1 - maturity);
             });
         avgOverrunRate = overrunRates.length > 0
             ? overrunRates.reduce((a, b) => a + b, 0) / overrunRates.length
@@ -273,6 +279,8 @@ function calcPrecision(userId, tasks) {
     // Universal proportional rate for ALL tasks:
     // Completed tasks: raw ratio (actual / estimated)
     // In-progress tasks: hours consumed vs hours expected at this point
+    // Maturity smoothing: early in timeline (<30%), blend ratio toward 1.0
+    //   to avoid amplifying tiny differences when data is insufficient
     const ratios = evaluated.map(t => {
         if (t.status === 'completed') {
             return t.actualHours / t.estimatedHours;
@@ -280,7 +288,12 @@ function calcPrecision(userId, tasks) {
         // In-progress: scale by elapsed timeline
         const elapsed = getElapsedFraction(t);
         const expectedHoursNow = t.estimatedHours * Math.max(elapsed, 0.05);
-        return t.actualHours / expectedHoursNow;
+        const rawRatio = t.actualHours / expectedHoursNow;
+
+        // Maturity factor: 0.0 at start → 1.0 at 30%+ elapsed
+        // Before 30%, blend toward 1.0 (assume on track when data is scarce)
+        const maturity = Math.min(elapsed / 0.30, 1.0);
+        return rawRatio * maturity + 1.0 * (1 - maturity);
     });
     const avgRatio = ratios.reduce((a, b) => a + b, 0) / ratios.length;
     const worstOverrun = Math.max(...ratios);
