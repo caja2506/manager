@@ -242,28 +242,39 @@ function OwnerAvatar({ task, teamMembers }) {
             </div>
         );
     }
+
     const initials = (() => {
         const name = member.displayName || member.email || '??';
         const parts = name.trim().split(/\s+/);
         if (parts.length >= 2) {
             return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
         }
-        // Single word: take first 2 chars (works for email prefix too)
         const clean = parts[0].replace(/[^a-zA-Z]/g, '');
         return (clean.slice(0, 2) || '??').toUpperCase();
     })();
 
+    // Solo usar foto si es una imagen personalizada real (no el avatar automático de Google)
+    const isRealPhoto = member.photoURL &&
+        !member.photoURL.includes('googleusercontent.com/a/') &&
+        !member.photoURL.match(/=s\d+-c$/);
+
+    // Color consistente por usuario
+    const hue = (member.uid || member.email || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 360;
+    const bg = isRealPhoto
+        ? `url(${member.photoURL}) center/cover`
+        : `hsl(${hue}, 65%, 45%)`;
+
     return (
         <div
-            className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black ring-2 ring-slate-700"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black ring-2 ring-slate-700 shrink-0"
             style={{
-                background: member.photoURL ? `url(${member.photoURL}) center/cover` : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                color: member.photoURL ? 'transparent' : '#fff',
+                background: bg,
+                color: isRealPhoto ? 'transparent' : '#fff',
                 letterSpacing: '-0.03em',
             }}
             title={member.displayName || member.email}
         >
-            {!member.photoURL && initials}
+            {!isRealPhoto && initials}
         </div>
     );
 }
