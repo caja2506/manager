@@ -1233,18 +1233,18 @@ export default function MainTable() {
         return map;
     }, [filteredTasks]);
 
-    // Auto-expand groups that have tasks — only on first data load
-    const initializedRef = useRef(false);
+    // Auto-expand groups with tasks, collapse empty ones — reactive to filter changes
+    const dataLoadedRef = useRef(false);
     useEffect(() => {
-        if (initializedRef.current || engTasks.length === 0) return;
-        initializedRef.current = true;
+        if (engTasks.length === 0) return;
+        dataLoadedRef.current = true;
         const ns = {};
         STATUS_GROUPS.forEach(g => {
             const count = (tasksByStatus[g.status] || []).length;
             ns[g.status] = count === 0; // collapsed=true only if empty
         });
         setCollapsedGroups(ns);
-    }, [tasksByStatus, engTasks.length]);
+    }, [tasksByStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const toggleGroup = (status) => setCollapsedGroups(prev => ({ ...prev, [status]: !prev[status] }));
     const activeFilterCount = [search, filterProject, filterAssignee, filterPriority].filter(Boolean).length;
