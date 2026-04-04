@@ -909,7 +909,24 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
 
                 {/* Assigned By (who assigned — far right) */}
                 <div className="flex items-center justify-center">
-                    {(() => {
+                    {canEdit ? (
+                        <InlineDropdown
+                            value={task.assignedBy || ''}
+                            options={ownerOptions}
+                            onSelect={v => saveField('assignedBy', v || null)}
+                            renderValue={(val) => {
+                                const assigner = teamMembers.find(m => m.uid === val);
+                                if (!assigner) return <span className="text-[9px] text-slate-700">—</span>;
+                                const initials = (assigner.displayName || assigner.email || '??').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                                return (
+                                    <div className="w-7 h-7 rounded-full bg-purple-600/20 border border-purple-500/30 flex items-center justify-center hover:bg-purple-600/40 transition-colors cursor-pointer" title={`Asignado por: ${assigner.displayName || assigner.email}`}>
+                                        <span className="text-[9px] font-bold text-purple-400">{initials}</span>
+                                    </div>
+                                );
+                            }}
+                            className="h-auto!"
+                        />
+                    ) : (() => {
                         const assigner = teamMembers.find(m => m.uid === task.assignedBy);
                         if (!assigner) return <span className="text-[9px] text-slate-700">—</span>;
                         const initials = (assigner.displayName || assigner.email || '??').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
