@@ -230,6 +230,86 @@ function InlineDatePicker({ value, onSave }) {
 }
 
 // ============================================================
+// SCORE POPOVER — click-to-see breakdown
+// ============================================================
+
+function ScorePopover({ type, score, color, items, anchorRef, onClose }) {
+    const [pos, setPos] = useState({ top: 0, left: 0 });
+
+    useEffect(() => {
+        if (!anchorRef?.current) return;
+        const rect = anchorRef.current.getBoundingClientRect();
+        const popW = 260, popH = 220;
+        let left = rect.left + rect.width / 2 - popW / 2;
+        let top = rect.bottom + 6;
+        if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
+        if (left < 8) left = 8;
+        if (top + popH > window.innerHeight - 8) top = rect.top - popH - 6;
+        setPos({ top, left });
+    }, [anchorRef]);
+
+    useEffect(() => {
+        const handler = (e) => { if (e.key === 'Escape') onClose(); };
+        const clickHandler = (e) => { if (!e.target.closest('.score-popover')) onClose(); };
+        window.addEventListener('keydown', handler);
+        setTimeout(() => window.addEventListener('click', clickHandler), 0);
+        return () => { window.removeEventListener('keydown', handler); window.removeEventListener('click', clickHandler); };
+    }, [onClose]);
+
+    const label = type === 'health' ? 'Health — Metodología' : 'Score — Operativo';
+    const themeColor = score >= 80 ? 'emerald' : score >= 60 ? 'amber' : score >= 40 ? 'orange' : 'red';
+    const qualityLabels = { emerald: 'Excelente', amber: 'Bueno', orange: 'Regular', red: 'Necesita mejoras' };
+
+    return createPortal(
+        <div
+            className="score-popover fixed z-[9999] animate-in fade-in zoom-in-95 duration-150"
+            style={{ top: pos.top, left: pos.left, width: 260 }}
+        >
+            <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl shadow-black/50 overflow-hidden">
+                {/* Header */}
+                <div className={`flex items-center gap-2.5 px-3 py-2.5 bg-${themeColor}-500/10 border-b border-slate-700/50`}>
+                    <div className="relative w-9 h-9 shrink-0">
+                        <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+                            <circle cx="18" cy="18" r="14" fill="none" stroke="#1e293b" strokeWidth="3" />
+                            <circle cx="18" cy="18" r="14" fill="none" stroke={color} strokeWidth="3"
+                                strokeDasharray={`${(score / 100) * 87.96} 87.96`} strokeLinecap="round" />
+                        </svg>
+                        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black" style={{ color }}>{score}</span>
+                    </div>
+                    <div className="min-w-0">
+                        <div className="text-[10px] font-black text-slate-300 uppercase tracking-wide">{label}</div>
+                        <div className="text-[9px] font-bold" style={{ color }}>{qualityLabels[themeColor]}</div>
+                    </div>
+                </div>
+                {/* Checklist */}
+                <div className="px-2.5 py-2 space-y-0.5 max-h-48 overflow-y-auto">
+                    {items.map((item, i) => (
+                        <div key={i} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg ${item.passed ? 'opacity-50' : 'bg-slate-800/40'}`}>
+                            {item.passed ? (
+                                <div className="w-3.5 h-3.5 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+                                    <Check className="w-2.5 h-2.5 text-emerald-400" />
+                                </div>
+                            ) : (
+                                <div className="w-3.5 h-3.5 rounded-full bg-red-500/20 flex items-center justify-center shrink-0">
+                                    <X className="w-2.5 h-2.5 text-red-400" />
+                                </div>
+                            )}
+                            <span className={`text-[10px] flex-1 ${item.passed ? 'text-slate-500 line-through' : 'text-slate-300 font-medium'}`}>
+                                {item.label}
+                            </span>
+                            <span className={`text-[8px] font-bold px-1 py-0.5 rounded ${item.passed ? 'bg-emerald-500/15 text-emerald-400' : 'bg-slate-700 text-slate-400'}`}>
+                                {type === 'health' ? `${item.pts}pts` : item.penalty}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>,
+        document.body
+    );
+}
+
+// ============================================================
 // OWNER AVATAR
 // ============================================================
 
@@ -352,6 +432,9 @@ function SubtaskExpander({ subtasks, taskId, canEdit }) {
 // ============================================================
 
 function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDates, onOpenModal, groupColor, isLast, savedField, onSaved, taskTypes, workAreaTypes }) {
+    const [popover, setPopover] = useState(null); // 'health' | 'score' | null
+    const healthRef = useRef(null);
+    const scoreRef = useRef(null);
     const [expandedSubs, setExpandedSubs] = useState(false);
 
     const saveField = useCallback(async (field, value) => {
@@ -457,6 +540,23 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
     };
     const methHealth = calcMethodHealth();
     const methColor = methHealth >= 80 ? '#22c55e' : methHealth >= 60 ? '#f59e0b' : methHealth >= 40 ? '#fb923c' : '#ef4444';
+
+    // ──── Popover breakdown items ────
+    const healthItems = [
+        { label: 'Subtareas definidas', pts: 15, passed: totalSubs > 0 },
+        { label: 'Estimación de horas', pts: 20, passed: estimated > 0 },
+        { label: 'Responsable asignado', pts: 20, passed: !!task.assignedTo },
+        { label: 'Fecha límite', pts: 15, passed: !!(task.dueDate || task.plannedEndDate) },
+        { label: 'Tipo de tarea', pts: 10, passed: !!task.taskTypeId },
+        { label: 'Descripción (≥10 chars)', pts: 10, passed: (task.description || '').trim().length >= 10 },
+        { label: task.priority === 'critical' ? 'Milestone (crítica)' : 'Milestone', pts: 10, passed: task.priority !== 'critical' || !!task.milestoneId },
+    ];
+
+    const scoreItems = opScore !== null ? [
+        { label: 'Timeline (atrasos)', penalty: daysLeft !== null && daysLeft < 0 ? `-${Math.min(40, Math.abs(daysLeft) * 4)}` : daysLeft !== null && daysLeft <= 2 ? '-15' : '0', passed: !(daysLeft !== null && daysLeft < 0) && !(daysLeft !== null && daysLeft <= 2) },
+        { label: 'Budget de horas', penalty: hoursPct > 120 ? '-25' : hoursPct > 100 ? '-15' : hoursPct > 85 ? '-5' : '0', passed: hoursPct <= 85 },
+        { label: 'Avance vs timeline', penalty: (timelinePct > 70 && progressPct < 30) ? '-20' : (timelinePct > 50 && progressPct < 20) ? '-10' : '0', passed: !((timelinePct > 70 && progressPct < 30) || (timelinePct > 50 && progressPct < 20)) },
+    ] : [];
 
     return (
         <>
@@ -629,8 +729,13 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                 </div>
 
                 {/* ── Health (metodología) ── */}
-                <div className="flex items-center justify-center" onClick={e => e.stopPropagation()}>
-                    <div className="relative flex items-center justify-center" title={`Metodología ${methHealth}/100`}>
+                <div className="flex items-center justify-center relative" onClick={e => e.stopPropagation()}>
+                    <div
+                        ref={healthRef}
+                        className="relative flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
+                        title={`Metodología ${methHealth}/100`}
+                        onClick={() => setPopover(popover === 'health' ? null : 'health')}
+                    >
                         <svg width="30" height="30" viewBox="0 0 36 36" className="-rotate-90">
                             <circle cx="18" cy="18" r="14" fill="none" stroke="#1e293b" strokeWidth="4" />
                             <circle cx="18" cy="18" r="14" fill="none" stroke={methColor} strokeWidth="4"
@@ -639,12 +744,24 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                         </svg>
                         <span className="absolute text-[8px] font-black" style={{ color: methColor }}>{methHealth}</span>
                     </div>
+                    {popover === 'health' && (
+                        <ScorePopover
+                            type="health" score={methHealth} color={methColor}
+                            items={healthItems} anchorRef={healthRef}
+                            onClose={() => setPopover(null)}
+                        />
+                    )}
                 </div>
 
                 {/* ── Score (operativo) ── */}
-                <div className="flex items-center justify-center" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-center relative" onClick={e => e.stopPropagation()}>
                     {opScore !== null ? (
-                        <div className="relative flex items-center justify-center" title={`Score operativo ${opScore}/100`}>
+                        <div
+                            ref={scoreRef}
+                            className="relative flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
+                            title={`Score operativo ${opScore}/100`}
+                            onClick={() => setPopover(popover === 'score' ? null : 'score')}
+                        >
                             <svg width="30" height="30" viewBox="0 0 36 36" className="-rotate-90">
                                 <circle cx="18" cy="18" r="14" fill="none" stroke="#1e293b" strokeWidth="4" />
                                 <circle cx="18" cy="18" r="14" fill="none" stroke={opScoreColor} strokeWidth="4"
@@ -655,6 +772,13 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                         </div>
                     ) : (
                         <span className="text-[11px] text-slate-600">—</span>
+                    )}
+                    {popover === 'score' && opScore !== null && (
+                        <ScorePopover
+                            type="score" score={opScore} color={opScoreColor}
+                            items={scoreItems} anchorRef={scoreRef}
+                            onClose={() => setPopover(null)}
+                        />
                     )}
                 </div>
 
