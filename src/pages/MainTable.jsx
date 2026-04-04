@@ -243,17 +243,23 @@ function OwnerAvatar({ task, teamMembers }) {
         );
     }
     const initials = (() => {
-        const name = member.displayName || member.email || '?';
+        const name = member.displayName || member.email || '??';
         const parts = name.trim().split(/\s+/);
-        return parts.length >= 2 ? (parts[0][0] + parts[1][0]).toUpperCase() : name[0].toUpperCase();
+        if (parts.length >= 2) {
+            return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        }
+        // Single word: take first 2 chars (works for email prefix too)
+        const clean = parts[0].replace(/[^a-zA-Z]/g, '');
+        return (clean.slice(0, 2) || '??').toUpperCase();
     })();
 
     return (
         <div
-            className="w-7 h-7 rounded-full flex items-center justify-center text-[9px] font-bold ring-2 ring-slate-700"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black ring-2 ring-slate-700"
             style={{
                 background: member.photoURL ? `url(${member.photoURL}) center/cover` : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
                 color: member.photoURL ? 'transparent' : '#fff',
+                letterSpacing: '-0.03em',
             }}
             title={member.displayName || member.email}
         >
