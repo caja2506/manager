@@ -8,6 +8,7 @@ import TransitionConfirmModal from '../components/workflow/TransitionConfirmModa
 import TaskModuleBanner from '../components/layout/TaskModuleBanner';
 import { useWorkflowTransition } from '../hooks/useWorkflowTransition';
 import { updateTask, updateTaskStatus, toggleSubtask, createSubtask, createTask } from '../services/taskService';
+import { logActivity, ACTIVITY_TYPES } from '../services/activityLogService';
 import {
     TASK_STATUS, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG
 } from '../models/schemas';
@@ -30,8 +31,8 @@ const STATUS_GROUPS = [
     { status: TASK_STATUS.CANCELLED,   label: 'Cancelado',   color: '#6b7280' },
 ];
 
-// 13-column grid: ☐ | Task | Owner | Status | Área | Tipo | Avance | Health | Score | Timeline | Hours | Priority | Project
-const GRID_COLS = '28px minmax(120px,260px) 36px 90px 72px 72px 56px 48px 48px minmax(100px,150px) minmax(70px,100px) 80px 72px';
+// 14-column grid: ☐ | Task | Owner | Asig. | Status | Área | Tipo | Avance | Health | Score | Timeline | Hours | Priority | Project
+const GRID_COLS = '28px minmax(110px,240px) 36px 36px 86px 68px 68px 56px 48px 48px minmax(90px,140px) minmax(65px,95px) 76px 68px';
 
 // ============================================================
 // SAVE FEEDBACK HOOK
@@ -444,11 +445,21 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
             } else {
                 await updateTask(task.id, { [field]: value });
             }
+            // Log assignment changes with assigner info
+            if (field === 'assignedTo') {
+                const assigneeName = teamMembers.find(m => m.uid === value)?.displayName || 'Sin asignar';
+                logActivity(task.id, {
+                    type: ACTIVITY_TYPES.ASSIGNEE_CHANGED,
+                    description: `Tarea reasignada a ${assigneeName}`,
+                    userId: task.assignedBy || null,
+                    meta: { previousAssignee: task.assignedTo, newAssignee: value, assigneeName },
+                });
+            }
             onSaved(`${task.id}-${field}`);
         } catch (err) {
             console.error(`Failed to save ${field}:`, err);
         }
-    }, [task.id, onSaved]);
+    }, [task.id, task.assignedTo, task.assignedBy, teamMembers, onSaved]);
 
     const project = engProjects.find(p => p.id === task.projectId);
     const isSaved = (field) => savedField === `${task.id}-${field}`;
@@ -630,6 +641,20 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                     ) : (
                         <OwnerAvatar task={task} teamMembers={teamMembers} />
                     )}
+                </div>
+
+                {/* Assigned By (who assigned this task) */}
+                <div className="flex items-center justify-center">
+                    {(() => {
+                        const assigner = teamMembers.find(m => m.uid === task.assignedBy);
+                        if (!assigner) return <span className="text-[9px] text-slate-700">—</span>;
+                        const initials = (assigner.displayName || assigner.email || '??').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                        return (
+                            <div className="w-7 h-7 rounded-full bg-purple-600/20 border border-purple-500/30 flex items-center justify-center" title={`Asignado por: ${assigner.displayName || assigner.email}`}>
+                                <span className="text-[9px] font-bold text-purple-400">{initials}</span>
+                            </div>
+                        );
+                    })()}
                 </div>
 
                 {/* Status — Monday.com full-width colored cell */}
@@ -1159,6 +1184,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                             <div></div>
                             <div className="text-left">Tarea</div>
                             <div>Resp</div>
+                            <div>Asig.</div>
                             <div>Estado</div>
                             <div>Área</div>
                             <div>Tipo</div>
@@ -1203,7 +1229,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                 style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${color}` }}
                             >
                                 <div></div>
-                                <div className="col-span-12">
+                                <div className="col-span-13">
                                     {addingTask ? (
                                         <div className="flex items-center gap-2">
                                             <input
@@ -1240,6 +1266,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                 className="grid items-center px-2 py-2 border-t border-slate-800/40 bg-slate-950/40"
                                 style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${color}` }}
                             >
+                                <div></div>
                                 <div></div>
                                 <div></div>
                                 <div></div>
