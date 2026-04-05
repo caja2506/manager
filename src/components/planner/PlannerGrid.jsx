@@ -16,8 +16,8 @@ const TIME_BANDS = [
         label:  '🍳 Desayuno',
         start:  8,
         end:    8.5,
-        bg:     'rgba(251, 191, 36, 0.10)',
-        border: 'rgba(245, 158, 11, 0.40)',
+        bg:     'rgba(251, 191, 36, 0.35)',
+        border: 'rgba(245, 158, 11, 0.65)',
         text:   '#fcd34d',
     },
     {
@@ -25,8 +25,8 @@ const TIME_BANDS = [
         label:  '🍽 Almuerzo',
         start:  12,
         end:    13,
-        bg:     'rgba(52, 211, 153, 0.10)',
-        border: 'rgba(16, 185, 129, 0.35)',
+        bg:     'rgba(52, 211, 153, 0.35)',
+        border: 'rgba(16, 185, 129, 0.60)',
         text:   '#fde68a',
     },
     {
@@ -34,8 +34,8 @@ const TIME_BANDS = [
         label:  '☕ Café',
         start:  15.5,
         end:    16,
-        bg:     'rgba(249, 115, 22, 0.10)',
-        border: 'rgba(234, 88, 12, 0.35)',
+        bg:     'rgba(249, 115, 22, 0.35)',
+        border: 'rgba(234, 88, 12, 0.60)',
         text:   '#fdba74',
     },
 ];
