@@ -252,6 +252,7 @@ function getDecimalHour(d) {
 
 /**
  * Start a new planner-managed timer.
+ * Also transitions the task to in_progress if it's in a valid starting state.
  */
 async function startPlannerTimer(adminDb, userId, block, now) {
     const newLogRef = adminDb.collection(paths.TIME_LOGS).doc();
@@ -270,6 +271,30 @@ async function startPlannerTimer(adminDb, userId, block, now) {
         planItemId: block.id || null,
         createdAt: now,
     });
+
+    // ── Auto-transition task to in_progress ──
+    // Valid transitions: backlog→in_progress, pending→in_progress, blocked→in_progress
+    if (block.taskId) {
+        try {
+            const taskRef = adminDb.collection(paths.TASKS).doc(block.taskId);
+            const taskSnap = await taskRef.get();
+            if (taskSnap.exists) {
+                const taskData = taskSnap.data();
+                const CAN_AUTO_START = ["backlog", "pending", "blocked"];
+                if (CAN_AUTO_START.includes(taskData.status)) {
+                    await taskRef.update({
+                        status: "in_progress",
+                        statusChangedAt: now,
+                        statusChangedBy: "planner_auto",
+                        updatedAt: now,
+                    });
+                    console.log(`[plannerTimerSync] Task ${block.taskId} transitioned: ${taskData.status} → in_progress`);
+                }
+            }
+        } catch (err) {
+            console.warn(`[plannerTimerSync] Could not transition task ${block.taskId}:`, err.message);
+        }
+    }
 }
 
 /**
