@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
 import { plannerService } from '../services/plannerService';
 import { syncPlannerToGantt } from '../services/ganttPlannerSync';
+import { updateTask } from '../services/taskService';
 import { enrichPlanItemsWithTasks } from '../utils/plannerUtils';
 import PlannerSidebar from '../components/planner/PlannerSidebar';
 import DailyTeamGrid from '../components/planner/DailyTeamGrid';
@@ -159,6 +160,16 @@ export default function DailyTeamBoard() {
             setPlannerError(null);
             setRawPlanItems(prev => [...prev, { id: newId, ...planItem }]);
             syncPlannerToGantt(taskId).catch(console.warn);
+
+            // ── Auto-assign: update the task's assignedTo if it changed ──
+            if (finalAssignedTo && finalAssignedTo !== task.assignedTo) {
+                try {
+                    await updateTask(taskId, { assignedTo: finalAssignedTo });
+                    console.log(`[DailyBoard] Task ${taskId} reassigned to ${assignedMember?.displayName || finalAssignedTo}`);
+                } catch (err) {
+                    console.warn('[DailyBoard] Failed to update task assignedTo:', err.message);
+                }
+            }
         } catch (e) {
             if (e.name === 'PlannerValidationError') {
                 setPlannerError(e.validationErrors?.join(' | ') || e.message);
@@ -209,6 +220,16 @@ export default function DailyTeamBoard() {
             await plannerService.updatePlanItem(itemId, updates);
             setRawPlanItems(prev => prev.map(pi => pi.id === itemId ? { ...pi, ...updates } : pi));
             syncPlannerToGantt(item.taskId).catch(console.warn);
+
+            // ── Auto-assign: update task if moved to a different person ──
+            if (assignedTo && assignedTo !== item.assignedTo) {
+                try {
+                    await updateTask(item.taskId, { assignedTo });
+                    console.log(`[DailyBoard] Task ${item.taskId} reassigned to ${assignedTo}`);
+                } catch (err) {
+                    console.warn('[DailyBoard] Failed to update task assignedTo:', err.message);
+                }
+            }
         } catch (e) { console.error('Error moving block:', e); }
     }, [allPlanItems, weekStartStr]);
 
