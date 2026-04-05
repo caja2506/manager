@@ -731,17 +731,17 @@ export default function TeamScoresPage() {
 
     if (!isReady) {
         return (
-            <div className="min-h-screen flex items-center justify-center" style={{ background: '#0c0a1a' }}>
-                <div className="w-10 h-10 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#6366f1', borderTopColor: 'transparent' }} />
+            <div className="flex items-center justify-center py-20">
+                <div className="w-10 h-10 border-2 border-t-transparent rounded-full animate-spin border-indigo-500" />
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen pb-24" style={{ background: '#0c0a1a' }}>
+        <div className="w-full max-w-7xl mx-auto pb-10">
 
             {/* ── Hero Header ── */}
-            <div className="relative overflow-hidden" style={{
+            <div className="relative overflow-hidden rounded-xl mb-6 border border-slate-800/50" style={{
                 background: 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(16,185,129,0.05) 50%, rgba(245,158,11,0.05) 100%)',
                 borderBottom: '1px solid rgba(255,255,255,0.06)',
             }}>
