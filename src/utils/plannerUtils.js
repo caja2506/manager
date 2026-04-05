@@ -139,16 +139,16 @@ export function validatePlanItem(data) {
         errors.push('plannedHours debe ser mayor a 0.');
     }
 
-    // B7: date must fall within the target week (Mon-Fri of weekStartDate)
+    // B7: date must fall within the target week (Mon-Sun of weekStartDate)
     if (data.date && data.weekStartDate) {
         const blockDate = new Date(data.date + 'T00:00:00');
         const weekMon = new Date(data.weekStartDate + 'T00:00:00');
-        const weekFri = new Date(weekMon);
-        weekFri.setDate(weekFri.getDate() + 4); // Friday
+        const weekSun = new Date(weekMon);
+        weekSun.setDate(weekSun.getDate() + 6); // Sunday
 
         if (!isNaN(blockDate.getTime()) && !isNaN(weekMon.getTime())) {
-            if (blockDate < weekMon || blockDate > weekFri) {
-                errors.push('La fecha del bloque debe estar dentro de la semana (Lun-Vie).');
+            if (blockDate < weekMon || blockDate > weekSun) {
+                errors.push('La fecha del bloque debe estar dentro de la semana (Lun-Dom).');
             }
         }
     }
@@ -234,6 +234,26 @@ export function validatePlanItemFull(data, context = {}) {
         result.warnings.push(
             `⚠ Bloque de ${data.plannedHours}h — considera dividir en bloques más granulares (≤ 4h).`
         );
+    }
+
+    // W6: Weekend or off-hours blocks → overtime warning
+    if (data.date) {
+        const blockDate = new Date(data.date + 'T00:00:00');
+        const dayOfWeek = blockDate.getDay(); // 0=Sun, 6=Sat
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
+            result.warnings.push(
+                `⏱ Bloque en fin de semana — se contabilizará como OVERTIME.`
+            );
+        }
+    }
+    if (data.startDateTime) {
+        const startDate = new Date(data.startDateTime);
+        const hour = startDate.getHours();
+        if (hour < 8 || hour >= 17) {
+            result.warnings.push(
+                `⏱ Bloque fuera de horario laboral (8am-5pm) — se contabilizará como OVERTIME.`
+            );
+        }
     }
 
     return result;

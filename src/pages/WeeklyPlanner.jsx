@@ -39,9 +39,16 @@ export default function WeeklyPlanner() {
     }, [weekOffset]);
 
     const weekDays = useMemo(() =>
-        Array.from({ length: 5 }, (_, i) => {
+        Array.from({ length: 7 }, (_, i) => {
             const d = addDays(weekStart, i);
-            return { date: d, label: format(d, 'EEE d', { locale: es }), isToday: isToday(d) };
+            const dayOfWeek = d.getDay(); // 0=Sun, 6=Sat
+            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+            return {
+                date: d,
+                label: format(d, 'EEE d', { locale: es }),
+                isToday: isToday(d),
+                isWeekend,
+            };
         }), [weekStart]);
 
     const weekStartStr = format(weekStart, 'yyyy-MM-dd');

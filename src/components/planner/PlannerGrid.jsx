@@ -201,7 +201,7 @@ export default function PlannerGrid({
     const hours = Array.from({ length: totalHours }, (_, i) => PLANNER_START_HOUR + i);
 
     // ── Compute per-day layout ────────────────────────────────
-    const dayLayouts = weekDays.map(({ date: dayDate, isToday }) => {
+    const dayLayouts = weekDays.map(({ date: dayDate, isToday, isWeekend }) => {
         const dayStr      = format(dayDate, 'yyyy-MM-dd');
         const rawItems    = planItems.filter(p => p.date === dayStr);
         const layoutItems = computeColumnLayout(rawItems);
@@ -209,7 +209,7 @@ export default function PlannerGrid({
             ? Math.max(...layoutItems.map(i => i.totalColumns))
             : 1;
         const dynMinWidth = Math.max(160, maxSim * 80);
-        return { dayDate, dayStr, isToday, layoutItems, dynMinWidth };
+        return { dayDate, dayStr, isToday, isWeekend, layoutItems, dynMinWidth };
     });
 
     // Ghost preview height (default 1h block for the task being placed)
@@ -248,19 +248,22 @@ export default function PlannerGrid({
 
                         {/* Day header cells */}
                         <div className="flex flex-1 min-w-0">
-                            {dayLayouts.map(({ dayDate, dayStr, isToday, dynMinWidth }) => (
+                            {dayLayouts.map(({ dayDate, dayStr, isToday, isWeekend, dynMinWidth }) => (
                                 <div
                                     key={dayStr}
                                     className={`border-r border-slate-800 last:border-r-0 flex flex-col items-center justify-center py-2 transition-colors
                                         ${isToday
                                             ? 'bg-indigo-600 text-white'
-                                            : 'bg-slate-900 text-slate-300'
+                                            : isWeekend
+                                                ? 'bg-amber-900/30 text-amber-300'
+                                                : 'bg-slate-900 text-slate-300'
                                         }`}
                                     style={{ flex: `1 0 ${dynMinWidth}px` }}
                                 >
                                     <span className={`text-[10px] font-black uppercase tracking-[0.15em]
-                                        ${isToday ? 'text-indigo-200' : 'text-slate-400'}`}>
+                                        ${isToday ? 'text-indigo-200' : isWeekend ? 'text-amber-400' : 'text-slate-400'}`}>
                                         {format(dayDate, 'EEE', { locale: es })}
+                                        {isWeekend && ' ⏱'}
                                     </span>
                                     <span className="text-2xl font-black leading-none mt-0.5">
                                         {format(dayDate, 'd')}
