@@ -6,9 +6,9 @@ import { PLANNER_START_HOUR, PLANNER_END_HOUR, SLOT_HEIGHT_PX } from './PlannerG
 
 // ── Break time bands (same as PlannerGrid) ──
 const TIME_BANDS = [
-    { id: 'desayuno', label: '🍳 Desayuno', start: 8,    end: 8.5,  bg: 'rgba(251,191,36,0.35)', border: 'rgba(245,158,11,0.65)', text: '#fcd34d' },
-    { id: 'almuerzo', label: '🍽 Almuerzo', start: 12,   end: 13,   bg: 'rgba(52,211,153,0.35)',  border: 'rgba(16,185,129,0.60)',  text: '#fde68a' },
-    { id: 'cafe',     label: '☕ Café',      start: 15.5, end: 16,   bg: 'rgba(249,115,22,0.35)',  border: 'rgba(234,88,12,0.60)',   text: '#fdba74' },
+    { id: 'desayuno', label: '🍳 Desayuno', start: 8,    end: 8.5,  bg: 'rgba(251,191,36,1)', border: 'rgba(245,158,11,1)', text: '#fcd34d' },
+    { id: 'almuerzo', label: '🍽 Almuerzo', start: 12,   end: 13,   bg: 'rgba(52,211,153,1)',  border: 'rgba(16,185,129,1)',  text: '#fde68a' },
+    { id: 'cafe',     label: '☕ Café',      start: 15.5, end: 16,   bg: 'rgba(249,115,22,1)',  border: 'rgba(234,88,12,1)',   text: '#fdba74' },
 ];
 
 const DEFAULT_SCROLL_HOUR = 9;
