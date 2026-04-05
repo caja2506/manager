@@ -20,6 +20,7 @@ import {
 import { COLLECTIONS, createTimeLogDocument } from '../models/schemas';
 import { calculateProjectRisk } from './riskService';
 import { logActivity, ACTIVITY_TYPES } from './activityLogService';
+import { getEffectiveHours } from '../utils/breakTimeUtils';
 
 // ============================================================
 // ACTIVE TIMER — Firestore-based (no localStorage)
@@ -144,19 +145,23 @@ export async function stopTimer(logId, { notes = '', overtime = false } = {}) {
     const logData = logSnap.data();
     const startTime = new Date(logData.startTime);
     const totalMs = now - startTime;
-    let totalHours = parseFloat((totalMs / 3600000).toFixed(6));
+    const totalHoursGross = parseFloat((totalMs / 3600000).toFixed(6));
+    let totalHours = getEffectiveHours(startTime, now);
 
     // Fallback: at least 1 minute
     if (totalHours < 0.016666) {
         totalHours = 0.016666;
     }
 
+    const breakHoursDeducted = parseFloat((totalHoursGross - totalHours).toFixed(4));
     const overtimeHours = overtime ? totalHours : 0;
 
     try {
         await updateDoc(logRef, {
             endTime: now.toISOString(),
             totalHours,
+            totalHoursGross,
+            breakHoursDeducted,
             overtime,
             overtimeHours,
             notes: notes || logData.notes || '',
@@ -208,14 +213,18 @@ export async function closeDay(timeLogs) {
     for (const log of runningTimers) {
         const startTime = new Date(log.startTime);
         const totalMs = now - startTime;
-        let totalHours = parseFloat((totalMs / 3600000).toFixed(6));
+        const totalHoursGross = parseFloat((totalMs / 3600000).toFixed(6));
+        let totalHours = getEffectiveHours(startTime, now);
         if (totalHours < 0.016666) totalHours = 0.016666;
+        const breakHoursDeducted = parseFloat((totalHoursGross - totalHours).toFixed(4));
 
         try {
             await updateDoc(doc(db, COLLECTIONS.TIME_LOGS, log.id), {
                 endTime: now.toISOString(),
                 totalHours,
-                autoStopped: true,    // ← flag for openDay() to find
+                totalHoursGross,
+                breakHoursDeducted,
+                autoStopped: true,
                 notes: (log.notes || '') + ' [Auto-cerrado al cierre de día]',
             });
 
@@ -356,7 +365,8 @@ export async function createManualTimeLog({
     const start = new Date(startTime);
     const end = new Date(endTime);
     const totalMs = end - start;
-    let totalHours = parseFloat((totalMs / 3600000).toFixed(6));
+    const totalHoursGross = parseFloat((totalMs / 3600000).toFixed(6));
+    let totalHours = getEffectiveHours(start, end);
 
     if (totalHours > 0 && totalHours < 0.016666) {
         totalHours = 0.016666;
@@ -364,6 +374,7 @@ export async function createManualTimeLog({
         totalHours = 0;
     }
 
+    const breakHoursDeducted = parseFloat((totalHoursGross - totalHours).toFixed(4));
     const overtimeHours = overtime ? totalHours : 0;
 
     const logData = createTimeLogDocument({
@@ -373,6 +384,8 @@ export async function createManualTimeLog({
         startTime: start.toISOString(),
         endTime: end.toISOString(),
         totalHours,
+        totalHoursGross,
+        breakHoursDeducted,
         overtime,
         overtimeHours,
         notes,
@@ -395,7 +408,10 @@ export async function updateTimeLog(logId, updates) {
         const start = new Date(updates.startTime);
         const end = new Date(updates.endTime);
         const totalMs = end - start;
-        updates.totalHours = parseFloat((totalMs / 3600000).toFixed(6));
+        const totalHoursGross = parseFloat((totalMs / 3600000).toFixed(6));
+        updates.totalHours = getEffectiveHours(start, end);
+        updates.totalHoursGross = totalHoursGross;
+        updates.breakHoursDeducted = parseFloat((totalHoursGross - updates.totalHours).toFixed(4));
         if (updates.overtime) {
             updates.overtimeHours = updates.totalHours;
         }

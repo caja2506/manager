@@ -1,20 +1,17 @@
 /**
- * Break Time Utils — Frontend (ESM)
- * ==================================
+ * Break Time Utils — Backend (CJS)
+ * =================================
  * Shared break band definitions and effective-hours calculator.
- * Used by Planner and Timer to deduct break time from hours.
- *
- * V2: Uses Costa Rica timezone for hour comparison to avoid
- * UTC/local mismatches when running on server vs client.
+ * Mirror of src/utils/breakTimeUtils.js for Cloud Functions.
  */
 
-export const BREAK_BANDS = [
-    { id: 'desayuno', start: 8,    end: 8.5  },   // 30 min
-    { id: 'almuerzo', start: 12,   end: 13   },   // 60 min
-    { id: 'cafe',     start: 15.5, end: 16   },   // 30 min
+const BREAK_BANDS = [
+    { id: "desayuno", start: 8,    end: 8.5  },   // 30 min
+    { id: "almuerzo", start: 12,   end: 13   },   // 60 min
+    { id: "cafe",     start: 15.5, end: 16   },   // 30 min
 ];
 
-const TZ = 'America/Costa_Rica';
+const TZ = "America/Costa_Rica";
 
 /**
  * Get the hour (decimal) of a Date in Costa Rica timezone.
@@ -22,20 +19,18 @@ const TZ = 'America/Costa_Rica';
  * @returns {number} e.g. 8.5 for 8:30 AM
  */
 function getLocalDecimalHour(d) {
-    const parts = d.toLocaleString('en-US', {
+    const parts = d.toLocaleString("en-US", {
         timeZone: TZ,
-        hour: 'numeric', minute: 'numeric', hour12: false,
-    }).split(':');
+        hour: "numeric", minute: "numeric", hour12: false,
+    }).split(":");
     return parseInt(parts[0]) + parseInt(parts[1]) / 60;
 }
 
 /**
- * Calculate the overlap (in hours) between a time range and all break bands.
- * @param {Date|string} startDt - start of the block
- * @param {Date|string} endDt   - end of the block
- * @returns {number} total break hours that fall within the given range
+ * Calculate break hours that overlap with a time range.
+ * Uses Costa Rica timezone for hour comparison.
  */
-export function getBreakHoursInRange(startDt, endDt) {
+function getBreakHoursInRange(startDt, endDt) {
     const start = startDt instanceof Date ? startDt : new Date(startDt);
     const end   = endDt   instanceof Date ? endDt   : new Date(endDt);
 
@@ -54,15 +49,17 @@ export function getBreakHoursInRange(startDt, endDt) {
 }
 
 /**
- * Calculate effective working hours = gross hours − break overlap.
+ * Calculate effective working hours = gross − break overlap.
  * @param {Date|string} startDt
  * @param {Date|string} endDt
  * @returns {number} net working hours
  */
-export function getEffectiveHours(startDt, endDt) {
+function getEffectiveHours(startDt, endDt) {
     const start = startDt instanceof Date ? startDt : new Date(startDt);
     const end   = endDt   instanceof Date ? endDt   : new Date(endDt);
     const grossHours = (end - start) / 3_600_000;
     const breakHours = getBreakHoursInRange(start, end);
     return parseFloat(Math.max(0, grossHours - breakHours).toFixed(2));
 }
+
+module.exports = { BREAK_BANDS, getBreakHoursInRange, getEffectiveHours };

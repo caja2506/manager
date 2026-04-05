@@ -206,7 +206,22 @@ function createAutomationExports(adminDb, secrets) {
         }
     );
 
-    return { unifiedRoutineScheduler, executeRoutineManually, sendTestMessage, executePerformanceReport };
+    // One-time migration: fix timeLogs break deduction
+    const migrateBreakHours = onCall(
+        { timeoutSeconds: 300 },
+        async (request) => {
+            await requireAdmin(adminDb, request);
+            try {
+                const { migrateBreakHoursCallable } = require("../scripts/migrateBreakHours");
+                const result = await migrateBreakHoursCallable(adminDb);
+                return result;
+            } catch (err) {
+                throw new HttpsError("internal", `Migration failed: ${err.message}`);
+            }
+        }
+    );
+
+    return { unifiedRoutineScheduler, executeRoutineManually, sendTestMessage, executePerformanceReport, migrateBreakHours };
 }
 
 module.exports = { createAutomationExports };

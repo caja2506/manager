@@ -65,6 +65,7 @@ exports.unifiedRoutineScheduler = automationExports.unifiedRoutineScheduler;
 exports.executeRoutineManually = automationExports.executeRoutineManually;
 exports.sendTestMessage = automationExports.sendTestMessage;
 exports.executePerformanceReport = automationExports.executePerformanceReport;
+exports.migrateBreakHours = automationExports.migrateBreakHours;
 
 // ── Domain: Telegram ──
 const { createTelegramExports } = require("./exports/telegram");
