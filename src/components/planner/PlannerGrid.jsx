@@ -234,76 +234,79 @@ export default function PlannerGrid({
                 </div>
             )}
 
-            {/* ── Fixed header row (never scrolls) ── */}
-            <div
-                className="flex shrink-0 border-b border-slate-700 bg-slate-900 z-20"
-                style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
-            >
-                {/* Corner cell above time ruler */}
-                <div className="w-16 shrink-0 border-r border-slate-800" />
+            {/* ── Scrollable body — header scrolls horizontally with grid ── */}
+            <div ref={scrollBodyRef} className="flex-1 overflow-auto">
+                <div className="inline-flex flex-col" style={{ minWidth: '100%' }}>
 
-                {/* Day header cells */}
-                <div className="flex flex-1 min-w-0">
-                    {dayLayouts.map(({ dayDate, dayStr, isToday, dynMinWidth }) => (
-                        <div
-                            key={dayStr}
-                            className={`border-r border-slate-800 last:border-r-0 flex flex-col items-center justify-center py-2 transition-colors
-                                ${isToday
-                                    ? 'bg-indigo-600 text-white'
-                                    : 'bg-slate-900 text-slate-300'
-                                }`}
-                            style={{ flex: `1 0 ${dynMinWidth}px` }}
-                        >
-                            <span className={`text-[10px] font-black uppercase tracking-[0.15em]
-                                ${isToday ? 'text-indigo-200' : 'text-slate-400'}`}>
-                                {format(dayDate, 'EEE', { locale: es })}
-                            </span>
-                            <span className="text-2xl font-black leading-none mt-0.5">
-                                {format(dayDate, 'd')}
-                            </span>
+                    {/* Sticky header row */}
+                    <div
+                        className="flex shrink-0 border-b border-slate-700 bg-slate-900 z-20 sticky top-0"
+                        style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
+                    >
+                        {/* Corner cell above time ruler */}
+                        <div className="w-16 shrink-0 border-r border-slate-800 bg-slate-900" />
+
+                        {/* Day header cells */}
+                        <div className="flex flex-1 min-w-0">
+                            {dayLayouts.map(({ dayDate, dayStr, isToday, dynMinWidth }) => (
+                                <div
+                                    key={dayStr}
+                                    className={`border-r border-slate-800 last:border-r-0 flex flex-col items-center justify-center py-2 transition-colors
+                                        ${isToday
+                                            ? 'bg-indigo-600 text-white'
+                                            : 'bg-slate-900 text-slate-300'
+                                        }`}
+                                    style={{ flex: `1 0 ${dynMinWidth}px` }}
+                                >
+                                    <span className={`text-[10px] font-black uppercase tracking-[0.15em]
+                                        ${isToday ? 'text-indigo-200' : 'text-slate-400'}`}>
+                                        {format(dayDate, 'EEE', { locale: es })}
+                                    </span>
+                                    <span className="text-2xl font-black leading-none mt-0.5">
+                                        {format(dayDate, 'd')}
+                                    </span>
+                                </div>
+                            ))}
                         </div>
-                    ))}
-                </div>
-            </div>
+                    </div>
 
-            {/* ── Scrollable body ── */}
-            <div ref={scrollBodyRef} className="flex flex-1 overflow-auto">
-
-                {/* Time ruler — sticky left */}
-                <div className="w-16 shrink-0 border-r border-slate-800 bg-slate-800 sticky left-0 z-10">
-                    {hours.map(h => (
-                        <div
-                            key={h}
-                            className="border-b border-slate-800 flex items-start justify-end pr-2 pt-1"
-                            style={{ height: SLOT_HEIGHT_PX }}
-                        >
-                            <span className="text-[10px] font-black text-slate-400 leading-none">
-                                {`${String(h).padStart(2, '0')}:00`}
-                            </span>
+                    {/* Grid body */}
+                    <div className="flex">
+                        {/* Time ruler — sticky left */}
+                        <div className="w-16 shrink-0 border-r border-slate-800 bg-slate-800 sticky left-0 z-10">
+                            {hours.map(h => (
+                                <div
+                                    key={h}
+                                    className="border-b border-slate-800 flex items-start justify-end pr-2 pt-1"
+                                    style={{ height: SLOT_HEIGHT_PX }}
+                                >
+                                    <span className="text-[10px] font-black text-slate-400 leading-none">
+                                        {`${String(h).padStart(2, '0')}:00`}
+                                    </span>
+                                </div>
+                            ))}
                         </div>
-                    ))}
-                </div>
 
-                {/* Day columns */}
-                <div className="flex flex-1 min-w-0" style={{ minHeight: totalHours * SLOT_HEIGHT_PX }}>
-                    {dayLayouts.map(({ dayDate, dayStr, layoutItems, dynMinWidth }, dayIndex) => (
-                        <div
-                            key={dayStr}
-                            className="flex flex-col border-r border-slate-800 last:border-r-0"
-                            style={{ flex: `1 0 ${dynMinWidth}px` }}
-                        >
-                            {/* Drop zone */}
-                            <div
-                                className={`relative ${placingTask ? 'cursor-crosshair' : ''}`}
-                                style={{ height: totalHours * SLOT_HEIGHT_PX }}
-                                onDragOver={handleDragOver}
-                                onDrop={e => handleDrop(e, dayDate)}
-                                onMouseMove={e => handlePlacementMouseMove(e, dayDate, dayIndex)}
-                                onMouseLeave={handlePlacementMouseLeave}
-                                onClick={e => {
-                                    if (placingTask) handlePlacementClick(e, dayDate);
-                                }}
-                            >
+                        {/* Day columns */}
+                        <div className="flex flex-1 min-w-0" style={{ minHeight: totalHours * SLOT_HEIGHT_PX }}>
+                            {dayLayouts.map(({ dayDate, dayStr, layoutItems, dynMinWidth }, dayIndex) => (
+                                <div
+                                    key={dayStr}
+                                    className="flex flex-col border-r border-slate-800 last:border-r-0"
+                                    style={{ flex: `1 0 ${dynMinWidth}px` }}
+                                >
+                                    {/* Drop zone */}
+                                    <div
+                                        className={`relative ${placingTask ? 'cursor-crosshair' : ''}`}
+                                        style={{ height: totalHours * SLOT_HEIGHT_PX }}
+                                        onDragOver={handleDragOver}
+                                        onDrop={e => handleDrop(e, dayDate)}
+                                        onMouseMove={e => handlePlacementMouseMove(e, dayDate, dayIndex)}
+                                        onMouseLeave={handlePlacementMouseLeave}
+                                        onClick={e => {
+                                            if (placingTask) handlePlacementClick(e, dayDate);
+                                        }}
+                                    >
                                 {/* Hour grid lines */}
                                 {hours.map(h => (
                                     <React.Fragment key={h}>
@@ -397,6 +400,8 @@ export default function PlannerGrid({
                             </div>
                         </div>
                     ))}
+                </div>
+                    </div>
                 </div>
             </div>
         </div>

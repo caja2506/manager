@@ -197,135 +197,140 @@ export default function DailyTeamGrid({
                 </div>
             )}
 
-            {/* Fixed header row */}
-            <div className="flex shrink-0 border-b border-slate-700 bg-slate-900 z-20" style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                <div className="w-16 shrink-0 border-r border-slate-800" />
-                <div className="flex flex-1 min-w-0">
-                    {memberLayouts.map(({ member, dynMinWidth }) => {
-                        const roleCfg = ROLE_ICONS[member.teamRole] || ROLE_ICONS.engineer;
-                        const initials = (member.displayName || '??').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-                        return (
-                            <div
-                                key={member.uid}
-                                className="border-r border-slate-800 last:border-r-0 flex flex-col items-center justify-center py-2.5 px-1 transition-colors bg-slate-900"
-                                style={{ flex: `1 0 ${dynMinWidth}px` }}
-                            >
-                                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white mb-1"
-                                    style={{ background: `${roleCfg.color}30`, border: `2px solid ${roleCfg.color}50` }}>
-                                    {initials}
-                                </div>
-                                <span className="text-[10px] font-bold text-slate-200 truncate max-w-full px-1">
-                                    {member.displayName?.split(' ')[0] || member.uid}
-                                </span>
-                                <span className="text-[9px] font-medium" style={{ color: roleCfg.color }}>
-                                    {roleCfg.emoji} {member.teamRole?.replace('_', ' ') || ''}
-                                </span>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
+            {/* Scrollable body — header, grid, and footer all scroll horizontally together */}
+            <div ref={scrollBodyRef} className="flex-1 overflow-auto">
+                <div className="inline-flex flex-col" style={{ minWidth: '100%' }}>
 
-            {/* Scrollable body */}
-            <div ref={scrollBodyRef} className="flex flex-1 overflow-auto">
-
-                {/* Time ruler */}
-                <div className="w-16 shrink-0 border-r border-slate-800 bg-slate-800 sticky left-0 z-10">
-                    {hours.map(h => (
-                        <div key={h} className="border-b border-slate-800 flex items-start justify-end pr-2 pt-1" style={{ height: SLOT_HEIGHT_PX }}>
-                            <span className="text-[10px] font-black text-slate-400 leading-none">
-                                {`${String(h).padStart(2, '0')}:00`}
-                            </span>
-                        </div>
-                    ))}
-                </div>
-
-                {/* Member columns */}
-                <div className="flex flex-1 min-w-0" style={{ minHeight: totalHours * SLOT_HEIGHT_PX }}>
-                    {memberLayouts.map(({ member, layoutItems, dynMinWidth }, memberIndex) => (
-                        <div
-                            key={member.uid}
-                            className="flex flex-col border-r border-slate-800 last:border-r-0"
-                            style={{ flex: `1 0 ${dynMinWidth}px` }}
-                        >
-                            <div
-                                className={`relative ${placingTask ? 'cursor-crosshair' : ''}`}
-                                style={{ height: totalHours * SLOT_HEIGHT_PX }}
-                                onDragOver={handleDragOver}
-                                onDrop={e => handleDrop(e, member.uid)}
-                                onMouseMove={e => handlePlacementMouseMove(e, member.uid, memberIndex)}
-                                onMouseLeave={() => setHoverSlot(null)}
-                                onClick={e => { if (placingTask) handlePlacementClick(e, member.uid); }}
-                            >
-                                {/* Hour grid lines */}
-                                {hours.map(h => (
-                                    <React.Fragment key={h}>
-                                        <div className="absolute left-0 right-0 border-t border-slate-800"
-                                            style={{ top: (h - PLANNER_START_HOUR) * SLOT_HEIGHT_PX }} />
-                                        <div className="absolute left-0 right-0 border-t border-dashed border-slate-800/70"
-                                            style={{ top: (h - PLANNER_START_HOUR) * SLOT_HEIGHT_PX + SLOT_HEIGHT_PX / 2 }} />
-                                    </React.Fragment>
-                                ))}
-
-                                {/* Time bands */}
-                                {TIME_BANDS.map(band => {
-                                    const top    = (band.start - PLANNER_START_HOUR) * SLOT_HEIGHT_PX;
-                                    const height = (band.end - band.start) * SLOT_HEIGHT_PX;
-                                    return (
-                                        <div key={band.id}
-                                            className="absolute left-0 right-0 pointer-events-none flex items-center justify-center overflow-hidden"
-                                            style={{ top, height, zIndex: 5, background: band.bg, borderTop: `1.5px dashed ${band.border}`, borderBottom: `1.5px dashed ${band.border}` }}>
-                                            <span className="text-[9px] font-black uppercase tracking-[0.18em] select-none whitespace-nowrap"
-                                                style={{ color: band.text, opacity: 0.75 }}>
-                                                {band.label}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
-
-                                {/* Ghost preview */}
-                                {placingTask && effectiveHoverSlot && effectiveHoverSlot.memberUid === member.uid && (
+                    {/* Sticky header row */}
+                    <div className="flex shrink-0 border-b border-slate-700 bg-slate-900 z-20 sticky top-0" style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                        <div className="w-16 shrink-0 border-r border-slate-800 bg-slate-900" />
+                        <div className="flex flex-1 min-w-0">
+                            {memberLayouts.map(({ member, dynMinWidth }) => {
+                                const roleCfg = ROLE_ICONS[member.teamRole] || ROLE_ICONS.engineer;
+                                const initials = (member.displayName || '??').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                                return (
                                     <div
-                                        className="absolute left-1 right-1 rounded-xl border-2 border-dashed border-emerald-400/60 bg-emerald-500/15 pointer-events-none flex flex-col items-center justify-center gap-0.5 z-15 transition-all duration-100"
-                                        style={{ top: effectiveHoverSlot.top, height: ghostHeight }}>
-                                        <MousePointerClick className="w-4 h-4 text-emerald-400" />
-                                        <span className="text-[10px] font-black text-emerald-300 truncate px-2 max-w-full">{placingTask.title}</span>
-                                        <span className="text-[9px] font-bold text-emerald-400/80">
-                                            {`${String(effectiveHoverSlot.hour).padStart(2, '0')}:${String(effectiveHoverSlot.minute).padStart(2, '0')}`}
+                                        key={member.uid}
+                                        className="border-r border-slate-800 last:border-r-0 flex flex-col items-center justify-center py-2.5 px-1 transition-colors bg-slate-900"
+                                        style={{ flex: `1 0 ${dynMinWidth}px` }}
+                                    >
+                                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white mb-1"
+                                            style={{ background: `${roleCfg.color}30`, border: `2px solid ${roleCfg.color}50` }}>
+                                            {initials}
+                                        </div>
+                                        <span className="text-[10px] font-bold text-slate-200 truncate max-w-full px-1">
+                                            {member.displayName?.split(' ')[0] || member.uid}
+                                        </span>
+                                        <span className="text-[9px] font-medium" style={{ color: roleCfg.color }}>
+                                            {roleCfg.emoji} {member.teamRole?.replace('_', ' ') || ''}
                                         </span>
                                     </div>
-                                )}
-
-                                {/* Placement highlight */}
-                                {placingTask && (
-                                    <div className="absolute inset-0 bg-emerald-500/5 pointer-events-none z-1" />
-                                )}
-
-                                {/* Task blocks */}
-                                {layoutItems.map(item => {
-                                    const { totalColumns, columnIndex } = item;
-                                    const GAP_PX = 3;
-                                    const colWidth = `calc(${100 / totalColumns}% - ${GAP_PX}px)`;
-                                    const colLeft  = `calc(${(columnIndex / totalColumns) * 100}% + ${GAP_PX / 2}px)`;
-                                    return (
-                                        <PlannerTaskBlock
-                                            key={item.id}
-                                            item={item}
-                                            topOffset={getTopOffset(item.startDateTime)}
-                                            height={getBlockHeight(item.startDateTime, item.endDateTime)}
-                                            widthStyle={colWidth}
-                                            leftStyle={colLeft}
-                                            totalColumns={totalColumns}
-                                            isConflict={conflictIds?.has(item.id)}
-                                            onClick={() => onBlockClick?.(item)}
-                                            onDelete={() => onBlockDelete?.(item.id)}
-                                            onResize={newEnd => onBlockResize?.(item.id, newEnd)}
-                                        />
-                                    );
-                                })}
-                            </div>
+                                );
+                            })}
                         </div>
-                    ))}
+                    </div>
+
+                    {/* Grid body */}
+                    <div className="flex">
+                        {/* Time ruler — sticky left */}
+                        <div className="w-16 shrink-0 border-r border-slate-800 bg-slate-800 sticky left-0 z-10">
+                            {hours.map(h => (
+                                <div key={h} className="border-b border-slate-800 flex items-start justify-end pr-2 pt-1" style={{ height: SLOT_HEIGHT_PX }}>
+                                    <span className="text-[10px] font-black text-slate-400 leading-none">
+                                        {`${String(h).padStart(2, '0')}:00`}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Member columns */}
+                        <div className="flex flex-1 min-w-0" style={{ minHeight: totalHours * SLOT_HEIGHT_PX }}>
+                            {memberLayouts.map(({ member, layoutItems, dynMinWidth }, memberIndex) => (
+                                <div
+                                    key={member.uid}
+                                    className="flex flex-col border-r border-slate-800 last:border-r-0"
+                                    style={{ flex: `1 0 ${dynMinWidth}px` }}
+                                >
+                                    <div
+                                        className={`relative ${placingTask ? 'cursor-crosshair' : ''}`}
+                                        style={{ height: totalHours * SLOT_HEIGHT_PX }}
+                                        onDragOver={handleDragOver}
+                                        onDrop={e => handleDrop(e, member.uid)}
+                                        onMouseMove={e => handlePlacementMouseMove(e, member.uid, memberIndex)}
+                                        onMouseLeave={() => setHoverSlot(null)}
+                                        onClick={e => { if (placingTask) handlePlacementClick(e, member.uid); }}
+                                    >
+                                        {/* Hour grid lines */}
+                                        {hours.map(h => (
+                                            <React.Fragment key={h}>
+                                                <div className="absolute left-0 right-0 border-t border-slate-800"
+                                                    style={{ top: (h - PLANNER_START_HOUR) * SLOT_HEIGHT_PX }} />
+                                                <div className="absolute left-0 right-0 border-t border-dashed border-slate-800/70"
+                                                    style={{ top: (h - PLANNER_START_HOUR) * SLOT_HEIGHT_PX + SLOT_HEIGHT_PX / 2 }} />
+                                            </React.Fragment>
+                                        ))}
+
+                                        {/* Time bands */}
+                                        {TIME_BANDS.map(band => {
+                                            const top    = (band.start - PLANNER_START_HOUR) * SLOT_HEIGHT_PX;
+                                            const height = (band.end - band.start) * SLOT_HEIGHT_PX;
+                                            return (
+                                                <div key={band.id}
+                                                    className="absolute left-0 right-0 pointer-events-none flex items-center justify-center overflow-hidden"
+                                                    style={{ top, height, zIndex: 5, background: band.bg, borderTop: `1.5px dashed ${band.border}`, borderBottom: `1.5px dashed ${band.border}` }}>
+                                                    <span className="text-[9px] font-black uppercase tracking-[0.18em] select-none whitespace-nowrap"
+                                                        style={{ color: band.text, opacity: 0.75 }}>
+                                                        {band.label}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+
+                                        {/* Ghost preview */}
+                                        {placingTask && effectiveHoverSlot && effectiveHoverSlot.memberUid === member.uid && (
+                                            <div
+                                                className="absolute left-1 right-1 rounded-xl border-2 border-dashed border-emerald-400/60 bg-emerald-500/15 pointer-events-none flex flex-col items-center justify-center gap-0.5 z-15 transition-all duration-100"
+                                                style={{ top: effectiveHoverSlot.top, height: ghostHeight }}>
+                                                <MousePointerClick className="w-4 h-4 text-emerald-400" />
+                                                <span className="text-[10px] font-black text-emerald-300 truncate px-2 max-w-full">{placingTask.title}</span>
+                                                <span className="text-[9px] font-bold text-emerald-400/80">
+                                                    {`${String(effectiveHoverSlot.hour).padStart(2, '0')}:${String(effectiveHoverSlot.minute).padStart(2, '0')}`}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {/* Placement highlight */}
+                                        {placingTask && (
+                                            <div className="absolute inset-0 bg-emerald-500/5 pointer-events-none z-1" />
+                                        )}
+
+                                        {/* Task blocks */}
+                                        {layoutItems.map(item => {
+                                            const { totalColumns, columnIndex } = item;
+                                            const GAP_PX = 3;
+                                            const colWidth = `calc(${100 / totalColumns}% - ${GAP_PX}px)`;
+                                            const colLeft  = `calc(${(columnIndex / totalColumns) * 100}% + ${GAP_PX / 2}px)`;
+                                            return (
+                                                <PlannerTaskBlock
+                                                    key={item.id}
+                                                    item={item}
+                                                    topOffset={getTopOffset(item.startDateTime)}
+                                                    height={getBlockHeight(item.startDateTime, item.endDateTime)}
+                                                    widthStyle={colWidth}
+                                                    leftStyle={colLeft}
+                                                    totalColumns={totalColumns}
+                                                    isConflict={conflictIds?.has(item.id)}
+                                                    onClick={() => onBlockClick?.(item)}
+                                                    onDelete={() => onBlockDelete?.(item.id)}
+                                                    onResize={newEnd => onBlockResize?.(item.id, newEnd)}
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </div>
 
