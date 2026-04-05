@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
     Mail, Save, Send, Clock, Users, ChevronDown, ChevronUp,
     Plus, X, CheckCircle, AlertCircle, Loader2, BarChart3,
-    Shield, Target, FileText, Zap
+    Shield, Target, FileText, Zap, CalendarDays
 } from 'lucide-react';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
@@ -50,6 +50,10 @@ export default function EmailReportSettings() {
     const [sending, setSending] = useState(false);
     const [sendResult, setSendResult] = useState(null);
     const [emailError, setEmailError] = useState('');
+    const [reportDate, setReportDate] = useState(() => {
+        const d = new Date();
+        return d.toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+    });
 
     // Subscribe to Firestore
     useEffect(() => {
@@ -124,7 +128,7 @@ export default function EmailReportSettings() {
         setSendResult(null);
         try {
             const fn = httpsCallable(functions, 'executePerformanceReport');
-            const result = await fn();
+            const result = await fn({ reportDate });
             setSendResult({
                 ok: true,
                 data: result.data,
@@ -374,6 +378,25 @@ export default function EmailReportSettings() {
                             {saving ? 'Guardando...' : 'Guardar Configuración'}
                         </button>
 
+                        {saved && (
+                            <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
+                                <CheckCircle className="w-3 h-3" /> Guardado
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Date picker + Send Now */}
+                    <div className="flex items-center gap-3 pt-2">
+                        <div className="flex items-center gap-2">
+                            <CalendarDays className="w-4 h-4 text-indigo-400" />
+                            <input
+                                type="date"
+                                value={reportDate}
+                                onChange={e => setReportDate(e.target.value)}
+                                className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 w-44"
+                            />
+                            <span className="text-[10px] text-slate-500">Fecha del reporte</span>
+                        </div>
                         <button
                             onClick={handleSendNow}
                             disabled={sending || recipients.length === 0}
@@ -386,12 +409,6 @@ export default function EmailReportSettings() {
                             )}
                             {sending ? 'Enviando...' : 'Enviar Ahora'}
                         </button>
-
-                        {saved && (
-                            <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
-                                <CheckCircle className="w-3 h-3" /> Guardado
-                            </span>
-                        )}
                     </div>
 
                     {/* Send result */}

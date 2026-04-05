@@ -31,16 +31,18 @@ const DAILY_AVAILABLE_HOURS = 8; // 7:00-17:00 minus 2h breaks = 8h effective
 async function execute(adminDb, token, targets, context) {
     const { dryRun, runId, options = {} } = context;
     const now = new Date();
-    const today = now.toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+
+    // Allow manual date override for testing
+    const today = options.reportDate || now.toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
     const startOfDay = new Date(today + "T00:00:00-06:00");
     const endOfDay = new Date(today + "T23:59:59-06:00");
 
-    // Tomorrow
+    // Tomorrow (relative to report date)
     const tomorrowDate = new Date(startOfDay);
     tomorrowDate.setDate(tomorrowDate.getDate() + 1);
     const tomorrow = tomorrowDate.toLocaleDateString("en-CA");
 
-    console.log(`[perfReport] Building V2 report for ${today}...`);
+    console.log(`[perfReport] Building V2 report for ${today} (override: ${!!options.reportDate})...`);
 
     // ══════════════════════════════════════════
     // 1. LOAD ALL DATA
@@ -420,7 +422,7 @@ function buildReportData({
     });
 
     // Overloaded tomorrow
-    Object.entries(userPlannedMap).forEach(([uid, hours]) => {
+    Object.entries(userPlannedMap).forEach(([uid]) => {
         // Check tomorrow's load
         const tomorrowHours = planItemsTomorrow
             .filter(pi => pi.assignedTo === uid)

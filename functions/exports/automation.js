@@ -193,9 +193,11 @@ function createAutomationExports(adminDb, secrets) {
             try {
                 const { executeRoutine } = require("../automation/routineExecutor");
                 const token = telegramBotToken.value();
+                const reportDate = request.data?.reportDate || null;
                 const result = await executeRoutine(adminDb, token, "daily_performance_report", "manual", {
                     forceDryRun: false,
                     resendApiKey: resendApiKey.value(),
+                    reportDate,
                 });
                 return result;
             } catch (err) {
