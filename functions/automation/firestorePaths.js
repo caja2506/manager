@@ -31,6 +31,7 @@ module.exports = {
     NOTIFICATIONS: "notifications",
     TASK_TYPES: "taskTypes",
     TASK_TYPE_CATEGORIES: "taskTypeCategories",
+    WEEKLY_PLAN_ITEMS: "weeklyPlanItems",
 
     // ── BOM (legacy naming preserved) ──
     PROYECTOS_BOM: "proyectos_bom",
