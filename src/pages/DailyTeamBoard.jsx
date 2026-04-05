@@ -29,6 +29,7 @@ export default function DailyTeamBoard() {
     // ──────────────── Day navigation ────────────────
     const [dayOffset, setDayOffset] = useState(0);
     const [filterProject, setFilterProject] = useState('all');
+    const [filterMember, setFilterMember] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
 
     const selectedDate = useMemo(() => addDays(new Date(), dayOffset), [dayOffset]);
@@ -81,13 +82,15 @@ export default function DailyTeamBoard() {
 
     // Members to show (non-manager team members with active tasks or any assignments)
     const visibleMembers = useMemo(() => {
-        return teamMembers
+        const sorted = teamMembers
             .filter(m => m.teamRole !== 'manager')
             .sort((a, b) => {
                 const roleOrder = { team_lead: 0, engineer: 1, technician: 2 };
                 return (roleOrder[a.teamRole] ?? 3) - (roleOrder[b.teamRole] ?? 3);
             });
-    }, [teamMembers]);
+        if (filterMember === 'all') return sorted;
+        return sorted.filter(m => m.uid === filterMember);
+    }, [teamMembers, filterMember]);
 
     // ──────────────── Unscheduled tasks ────────────────
     const unscheduledTasks = useMemo(() => {
@@ -335,6 +338,29 @@ export default function DailyTeamBoard() {
                     ))}
                 </select>
 
+                {/* Member filter */}
+                <select
+                    value={filterMember}
+                    onChange={e => setFilterMember(e.target.value)}
+                    className="bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-300 py-1.5 px-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
+                >
+                    <option value="all">👥 Todo el Equipo</option>
+                    {teamMembers
+                        .filter(m => m.teamRole !== 'manager')
+                        .map(m => (
+                            <option key={m.uid} value={m.uid}>{m.displayName || m.email}</option>
+                        ))}
+                </select>
+
+                {filterMember !== 'all' && (
+                    <button
+                        onClick={() => setFilterMember('all')}
+                        className="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 bg-indigo-500/15 border border-indigo-500/30 px-2 py-1 rounded-lg transition-colors"
+                    >
+                        ✕ Mostrar todos
+                    </button>
+                )}
+
                 {conflictIds.size > 0 && (
                     <div className="flex items-center gap-1.5 bg-rose-500/15 border border-rose-500/30 text-rose-400 px-2.5 py-1 rounded-lg text-[10px] font-bold animate-pulse">
                         ⚠️ {conflictIds.size} conflicto(s)
@@ -388,6 +414,8 @@ export default function DailyTeamBoard() {
                             onBlockDelete={handleBlockDelete}
                             placingTask={placingTask}
                             onPlacementComplete={handlePlacementComplete}
+                            onMemberClick={(uid) => setFilterMember(filterMember === uid ? 'all' : uid)}
+                            activeMemberFilter={filterMember}
                         />
                     )}
                 </div>

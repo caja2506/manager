@@ -68,6 +68,8 @@ export default function DailyTeamGrid({
     onBlockDelete,
     placingTask,
     onPlacementComplete,
+    onMemberClick,
+    activeMemberFilter,
 }) {
     const totalHours   = PLANNER_END_HOUR - PLANNER_START_HOUR;
     const scrollBodyRef = useRef(null);
@@ -208,14 +210,18 @@ export default function DailyTeamGrid({
                             {memberLayouts.map(({ member, dynMinWidth }) => {
                                 const roleCfg = ROLE_ICONS[member.teamRole] || ROLE_ICONS.engineer;
                                 const initials = (member.displayName || '??').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                                const isFiltered = activeMemberFilter === member.uid;
                                 return (
                                     <div
                                         key={member.uid}
-                                        className="border-r border-slate-800 last:border-r-0 flex flex-col items-center justify-center py-2.5 px-1 transition-colors bg-slate-900"
+                                        onClick={() => onMemberClick?.(member.uid)}
+                                        className={`border-r border-slate-800 last:border-r-0 flex flex-col items-center justify-center py-2.5 px-1 transition-all bg-slate-900 ${
+                                            onMemberClick ? 'cursor-pointer hover:bg-slate-800' : ''
+                                        } ${isFiltered ? 'ring-2 ring-indigo-500/60 bg-indigo-950/40' : ''}`}
                                         style={{ flex: `1 0 ${dynMinWidth}px` }}
                                     >
-                                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white mb-1"
-                                            style={{ background: `${roleCfg.color}30`, border: `2px solid ${roleCfg.color}50` }}>
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white mb-1 transition-all ${isFiltered ? 'scale-110' : ''}`}
+                                            style={{ background: `${roleCfg.color}30`, border: `2px solid ${isFiltered ? roleCfg.color : roleCfg.color + '50'}` }}>
                                             {initials}
                                         </div>
                                         <span className="text-[10px] font-bold text-slate-200 truncate max-w-full px-1">
