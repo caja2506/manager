@@ -68,14 +68,13 @@ export function validateTransition(task, newStatus, context = {}) {
         return result; // Early return — no point checking further
     }
 
-    // --- 2. Check required fields ---
+    // --- 2. Check required fields (warnings, overridable via confirmation) ---
     const requiredFields = getRequiredFields(newStatus);
     for (const req of requiredFields) {
         if (!req.validate(task)) {
-            result.valid = false;
-            result.errors.push({
+            result.warnings.push({
                 code: 'MISSING_REQUIRED_FIELD',
-                message: `Campo obligatorio faltante: ${req.label}`,
+                message: `Campo recomendado faltante: ${req.label}`,
                 field: req.field,
             });
         }
