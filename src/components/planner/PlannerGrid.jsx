@@ -15,7 +15,7 @@ const TIME_BANDS = [
         id:     'desayuno',
         label:  '🍳 Desayuno',
         start:  8,
-        end:    9,
+        end:    8.5,
         bg:     'rgba(251, 191, 36, 0.10)',
         border: 'rgba(245, 158, 11, 0.40)',
         text:   '#fcd34d',
