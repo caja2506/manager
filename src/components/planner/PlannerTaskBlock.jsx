@@ -4,10 +4,10 @@ import { X, User, Clock, AlertTriangle } from 'lucide-react';
 import { PLANNER_START_HOUR, SLOT_HEIGHT_PX } from './PlannerGrid';
 
 const PRIORITY_STYLES = {
-    critical: 'bg-red-500    border-red-700    text-white',
-    high:     'bg-amber-500  border-amber-700  text-white',
-    medium:   'bg-indigo-500 border-indigo-700 text-white',
-    low:      'bg-slate-400  border-slate-600  text-white',
+    critical: 'bg-red-500/85    border-red-700    text-white',
+    high:     'bg-amber-500/85  border-amber-700  text-white',
+    medium:   'bg-indigo-500/85 border-indigo-700 text-white',
+    low:      'bg-slate-400/85  border-slate-600  text-white',
 };
 
 /**
