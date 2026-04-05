@@ -20,7 +20,7 @@ import {
 import { COLLECTIONS, createTimeLogDocument } from '../models/schemas';
 import { calculateProjectRisk } from './riskService';
 import { logActivity, ACTIVITY_TYPES } from './activityLogService';
-import { getEffectiveHours } from '../utils/breakTimeUtils';
+import { getEffectiveHours, getBreakHoursInRange } from '../utils/breakTimeUtils';
 
 // ============================================================
 // ACTIVE TIMER — Firestore-based (no localStorage)
@@ -452,7 +452,11 @@ export function formatElapsed(startIso) {
     if (!startIso) return '0:00:00';
     const now = new Date();
     const start = new Date(startIso);
-    const totalSeconds = Math.max(0, Math.floor((now - start) / 1000));
+    const grossMs = Math.max(0, now - start);
+    // Subtract break hours that have already elapsed
+    const breakHours = getBreakHoursInRange(start, now);
+    const netMs = Math.max(0, grossMs - breakHours * 3_600_000);
+    const totalSeconds = Math.floor(netMs / 1000);
     const h = Math.floor(totalSeconds / 3600);
     const m = Math.floor((totalSeconds % 3600) / 60);
     const s = totalSeconds % 60;

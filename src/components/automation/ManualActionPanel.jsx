@@ -175,11 +175,16 @@ export default function ManualActionPanel({ routines = [], teamMembers = [], onE
 function MigrationPanel() {
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState(null);
+    const [confirmed, setConfirmed] = useState(false);
 
     const handleMigrate = async () => {
-        if (!window.confirm('¿Ejecutar migración de break hours? Esto recalculará TODOS los timeLogs existentes.')) return;
+        if (!confirmed) {
+            setConfirmed(true);
+            return;
+        }
         setLoading(true);
         setResult(null);
+        setConfirmed(false);
         try {
             const fn = httpsCallable(functions, 'migrateBreakHours');
             const res = await fn();
@@ -201,14 +206,28 @@ function MigrationPanel() {
                 Recalcula totalHours en todos los timeLogs existentes descontando breaks (desayuno, almuerzo, café).
                 Guarda el valor original en totalHoursGross para auditoría.
             </p>
-            <button
-                onClick={handleMigrate}
-                disabled={loading}
-                className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-lg text-sm font-bold transition-colors"
-            >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wrench className="w-4 h-4" />}
-                {loading ? 'Ejecutando migración...' : 'Ejecutar Migración'}
-            </button>
+            <div className="flex items-center gap-3">
+                <button
+                    onClick={handleMigrate}
+                    disabled={loading}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
+                        confirmed
+                            ? 'bg-red-600 hover:bg-red-500 text-white animate-pulse'
+                            : 'bg-amber-600 hover:bg-amber-500 text-white'
+                    } disabled:bg-slate-700 disabled:text-slate-500`}
+                >
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wrench className="w-4 h-4" />}
+                    {loading ? 'Ejecutando...' : confirmed ? '⚠️ Confirmar Migración' : 'Ejecutar Migración'}
+                </button>
+                {confirmed && (
+                    <button
+                        onClick={() => setConfirmed(false)}
+                        className="text-xs text-slate-400 hover:text-white"
+                    >
+                        Cancelar
+                    </button>
+                )}
+            </div>
             {result && (
                 <div className={`mt-3 p-3 rounded-lg border text-sm ${result.ok ? 'bg-emerald-900/20 border-emerald-700/50 text-emerald-300' : 'bg-red-900/20 border-red-700/50 text-red-300'}`}>
                     {result.ok ? (
