@@ -4,7 +4,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { formatDuration, getActiveTimerForTask, formatElapsed, startTimer, stopTimer, canManageOthersTimers } from '../../services/timeService';
 import {
     AlertTriangle, CheckCheck, User, Calendar, Clock,
-    GripVertical, Play, Square
+    GripVertical, Play, Square, ArrowRightLeft
 } from 'lucide-react';
 import {
     TASK_STATUS_CONFIG,
@@ -43,7 +43,7 @@ const PRIORITY_COLORS = {
 const PILL = 'h-6 inline-flex items-center gap-1 px-2.5 rounded-full text-[10px] font-semibold border';
 const ICON = 'w-3 h-3 shrink-0';
 
-export default function TaskCard({ task, project, teamMembers, subtasks = [], onClick, isDragOverlay = false, timeLogs = [], currentUserId, userRole, userTeamRole }) {
+export default function TaskCard({ task, project, teamMembers, subtasks = [], onClick, isDragOverlay = false, timeLogs = [], currentUserId, userRole, userTeamRole, onStartMove, isMoving }) {
     const {
         attributes, listeners, setNodeRef, transform, transition, isDragging,
     } = useSortable({
@@ -134,6 +134,7 @@ export default function TaskCard({ task, project, teamMembers, subtasks = [], on
     else if (isDragOverlay) cardCls += ' shadow-2xl ring-2 ring-indigo-400 rotate-[2deg]';
     if (isOverdue) cardCls += ' border-red-500/40 shadow-red-500/10';
     if (activeLog) cardCls += ' ring-1 ring-emerald-500/30';
+    if (isMoving) cardCls += ' ring-2 ring-emerald-400/60 shadow-emerald-500/20';
 
     // ── Initials helper ──
     const getInitials = (member) => {
@@ -158,6 +159,17 @@ export default function TaskCard({ task, project, teamMembers, subtasks = [], on
                     >
                         <GripVertical className={ICON} />
                     </button>
+
+                    {/* Move button (placement mode) */}
+                    {onStartMove && !isDragOverlay && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onStartMove(task); }}
+                            className={`p-0.5 transition-colors rounded ${isMoving ? 'text-emerald-400 bg-emerald-500/20' : 'text-slate-600 hover:text-emerald-400 opacity-0 group-hover:opacity-100'}`}
+                            title="Mover a otra columna"
+                        >
+                            <ArrowRightLeft className={ICON} />
+                        </button>
+                    )}
 
                     {/* Priority pill */}
                     <span

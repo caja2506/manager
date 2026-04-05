@@ -20,6 +20,7 @@ import { startTimer, stopTimer, getActiveTimerForTask, canManageOthersTimers } f
 import {
     TASK_STATUS, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG
 } from '../models/schemas';
+import { getAvailableTransitions } from '../core/workflow/workflowModel';
 import {
     Plus, Search, Menu, Filter, X
 } from 'lucide-react';
@@ -28,7 +29,7 @@ import {
 // DROPPABLE COLUMN COMPONENT
 // ============================================================
 
-function KanbanColumn({ status, children, taskCount }) {
+function KanbanColumn({ status, children, taskCount, isPlacementTarget, onPlacementClick }) {
     const cfg = TASK_STATUS_CONFIG[status];
     const { isOver, setNodeRef } = useDroppable({
         id: `column-${status}`,
@@ -54,11 +55,19 @@ function KanbanColumn({ status, children, taskCount }) {
             {/* Column Drop Zone */}
             <div
                 ref={setNodeRef}
+                onClick={onPlacementClick}
                 className={`flex-1 space-y-3 overflow-y-auto pr-1 rounded-2xl transition-all duration-200 min-h-[120px] ${isOver
                     ? 'bg-indigo-500/10 ring-2 ring-indigo-500/40 ring-dashed p-2.5'
-                    : 'p-0'
+                    : isPlacementTarget
+                        ? 'bg-emerald-500/10 ring-2 ring-emerald-400/50 ring-dashed p-2.5 cursor-pointer hover:bg-emerald-500/15'
+                        : 'p-0'
                     }`}
             >
+                {isPlacementTarget && (
+                    <div className="flex items-center justify-center gap-2 py-3 text-emerald-400 animate-pulse">
+                        <span className="text-xs font-bold">Click para mover aquí</span>
+                    </div>
+                )}
                 {children}
             </div>
         </div>
@@ -97,6 +106,7 @@ export default function TaskManager() {
     // Drag state
     const [activeId, setActiveId] = useState(null);
     const [showFilters, setShowFilters] = useState(false);
+    const [movingTask, setMovingTask] = useState(null);
 
     const openNew = () => { setSelectedTask(null); setIsModalOpen(true); };
     const openTask = (task) => { setSelectedTask(task); setIsModalOpen(true); };
@@ -221,6 +231,60 @@ export default function TaskManager() {
         setActiveId(null);
     }, []);
 
+    // --- Placement mode: valid target statuses ---
+    const validMoveTargets = useMemo(() => {
+        if (!movingTask) return new Set();
+        return new Set(getAvailableTransitions(movingTask.status));
+    }, [movingTask]);
+
+    // --- Handle placement click on column ---
+    const handlePlacementClick = useCallback(async (targetStatus) => {
+        if (!movingTask) return;
+        const task = movingTask;
+        setMovingTask(null);
+
+        const result = requestTransition(task, targetStatus, user.uid);
+        if (!result.allowed) {
+            console.warn('Transition blocked:', result.error);
+            return;
+        }
+        if (result.needsConfirmation) return;
+
+        try {
+            await result.execute();
+
+            const taskOwner = task.assignedTo;
+            const isSelf = taskOwner === user.uid;
+            const canManageOthers = canManageOthersTimers(role, teamRole);
+
+            if (targetStatus === TASK_STATUS.IN_PROGRESS && task.status !== TASK_STATUS.IN_PROGRESS) {
+                if (taskOwner && (isSelf || canManageOthers)) {
+                    const existingTimer = getActiveTimerForTask(timeLogs, task.id);
+                    if (!existingTimer) {
+                        const proj = engProjects.find(p => p.id === task.projectId);
+                        const owner = teamMembers.find(m => (m.uid || m.id) === taskOwner);
+                        await startTimer({
+                            taskId: task.id, projectId: task.projectId, userId: taskOwner,
+                            notes: 'Auto-started from Kanban placement',
+                            taskTitle: task.title || '',
+                            projectName: proj?.name || '',
+                            displayName: owner?.displayName || owner?.email || '',
+                        });
+                    }
+                }
+            } else if (task.status === TASK_STATUS.IN_PROGRESS && targetStatus !== TASK_STATUS.IN_PROGRESS) {
+                if (isSelf || canManageOthers) {
+                    const activeLog = getActiveTimerForTask(timeLogs, task.id);
+                    if (activeLog) {
+                        await stopTimer(activeLog.id);
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Error updating task status:', err);
+        }
+    }, [movingTask, engProjects, teamMembers, user, requestTransition, role, teamRole, timeLogs]);
+
     return (
         <div className="-m-4 md:-m-8 flex flex-col bg-slate-950 text-white" style={{ minHeight: '100vh' }}>
             <TaskDetailModal
@@ -328,7 +392,10 @@ export default function TaskManager() {
                         {KANBAN_COLUMNS.map((status) => {
                             const columnTasks = tasksByStatus[status] || [];
                             return (
-                                <KanbanColumn key={status} status={status} taskCount={columnTasks.length}>
+                                <KanbanColumn key={status} status={status} taskCount={columnTasks.length}
+                                    isPlacementTarget={movingTask && movingTask.status !== status && validMoveTargets.has(status)}
+                                    onPlacementClick={movingTask && validMoveTargets.has(status) ? () => handlePlacementClick(status) : undefined}
+                                >
                                     <SortableContext
                                         items={columnTasks.map(t => t.id)}
                                         strategy={verticalListSortingStrategy}
@@ -350,6 +417,8 @@ export default function TaskManager() {
                                                     currentUserId={user?.uid}
                                                     userRole={role}
                                                     userTeamRole={teamRole}
+                                                    onStartMove={canEdit ? (t) => setMovingTask(movingTask?.id === t.id ? null : t) : undefined}
+                                                    isMoving={movingTask?.id === task.id}
                                                 />
                                             ))
                                         )}
