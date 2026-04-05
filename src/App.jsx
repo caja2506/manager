@@ -45,6 +45,7 @@ import PlatformOverview from './pages/PlatformOverview';
 import DailyBriefing from './pages/DailyBriefing';
 import TeamScoresPage from './pages/TeamScoresPage';
 import DataFlowPage from './pages/DataFlowPage';
+import DailyTeamBoard from './pages/DailyTeamBoard';
 
 // ========================================================
 // AUTH LOADING SCREEN
@@ -206,6 +207,7 @@ export default function App() {
           <Route path="/audit" element={<ErrorBoundary module="Auditoría"><AuditFindings /></ErrorBoundary>} />
           <Route path="/control-tower" element={<ErrorBoundary module="Control Tower"><ControlTower /></ErrorBoundary>} />
           <Route path="/planner" element={<ErrorBoundary module="Planner Semanal"><WeeklyPlanner /></ErrorBoundary>} />
+          <Route path="/daily-board" element={<ErrorBoundary module="Daily Board"><DailyTeamBoard /></ErrorBoundary>} />
           <Route path="/gantt" element={<ErrorBoundary module="Gantt"><ProjectGantt /></ErrorBoundary>} />
           <Route path="/daily-scrum" element={<ErrorBoundary module="Equipo Hoy"><DailyScrumPage /></ErrorBoundary>} />
 
