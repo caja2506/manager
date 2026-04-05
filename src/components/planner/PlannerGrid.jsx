@@ -332,7 +332,7 @@ export default function PlannerGrid({
                                             style={{
                                                 top,
                                                 height,
-                                                zIndex:       5,
+                                                zIndex:       25,
                                                 background:   band.bg,
                                                 borderTop:    `1.5px dashed ${band.border}`,
                                                 borderBottom: `1.5px dashed ${band.border}`,

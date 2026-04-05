@@ -284,7 +284,7 @@ export default function DailyTeamGrid({
                                             return (
                                                 <div key={band.id}
                                                     className="absolute left-0 right-0 pointer-events-none flex items-center justify-center overflow-hidden"
-                                                    style={{ top, height, zIndex: 5, background: band.bg, borderTop: `1.5px dashed ${band.border}`, borderBottom: `1.5px dashed ${band.border}` }}>
+                                                    style={{ top, height, zIndex: 25, background: band.bg, borderTop: `1.5px dashed ${band.border}`, borderBottom: `1.5px dashed ${band.border}` }}>
                                                     <span className="text-[9px] font-black uppercase tracking-[0.18em] select-none whitespace-nowrap"
                                                         style={{ color: band.text, opacity: 0.75 }}>
                                                         {band.label}
