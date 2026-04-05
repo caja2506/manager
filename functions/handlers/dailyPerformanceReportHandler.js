@@ -1,17 +1,12 @@
 /**
- * Daily Performance Report Handler — Backend (CJS)
- * ===================================================
- * Generates a comprehensive daily team performance report and delivers
- * it through two channels:
- *   1. Email via Resend (analyzeops.com)
- *   2. PDF via Telegram to managers/leads
- *
- * Leverages existing analytics engines:
- *   - kpiEngine → KPI calculations
- *   - riskFlagEngine → risk assessment
- *   - scorecardService → individual scores
- *   - trendEngine → trend vs previous period
- *   - recommendationEngine → suggested actions
+ * Daily Performance Report Handler — V2 "Manager Briefing"
+ * =========================================================
+ * Generates a USEFUL daily report that answers 5 questions:
+ *   1. ¿Quién trabajó y quién no? (presencia efectiva)
+ *   2. ¿Se avanzó lo planificado? (plan vs realidad)
+ *   3. ¿Dónde están los problemas? (alertas accionables)
+ *   4. ¿Qué se logró concretamente? (logros del día)
+ *   5. ¿Qué debo decidir mañana? (vista del mañana)
  *
  * @module handlers/dailyPerformanceReportHandler
  */
@@ -21,6 +16,14 @@ const { OPERATIONAL_ROLES } = require("../automation/constants");
 const { sendAndLogEmail } = require("../email/emailProvider");
 const { dailyPerformanceReport } = require("../email/emailTemplates");
 const { sendToUser } = require("../telegram/telegramProvider");
+
+// ── Break bands (must match frontend breakTimeUtils.js) ──
+const BREAK_BANDS = [
+    { start: 8, end: 8.5 },   // Desayuno 30min
+    { start: 12, end: 13 },   // Almuerzo 60min
+    { start: 15.5, end: 16 }, // Café 30min
+];
+const DAILY_AVAILABLE_HOURS = 8; // 7:00-17:00 minus 2h breaks = 8h effective
 
 /**
  * Execute the daily performance report routine.
@@ -32,68 +35,53 @@ async function execute(adminDb, token, targets, context) {
     const startOfDay = new Date(today + "T00:00:00-06:00");
     const endOfDay = new Date(today + "T23:59:59-06:00");
 
-    console.log(`[perfReport] Building report for ${today}...`);
+    // Tomorrow
+    const tomorrowDate = new Date(startOfDay);
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    const tomorrow = tomorrowDate.toLocaleDateString("en-CA");
+
+    console.log(`[perfReport] Building V2 report for ${today}...`);
 
     // ══════════════════════════════════════════
     // 1. LOAD ALL DATA
     // ══════════════════════════════════════════
-    const [tasksSnap, timeLogsSnap, delaysSnap, usersSnap] = await Promise.all([
+    const [
+        tasksSnap, timeLogsSnap, delaysSnap, usersSnap,
+        subtasksSnap, planItemsTodaySnap, planItemsTomorrowSnap,
+        telegramReportsSnap,
+    ] = await Promise.all([
         adminDb.collection(paths.TASKS).get(),
         adminDb.collection(paths.TIME_LOGS).get(),
         adminDb.collection(paths.DELAYS).get(),
         adminDb.collection(paths.USERS).get(),
+        adminDb.collection(paths.SUBTASKS).get(),
+        adminDb.collection("weeklyPlanItems").where("date", "==", today).get(),
+        adminDb.collection("weeklyPlanItems").where("date", "==", tomorrow).get(),
+        adminDb.collection(paths.TELEGRAM_REPORTS)
+            .where("reportDate", "==", today).get(),
     ]);
 
     const allTasks = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const allTimeLogs = timeLogsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const allDelays = delaysSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const allUsers = usersSnap.docs.map(d => ({ id: d.id, uid: d.id, ...d.data() }));
+    const allSubtasks = subtasksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const planItemsToday = planItemsTodaySnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const planItemsTomorrow = planItemsTomorrowSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const telegramReportsToday = telegramReportsSnap.docs.map(d => d.data());
 
-    // Load analytics snapshots (latest)
-    let latestKpiSnapshot = null;
-    let latestRiskFlags = [];
-    let latestRecommendations = [];
-    let latestUserScores = [];
-
-    try {
-        const [kpiSnap, riskSnap, recsSnap, userScoresSnap] = await Promise.all([
-            adminDb.collection(paths.OPERATIONAL_KPI_SNAPSHOTS)
-                .orderBy("generatedAt", "desc").limit(1).get(),
-            adminDb.collection(paths.OPERATIONAL_RISK_FLAGS)
-                .orderBy("createdAt", "desc").limit(20).get(),
-            adminDb.collection(paths.OPERATIONAL_RECOMMENDATIONS)
-                .orderBy("createdAt", "desc").limit(10).get(),
-            adminDb.collection(paths.USER_OPERATIONAL_SCORES)
-                .orderBy("generatedAt", "desc").limit(20).get(),
-        ]);
-
-        latestKpiSnapshot = kpiSnap.docs[0]?.data() || null;
-        latestRiskFlags = riskSnap.docs.map(d => d.data());
-        latestRecommendations = recsSnap.docs.map(d => d.data());
-        latestUserScores = userScoresSnap.docs.map(d => d.data());
-    } catch (err) {
-        console.warn("[perfReport] Error loading analytics data:", err.message);
-    }
+    console.log(`[perfReport] Loaded: ${allTasks.length} tasks, ${allTimeLogs.length} timeLogs, ${allSubtasks.length} subtasks, ${planItemsToday.length} planItems today, ${planItemsTomorrow.length} tomorrow`);
 
     // ══════════════════════════════════════════
     // 2. BUILD REPORT DATA
     // ══════════════════════════════════════════
     const reportData = buildReportData({
-        today,
-        now,
-        startOfDay,
-        endOfDay,
-        allTasks,
-        allTimeLogs,
-        allDelays,
-        allUsers,
-        latestKpiSnapshot,
-        latestRiskFlags,
-        latestRecommendations,
-        latestUserScores,
+        today, tomorrow, now, startOfDay, endOfDay,
+        allTasks, allTimeLogs, allDelays, allUsers, allSubtasks,
+        planItemsToday, planItemsTomorrow, telegramReportsToday,
     });
 
-    console.log(`[perfReport] Report built: ${reportData.executiveSummary.totalHoursToday.toFixed(1)}h, ${reportData.scorecards.length} users, ${reportData.risks.length} risks`);
+    console.log(`[perfReport] Report built: ${reportData.pulseOfDay.hoursReal}h real / ${reportData.pulseOfDay.hoursPlanned}h planned, ${reportData.teamNarratives.length} members, ${reportData.productivityAlerts.length} alerts`);
 
     // ══════════════════════════════════════════
     // 3. LOAD REPORT CONFIG
@@ -101,23 +89,17 @@ async function execute(adminDb, token, targets, context) {
     let config = {
         channels: { email: true, telegramPdf: true },
         recipients: [],
-        sections: {
-            executiveSummary: true, risks: true, kpis: true,
-            individualScores: true, overdueTasks: true, recommendations: true,
-        },
     };
 
     try {
         const configSnap = await adminDb.collection(paths.SETTINGS).doc("emailReportConfig").get();
-        if (configSnap.exists) {
-            config = { ...config, ...configSnap.data() };
-        }
+        if (configSnap.exists) config = { ...config, ...configSnap.data() };
     } catch (err) {
-        console.warn("[perfReport] No config found, using defaults:", err.message);
+        console.warn("[perfReport] No config found:", err.message);
     }
 
     // ══════════════════════════════════════════
-    // 4. DELIVER: Channel A — Email via Resend
+    // 4. DELIVER: Email
     // ══════════════════════════════════════════
     let emailResult = { ok: false, skipped: true };
 
@@ -131,20 +113,17 @@ async function execute(adminDb, token, targets, context) {
                 const html = dailyPerformanceReport(reportData);
                 emailResult = await sendAndLogEmail(adminDb, resendApiKey, {
                     to: config.recipients,
-                    subject: `📊 Reporte de Rendimiento — ${reportData.date}`,
+                    subject: `📊 Briefing del Equipo — ${reportData.date}`,
                     html,
                 }, { routineKey: "daily_performance_report", runId });
-
-                console.log(`[perfReport] Email result: ${emailResult.ok ? "sent" : "failed"} ${emailResult.error || ""}`);
             } else {
-                console.warn("[perfReport] No Resend API Key available, skipping email channel");
                 emailResult = { ok: false, error: "No API key" };
             }
         }
     }
 
     // ══════════════════════════════════════════
-    // 5. DELIVER: Channel B — Telegram summary
+    // 5. DELIVER: Telegram
     // ══════════════════════════════════════════
     let telegramResult = { sentCount: 0, failedCount: 0, errors: [] };
 
@@ -157,11 +136,10 @@ async function execute(adminDb, token, targets, context) {
 
         for (const mgr of managersAndLeads) {
             if (dryRun) {
-                console.log(`[perfReport] DRY-RUN: Would send Telegram summary to ${mgr.name}`);
+                console.log(`[perfReport] DRY-RUN: Would send Telegram to ${mgr.name}`);
                 telegramResult.sentCount++;
                 continue;
             }
-
             try {
                 const result = await sendToUser(adminDb, token, mgr.uid, mgr.chatId, summaryMsg, {
                     runId, routineKey: "daily_performance_report", dryRun: false,
@@ -179,7 +157,7 @@ async function execute(adminDb, token, targets, context) {
     }
 
     // ══════════════════════════════════════════
-    // 6. LOG REPORT GENERATION
+    // 6. LOG
     // ══════════════════════════════════════════
     if (!dryRun) {
         try {
@@ -201,11 +179,20 @@ async function execute(adminDb, token, targets, context) {
 }
 
 // ═══════════════════════════════════════════════
-// DATA BUILDER
+// DATA BUILDER — V2
 // ═══════════════════════════════════════════════
 
-function buildReportData({ today, now, startOfDay, endOfDay, allTasks, allTimeLogs, allDelays, allUsers, latestKpiSnapshot, latestRiskFlags, latestRecommendations, latestUserScores }) {
-    // Tasks
+function buildReportData({
+    today, tomorrow, now, startOfDay, endOfDay,
+    allTasks, allTimeLogs, allDelays, allUsers, allSubtasks,
+    planItemsToday, planItemsTomorrow, telegramReportsToday,
+}) {
+    // ── Active team: users with operational roles ──
+    const teamUsers = allUsers.filter(u =>
+        u.operationalRole && !["none", "viewer"].includes(u.operationalRole)
+    );
+
+    // ── Tasks by status ──
     const activeTasks = allTasks.filter(t => !["completed", "cancelled"].includes(t.status));
     const blockedTasks = allTasks.filter(t => t.status === "blocked");
     const completedToday = allTasks.filter(t => {
@@ -213,212 +200,428 @@ function buildReportData({ today, now, startOfDay, endOfDay, allTasks, allTimeLo
         const cd = new Date(t.completedDate);
         return cd >= startOfDay && cd <= endOfDay;
     });
+
+    // ── Overdue tasks ──
     const overdueTasks = activeTasks.filter(t => t.dueDate && new Date(t.dueDate) < now)
         .map(t => {
-            const daysOverdue = Math.ceil((now - new Date(t.dueDate)) / 86400000);
             const user = allUsers.find(u => u.id === t.assignedTo);
             return {
                 title: t.title,
                 assignedTo: user?.displayName || user?.name || t.assignedTo || "Sin asignar",
                 dueDate: t.dueDate,
-                daysOverdue,
+                daysOverdue: Math.ceil((now - new Date(t.dueDate)) / 86400000),
+                priority: t.priority || "medium",
             };
         })
         .sort((a, b) => b.daysOverdue - a.daysOverdue);
 
-    // Time logs today
+    // ── Subtasks by taskId ──
+    const subtasksByTask = {};
+    for (const st of allSubtasks) {
+        if (!subtasksByTask[st.taskId]) subtasksByTask[st.taskId] = [];
+        subtasksByTask[st.taskId].push(st);
+    }
+
+    // ── Time logs today ──
     const todayTimeLogs = allTimeLogs.filter(log => {
-        if (!log.startTime) return false;
+        if (!log.startTime && !log.date) return false;
+        if (log.date) return log.date === today;
         const logStart = new Date(log.startTime);
         return logStart >= startOfDay && logStart <= endOfDay;
     });
 
-    // Hours by user
+    // ── Hours by user today ──
     const userHoursMap = {};
+    const userTimeRanges = {}; // track first/last times
     todayTimeLogs.forEach(log => {
         const uid = log.userId;
         if (!uid) return;
         if (!userHoursMap[uid]) userHoursMap[uid] = 0;
         userHoursMap[uid] += (log.totalHours || 0);
+
+        // Track connection times
+        if (log.startTime) {
+            if (!userTimeRanges[uid]) userTimeRanges[uid] = { first: log.startTime, last: log.startTime };
+            if (log.startTime < userTimeRanges[uid].first) userTimeRanges[uid].first = log.startTime;
+            const endTime = log.endTime || log.startTime;
+            if (endTime > userTimeRanges[uid].last) userTimeRanges[uid].last = endTime;
+        }
     });
 
-    const totalHoursToday = Object.values(userHoursMap).reduce((sum, h) => sum + h, 0);
-    const teamSize = new Set(activeTasks.map(t => t.assignedTo).filter(Boolean)).size;
+    // ── Planned hours today by user ──
+    const userPlannedMap = {};
+    const userPlannedTasks = {}; // taskIds planned for today per user
+    planItemsToday.forEach(pi => {
+        const uid = pi.assignedTo;
+        if (!uid) return;
+        if (!userPlannedMap[uid]) userPlannedMap[uid] = 0;
+        userPlannedMap[uid] += (pi.plannedHours || 0);
+        if (!userPlannedTasks[uid]) userPlannedTasks[uid] = new Set();
+        userPlannedTasks[uid].add(pi.taskId);
+    });
 
-    // Delays today
+    // ── Telegram reports today ──
+    const usersWhoReported = new Set(telegramReportsToday.map(r => r.userId));
+
+    // ── Delays today ──
     const delaysToday = allDelays.filter(d => {
         if (!d.createdAt) return false;
         const cd = new Date(d.createdAt);
         return cd >= startOfDay && cd <= endOfDay;
     });
 
-    // Completed tasks by user
-    const completedByUser = {};
-    completedToday.forEach(t => {
-        if (t.assignedTo) completedByUser[t.assignedTo] = (completedByUser[t.assignedTo] || 0) + 1;
-    });
+    // ══════════════════════════════════════════
+    // SECTION 1: PULSO DEL DÍA
+    // ══════════════════════════════════════════
+    const totalHoursReal = Object.values(userHoursMap).reduce((s, h) => s + h, 0);
+    const totalHoursPlanned = Object.values(userPlannedMap).reduce((s, h) => s + h, 0);
+    const teamSize = teamUsers.length;
+    const totalExpectedHours = teamSize * DAILY_AVAILABLE_HOURS;
 
-    // Build KPIs from snapshot
-    const kpis = {};
-    if (latestKpiSnapshot?.metrics) {
-        for (const [key, metric] of Object.entries(latestKpiSnapshot.metrics)) {
-            kpis[key] = {
-                value: typeof metric === "object" ? metric.value : metric,
-                trend: "stable", // Would need previous snapshot for real trend
-            };
+    // Subtask stats
+    const activeTaskIds = new Set(activeTasks.map(t => t.id));
+    let totalSubtasks = 0;
+    let completedSubtasks = 0;
+    for (const [taskId, subs] of Object.entries(subtasksByTask)) {
+        if (activeTaskIds.has(taskId)) {
+            totalSubtasks += subs.length;
+            completedSubtasks += subs.filter(s => s.completed).length;
         }
     }
 
-    // Build scorecards
-    const scorecards = [];
-    const processedUsers = new Set();
+    const pulseOfDay = {
+        hoursReal: parseFloat(totalHoursReal.toFixed(1)),
+        hoursPlanned: parseFloat(totalHoursPlanned.toFixed(1)),
+        hoursExpected: totalExpectedHours,
+        hoursPct: totalExpectedHours > 0 ? Math.round((totalHoursReal / totalExpectedHours) * 100) : 0,
+        tasksCompletedToday: completedToday.length,
+        activeTasks: activeTasks.length,
+        blockedTasks: blockedTasks.length,
+        delaysToday: delaysToday.length,
+        subtasksTotal: totalSubtasks,
+        subtasksCompleted: completedSubtasks,
+        subtasksPct: totalSubtasks > 0 ? Math.round((completedSubtasks / totalSubtasks) * 100) : 0,
+        teamSize,
+        newOverdue: overdueTasks.filter(t => t.daysOverdue <= 1).length,
+    };
 
-    // From analytics user scores
-    for (const score of latestUserScores) {
-        if (processedUsers.has(score.entityId)) continue;
-        processedUsers.add(score.entityId);
+    // ══════════════════════════════════════════
+    // SECTION 2: NARRATIVA POR PERSONA
+    // ══════════════════════════════════════════
+    const teamNarratives = teamUsers.map(user => {
+        const uid = user.id;
+        const hours = parseFloat((userHoursMap[uid] || 0).toFixed(1));
+        const plannedHours = parseFloat((userPlannedMap[uid] || 0).toFixed(1));
+        const planPct = plannedHours > 0 ? Math.round((hours / plannedHours) * 100) : (hours > 0 ? 100 : 0);
 
-        const userActiveTasks = activeTasks.filter(t => t.assignedTo === score.entityId).length;
-        const compositeScore = score.metrics?.compositeScore?.value ||
-            calculateSimpleScore(score.metrics);
+        // Tasks this user worked on today (from timeLogs)
+        const userTaskIds = new Set();
+        todayTimeLogs.filter(l => l.userId === uid && l.taskId).forEach(l => userTaskIds.add(l.taskId));
 
-        scorecards.push({
-            userName: score.userName || score.entityId,
-            role: score.userRole || "unknown",
-            hours: parseFloat((userHoursMap[score.entityId] || 0).toFixed(1)),
-            tasksCompleted: completedByUser[score.entityId] || 0,
-            activeTasks: userActiveTasks,
-            score: Math.round(compositeScore * 100) || 0,
-            grade: scoreToGrade(Math.round(compositeScore * 100) || 0),
+        // Hours per task
+        const hoursByTask = {};
+        todayTimeLogs.filter(l => l.userId === uid && l.taskId).forEach(l => {
+            hoursByTask[l.taskId] = (hoursByTask[l.taskId] || 0) + (l.totalHours || 0);
         });
+
+        const workedOnTasks = [...userTaskIds].map(tid => {
+            const task = allTasks.find(t => t.id === tid);
+            return {
+                id: tid,
+                title: task?.title || tid,
+                hours: parseFloat((hoursByTask[tid] || 0).toFixed(1)),
+            };
+        }).sort((a, b) => b.hours - a.hours);
+
+        // Completed today
+        const completedByUser = completedToday.filter(t => t.assignedTo === uid);
+
+        // Subtasks for this user's active tasks
+        const userActiveTasks = activeTasks.filter(t => t.assignedTo === uid);
+        let userSubtasksTotal = 0;
+        let userSubtasksCompleted = 0;
+        for (const t of userActiveTasks) {
+            const subs = subtasksByTask[t.id] || [];
+            userSubtasksTotal += subs.length;
+            userSubtasksCompleted += subs.filter(s => s.completed).length;
+        }
+
+        // Connection times
+        const timeRange = userTimeRanges[uid];
+        let connectionStr = "";
+        if (timeRange) {
+            try {
+                const first = new Date(timeRange.first);
+                const last = new Date(timeRange.last);
+                connectionStr = `${first.getHours().toString().padStart(2, "0")}:${first.getMinutes().toString().padStart(2, "0")} - ${last.getHours().toString().padStart(2, "0")}:${last.getMinutes().toString().padStart(2, "0")}`;
+            } catch { /* skip */ }
+        }
+
+        // Reported via Telegram?
+        const reported = usersWhoReported.has(uid);
+
+        // Status emoji
+        let statusEmoji = "⚪";
+        if (hours >= 6 && planPct >= 80) statusEmoji = "🟢";
+        else if (hours >= 4) statusEmoji = "🟡";
+        else if (hours > 0) statusEmoji = "🟠";
+        else statusEmoji = "🔴";
+
+        return {
+            uid,
+            name: user.displayName || user.name || user.email || uid,
+            role: user.operationalRole || "unknown",
+            hours,
+            plannedHours,
+            planPct,
+            workedOnTasks,
+            completedTasks: completedByUser.map(t => t.title),
+            subtasksTotal: userSubtasksTotal,
+            subtasksCompleted: userSubtasksCompleted,
+            connectionStr,
+            reported,
+            statusEmoji,
+            activeTasks: userActiveTasks.length,
+        };
+    }).sort((a, b) => b.hours - a.hours);
+
+    // ══════════════════════════════════════════
+    // SECTION 3: ALERTAS ACCIONABLES
+    // ══════════════════════════════════════════
+    const actionableAlerts = [];
+
+    // Blocked tasks > 3 days
+    blockedTasks.forEach(t => {
+        const blockedSince = t.blockedAt || t.updatedAt;
+        if (blockedSince) {
+            const daysBlocked = Math.ceil((now - new Date(blockedSince)) / 86400000);
+            if (daysBlocked >= 3) {
+                const user = allUsers.find(u => u.id === t.assignedTo);
+                actionableAlerts.push({
+                    severity: "critical",
+                    icon: "🔴",
+                    text: `"${t.title}" lleva ${daysBlocked} días bloqueada`,
+                    detail: `Responsable: ${user?.displayName || "Sin asignar"}${t.blockedReason ? ` | Razón: ${t.blockedReason}` : ""}`,
+                    action: "Desbloquear o reasignar",
+                });
+            }
+        }
+    });
+
+    // Overdue > 5 days
+    overdueTasks.filter(t => t.daysOverdue >= 5).forEach(t => {
+        actionableAlerts.push({
+            severity: "high",
+            icon: "🟠",
+            text: `"${t.title}" venció hace ${t.daysOverdue} días`,
+            detail: `Responsable: ${t.assignedTo}`,
+            action: "Cerrar, reprogramar o cancelar",
+        });
+    });
+
+    // Overloaded tomorrow
+    Object.entries(userPlannedMap).forEach(([uid, hours]) => {
+        // Check tomorrow's load
+        const tomorrowHours = planItemsTomorrow
+            .filter(pi => pi.assignedTo === uid)
+            .reduce((s, pi) => s + (pi.plannedHours || 0), 0);
+        if (tomorrowHours > DAILY_AVAILABLE_HOURS) {
+            const user = allUsers.find(u => u.id === uid);
+            actionableAlerts.push({
+                severity: "medium",
+                icon: "🟡",
+                text: `${user?.displayName || uid} tiene ${tomorrowHours.toFixed(1)}h planificadas mañana`,
+                detail: `Capacidad: ${DAILY_AVAILABLE_HOURS}h`,
+                action: "Reasignar o repriorizar",
+            });
+        }
+    });
+
+    actionableAlerts.sort((a, b) => {
+        const order = { critical: 0, high: 1, medium: 2 };
+        return (order[a.severity] || 3) - (order[b.severity] || 3);
+    });
+
+    // ══════════════════════════════════════════
+    // SECTION 3.5: ALERTAS DE PRODUCTIVIDAD
+    // ══════════════════════════════════════════
+    const productivityAlerts = [];
+
+    for (const narrative of teamNarratives) {
+        if (narrative.hours < 6) continue; // Solo si registró muchas horas
+
+        let flags = 0;
+        const details = [];
+
+        if (narrative.subtasksCompleted === 0 && narrative.subtasksTotal > 0) {
+            flags++;
+            details.push(`❌ Subtareas completadas: 0/${narrative.subtasksTotal}`);
+        }
+        if (narrative.completedTasks.length === 0) {
+            flags++;
+            details.push("❌ Tareas completadas: 0");
+        }
+        if (!narrative.reported) {
+            flags++;
+            details.push("❌ No envió reporte diario");
+        }
+
+        // Only flag if ≥2 conditions met
+        if (flags >= 2) {
+            productivityAlerts.push({
+                name: narrative.name,
+                hours: narrative.hours,
+                severity: narrative.hours >= 8 && flags >= 3 ? "critical" : "high",
+                details,
+                workedOn: narrative.workedOnTasks.slice(0, 2).map(t => t.title).join(", ") || "Sin registro",
+                action: "Verificar avance real o necesidad de apoyo",
+            });
+        }
     }
 
-    // Fill in users that have hours today but no analytics score
-    for (const [uid, hours] of Object.entries(userHoursMap)) {
-        if (processedUsers.has(uid)) continue;
-        const user = allUsers.find(u => u.id === uid);
-        const userActiveTasks = activeTasks.filter(t => t.assignedTo === uid).length;
+    // ══════════════════════════════════════════
+    // SECTION 4: VISTA DEL MAÑANA
+    // ══════════════════════════════════════════
+    const tomorrowPlannedUsers = new Set(planItemsTomorrow.map(pi => pi.assignedTo).filter(Boolean));
+    const tomorrowTotalHours = planItemsTomorrow.reduce((s, pi) => s + (pi.plannedHours || 0), 0);
+    const tasksDueTomorrow = activeTasks.filter(t => {
+        if (!t.dueDate) return false;
+        return t.dueDate.substring(0, 10) === tomorrow;
+    }).map(t => {
+        const user = allUsers.find(u => u.id === t.assignedTo);
+        return {
+            title: t.title,
+            assignedTo: user?.displayName || "Sin asignar",
+        };
+    });
+    const unassignedTasks = activeTasks.filter(t => !t.assignedTo).length;
 
-        scorecards.push({
-            userName: user?.displayName || user?.name || uid,
-            role: user?.operationalRole || "unknown",
-            hours: parseFloat(hours.toFixed(1)),
-            tasksCompleted: completedByUser[uid] || 0,
-            activeTasks: userActiveTasks,
-            score: 0,
-            grade: "-",
-        });
-    }
+    const tomorrowView = {
+        date: tomorrow,
+        plannedUsers: tomorrowPlannedUsers.size,
+        totalHours: parseFloat(tomorrowTotalHours.toFixed(1)),
+        tasksDueTomorrow,
+        unassignedTasks,
+    };
 
-    scorecards.sort((a, b) => b.score - a.score);
-
-    // Recommendations
-    const recommendations = latestRecommendations
-        .slice(0, 5)
-        .map(r => ({
-            text: r.text || r.recommendation || r.description || JSON.stringify(r),
-            priority: r.priority || "medium",
-            type: r.type || "general",
-        }));
+    // ══════════════════════════════════════════
+    // SECTION 5: LOGROS DEL DÍA
+    // ══════════════════════════════════════════
+    const achievements = completedToday.map(t => {
+        const user = allUsers.find(u => u.id === t.assignedTo);
+        return {
+            title: t.title,
+            completedBy: user?.displayName || "Desconocido",
+        };
+    });
 
     return {
         date: today,
+        datePretty: formatDateES(today),
         generatedAt: now.toISOString(),
-        executiveSummary: {
-            totalHoursToday,
-            tasksCompletedToday: completedToday.length,
-            activeTasks: activeTasks.length,
-            blockedTasks: blockedTasks.length,
-            delaysReportedToday: delaysToday.length,
-            teamSize,
-        },
-        risks: latestRiskFlags.slice(0, 10),
-        kpis,
-        scorecards,
-        overdueTasks,
-        recommendations,
+        pulseOfDay,
+        teamNarratives,
+        actionableAlerts,
+        productivityAlerts,
+        overdueTasks: overdueTasks.slice(0, 10),
+        tomorrowView,
+        achievements,
     };
 }
 
-function scoreToGrade(score) {
-    if (score >= 90) return "A";
-    if (score >= 80) return "B";
-    if (score >= 70) return "C";
-    if (score >= 60) return "D";
-    if (score > 0) return "F";
-    return "-";
-}
-
-function calculateSimpleScore(metrics) {
-    if (!metrics) return 0;
-    const values = Object.values(metrics)
-        .map(m => typeof m === "object" ? m.value : m)
-        .filter(v => typeof v === "number" && v >= 0 && v <= 1);
-    if (values.length === 0) return 0;
-    return values.reduce((sum, v) => sum + v, 0) / values.length;
-}
-
 // ═══════════════════════════════════════════════
-// TELEGRAM SUMMARY BUILDER
+// TELEGRAM SUMMARY — V2
 // ═══════════════════════════════════════════════
 
 function buildTelegramSummary(data) {
-    const { date, executiveSummary: es, risks, scorecards, overdueTasks, recommendations } = data;
+    const { datePretty, pulseOfDay: p, teamNarratives, actionableAlerts, productivityAlerts, overdueTasks, tomorrowView, achievements } = data;
 
-    let msg = `📊 <b>Reporte de Rendimiento</b>\n`;
-    msg += `📅 ${date}\n\n`;
+    let msg = `📊 <b>Briefing del Equipo</b>\n`;
+    msg += `📅 ${datePretty}\n\n`;
 
-    // Executive Summary
-    msg += `━━━━ RESUMEN ━━━━\n`;
-    msg += `⏱️ Horas: <b>${es.totalHoursToday.toFixed(1)}h</b>\n`;
-    msg += `✅ Completadas: <b>${es.tasksCompletedToday}</b>\n`;
-    msg += `📌 Activas: <b>${es.activeTasks}</b>\n`;
-    msg += `🚫 Bloqueadas: <b>${es.blockedTasks}</b>\n`;
-    msg += `⚠️ Delays: <b>${es.delaysReportedToday}</b>\n`;
-    msg += `👥 Equipo: <b>${es.teamSize}</b>\n\n`;
+    // ── Pulso del Día ──
+    msg += `━━━━ 📊 PULSO DEL DÍA ━━━━\n`;
+    const hourIcon = p.hoursPct >= 80 ? "🟢" : p.hoursPct >= 60 ? "🟡" : "🔴";
+    msg += `${hourIcon} Horas: <b>${p.hoursReal}h / ${p.hoursExpected}h</b> (${p.hoursPct}%)\n`;
+    msg += `📋 Planificadas: <b>${p.hoursPlanned}h</b>\n`;
+    msg += `✅ Tareas completadas: <b>${p.tasksCompletedToday}</b>\n`;
+    if (p.subtasksTotal > 0) {
+        msg += `📌 Subtareas: <b>${p.subtasksCompleted}/${p.subtasksTotal}</b> (${p.subtasksPct}%)\n`;
+    }
+    if (p.blockedTasks > 0) msg += `🚫 Bloqueadas: <b>${p.blockedTasks}</b>\n`;
+    if (p.newOverdue > 0) msg += `⚠️ Nuevas vencidas: <b>${p.newOverdue}</b>\n`;
+    msg += `\n`;
 
-    // Risks
-    if (risks.length > 0) {
-        msg += `━━━━ RIESGOS ━━━━\n`;
-        risks.slice(0, 5).forEach(r => {
-            const icon = r.severity === "critical" ? "🔴" : r.severity === "high" ? "🟠" : "🟡";
-            msg += `${icon} ${r.justification || r.kpiName}\n`;
+    // ── Equipo ──
+    if (teamNarratives.length > 0) {
+        msg += `━━━━ 👥 EQUIPO ━━━━\n`;
+        teamNarratives.forEach(n => {
+            const planStr = n.plannedHours > 0 ? ` (${n.planPct}% plan)` : "";
+            const subStr = n.subtasksTotal > 0 ? ` | sub:${n.subtasksCompleted}/${n.subtasksTotal}` : "";
+            const completedStr = n.completedTasks.length > 0 ? ` ✅${n.completedTasks.length}` : "";
+            msg += `${n.statusEmoji} <b>${n.name}</b>: ${n.hours}h${planStr}${completedStr}${subStr}\n`;
         });
         msg += `\n`;
     }
 
-    // Scorecards
-    if (scorecards.length > 0) {
-        msg += `━━━━ EQUIPO ━━━━\n`;
-        scorecards.slice(0, 8).forEach(s => {
-            const gradeEmoji = s.grade === "A" ? "🟢" : s.grade === "B" ? "🔵" : s.grade === "C" ? "🟡" : "🔴";
-            msg += `${gradeEmoji} ${s.userName}: ${s.hours}h | ${s.tasksCompleted} comp | ${s.score}pts (${s.grade})\n`;
+    // ── Alertas de Productividad ──
+    if (productivityAlerts.length > 0) {
+        msg += `━━━━ 🔴 PRODUCTIVIDAD ━━━━\n`;
+        productivityAlerts.forEach(a => {
+            msg += `⚠️ <b>${a.name}</b> (${a.hours}h)\n`;
+            a.details.forEach(d => msg += `   ${d}\n`);
+            msg += `   → ${a.action}\n`;
         });
         msg += `\n`;
     }
 
-    // Overdue
-    if (overdueTasks.length > 0) {
-        msg += `━━━━ VENCIDAS (${overdueTasks.length}) ━━━━\n`;
-        overdueTasks.slice(0, 5).forEach(t => {
-            msg += `🔴 "${t.title}" — ${t.daysOverdue}d (${t.assignedTo})\n`;
+    // ── Alertas Accionables ──
+    if (actionableAlerts.length > 0) {
+        msg += `━━━━ 🚨 ALERTAS ━━━━\n`;
+        actionableAlerts.slice(0, 5).forEach(a => {
+            msg += `${a.icon} ${a.text}\n`;
+            if (a.action) msg += `   → ${a.action}\n`;
         });
-        if (overdueTasks.length > 5) msg += `... y ${overdueTasks.length - 5} más\n`;
         msg += `\n`;
     }
 
-    // Recommendations
-    if (recommendations.length > 0) {
-        msg += `━━━━ ACCIONES ━━━━\n`;
-        recommendations.slice(0, 3).forEach((r, i) => {
-            msg += `${i + 1}. ${r.text}\n`;
+    // ── Logros ──
+    if (achievements.length > 0) {
+        msg += `━━━━ 🎉 LOGROS ━━━━\n`;
+        achievements.forEach(a => {
+            msg += `✅ ${a.title} (${a.completedBy})\n`;
         });
+        msg += `\n`;
     }
 
-    msg += `\n🔗 <a href="https://bom-ame-cr.web.app">Ver Dashboard</a>`;
+    // ── Vista del Mañana ──
+    msg += `━━━━ 📅 MAÑANA ━━━━\n`;
+    msg += `👥 ${tomorrowView.plannedUsers} personas | ${tomorrowView.totalHours}h programadas\n`;
+    if (tomorrowView.tasksDueTomorrow.length > 0) {
+        msg += `⚠️ Vencen mañana:\n`;
+        tomorrowView.tasksDueTomorrow.slice(0, 3).forEach(t => {
+            msg += `   - ${t.title} (${t.assignedTo})\n`;
+        });
+    }
+    if (tomorrowView.unassignedTasks > 0) {
+        msg += `🆕 ${tomorrowView.unassignedTasks} tareas sin asignar\n`;
+    }
+
+    msg += `\n🔗 <a href="https://analyzeops.com">Ver Dashboard</a>`;
     msg += `\n<i>— AnalyzeOps</i>`;
 
     return msg;
+}
+
+function formatDateES(dateStr) {
+    try {
+        const d = new Date(dateStr + "T12:00:00");
+        const days = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+        const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+        return `${days[d.getDay()]} ${d.getDate()} de ${months[d.getMonth()]}, ${d.getFullYear()}`;
+    } catch {
+        return dateStr;
+    }
 }
 
 module.exports = { execute, buildReportData };
