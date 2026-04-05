@@ -355,7 +355,9 @@ function buildReportData({
             try {
                 const first = new Date(timeRange.first);
                 const last = new Date(timeRange.last);
-                connectionStr = `${first.getHours().toString().padStart(2, "0")}:${first.getMinutes().toString().padStart(2, "0")} - ${last.getHours().toString().padStart(2, "0")}:${last.getMinutes().toString().padStart(2, "0")}`;
+                const tz = "America/Costa_Rica";
+                const fmtTime = (d) => d.toLocaleString("en-US", { timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false });
+                connectionStr = `${fmtTime(first)} - ${fmtTime(last)}`;
             } catch { /* skip */ }
         }
 
