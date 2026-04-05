@@ -7,7 +7,7 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const VALID_TRANSITIONS = {
     backlog: ["pending", "in_progress", "cancelled"],
     pending: ["in_progress", "backlog", "blocked", "cancelled"],
-    in_progress: ["validation", "blocked", "cancelled"],
+    in_progress: ["validation", "pending", "blocked", "cancelled"],
     blocked: ["in_progress", "pending", "cancelled"],
     validation: ["completed", "in_progress", "blocked"],
     completed: ["in_progress"],
