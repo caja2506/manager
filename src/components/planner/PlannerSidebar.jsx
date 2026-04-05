@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Clock, Briefcase, Plus, GripVertical, MousePointerClick, Move, ArrowDownUp, HelpCircle, X, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
+import { Search, Clock, Briefcase, Plus, GripVertical, MousePointerClick, Move, ArrowDownUp, HelpCircle, X, ChevronDown, ChevronUp, Pencil, User } from 'lucide-react';
 
 /**
  * Unscheduled tasks panel for the Weekly Planner sidebar.
@@ -16,6 +16,9 @@ export default function PlannerSidebar({
     onCancelPlacement,
     searchQuery,
     setSearchQuery,
+    teamMembers,
+    filterMember,
+    setFilterMember,
 }) {
     const [showHelp, setShowHelp] = useState(false);
 
@@ -34,16 +37,30 @@ export default function PlannerSidebar({
         <aside className="w-72 shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col h-full overflow-hidden">
             <div className="p-4 border-b border-slate-800">
                 <h2 className="font-black text-slate-400 text-sm uppercase tracking-wider mb-3">Sin Planificar</h2>
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                        type="text"
-                        placeholder="Buscar tarea..."
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
-                        className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-200 font-medium placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                </div>
+                {/* Member filter dropdown */}
+                {setFilterMember ? (
+                    <select
+                        value={filterMember || 'all'}
+                        onChange={e => setFilterMember(e.target.value)}
+                        className="w-full py-2 px-3 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-200 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                    >
+                        <option value="all">👥 Todo el Equipo</option>
+                        {(teamMembers || []).map(m => (
+                            <option key={m.uid} value={m.uid}>{m.displayName || m.email}</option>
+                        ))}
+                    </select>
+                ) : (
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input
+                            type="text"
+                            placeholder="Buscar tarea..."
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-200 font-medium placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                    </div>
+                )}
             </div>
 
             {/* ── Usage instructions toggle ── */}
@@ -180,6 +197,12 @@ export default function PlannerSidebar({
                                     </span>
                                 )}
                             </div>
+                            {task.assigneeName && (
+                                <div className="flex items-center gap-1 mt-1.5 text-[10px] text-indigo-300/80 font-semibold">
+                                    <User className="w-3 h-3" />
+                                    <span className="truncate">{task.assigneeName}</span>
+                                </div>
+                            )}
                         </li>
                     );
                 })}

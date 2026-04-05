@@ -107,12 +107,16 @@ export default function DailyTeamBoard() {
                 const planned = taskPlannedMap[t.id] || 0;
                 return planned < (t.estimatedHours || 0.1);
             })
-            .map(t => ({
-                ...t,
-                projectName: engProjects.find(p => p.id === t.projectId)?.name || '',
-                plannedHours: taskPlannedMap[t.id] || 0,
-            }));
-    }, [engTasks, engProjects, allPlanItems, filterProject, filterMember]);
+            .map(t => {
+                const member = teamMembers.find(m => m.uid === t.assignedTo);
+                return {
+                    ...t,
+                    projectName: engProjects.find(p => p.id === t.projectId)?.name || '',
+                    plannedHours: taskPlannedMap[t.id] || 0,
+                    assigneeName: member?.displayName || null,
+                };
+            });
+    }, [engTasks, engProjects, allPlanItems, filterProject, filterMember, teamMembers]);
 
     // ──────────────── Drop handler ────────────────
     const handleDropTask = useCallback(async ({ taskId, date, hour, minute, assignedTo }) => {
@@ -393,6 +397,9 @@ export default function DailyTeamBoard() {
                         onTaskEdit={(task) => { setTaskModalTask(task); setSidebarOpen(false); }}
                         placingTask={placingTask}
                         onCancelPlacement={() => setPlacingTask(null)}
+                        teamMembers={teamMembers.filter(m => m.teamRole !== 'manager')}
+                        filterMember={filterMember}
+                        setFilterMember={setFilterMember}
                     />
                 </div>
 
