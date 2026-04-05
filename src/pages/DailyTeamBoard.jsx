@@ -6,6 +6,7 @@ import { plannerService } from '../services/plannerService';
 import { syncPlannerToGantt } from '../services/ganttPlannerSync';
 import { updateTask } from '../services/taskService';
 import { enrichPlanItemsWithTasks } from '../utils/plannerUtils';
+import { getEffectiveHours } from '../utils/breakTimeUtils';
 import PlannerSidebar from '../components/planner/PlannerSidebar';
 import DailyTeamGrid from '../components/planner/DailyTeamGrid';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
@@ -138,7 +139,7 @@ export default function DailyTeamBoard() {
             dayOfWeek: startDt.getDay(),
             startDateTime: startDt.toISOString(),
             endDateTime: endDt.toISOString(),
-            plannedHours: defaultHours,
+            plannedHours: getEffectiveHours(startDt, endDt),
             createdBy: user.uid,
             assignedTo: finalAssignedTo,
             projectId: task.projectId,
@@ -196,7 +197,7 @@ export default function DailyTeamBoard() {
         if (!item) return;
         const startDt = parseISO(item.startDateTime);
         const endDt = new Date(newEndDateTime);
-        const diffH = parseFloat(((endDt - startDt) / 3600000).toFixed(2));
+        const diffH = getEffectiveHours(startDt, endDt);
         try {
             await plannerService.updatePlanItem(itemId, { endDateTime: endDt.toISOString(), plannedHours: diffH });
             setRawPlanItems(prev => prev.map(pi =>
@@ -220,6 +221,7 @@ export default function DailyTeamBoard() {
             dayOfWeek: newStart.getDay(),
             startDateTime: newStart.toISOString(),
             endDateTime: newEnd.toISOString(),
+            plannedHours: getEffectiveHours(newStart, newEnd),
             weekStartDate: weekStartStr,
             ...(assignedTo ? { assignedTo } : {}),
         };

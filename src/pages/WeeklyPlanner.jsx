@@ -5,6 +5,7 @@ import { useRole } from '../contexts/RoleContext';
 import { plannerService } from '../services/plannerService';
 import { syncPlannerToGantt } from '../services/ganttPlannerSync';
 import { enrichPlanItemsWithTasks } from '../utils/plannerUtils';
+import { getEffectiveHours } from '../utils/breakTimeUtils';
 import PlannerSidebar from '../components/planner/PlannerSidebar';
 import PlannerGrid from '../components/planner/PlannerGrid';
 import WeeklyCapacitySummary from '../components/planner/WeeklyCapacitySummary';
@@ -137,7 +138,7 @@ export default function WeeklyPlanner() {
             dayOfWeek: startDt.getDay(),
             startDateTime: startDt.toISOString(),
             endDateTime: endDt.toISOString(),
-            plannedHours: defaultHours,
+            plannedHours: getEffectiveHours(startDt, endDt),
             createdBy: user.uid,
 
             // ── Optional (for filtering queries) ──
@@ -201,7 +202,7 @@ export default function WeeklyPlanner() {
 
         const startDt = parseISO(item.startDateTime);
         const endDt = new Date(newEndDateTime);
-        const diffH = parseFloat(((endDt - startDt) / 3600000).toFixed(2));
+        const diffH = getEffectiveHours(startDt, endDt);
 
         try {
             await plannerService.updatePlanItem(itemId, {
@@ -234,6 +235,7 @@ export default function WeeklyPlanner() {
             dayOfWeek: newStart.getDay(),
             startDateTime: newStart.toISOString(),
             endDateTime: newEnd.toISOString(),
+            plannedHours: getEffectiveHours(newStart, newEnd),
             weekStartDate: weekStartStr,
         };
 
