@@ -6,9 +6,9 @@ import { PLANNER_START_HOUR, PLANNER_END_HOUR, SLOT_HEIGHT_PX } from './PlannerG
 
 // ── Break time bands (same as PlannerGrid) ──
 const TIME_BANDS = [
-    { id: 'desayuno', label: '🍳 Desayuno', start: 8,    end: 8.5,  bg: 'rgba(251,191,36,1)', border: 'rgba(245,158,11,1)', text: '#fcd34d' },
-    { id: 'almuerzo', label: '🍽 Almuerzo', start: 12,   end: 13,   bg: 'rgba(52,211,153,1)',  border: 'rgba(16,185,129,1)',  text: '#fde68a' },
-    { id: 'cafe',     label: '☕ Café',      start: 15.5, end: 16,   bg: 'rgba(249,115,22,1)',  border: 'rgba(234,88,12,1)',   text: '#fdba74' },
+    { id: 'desayuno', label: '🍳 Desayuno', start: 8,    end: 8.5,  bg: 'rgba(251,191,36,1)', border: 'rgba(245,158,11,1)', text: '#78350f' },
+    { id: 'almuerzo', label: '🍽 Almuerzo', start: 12,   end: 13,   bg: 'rgba(52,211,153,1)',  border: 'rgba(16,185,129,1)',  text: '#064e3b' },
+    { id: 'cafe',     label: '☕ Café',      start: 15.5, end: 16,   bg: 'rgba(249,115,22,1)',  border: 'rgba(234,88,12,1)',   text: '#7c2d12' },
 ];
 
 const DEFAULT_SCROLL_HOUR = 9;
@@ -286,7 +286,7 @@ export default function DailyTeamGrid({
                                                     className="absolute left-0 right-0 pointer-events-none flex items-center justify-center overflow-hidden"
                                                     style={{ top, height, zIndex: 25, background: band.bg, borderTop: `1.5px dashed ${band.border}`, borderBottom: `1.5px dashed ${band.border}` }}>
                                                     <span className="text-[9px] font-black uppercase tracking-[0.18em] select-none whitespace-nowrap"
-                                                        style={{ color: band.text, opacity: 0.75 }}>
+                                                        style={{ color: band.text }}>
                                                         {band.label}
                                                     </span>
                                                 </div>
