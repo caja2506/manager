@@ -281,7 +281,7 @@ export default function DailyTeamBoard() {
     const isTodaySelected = isToday(selectedDate);
 
     return (
-        <div className="flex flex-col h-[calc(100vh-5rem)] -m-4 md:-m-8 overflow-hidden bg-slate-950">
+        <div className="flex flex-col h-dvh -m-4 md:-m-8 -mb-20 md:-mb-4 overflow-hidden bg-slate-950">
 
             {/* Validation error */}
             {plannerError && (
