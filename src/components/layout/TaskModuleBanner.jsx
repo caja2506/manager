@@ -18,6 +18,7 @@ const TABS = [
     { label: 'Main Table', path: '/main-table' },
     { label: 'Kanban', path: '/tasks' },
     { label: 'Weekly Planner', path: '/planner' },
+    { label: 'Daily Board', path: '/daily-board' },
     { label: 'Gantt', path: '/gantt' },
 ];
 
