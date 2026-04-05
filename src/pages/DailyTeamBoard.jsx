@@ -103,6 +103,7 @@ export default function DailyTeamBoard() {
             .filter(t => !['completed', 'cancelled'].includes(t.status))
             .filter(t => {
                 if (filterProject !== 'all' && t.projectId !== filterProject) return false;
+                if (filterMember !== 'all' && t.assignedTo !== filterMember && t.assignedTo) return false;
                 const planned = taskPlannedMap[t.id] || 0;
                 return planned < (t.estimatedHours || 0.1);
             })
@@ -111,7 +112,7 @@ export default function DailyTeamBoard() {
                 projectName: engProjects.find(p => p.id === t.projectId)?.name || '',
                 plannedHours: taskPlannedMap[t.id] || 0,
             }));
-    }, [engTasks, engProjects, allPlanItems, filterProject]);
+    }, [engTasks, engProjects, allPlanItems, filterProject, filterMember]);
 
     // ──────────────── Drop handler ────────────────
     const handleDropTask = useCallback(async ({ taskId, date, hour, minute, assignedTo }) => {
