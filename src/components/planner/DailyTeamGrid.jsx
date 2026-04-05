@@ -70,6 +70,7 @@ export default function DailyTeamGrid({
     onPlacementComplete,
     onMemberClick,
     activeMemberFilter,
+    allMemberUids,       // all team member UIDs (not just visible), to distinguish truly unassigned
 }) {
     const totalHours   = PLANNER_END_HOUR - PLANNER_START_HOUR;
     const scrollBodyRef = useRef(null);
@@ -167,9 +168,9 @@ export default function DailyTeamGrid({
             return { member, layoutItems, dynMinWidth };
         });
 
-        // Unassigned items
-        const assignedUids = new Set(members.map(m => m.uid));
-        const unassignedItems = planItems.filter(p => !assignedUids.has(p.assignedTo));
+        // Unassigned items — only truly unassigned (not assigned to any known team member)
+        const knownUids = allMemberUids ? new Set(allMemberUids) : new Set(members.map(m => m.uid));
+        const unassignedItems = planItems.filter(p => !p.assignedTo || !knownUids.has(p.assignedTo));
         if (unassignedItems.length > 0) {
             const layoutItems = computeColumnLayout(unassignedItems);
             layouts.push({
@@ -179,7 +180,7 @@ export default function DailyTeamGrid({
             });
         }
         return layouts;
-    }, [members, planItems]);
+    }, [members, planItems, allMemberUids]);
 
     const ghostHeight = placingTask
         ? Math.min(2, placingTask.estimatedHours || 1) * SLOT_HEIGHT_PX

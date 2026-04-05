@@ -417,6 +417,7 @@ export default function DailyTeamBoard() {
                             onPlacementComplete={handlePlacementComplete}
                             onMemberClick={(uid) => setFilterMember(filterMember === uid ? 'all' : uid)}
                             activeMemberFilter={filterMember}
+                            allMemberUids={teamMembers.filter(m => m.teamRole !== 'manager').map(m => m.uid)}
                         />
                     )}
                 </div>
