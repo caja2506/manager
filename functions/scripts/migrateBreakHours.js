@@ -9,7 +9,7 @@
  */
 
 const admin = require("firebase-admin");
-const { getEffectiveHours } = require("../utils/breakTimeUtils");
+const { getEffectiveHours, loadBreakBands } = require("../utils/breakTimeUtils");
 
 // Initialize Firebase Admin
 if (!admin.apps.length) {
@@ -22,6 +22,7 @@ async function migrateBreakHours() {
     console.log("  MIGRATION: Fix timeLogs break deduction");
     console.log("═══════════════════════════════════════════════\n");
 
+    await loadBreakBands(db);
     const logsSnap = await db.collection("timeLogs").get();
     console.log(`Total timeLogs: ${logsSnap.size}`);
 
@@ -136,6 +137,7 @@ async function migrateBreakHours() {
 
 // Also export as Cloud Function callable
 async function migrateBreakHoursCallable(adminDb) {
+    await loadBreakBands(adminDb);
     const logsSnap = await adminDb.collection("timeLogs").get();
     let updated = 0;
     let skipped = 0;

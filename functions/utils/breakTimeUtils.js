@@ -1,11 +1,16 @@
 /**
  * Break Time Utils — Backend (CJS)
  * =================================
- * Shared break band definitions and effective-hours calculator.
- * Mirror of src/utils/breakTimeUtils.js for Cloud Functions.
+ * V3: Reads break bands from Firestore settings/daySchedule.
+ * Falls back to hardcoded defaults if Firestore doc doesn't exist.
+ *
+ * Usage:
+ *   const { getEffectiveHours, loadBreakBands } = require("./breakTimeUtils");
+ *   await loadBreakBands(adminDb); // call once at start
+ *   const net = getEffectiveHours(start, end);
  */
 
-const BREAK_BANDS = [
+const DEFAULTS = [
     { id: "desayuno", start: 8,    end: 8.5  },   // 30 min
     { id: "almuerzo", start: 12,   end: 13   },   // 60 min
     { id: "cafe",     start: 15.5, end: 16   },   // 30 min
@@ -13,11 +18,36 @@ const BREAK_BANDS = [
 
 const TZ = "America/Costa_Rica";
 
+let _bands = DEFAULTS;
+
 /**
- * Get the hour (decimal) of a Date in Costa Rica timezone.
- * @param {Date} d
- * @returns {number} e.g. 8.5 for 8:30 AM
+ * Load break bands from Firestore once (call at the start of a function).
+ * @param {FirebaseFirestore.Firestore} adminDb
  */
+async function loadBreakBands(adminDb) {
+    try {
+        const snap = await adminDb.doc("settings/daySchedule").get();
+        if (snap.exists) {
+            const data = snap.data();
+            if (data.breakBands?.length) {
+                _bands = data.breakBands.map(b => ({
+                    id: b.id,
+                    start: timeStringToDecimal(b.start),
+                    end: timeStringToDecimal(b.end),
+                }));
+            }
+        }
+    } catch (err) {
+        console.warn("Could not load break bands from Firestore, using defaults:", err.message);
+    }
+}
+
+function timeStringToDecimal(timeStr) {
+    if (typeof timeStr === "number") return timeStr;
+    const [h, m] = timeStr.split(":").map(Number);
+    return h + (m || 0) / 60;
+}
+
 function getLocalDecimalHour(d) {
     const parts = d.toLocaleString("en-US", {
         timeZone: TZ,
@@ -26,10 +56,6 @@ function getLocalDecimalHour(d) {
     return parseInt(parts[0]) + parseInt(parts[1]) / 60;
 }
 
-/**
- * Calculate break hours that overlap with a time range.
- * Uses Costa Rica timezone for hour comparison.
- */
 function getBreakHoursInRange(startDt, endDt) {
     const start = startDt instanceof Date ? startDt : new Date(startDt);
     const end   = endDt   instanceof Date ? endDt   : new Date(endDt);
@@ -38,7 +64,7 @@ function getBreakHoursInRange(startDt, endDt) {
     const endHour   = getLocalDecimalHour(end);
 
     let breakHours = 0;
-    for (const band of BREAK_BANDS) {
+    for (const band of _bands) {
         const overlapStart = Math.max(startHour, band.start);
         const overlapEnd   = Math.min(endHour,   band.end);
         if (overlapEnd > overlapStart) {
@@ -48,12 +74,6 @@ function getBreakHoursInRange(startDt, endDt) {
     return parseFloat(breakHours.toFixed(2));
 }
 
-/**
- * Calculate effective working hours = gross − break overlap.
- * @param {Date|string} startDt
- * @param {Date|string} endDt
- * @returns {number} net working hours
- */
 function getEffectiveHours(startDt, endDt) {
     const start = startDt instanceof Date ? startDt : new Date(startDt);
     const end   = endDt   instanceof Date ? endDt   : new Date(endDt);
@@ -62,4 +82,4 @@ function getEffectiveHours(startDt, endDt) {
     return parseFloat(Math.max(0, grossHours - breakHours).toFixed(2));
 }
 
-module.exports = { BREAK_BANDS, getBreakHoursInRange, getEffectiveHours };
+module.exports = { BREAK_BANDS: DEFAULTS, loadBreakBands, getBreakHoursInRange, getEffectiveHours };
