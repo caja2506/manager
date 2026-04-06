@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRole } from '../../contexts/RoleContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { useAppData, APP_VERSION } from '../../contexts/AppDataContext';
 import { useEngineeringData } from '../../hooks/useEngineeringData';
 import AnalyzeOpsLogo from '../brand/AnalyzeOpsLogo';
@@ -9,7 +10,7 @@ import {
     Activity, LayoutDashboard, User, FolderGit2,
     ListTodo, Database, Clock, FileText, BarChart3, Users,
     Bell, Settings, LogOut, Shield, LayoutList, Briefcase, LineChart, CalendarDays, GanttChartSquare, Radar, Zap,
-    ChevronRight, X, Target, Map, Award, LayoutGrid
+    ChevronRight, X, Target, Map, Award, LayoutGrid, Sun, Moon
 } from 'lucide-react';
 
 // ─── Section Definitions ───
@@ -111,6 +112,7 @@ function sectionContainsRoute(section, pathname) {
 export default function Sidebar() {
     const { user, signOut } = useAuth();
     const { role, isAdmin, canEdit } = useRole();
+    const { toggleTheme, isDark } = useTheme();
     const { proyectos, catalogo } = useAppData();
     const { engProjects, engTasks } = useEngineeringData();
     const location = useLocation();
@@ -263,6 +265,13 @@ export default function Sidebar() {
                             className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:text-red-400 hover:bg-red-950/30 transition-all duration-200"
                         >
                             <LogOut className="w-[18px] h-[18px]" />
+                        </button>
+                        <button
+                            onClick={toggleTheme}
+                            title={isDark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
+                            className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:text-amber-400 hover:bg-amber-950/30 transition-all duration-200"
+                        >
+                            {isDark ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
                         </button>
                         {user.photoURL ? (
                             <img

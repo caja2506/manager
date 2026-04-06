@@ -6,6 +6,7 @@ import App from './App.jsx'
 import { AuthProvider } from './contexts/AuthContext'
 import { RoleProvider } from './contexts/RoleContext'
 import { AppDataProvider } from './contexts/AppDataContext'
+import { ThemeProvider } from './contexts/ThemeContext'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -13,7 +14,9 @@ createRoot(document.getElementById('root')).render(
       <AuthProvider>
         <RoleProvider>
           <AppDataProvider>
-            <App />
+            <ThemeProvider>
+              <App />
+            </ThemeProvider>
           </AppDataProvider>
         </RoleProvider>
       </AuthProvider>

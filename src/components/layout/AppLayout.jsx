@@ -47,7 +47,7 @@ export default function AppLayout() {
     } = useAppData();
 
     return (
-        <div className="h-screen flex flex-col md:flex-row bg-slate-950 text-slate-100 font-sans overflow-hidden">
+        <div className="h-screen flex flex-col md:flex-row font-sans overflow-hidden" style={{ background: 'var(--bg-app)', color: 'var(--text-primary)' }}>
 
             {/* ===== PROCESSING PANEL ===== */}
             {(isDiagnosticOpen || isProcessing) && (

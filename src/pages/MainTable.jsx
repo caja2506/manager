@@ -1449,7 +1449,7 @@ export default function MainTable() {
     const activeFilterCount = [search, filterProject, filterAssignee, filterPriority].filter(Boolean).length;
 
     return (
-        <div className="-m-4 md:-m-8 flex flex-col bg-slate-900 text-white" style={{ minHeight: '100vh' }}>
+        <div className="-m-4 md:-m-8 flex flex-col" style={{ background: 'var(--bg-app)', color: 'var(--text-primary)', minHeight: '100vh' }}>
             <TaskDetailModal isOpen={isModalOpen} onClose={closeModal} task={selectedTask} projects={engProjects} teamMembers={teamMembers}
                 subtasks={selectedTask ? engSubtasks.filter(s => s.taskId === selectedTask.id) : []} taskTypes={taskTypes} userId={user?.uid} canEdit={canEdit} canDelete={canDelete} />
             <TransitionConfirmModal isOpen={!!pendingTransition} pending={pendingTransition} isTransitioning={isTransitioning} onConfirm={confirmTransition} onCancel={cancelTransition} />
