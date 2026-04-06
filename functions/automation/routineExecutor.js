@@ -102,11 +102,10 @@ async function executeRoutine(adminDb, token, routineKey, triggerType, options =
         targets = await resolveTargetsByRole(adminDb, routine.allowedRoles);
     }
 
-    // Email-based routines (like daily_performance_report) get recipients
-    // from settings/emailReportConfig instead of the target resolver.
-    const EMAIL_ROUTINES = new Set(["daily_performance_report"]);
+    // Routines that resolve their own targets internally (not via targetResolver)
+    const SELF_TARGETING_ROUTINES = new Set(["daily_performance_report", "planner_timer_sync"]);
 
-    if (targets.length === 0 && !EMAIL_ROUTINES.has(routineKey)) {
+    if (targets.length === 0 && !SELF_TARGETING_ROUTINES.has(routineKey)) {
         console.log(`${tag} No targets resolved`);
         return { success: false, runId: null, status: "no_targets", error: "No targets resolved" };
     }
