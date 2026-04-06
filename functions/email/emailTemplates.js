@@ -23,7 +23,7 @@ function dailyPerformanceReport(data) {
 
 <!-- Header -->
 <tr><td style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:32px 40px;">
-  <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;">📊 Briefing del Equipo</h1>
+  <h1 style="margin:0;color:#fff;font-size:24px;font-weight:800;letter-spacing:-0.5px;">Briefing del Equipo</h1>
   <p style="margin:8px 0 0;color:#c7d2fe;font-size:14px;">${datePretty} — AnalyzeOps</p>
 </td></tr>
 
@@ -31,17 +31,17 @@ function dailyPerformanceReport(data) {
 <!-- SECTION 1: PULSO DEL DÍA             -->
 <!-- ══════════════════════════════════════ -->
 <tr><td style="padding:28px 40px 20px;">
-  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;border-bottom:1px solid #334155;padding-bottom:8px;">📊 Pulso del Día</h2>
+  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">Pulso del Dia</h2>
   <table width="100%" cellpadding="0" cellspacing="0">
     <tr>
-      ${pulseCard("⏱️", "Horas Reales", `${pulseOfDay.hoursReal}h`, pulseOfDay.hoursPct >= 80 ? "#22c55e" : pulseOfDay.hoursPct >= 60 ? "#f59e0b" : "#ef4444", `de ${pulseOfDay.hoursExpected}h (${pulseOfDay.hoursPct}%)`)}
-      ${pulseCard("📋", "Planificadas", `${pulseOfDay.hoursPlanned}h`, "#3b82f6", "en el planner")}
-      ${pulseCard("✅", "Completadas", pulseOfDay.tasksCompletedToday, "#22c55e", `de ${pulseOfDay.activeTasks} activas`)}
+      ${pulseCard("", "Horas Reales", `${pulseOfDay.hoursReal}h`, pulseOfDay.hoursPct >= 80 ? "#22c55e" : pulseOfDay.hoursPct >= 60 ? "#f59e0b" : "#ef4444", `de ${pulseOfDay.hoursExpected}h (${pulseOfDay.hoursPct}%)`)}
+      ${pulseCard("", "Planificadas", `${pulseOfDay.hoursPlanned}h`, "#3b82f6", "en el planner")}
+      ${pulseCard("", "Completadas", pulseOfDay.tasksCompletedToday, "#22c55e", `de ${pulseOfDay.activeTasks} activas`)}
     </tr>
     <tr>
-      ${pulseCard("📌", "Subtareas", `${pulseOfDay.subtasksCompleted}/${pulseOfDay.subtasksTotal}`, pulseOfDay.subtasksPct >= 40 ? "#22c55e" : "#f59e0b", `${pulseOfDay.subtasksPct}% avance`)}
-      ${pulseCard("🚫", "Bloqueadas", pulseOfDay.blockedTasks, pulseOfDay.blockedTasks > 0 ? "#ef4444" : "#22c55e", "")}
-      ${pulseCard("⚠️", "Nuevas Vencidas", pulseOfDay.newOverdue, pulseOfDay.newOverdue > 0 ? "#ef4444" : "#22c55e", `${overdueTasks.length} total`)}
+      ${pulseCard("", "Subtareas", `${pulseOfDay.subtasksCompleted}/${pulseOfDay.subtasksTotal}`, pulseOfDay.subtasksPct >= 40 ? "#22c55e" : "#f59e0b", `${pulseOfDay.subtasksPct}% avance`)}
+      ${pulseCard("", "Bloqueadas", pulseOfDay.blockedTasks, pulseOfDay.blockedTasks > 0 ? "#ef4444" : "#22c55e", "")}
+      ${pulseCard("", "Vencidas", pulseOfDay.newOverdue, pulseOfDay.newOverdue > 0 ? "#ef4444" : "#22c55e", `${overdueTasks.length} total`)}
     </tr>
   </table>
 </td></tr>
@@ -51,7 +51,7 @@ function dailyPerformanceReport(data) {
 <!-- ══════════════════════════════════════ -->
 ${teamNarratives.length > 0 ? `
 <tr><td style="padding:8px 40px 20px;">
-  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;border-bottom:1px solid #334155;padding-bottom:8px;">👥 ¿Quién Hizo Qué?</h2>
+  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">Quien Hizo Que?</h2>
   ${teamNarratives.map(n => narrativeCard(n)).join("")}
 </td></tr>
 ` : ""}
@@ -61,7 +61,7 @@ ${teamNarratives.length > 0 ? `
 <!-- ══════════════════════════════════════ -->
 ${productivityAlerts.length > 0 ? `
 <tr><td style="padding:8px 40px 20px;">
-  <h2 style="margin:0 0 16px;color:#fca5a5;font-size:18px;border-bottom:1px solid #7f1d1d;padding-bottom:8px;">🔴 Alertas de Productividad</h2>
+  <h2 style="margin:0 0 16px;color:#fca5a5;font-size:18px;font-weight:700;border-bottom:2px solid #7f1d1d;padding-bottom:8px;">Alertas de Productividad</h2>
   <p style="color:#94a3b8;font-size:11px;margin:0 0 12px;font-style:italic;">Personas con muchas horas registradas pero sin resultados medibles</p>
   ${productivityAlerts.map(a => productivityCard(a)).join("")}
 </td></tr>
@@ -72,7 +72,7 @@ ${productivityAlerts.length > 0 ? `
 <!-- ══════════════════════════════════════ -->
 ${actionableAlerts.length > 0 ? `
 <tr><td style="padding:8px 40px 20px;">
-  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;border-bottom:1px solid #334155;padding-bottom:8px;">🚨 Alertas Accionables</h2>
+  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">Alertas Accionables</h2>
   ${actionableAlerts.slice(0, 8).map(a => alertCard(a)).join("")}
 </td></tr>
 ` : ""}
@@ -82,7 +82,7 @@ ${actionableAlerts.length > 0 ? `
 <!-- ══════════════════════════════════════ -->
 ${achievements.length > 0 ? `
 <tr><td style="padding:8px 40px 20px;">
-  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;border-bottom:1px solid #334155;padding-bottom:8px;">🎉 Logros del Día</h2>
+  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">Logros del Dia</h2>
   ${achievements.map(a => `
     <div style="background:#064e3b;border-radius:8px;padding:10px 14px;margin-bottom:6px;border-left:3px solid #22c55e;">
       <p style="margin:0;color:#d1fae5;font-size:13px;">✅ <strong>${a.title}</strong></p>
@@ -96,7 +96,7 @@ ${achievements.length > 0 ? `
 <!-- SECTION 6: VISTA DEL MAÑANA          -->
 <!-- ══════════════════════════════════════ -->
 <tr><td style="padding:8px 40px 20px;">
-  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;border-bottom:1px solid #334155;padding-bottom:8px;">📅 Vista del Mañana</h2>
+  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">Vista del Manana</h2>
   <div style="background:#0f172a;border-radius:8px;padding:16px;border-left:3px solid #818cf8;">
     <table width="100%" cellpadding="0" cellspacing="0">
       <tr>
@@ -130,7 +130,7 @@ ${achievements.length > 0 ? `
 <!-- ══════════════════════════════════════ -->
 ${overdueTasks.length > 0 ? `
 <tr><td style="padding:8px 40px 20px;">
-  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;border-bottom:1px solid #334155;padding-bottom:8px;">📋 Tareas Vencidas (${overdueTasks.length})</h2>
+  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">Tareas Vencidas (${overdueTasks.length})</h2>
   ${overdueTasks.slice(0, 8).map(t => `
     <div style="background:#0f172a;border-radius:6px;padding:10px 14px;margin-bottom:6px;border-left:3px solid #ef4444;">
       <p style="margin:0;color:#f1f5f9;font-size:13px;font-weight:500;">${t.title}</p>
@@ -164,11 +164,11 @@ ${overdueTasks.length > 0 ? `
 
 function pulseCard(icon, label, value, color, subtitle) {
     return `<td width="33%" style="padding:6px;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;border-radius:8px;border-left:3px solid ${color};">
-    <tr><td style="padding:12px 14px;">
-      <p style="margin:0;color:#94a3b8;font-size:11px;">${icon} ${label}</p>
-      <p style="margin:4px 0 0;color:#f1f5f9;font-size:20px;font-weight:700;">${value}</p>
-      ${subtitle ? `<p style="margin:2px 0 0;color:#64748b;font-size:10px;">${subtitle}</p>` : ""}
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;border-radius:10px;border-left:4px solid ${color};">
+    <tr><td style="padding:14px 16px;">
+      <p style="margin:0;color:${color};font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">${label}</p>
+      <p style="margin:6px 0 0;color:#ffffff;font-size:26px;font-weight:800;line-height:1;">${value}</p>
+      ${subtitle ? `<p style="margin:4px 0 0;color:#94a3b8;font-size:11px;">${subtitle}</p>` : ""}
     </td></tr>
   </table>
 </td>`;
