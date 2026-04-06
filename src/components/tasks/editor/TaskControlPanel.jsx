@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
     Clock, BarChart2, AlertTriangle,
     ChevronDown, ChevronRight, Settings2, User,
-    Link2, ShieldAlert, CalendarRange, CalendarDays, Target, MapPin
+    Link2, ShieldAlert, CalendarRange, CalendarDays, Target, MapPin, X
 } from 'lucide-react';
 import {
     TASK_STATUS, TASK_STATUS_CONFIG,
@@ -52,7 +52,7 @@ export default function TaskControlPanel({
     canEdit, canEditDates, subtasks, teamMembers, taskTypes,
     timeLogs = [], allTasks = [], delays = [], dependencies = [], plannerItems = [],
     projectMilestones = [], milestoneWorkAreas = [],
-    onStatusChange, onOpenDelayReport, onOpenListManager,
+    onStatusChange, onOpenDelayReport, onOpenListManager, onDeleteDependency,
 }) {
     // ── Subtask-based auto progress ──
     const totalSubtasks = subtasks.length;
@@ -311,7 +311,7 @@ export default function TaskControlPanel({
                             <div className="space-y-1">
                                 <span className="text-[9px] font-bold text-slate-500">Depende de:</span>
                                 {predecessors.map(dep => (
-                                    <div key={dep.id} className="flex items-center gap-2 px-2 py-1.5 bg-slate-800/60 rounded-lg">
+                                    <div key={dep.id} className="flex items-center gap-2 px-2 py-1.5 bg-slate-800/60 rounded-lg group/dep">
                                         <Link2 className="w-3 h-3 text-amber-400 flex-shrink-0" />
                                         <span className="text-[10px] text-slate-300 truncate flex-1">
                                             {getTaskTitle(dep.predecessorTaskId)}
@@ -319,6 +319,16 @@ export default function TaskControlPanel({
                                         <span className="text-[8px] font-bold text-slate-500 bg-slate-700 px-1 py-0.5 rounded">
                                             {dep.type || 'FS'}
                                         </span>
+                                        {onDeleteDependency && (
+                                            <button
+                                                type="button"
+                                                onClick={() => onDeleteDependency(dep.id)}
+                                                className="opacity-0 group-hover/dep:opacity-100 w-5 h-5 flex items-center justify-center rounded-md bg-red-500/20 hover:bg-red-500/40 text-red-400 transition-all"
+                                                title="Eliminar dependencia"
+                                            >
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -327,7 +337,7 @@ export default function TaskControlPanel({
                             <div className="space-y-1 mt-1">
                                 <span className="text-[9px] font-bold text-slate-500">Bloquea a:</span>
                                 {successors.map(dep => (
-                                    <div key={dep.id} className="flex items-center gap-2 px-2 py-1.5 bg-slate-800/60 rounded-lg">
+                                    <div key={dep.id} className="flex items-center gap-2 px-2 py-1.5 bg-slate-800/60 rounded-lg group/dep">
                                         <Link2 className="w-3 h-3 text-red-400 flex-shrink-0" />
                                         <span className="text-[10px] text-slate-300 truncate flex-1">
                                             {getTaskTitle(dep.successorTaskId)}
@@ -335,6 +345,16 @@ export default function TaskControlPanel({
                                         <span className="text-[8px] font-bold text-slate-500 bg-slate-700 px-1 py-0.5 rounded">
                                             {dep.type || 'FS'}
                                         </span>
+                                        {onDeleteDependency && (
+                                            <button
+                                                type="button"
+                                                onClick={() => onDeleteDependency(dep.id)}
+                                                className="opacity-0 group-hover/dep:opacity-100 w-5 h-5 flex items-center justify-center rounded-md bg-red-500/20 hover:bg-red-500/40 text-red-400 transition-all"
+                                                title="Eliminar dependencia"
+                                            >
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        )}
                                     </div>
                                 ))}
                             </div>

@@ -16,6 +16,7 @@ import {
     fetchTaskDependencies,
     fetchTaskPlannerItems,
 } from '../../services/engineeringDataService';
+import { deleteDependency } from '../../services/ganttService';
 
 // Editor subcomponents
 import TaskHeader from './editor/TaskHeader';
@@ -325,6 +326,15 @@ export default function TaskDetailModal({
         onClose();
     };
 
+    const handleDeleteDependency = async (depId) => {
+        try {
+            await deleteDependency(depId);
+            setDependencies(prev => prev.filter(d => d.id !== depId));
+        } catch (err) {
+            console.error('Error deleting dependency:', err);
+        }
+    };
+
     // ── Render ──
 
     return createPortal(
@@ -405,6 +415,7 @@ export default function TaskDetailModal({
                         onStatusChange={handleStatusChange}
                         onOpenDelayReport={handleOpenDelayReport}
                         onOpenListManager={setListManager}
+                        onDeleteDependency={handleDeleteDependency}
                     />
                 </div>
 
