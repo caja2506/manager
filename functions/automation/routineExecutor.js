@@ -57,9 +57,30 @@ async function executeRoutine(adminDb, token, routineKey, triggerType, options =
         const paths = require("./firestorePaths");
         const snap = await adminDb.collection(paths.AUTOMATION_ROUTINES).doc(routineKey).get();
         if (!snap.exists) {
-            return { success: false, runId: null, status: "error", error: `Routine "${routineKey}" not found` };
+            // Auto-seed the routine doc for DAY_SCHEDULE triggers
+            if (triggerType === TRIGGER_TYPE.DAY_SCHEDULE) {
+                console.log(`${tag} Auto-seeding routine doc: ${routineKey}`);
+                await adminDb.collection(paths.AUTOMATION_ROUTINES).doc(routineKey).set({
+                    key: routineKey,
+                    name: routineKey,
+                    description: `Auto-created by scheduler`,
+                    enabled: true,
+                    scheduleType: "interval",
+                    channel: "none",
+                    targetRole: "all",
+                    dryRun: false,
+                    debugMode: false,
+                    createdAt: new Date().toISOString(),
+                });
+                // Re-read after creation
+                const newSnap = await adminDb.collection(paths.AUTOMATION_ROUTINES).doc(routineKey).get();
+                routine = { ...newSnap.data(), key: routineKey };
+            } else {
+                return { success: false, runId: null, status: "error", error: `Routine "${routineKey}" not found` };
+            }
+        } else {
+            routine = { ...snap.data(), key: routineKey };
         }
-        routine = { ...snap.data(), key: routineKey };
         const coreSnap = await adminDb.collection(paths.SETTINGS).doc(paths.SETTINGS_DOCS.AUTOMATION_CORE).get();
         const coreConfig = coreSnap.exists ? coreSnap.data() : {};
         effectiveDryRun = routine.dryRun || coreConfig.dryRun || false;

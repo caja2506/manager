@@ -134,6 +134,15 @@ function createAutomationExports(adminDb, secrets) {
                                 }
                             } else {
                                 console.log(`[scheduler] daySchedule: weekend (day=${dsDay}), skipping close/open`);
+
+                                // ── Planner Timer Sync runs on weekends too ──
+                                try {
+                                    console.log(`[scheduler] 📋 planner_timer_sync triggered (weekend)`);
+                                    const result = await executeRoutine(adminDb, token, "planner_timer_sync", TRIGGER_TYPE.DAY_SCHEDULE, {});
+                                    console.log(`[scheduler] planner_timer_sync result:`, JSON.stringify(result));
+                                } catch (e) {
+                                    console.error(`[scheduler] planner_timer_sync failed:`, e);
+                                }
                             }
                         } else {
                             console.log("[scheduler] daySchedule is disabled");
