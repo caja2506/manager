@@ -189,23 +189,21 @@ function narrativeCard(n) {
         n.workedOnTasks.slice(0, 5).forEach(function(t) {
             var sc = t.score || 50;
             var scoreColor = sc >= 80 ? "#22c55e" : sc >= 60 ? "#f59e0b" : "#ef4444";
-            var barWidth = Math.min(100, sc);
+
             var subInfo = (t.subtasksTotal || 0) > 0 ? t.subtasksCompleted + "/" + t.subtasksTotal + " (" + t.subtasksPct + "%)" : "-";
             taskRows += '<tr>';
             taskRows += '<td style="padding:4px 0;color:#e2e8f0;font-size:12px;font-weight:500;">' + t.title + '</td>';
             taskRows += '<td align="center" style="padding:4px 8px;color:#ffffff;font-size:12px;font-weight:700;">' + t.hours + 'h</td>';
             taskRows += '<td align="center" style="padding:4px 4px;color:#94a3b8;font-size:10px;">' + subInfo + '</td>';
-            taskRows += '<td align="right" style="padding:4px 0;width:80px;">';
-            taskRows += '<table cellpadding="0" cellspacing="0" width="100%"><tr>';
-            taskRows += '<td style="background:#1e293b;border-radius:3px;height:8px;"><div style="background:' + scoreColor + ';height:8px;width:' + barWidth + '%;border-radius:3px;"></div></td>';
-            taskRows += '<td style="padding-left:4px;color:' + scoreColor + ';font-size:10px;font-weight:700;white-space:nowrap;">' + sc + '</td>';
-            taskRows += '</tr></table></td>';
+            taskRows += '<td align="center" style="padding:4px 4px;width:50px;">';
+            taskRows += '<span style="color:' + scoreColor + ';font-size:12px;font-weight:800;">' + sc + '</span>';
+            taskRows += '</td>';
             taskRows += '</tr>';
         });
         tasksHtml = '<div style="margin-top:8px;">';
         tasksHtml += '<p style="margin:0 0 4px;color:#64748b;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">TAREAS TRABAJADAS</p>';
         tasksHtml += '<table width="100%" cellpadding="0" cellspacing="0">';
-        tasksHtml += '<tr><td style="padding:2px 0;color:#64748b;font-size:9px;">Tarea</td><td align="center" style="padding:2px 8px;color:#64748b;font-size:9px;">Horas</td><td align="center" style="padding:2px 4px;color:#64748b;font-size:9px;">Sub</td><td align="right" style="padding:2px 0;color:#64748b;font-size:9px;">Score</td></tr>';
+        tasksHtml += '<tr><td style="padding:2px 0;color:#64748b;font-size:9px;">Tarea</td><td align="center" style="padding:2px 8px;color:#64748b;font-size:9px;">Horas</td><td align="center" style="padding:2px 4px;color:#64748b;font-size:9px;">Sub</td><td align="center" style="padding:2px 4px;color:#64748b;font-size:9px;">Score</td></tr>';
         tasksHtml += taskRows;
         tasksHtml += '</table></div>';
     } else {

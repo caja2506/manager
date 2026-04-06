@@ -386,11 +386,13 @@ function buildReportData({
         // Completed today
         const completedByUser = completedToday.filter(t => t.assignedTo === uid);
 
-        // Subtasks for this user's active tasks
+        // Include both active tasks AND tasks completed today for accurate subtask counts
         const userActiveTasks = activeTasks.filter(t => t.assignedTo === uid);
+        const userCompletedToday = completedToday.filter(t => t.assignedTo === uid);
+        const userAllRelevantTasks = [...userActiveTasks, ...userCompletedToday];
         let userSubtasksTotal = 0;
         let userSubtasksCompleted = 0;
-        for (const t of userActiveTasks) {
+        for (const t of userAllRelevantTasks) {
             const subs = subtasksByTask[t.id] || [];
             userSubtasksTotal += subs.length;
             userSubtasksCompleted += subs.filter(s => s.completed).length;
