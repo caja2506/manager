@@ -29,7 +29,7 @@ function dailyPerformanceReport(data) {
 
 <!-- SECTION 1: PULSO DEL DIA -->
 <tr><td style="padding:28px 40px 20px;">
-  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">Pulso del Dia</h2>
+  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">Como vamos hoy?</h2>
   <table width="100%" cellpadding="0" cellspacing="0">
     <tr>
       ${pulseCard("", "Horas Reales", pulseOfDay.hoursReal + "h", pulseOfDay.hoursPct >= 80 ? "#22c55e" : pulseOfDay.hoursPct >= 60 ? "#f59e0b" : "#ef4444", "de " + pulseOfDay.hoursExpected + "h esperadas (" + pulseOfDay.teamSize + " personas x " + pulseOfDay.dailyHours + "h) - " + pulseOfDay.hoursPct + "%")}
@@ -55,7 +55,7 @@ ${teamNarratives.length > 0 ? `
 <!-- SECTION 3: PRODUCTIVIDAD -->
 ${productivityAlerts.length > 0 ? `
 <tr><td style="padding:8px 40px 20px;">
-  <h2 style="margin:0 0 16px;color:#fca5a5;font-size:18px;font-weight:700;border-bottom:2px solid #7f1d1d;padding-bottom:8px;">Alertas de Productividad</h2>
+  <h2 style="margin:0 0 16px;color:#fca5a5;font-size:18px;font-weight:700;border-bottom:2px solid #7f1d1d;padding-bottom:8px;">Quien necesita atencion?</h2>
   <p style="color:#94a3b8;font-size:11px;margin:0 0 12px;font-style:italic;">Personas con muchas horas registradas pero sin resultados medibles</p>
   ${productivityAlerts.map(a => productivityCard(a)).join("")}
 </td></tr>
@@ -64,7 +64,7 @@ ${productivityAlerts.length > 0 ? `
 <!-- SECTION 4: ALERTAS ACCIONABLES -->
 ${actionableAlerts.length > 0 ? `
 <tr><td style="padding:8px 40px 20px;">
-  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">Alertas Accionables</h2>
+  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">Que nos esta frenando?</h2>
   ${actionableAlerts.slice(0, 8).map(a => alertCard(a)).join("")}
 </td></tr>
 ` : ""}
@@ -72,7 +72,7 @@ ${actionableAlerts.length > 0 ? `
 <!-- SECTION 5: LOGROS -->
 ${achievements.length > 0 ? `
 <tr><td style="padding:8px 40px 20px;">
-  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">Logros del Dia</h2>
+  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">Que logramos hoy?</h2>
   ${achievements.map(a => `
     <div style="background:#064e3b;border-radius:8px;padding:10px 14px;margin-bottom:6px;border-left:3px solid #22c55e;">
       <p style="margin:0;color:#d1fae5;font-size:13px;"><strong>${a.title}</strong></p>
@@ -84,7 +84,7 @@ ${achievements.length > 0 ? `
 
 <!-- SECTION 6: VISTA DEL MANANA -->
 <tr><td style="padding:8px 40px 20px;">
-  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">Vista del Manana</h2>
+  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">Que viene manana?</h2>
   <div style="background:#0f172a;border-radius:8px;padding:16px;border-left:3px solid #818cf8;">
     <table width="100%" cellpadding="0" cellspacing="0">
       <tr>
@@ -116,7 +116,7 @@ ${achievements.length > 0 ? `
 <!-- OVERDUE -->
 ${overdueTasks.length > 0 ? `
 <tr><td style="padding:8px 40px 20px;">
-  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">Tareas Vencidas (${overdueTasks.length})</h2>
+  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">Que se nos paso? (${overdueTasks.length})</h2>
   ${overdueTasks.slice(0, 8).map(t => `
     <div style="background:#0f172a;border-radius:6px;padding:10px 14px;margin-bottom:6px;border-left:3px solid #ef4444;">
       <p style="margin:0;color:#f1f5f9;font-size:13px;font-weight:500;">${t.title}</p>
