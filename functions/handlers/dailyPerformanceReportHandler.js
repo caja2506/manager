@@ -224,6 +224,25 @@ function buildReportData({
         subtasksByTask[st.taskId].push(st);
     }
 
+    // ── Subtasks completed TODAY ──
+    const subtasksCompletedToday = allSubtasks.filter(st => {
+        if (!st.completed || !st.completedAt) return false;
+        const ca = new Date(st.completedAt);
+        return ca >= startOfDay && ca <= endOfDay;
+    }).map(st => {
+        const parentTask = allTasks.find(t => t.id === st.taskId);
+        const assignee = parentTask ? allUsers.find(u => u.id === parentTask.assignedTo) : null;
+        return {
+            id: st.id,
+            title: st.title || st.name || 'Sin título',
+            taskId: st.taskId,
+            parentTaskTitle: parentTask?.title || 'Tarea desconocida',
+            completedBy: assignee?.displayName || assignee?.name || 'Desconocido',
+            completedByUid: parentTask?.assignedTo || null,
+            completedAt: st.completedAt,
+        };
+    });
+
     // ── Time logs today ──
     const todayTimeLogs = allTimeLogs.filter(log => {
         if (!log.startTime && !log.date) return false;
@@ -303,6 +322,7 @@ function buildReportData({
         subtasksTotal: totalSubtasks,
         subtasksCompleted: completedSubtasks,
         subtasksPct: totalSubtasks > 0 ? Math.round((completedSubtasks / totalSubtasks) * 100) : 0,
+        subtasksCompletedToday: subtasksCompletedToday.length,
         teamSize,
         newOverdue: overdueTasks.filter(t => t.daysOverdue <= 1).length,
     };
@@ -348,6 +368,11 @@ function buildReportData({
             userSubtasksCompleted += subs.filter(s => s.completed).length;
         }
 
+        // Subtasks completed TODAY by this user (through their assigned tasks)
+        const userSubtasksToday = subtasksCompletedToday
+            .filter(st => st.completedByUid === uid)
+            .slice(0, 15);
+
         // Connection times
         const timeRange = userTimeRanges[uid];
         let connectionStr = "";
@@ -382,6 +407,7 @@ function buildReportData({
             completedTasks: completedByUser.map(t => t.title),
             subtasksTotal: userSubtasksTotal,
             subtasksCompleted: userSubtasksCompleted,
+            subtasksCompletedTodayList: userSubtasksToday,
             connectionStr,
             reported,
             statusEmoji,
@@ -564,6 +590,18 @@ function buildTelegramSummary(data) {
             const subStr = n.subtasksTotal > 0 ? ` | sub:${n.subtasksCompleted}/${n.subtasksTotal}` : "";
             const completedStr = n.completedTasks.length > 0 ? ` ✅${n.completedTasks.length}` : "";
             msg += `${n.statusEmoji} <b>${n.name}</b>: ${n.hours}h${planStr}${completedStr}${subStr}\n`;
+            // Subtasks completed today
+            if (n.subtasksCompletedTodayList && n.subtasksCompletedTodayList.length > 0) {
+                const grouped = {};
+                n.subtasksCompletedTodayList.forEach(st => {
+                    if (!grouped[st.parentTaskTitle]) grouped[st.parentTaskTitle] = [];
+                    grouped[st.parentTaskTitle].push(st.title);
+                });
+                for (const [parent, subs] of Object.entries(grouped)) {
+                    msg += `   📋 ${parent}:\n`;
+                    subs.slice(0, 5).forEach(s => msg += `      ✓ ${s}\n`);
+                }
+            }
         });
         msg += `\n`;
     }

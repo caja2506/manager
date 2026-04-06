@@ -39,7 +39,7 @@ function dailyPerformanceReport(data) {
       ${pulseCard("", "Completadas", pulseOfDay.tasksCompletedToday, "#22c55e", `de ${pulseOfDay.activeTasks} activas`)}
     </tr>
     <tr>
-      ${pulseCard("", "Subtareas", `${pulseOfDay.subtasksCompleted}/${pulseOfDay.subtasksTotal}`, pulseOfDay.subtasksPct >= 40 ? "#22c55e" : "#f59e0b", `${pulseOfDay.subtasksPct}% avance`)}
+      ${pulseCard("", "Subtareas Hoy", `+${pulseOfDay.subtasksCompletedToday}`, pulseOfDay.subtasksCompletedToday > 0 ? "#22c55e" : "#f59e0b", `${pulseOfDay.subtasksCompleted}/${pulseOfDay.subtasksTotal} total (${pulseOfDay.subtasksPct}%)`)}
       ${pulseCard("", "Bloqueadas", pulseOfDay.blockedTasks, pulseOfDay.blockedTasks > 0 ? "#ef4444" : "#22c55e", "")}
       ${pulseCard("", "Vencidas", pulseOfDay.newOverdue, pulseOfDay.newOverdue > 0 ? "#ef4444" : "#22c55e", `${overdueTasks.length} total`)}
     </tr>
@@ -184,24 +184,45 @@ function narrativeCard(n) {
     ).join(", ");
 
     const completedList = n.completedTasks.length > 0
-        ? `<p style="margin:4px 0 0;color:#86efac;font-size:11px;">✅ Completó: ${n.completedTasks.join(", ")}</p>`
+        ? `<p style="margin:4px 0 0;color:#86efac;font-size:11px;">Completo: ${n.completedTasks.join(", ")}</p>`
         : "";
 
     const subtaskStr = n.subtasksTotal > 0
-        ? `<span style="color:#94a3b8;"> | 📌 Sub: ${n.subtasksCompleted}/${n.subtasksTotal}</span>`
+        ? `<span style="color:#94a3b8;"> | Sub: ${n.subtasksCompleted}/${n.subtasksTotal}</span>`
         : "";
 
     const reportedStr = n.reported
-        ? `<span style="color:#86efac;font-size:10px;"> 📝</span>`
+        ? `<span style="color:#86efac;font-size:10px;"> [R]</span>`
         : "";
 
-    return `<div style="background:#0f172a;border-radius:8px;padding:12px 16px;margin-bottom:8px;border-left:3px solid ${n.statusEmoji === "🟢" ? "#22c55e" : n.statusEmoji === "🟡" ? "#f59e0b" : n.statusEmoji === "🟠" ? "#f97316" : "#ef4444"};">
-  <p style="margin:0;color:#f1f5f9;font-size:14px;font-weight:600;">${n.statusEmoji} ${n.name}${reportedStr}<span style="color:#94a3b8;font-size:12px;font-weight:400;"> — ${n.role}</span></p>
-  ${n.connectionStr ? `<p style="margin:4px 0 0;color:#94a3b8;font-size:11px;">🕐 Conectado: ${n.connectionStr}</p>` : ""}
-  ${tasksWorked ? `<p style="margin:4px 0 0;color:#cbd5e1;font-size:12px;">📋 ${tasksWorked}</p>` : `<p style="margin:4px 0 0;color:#f87171;font-size:12px;">📋 Sin registro de trabajo</p>`}
+    // Subtasks completed today — grouped by parent task
+    let subtasksTodayHtml = "";
+    if (n.subtasksCompletedTodayList && n.subtasksCompletedTodayList.length > 0) {
+        const grouped = {};
+        n.subtasksCompletedTodayList.forEach(st => {
+            if (!grouped[st.parentTaskTitle]) grouped[st.parentTaskTitle] = [];
+            grouped[st.parentTaskTitle].push(st.title);
+        });
+        let items = "";
+        for (const [parentTitle, subs] of Object.entries(grouped)) {
+            items += `<p style="margin:3px 0 0;color:#a5b4fc;font-size:11px;font-weight:600;">${parentTitle}</p>`;
+            subs.forEach(sub => {
+                items += `<p style="margin:1px 0 0 12px;color:#86efac;font-size:11px;">&#10003; ${sub}</p>`;
+            });
+        }
+        subtasksTodayHtml = `<div style="margin-top:6px;padding:8px 10px;background:#1e293b;border-radius:6px;border-left:2px solid #22c55e;"><p style="margin:0;color:#22c55e;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Subtareas completadas hoy: ${n.subtasksCompletedTodayList.length}</p>${items}</div>`;
+    }
+
+    const borderColor = n.statusEmoji === "🟢" ? "#22c55e" : n.statusEmoji === "🟡" ? "#f59e0b" : n.statusEmoji === "🟠" ? "#f97316" : "#ef4444";
+
+    return `<div style="background:#0f172a;border-radius:8px;padding:12px 16px;margin-bottom:8px;border-left:4px solid ${borderColor};">
+  <p style="margin:0;color:#ffffff;font-size:14px;font-weight:700;">${n.name}${reportedStr}<span style="color:#94a3b8;font-size:12px;font-weight:400;"> — ${n.role}</span></p>
+  ${n.connectionStr ? `<p style="margin:4px 0 0;color:#94a3b8;font-size:11px;">Conectado: ${n.connectionStr}</p>` : ""}
+  ${tasksWorked ? `<p style="margin:4px 0 0;color:#cbd5e1;font-size:12px;">${tasksWorked}</p>` : `<p style="margin:4px 0 0;color:#f87171;font-size:12px;">Sin registro de trabajo</p>`}
   ${completedList}
-  <p style="margin:4px 0 0;color:#e2e8f0;font-size:12px;font-weight:600;">⏱ ${n.hours}h registradas${subtaskStr}</p>
+  <p style="margin:4px 0 0;color:#e2e8f0;font-size:12px;font-weight:600;">${n.hours}h registradas${subtaskStr}</p>
   ${planBar}
+  ${subtasksTodayHtml}
 </div>`;
 }
 
