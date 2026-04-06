@@ -151,7 +151,7 @@ export default function AppLayout() {
             <MobileNav />
 
             {/* ===== MAIN CONTENT — React Router Outlet ===== */}
-            <main className="flex-1 overflow-y-auto pb-20 md:pb-4 p-4 md:p-8">
+            <main className="flex-1 overflow-y-auto pb-20 md:pb-4 p-4 md:p-8" style={{ background: 'var(--bg-app)', color: 'var(--text-primary)' }}>
                 <Outlet />
             </main>
         </div>

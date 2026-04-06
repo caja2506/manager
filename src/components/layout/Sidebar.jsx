@@ -172,10 +172,10 @@ export default function Sidebar() {
     return (
         <>
             {/* Spacer to maintain layout */}
-            <div className="hidden md:block w-[60px] bg-slate-950 flex-shrink-0 z-40" />
+            <div className="hidden md:block w-[60px] bg-slate-950 shrink-0 z-40" data-sidebar />
 
             {/* ═══ TWO-COLUMN SIDEBAR ═══ */}
-            <div ref={sidebarRef} className="hidden md:flex fixed left-0 top-0 h-full z-[100]">
+            <div ref={sidebarRef} className="hidden md:flex fixed left-0 top-0 h-full z-[100]" data-sidebar>
 
                 {/* ─── COLUMN 1: Icon Strip (always visible) ─── */}
                 <div className="w-[60px] h-full bg-slate-950 border-r border-slate-800/50 flex flex-col items-center py-3 flex-shrink-0">
