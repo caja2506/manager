@@ -32,7 +32,7 @@ function dailyPerformanceReport(data) {
   <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">Pulso del Dia</h2>
   <table width="100%" cellpadding="0" cellspacing="0">
     <tr>
-      ${pulseCard("", "Horas Reales", pulseOfDay.hoursReal + "h", pulseOfDay.hoursPct >= 80 ? "#22c55e" : pulseOfDay.hoursPct >= 60 ? "#f59e0b" : "#ef4444", "de " + pulseOfDay.hoursExpected + "h (" + pulseOfDay.hoursPct + "%)")}
+      ${pulseCard("", "Horas Reales", pulseOfDay.hoursReal + "h", pulseOfDay.hoursPct >= 80 ? "#22c55e" : pulseOfDay.hoursPct >= 60 ? "#f59e0b" : "#ef4444", "de " + pulseOfDay.hoursExpected + "h esperadas (" + pulseOfDay.teamSize + " personas x " + pulseOfDay.dailyHours + "h) - " + pulseOfDay.hoursPct + "%")}
       ${pulseCard("", "Planificadas", pulseOfDay.hoursPlanned + "h", "#3b82f6", "en el planner")}
       ${pulseCard("", "Completadas", pulseOfDay.tasksCompletedToday, "#22c55e", "de " + pulseOfDay.activeTasks + " activas")}
     </tr>

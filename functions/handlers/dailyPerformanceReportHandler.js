@@ -314,6 +314,8 @@ function buildReportData({
         hoursReal: parseFloat(totalHoursReal.toFixed(1)),
         hoursPlanned: parseFloat(totalHoursPlanned.toFixed(1)),
         hoursExpected: totalExpectedHours,
+        teamSize: teamSize,
+        dailyHours: DAILY_AVAILABLE_HOURS,
         hoursPct: totalExpectedHours > 0 ? Math.round((totalHoursReal / totalExpectedHours) * 100) : 0,
         tasksCompletedToday: completedToday.length,
         activeTasks: activeTasks.length,
@@ -323,7 +325,6 @@ function buildReportData({
         subtasksCompleted: completedSubtasks,
         subtasksPct: totalSubtasks > 0 ? Math.round((completedSubtasks / totalSubtasks) * 100) : 0,
         subtasksCompletedToday: subtasksCompletedToday.length,
-        teamSize,
         newOverdue: overdueTasks.filter(t => t.daysOverdue <= 1).length,
     };
 
