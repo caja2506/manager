@@ -390,7 +390,7 @@ function SubtaskExpander({ subtasks, taskId, canEdit }) {
     };
 
     return (
-        <div className="pl-10 pr-4 py-2.5 bg-slate-950/60 border-t border-slate-800/30 animate-in fade-in slide-in-from-top-1 duration-200" onClick={e => e.stopPropagation()}>
+        <div className="pl-10 pr-4 py-2.5 bg-slate-900/50 border-t border-slate-700/30 animate-in fade-in slide-in-from-top-1 duration-200" onClick={e => e.stopPropagation()}>
             <div className="space-y-1 max-w-md">
                 {subtasks.map(sub => (
                     <div key={sub.id} className="flex items-center gap-2 py-0.5 group/sub">
@@ -992,7 +992,7 @@ function MobileTaskCard({ task, engProjects, teamMembers, subtasks, canEdit, onO
 
     return (
         <div
-            className="bg-slate-900/60 border border-slate-800/60 rounded-xl p-4 space-y-3"
+            className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 space-y-3"
             style={{ borderLeft: `4px solid ${groupColor}` }}
             onClick={() => onOpenModal(task)}
         >
@@ -1192,10 +1192,10 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
             {isExpanded && (
                 <>
                     {/* Desktop: grid table (hidden on mobile) */}
-                    <div className="mt-1 rounded-xl overflow-hidden border border-slate-800/50 bg-slate-900/30 hidden md:block">
+                    <div className="mt-1 rounded-xl overflow-hidden border border-slate-800/50 bg-slate-800/20 hidden md:block">
                         {/* Header */}
                         <div
-                            className="grid items-center px-2 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-900/50 text-center"
+                            className="grid items-center px-2 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-800/40 text-center"
                             style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${color}` }}
                         >
                             <div></div>
@@ -1280,7 +1280,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                         {/* Group Summary Row — Monday.com style */}
                         {tasks.length > 0 && (
                             <div
-                                className="grid items-center px-2 py-2 border-t border-slate-800/40 bg-slate-950/40"
+                                className="grid items-center px-2 py-2 border-t border-slate-700/40 bg-slate-900/30"
                                 style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${color}` }}
                             >
                                 <div></div> {/* 1. Checkbox */}
@@ -1343,7 +1343,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                     {/* Mobile: card stack (hidden on desktop) */}
                     <div className="mt-2 space-y-3 md:hidden">
                         {tasks.length === 0 ? (
-                            <div className="px-4 py-5 text-center text-sm text-slate-600 bg-slate-900/30 rounded-xl border border-slate-800/50">
+                            <div className="px-4 py-5 text-center text-sm text-slate-600 bg-slate-800/30 rounded-xl border border-slate-700/50">
                                 Sin tareas en esta sección
                             </div>
                         ) : (
@@ -1367,7 +1367,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                         {canEdit && (
                             <button
                                 onClick={() => { setAddingTask(true); }}
-                                className="w-full py-3 text-sm text-slate-600 hover:text-indigo-400 flex items-center justify-center gap-2 bg-slate-900/20 border border-dashed border-slate-800 rounded-xl transition-colors"
+                                className="w-full py-3 text-sm text-slate-600 hover:text-indigo-400 flex items-center justify-center gap-2 bg-slate-800/20 border border-dashed border-slate-700 rounded-xl transition-colors"
                             >
                                 <Plus className="w-4 h-4" /> Agregar tarea
                             </button>
@@ -1449,7 +1449,7 @@ export default function MainTable() {
     const activeFilterCount = [search, filterProject, filterAssignee, filterPriority].filter(Boolean).length;
 
     return (
-        <div className="-m-4 md:-m-8 flex flex-col bg-slate-950 text-white" style={{ minHeight: '100vh' }}>
+        <div className="-m-4 md:-m-8 flex flex-col bg-slate-900 text-white" style={{ minHeight: '100vh' }}>
             <TaskDetailModal isOpen={isModalOpen} onClose={closeModal} task={selectedTask} projects={engProjects} teamMembers={teamMembers}
                 subtasks={selectedTask ? engSubtasks.filter(s => s.taskId === selectedTask.id) : []} taskTypes={taskTypes} userId={user?.uid} canEdit={canEdit} canDelete={canDelete} />
             <TransitionConfirmModal isOpen={!!pendingTransition} pending={pendingTransition} isTransitioning={isTransitioning} onConfirm={confirmTransition} onCancel={cancelTransition} />
@@ -1468,20 +1468,20 @@ export default function MainTable() {
                 <div className="relative flex-1 min-w-[160px] max-w-xs">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
                     <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar..."
-                        className="pl-8 pr-3 py-1.5 w-full border border-slate-700/60 rounded-lg text-xs text-white outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-900/60 placeholder:text-slate-600" />
+                        className="pl-8 pr-3 py-1.5 w-full border border-slate-700/60 rounded-lg text-xs text-white outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 placeholder:text-slate-600" />
                 </div>
                 <select value={filterProject} onChange={e => setFilterProject(e.target.value)}
-                    className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-900/60 cursor-pointer">
+                    className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer">
                     <option value="">Todos los proyectos</option>
                     {engProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
                 <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}
-                    className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-900/60 cursor-pointer">
+                    className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer">
                     <option value="">Todos los miembros</option>
                     {teamMembers.map(u => <option key={u.uid} value={u.uid}>{u.displayName || u.email}</option>)}
                 </select>
                 <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}
-                    className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-900/60 cursor-pointer">
+                    className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer">
                     <option value="">Todas las prioridades</option>
                     {Object.entries(TASK_PRIORITY_CONFIG).map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
                 </select>
