@@ -191,10 +191,37 @@ export async function deleteTask(taskId) {
     const batch = writeBatch(db);
     batch.delete(doc(db, COLLECTIONS.TASKS, taskId));
 
+    // Cascade: delete subtasks
     const subtasksSnap = await getDocs(
         query(collection(db, COLLECTIONS.SUBTASKS), where('taskId', '==', taskId))
     );
     subtasksSnap.docs.forEach(s => batch.delete(s.ref));
+
+    // Cascade: delete planner items (weeklyPlanItems)
+    try {
+        const planSnap = await getDocs(
+            query(collection(db, 'weeklyPlanItems'), where('taskId', '==', taskId))
+        );
+        planSnap.docs.forEach(p => batch.delete(p.ref));
+        if (!planSnap.empty) {
+            console.log(`[taskService] Cascade-deleted ${planSnap.size} planner items for task ${taskId}`);
+        }
+    } catch (err) {
+        console.warn('[taskService] Failed to cascade-delete planner items:', err.message);
+    }
+
+    // Cascade: delete time logs
+    try {
+        const logsSnap = await getDocs(
+            query(collection(db, COLLECTIONS.TIME_LOGS), where('taskId', '==', taskId))
+        );
+        logsSnap.docs.forEach(l => batch.delete(l.ref));
+        if (!logsSnap.empty) {
+            console.log(`[taskService] Cascade-deleted ${logsSnap.size} time logs for task ${taskId}`);
+        }
+    } catch (err) {
+        console.warn('[taskService] Failed to cascade-delete time logs:', err.message);
+    }
 
     await batch.commit();
 }
