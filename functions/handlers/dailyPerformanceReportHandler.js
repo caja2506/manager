@@ -348,10 +348,38 @@ function buildReportData({
 
         const workedOnTasks = [...userTaskIds].map(tid => {
             const task = allTasks.find(t => t.id === tid);
+            const taskSubs = subtasksByTask[tid] || [];
+            const taskSubsCompleted = taskSubs.filter(s => s.completed).length;
+            const taskSubsPct = taskSubs.length > 0 ? Math.round((taskSubsCompleted / taskSubs.length) * 100) : null;
+
+            // Health score calculation (0-100)
+            let score = 50; // base
+            if (task?.plannedStartDate) score += 5;
+            if (task?.plannedEndDate) score += 5;
+            if (task?.dueDate) score += 5;
+            if (task?.estimatedHours > 0) score += 5;
+            if (taskSubs.length > 0) {
+                score += Math.round((taskSubsCompleted / taskSubs.length) * 20); // up to +20
+            } else {
+                score += 10; // no subtasks = neutral
+            }
+            if (task?.percentComplete >= 50) score += 5;
+            if (task?.percentComplete >= 80) score += 5;
+            if (task?.priority === 'critical' || task?.priority === 'high') score += 0; // no bonus
+            if (task?.status === 'blocked') score -= 15;
+            if (task?.dueDate && new Date(task.dueDate) < now) score -= 10; // overdue penalty
+            score = Math.max(0, Math.min(100, score));
+
             return {
                 id: tid,
                 title: task?.title || tid,
                 hours: parseFloat((hoursByTask[tid] || 0).toFixed(1)),
+                score,
+                percentComplete: task?.percentComplete ?? 0,
+                subtasksTotal: taskSubs.length,
+                subtasksCompleted: taskSubsCompleted,
+                subtasksPct: taskSubsPct,
+                status: task?.status || 'unknown',
             };
         }).sort((a, b) => b.hours - a.hours);
 
@@ -367,22 +395,26 @@ function buildReportData({
             userSubtasksTotal += subs.length;
             userSubtasksCompleted += subs.filter(s => s.completed).length;
         }
+        const userSubtasksPct = userSubtasksTotal > 0 ? Math.round((userSubtasksCompleted / userSubtasksTotal) * 100) : 0;
 
         // Subtasks completed TODAY by this user (through their assigned tasks)
         const userSubtasksToday = subtasksCompletedToday
             .filter(st => st.completedByUid === uid)
             .slice(0, 15);
 
-        // Connection times
+        // Active hours (first/last timer) — fixed timezone
         const timeRange = userTimeRanges[uid];
-        let connectionStr = "";
+        let activeHoursStr = "";
         if (timeRange) {
             try {
                 const first = new Date(timeRange.first);
                 const last = new Date(timeRange.last);
                 const tz = "America/Costa_Rica";
-                const fmtTime = (d) => d.toLocaleString("en-US", { timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false });
-                connectionStr = `${fmtTime(first)} - ${fmtTime(last)}`;
+                const fmtTime = (d) => {
+                    const h = d.toLocaleString("en-US", { timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false });
+                    return h;
+                };
+                activeHoursStr = `${fmtTime(first)} - ${fmtTime(last)}`;
             } catch { /* skip */ }
         }
 
@@ -407,8 +439,9 @@ function buildReportData({
             completedTasks: completedByUser.map(t => t.title),
             subtasksTotal: userSubtasksTotal,
             subtasksCompleted: userSubtasksCompleted,
+            subtasksPct: userSubtasksPct,
             subtasksCompletedTodayList: userSubtasksToday,
-            connectionStr,
+            activeHoursStr,
             reported,
             statusEmoji,
             activeTasks: userActiveTasks.length,
