@@ -6,8 +6,8 @@
  */
 
 import {
-    collection, query, where, orderBy, onSnapshot,
-    doc, updateDoc, writeBatch, limit
+    collection, query, where, onSnapshot,
+    doc, updateDoc, writeBatch
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { COLLECTIONS } from '../models/schemas';
@@ -20,14 +20,21 @@ import { COLLECTIONS } from '../models/schemas';
  * @returns {function} unsubscribe
  */
 export function subscribeToNotifications(userId, onData, onError) {
+    // We removed orderBy/limit from the query to avoid Firebase compound index requirement.
+    // Instead, we sort and limit the documents in-memory.
     const q = query(
         collection(db, COLLECTIONS.NOTIFICATIONS),
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc'),
-        limit(100)
+        where('userId', '==', userId)
     );
     return onSnapshot(q, (snap) => {
-        onData(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        let items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Descending sort
+        items.sort((a, b) => {
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return dateB - dateA;
+        });
+        onData(items.slice(0, 100)); // Limit in memory
     }, onError);
 }
 

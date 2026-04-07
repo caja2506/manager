@@ -246,7 +246,8 @@ function ScorePopover({ type, score, color, items, anchorRef, onClose }) {
         if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
         if (left < 8) left = 8;
         if (top + popH > window.innerHeight - 8) top = rect.top - popH - 6;
-        setPos({ top, left });
+        const timer = setTimeout(() => setPos({ top, left }), 0);
+        return () => clearTimeout(timer);
     }, [anchorRef]);
 
     useEffect(() => {
@@ -1412,7 +1413,7 @@ export default function MainTable() {
             const s = search.toLowerCase();
             const matchSearch = !s || (task.title || '').toLowerCase().includes(s) || (task.description || '').toLowerCase().includes(s);
             const matchProject = !filterProject || task.projectId === filterProject;
-            const matchAssignee = !filterAssignee || task.assignedBy === filterAssignee || task.assignedTo === filterAssignee;
+            const matchAssignee = !filterAssignee || task.assignedTo === filterAssignee;
             const matchPriority = !filterPriority || task.priority === filterPriority;
             return matchSearch && matchProject && matchAssignee && matchPriority;
         });
@@ -1442,7 +1443,8 @@ export default function MainTable() {
             const count = (tasksByStatus[g.status] || []).length;
             ns[g.status] = count === 0; // collapsed=true only if empty
         });
-        setCollapsedGroups(ns);
+        const timer = setTimeout(() => setCollapsedGroups(ns), 0);
+        return () => clearTimeout(timer);
     }, [tasksByStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const toggleGroup = (status) => setCollapsedGroups(prev => ({ ...prev, [status]: !prev[status] }));

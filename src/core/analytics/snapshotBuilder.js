@@ -46,8 +46,8 @@ export function buildDepartmentSnapshot(data) {
         const logDate = l.startTime || l.date;
         return logDate && new Date(logDate) >= sevenDaysAgo;
     });
-    const recentHours = recentLogs.reduce((sum, l) => sum + (l.totalHours || l.hours || 0), 0);
-    const recentOvertime = recentLogs.reduce((sum, l) => sum + (l.overtimeHours || 0), 0);
+    const recentHours = recentLogs.reduce((sum, l) => sum + Number(l.totalHours || l.hours || 0), 0);
+    const recentOvertime = recentLogs.reduce((sum, l) => sum + Number(l.overtimeHours || 0), 0);
 
     // Estimation accuracy for completed tasks
     const tasksWithEstimates = completedTasks.filter(t => t.estimatedHours > 0 && t.actualHours > 0);
@@ -121,9 +121,9 @@ export function buildProjectSnapshot(project, tasks, timeLogs, delays) {
     const activeTasks = projectTasks.filter(t => !['completed', 'cancelled'].includes(t.status));
     const completedTasks = projectTasks.filter(t => t.status === 'completed');
 
-    const totalEstimated = projectTasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
-    const totalActual = projectTasks.reduce((sum, t) => sum + (t.actualHours || 0), 0);
-    const totalLogged = projectLogs.reduce((sum, l) => sum + (l.totalHours || l.hours || 0), 0);
+    const totalEstimated = projectTasks.reduce((sum, t) => sum + Number(t.estimatedHours || 0), 0);
+    const totalActual = projectTasks.reduce((sum, t) => sum + Number(t.actualHours || 0), 0);
+    const totalLogged = projectLogs.reduce((sum, l) => sum + Number(l.totalHours || l.hours || 0), 0);
 
     const progress = projectTasks.length > 0
         ? Math.round((completedTasks.length / projectTasks.length) * 100)
@@ -159,7 +159,7 @@ export function buildUserSnapshot(userId, tasks, timeLogs, teamMembers) {
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const recentLogs = userLogs.filter(l => new Date(l.startTime || l.date) >= sevenDaysAgo);
-    const weeklyHours = recentLogs.reduce((sum, l) => sum + (l.totalHours || l.hours || 0), 0);
+    const weeklyHours = recentLogs.reduce((sum, l) => sum + Number(l.totalHours || l.hours || 0), 0);
 
     const activeTasks = userTasks.filter(t => !['completed', 'cancelled'].includes(t.status));
     const completedRecent = userTasks.filter(t =>

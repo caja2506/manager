@@ -11,6 +11,7 @@ import { useEngineeringData } from './useEngineeringData';
 import { useAuditData } from './useAuditData';
 import { buildDepartmentSnapshot, buildProjectSnapshot, buildUserSnapshot } from '../core/analytics/snapshotBuilder';
 import { calculateTeamUtilization } from '../core/analytics/teamUtilization';
+import { getActiveTeamMembers } from '../utils/teamFilters';
 
 export function useAnalyticsData() {
     const {
@@ -64,10 +65,16 @@ export function useAnalyticsData() {
 
     /**
      * Derived: team utilization metrics.
+     * Excludes managers without active tasks or recent timeLogs.
      */
+    const operationalMembers = useMemo(() => 
+        getActiveTeamMembers(teamMembers, engTasks, timeLogs),
+        [teamMembers, engTasks, timeLogs]
+    );
+
     const teamUtilization = useMemo(() => {
-        return calculateTeamUtilization(teamMembers, engTasks, timeLogs);
-    }, [teamMembers, engTasks, timeLogs]);
+        return calculateTeamUtilization(operationalMembers, engTasks, timeLogs);
+    }, [operationalMembers, engTasks, timeLogs]);
 
     /**
      * Derived: quick KPIs from current data.
@@ -98,10 +105,10 @@ export function useAnalyticsData() {
             activeDelays: activeDelays.length,
             overdueTasks,
             completedThisWeek,
-            teamSize: teamMembers.length,
+            teamSize: operationalMembers.length,
             avgUtilization: teamUtilization.avgUtilization,
         };
-    }, [engTasks, engProjects, delays, teamMembers, teamUtilization]);
+    }, [engTasks, engProjects, delays, operationalMembers, teamUtilization]);
 
     return {
         // Actions

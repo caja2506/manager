@@ -91,7 +91,7 @@ export default function TodayTasksPanel({ tasks, userId, timeLogs, onOpenTask, o
                                         </span>
                                     )}
                                 </div>
-                                <p className="font-bold text-white text-sm truncate">{task.title}</p>
+                                <p className="font-bold text-slate-100 text-sm truncate">{task.title}</p>
                             </div>
 
                             {/* Quick actions (visible on hover) */}

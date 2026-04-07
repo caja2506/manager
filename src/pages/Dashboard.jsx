@@ -18,6 +18,7 @@ import PageHeader from '../components/layout/PageHeader';
 import { resolveDelay } from '../services/delayService';
 import { calculateTeamScores } from '../core/analytics/performanceScore';
 import { getActiveAssignments } from '../services/resourceAssignmentService';
+import { getActiveTeamMembers } from '../utils/teamFilters';
 
 // ============================================================
 // ANIMATED COUNT UP HOOK
@@ -459,12 +460,12 @@ export default function Dashboard() {
 
     // ── Team workload ──
     const workload = useMemo(() => {
-        const engineers = teamMembers.filter(u => ['engineer', 'technician', 'team_lead', 'manager'].includes(u.teamRole) || !u.teamRole);
+        const engineers = getActiveTeamMembers(teamMembers, engTasks, timeLogs);
         return engineers.map(eng => {
             const assignedTasks = engTasks.filter(t => t.assignedTo === eng.uid && !['completed', 'cancelled'].includes(t.status));
             return { ...eng, totalAssigned: assignedTasks.length };
         }).sort((a, b) => b.totalAssigned - a.totalAssigned);
-    }, [engTasks, teamMembers]);
+    }, [engTasks, teamMembers, timeLogs]);
 
     // ── IPS Scores (for badge in team cards) ──
     const [ipsAssignments, setIpsAssignments] = useState([]);

@@ -4,11 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
 import { useAuditData } from '../hooks/useAuditData';
 import { useEngineeringData } from '../hooks/useEngineeringData';
-import {
-    subscribeToNotifications,
-    markNotificationRead,
-    markAllNotificationsRead,
-} from '../services/notificationService';
+import { useNotifications } from '../hooks/useNotifications';
 import { FindingCardList } from '../components/audit/FindingCard';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
 import {
@@ -49,9 +45,8 @@ export default function Notifications() {
     const { canEdit, canDelete } = useRole();
     const { engTasks = [], engProjects = [], engSubtasks = [], taskTypes = [], teamMembers = [] } = useEngineeringData();
 
-    // ── Firestore Notifications ──
-    const [notifications, setNotifications] = useState([]);
-    const [loading, setLoading] = useState(true);
+    // ── Notifications Hook ──
+    const { notifications, loading, unreadCount, markAsRead, markAllRead: handleMarkAllRead } = useNotifications();
 
     // ── Audit Alerts (live) ──
     const {
@@ -79,18 +74,6 @@ export default function Notifications() {
         }
     }, [engTasks]);
 
-    // ── Real-time Firestore subscription ──
-    useEffect(() => {
-        if (!user?.uid) return;
-
-        const unsub = subscribeToNotifications(
-            user.uid,
-            (items) => { setNotifications(items); setLoading(false); },
-            (err) => { console.error('[Notifications] Subscription failed:', err); setLoading(false); }
-        );
-
-        return unsub;
-    }, [user?.uid]);
 
     // ── Auto-run audit when data is ready ──
     useEffect(() => {
@@ -127,23 +110,10 @@ export default function Notifications() {
         };
     }, [auditResult]);
 
-    const unreadCount = notifications.filter(n => !n.read).length;
-
     // ── Filtered notifications ──
     const filteredNotifications = notifFilter === 'unread'
         ? notifications.filter(n => !n.read)
         : notifications;
-
-    // ── Actions ──
-    const markAsRead = useCallback(async (notifId) => {
-        try { await markNotificationRead(notifId); }
-        catch (err) { console.error('Error marking notification as read:', err); }
-    }, []);
-
-    const handleMarkAllRead = useCallback(async () => {
-        try { await markAllNotificationsRead(notifications); }
-        catch (err) { console.error('Error marking all as read:', err); }
-    }, [notifications]);
 
     return (
         <div className="space-y-6 animate-in fade-in duration-300">

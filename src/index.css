@@ -89,6 +89,11 @@
   background-color: #f1f5f9 !important;
 }
 
+[data-theme="light"] main [class*="from-slate-900"] {
+  background-image: none !important;
+  background-color: #ffffff !important;
+}
+
 [data-theme="light"] main [class*="bg-slate-900"] {
   background-color: #ffffff !important;
   backdrop-filter: none !important;
@@ -154,7 +159,14 @@
 [data-theme="light"] main [class*="bg-emerald-6"].text-white,
 [data-theme="light"] main [class*="bg-rose-6"].text-white,
 [data-theme="light"] main [class*="bg-amber-6"].text-white,
-[data-theme="light"] main [class*="bg-red-6"].text-white {
+[data-theme="light"] main [class*="bg-red-6"].text-white,
+[data-theme="light"] main [class*="from-indigo-6"].text-white,
+[data-theme="light"] main [class*="from-purple-6"].text-white,
+[data-theme="light"] main [class*="from-blue-6"].text-white,
+[data-theme="light"] main [class*="from-emerald-6"].text-white,
+[data-theme="light"] main [class*="from-rose-6"].text-white,
+[data-theme="light"] main [class*="from-indigo-6"] .text-white,
+[data-theme="light"] main [class*="from-purple-6"] .text-white {
   color: #ffffff !important;
 }
 
@@ -181,6 +193,14 @@
 [data-theme="light"] main .text-slate-600 {
   color: #94a3b8 !important;
 }
+
+/* ── Status Colors ── */
+[data-theme="light"] main .text-red-400 { color: #dc2626 !important; }
+[data-theme="light"] main .text-amber-400 { color: #d97706 !important; }
+[data-theme="light"] main .text-indigo-400 { color: #4f46e5 !important; }
+[data-theme="light"] main .text-emerald-400 { color: #059669 !important; }
+[data-theme="light"] main .text-purple-400 { color: #7e22ce !important; }
+[data-theme="light"] main .text-blue-400 { color: #2563eb !important; }
 
 
 /* ── Border colors ── */

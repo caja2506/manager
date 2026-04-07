@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
 import { useRole } from '../../contexts/RoleContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAppData, APP_VERSION } from '../../contexts/AppDataContext';
@@ -9,7 +8,7 @@ import AnalyzeOpsLogo from '../brand/AnalyzeOpsLogo';
 import {
     Activity, LayoutDashboard, User, FolderGit2,
     ListTodo, Database, Clock, FileText, BarChart3, Users,
-    Bell, Settings, LogOut, Shield, LayoutList, Briefcase, LineChart, CalendarDays, GanttChartSquare, Radar, Zap,
+    Bell, Settings, Shield, LayoutList, Briefcase, LineChart, CalendarDays, GanttChartSquare, Radar, Zap,
     ChevronRight, X, Target, Map, Award, LayoutGrid, Sun, Moon
 } from 'lucide-react';
 
@@ -110,8 +109,7 @@ function sectionContainsRoute(section, pathname) {
 
 // ─── Sidebar Component ───
 export default function Sidebar() {
-    const { user, signOut } = useAuth();
-    const { role, isAdmin, canEdit } = useRole();
+    const { isAdmin } = useRole();
     const { toggleTheme, isDark } = useTheme();
     const { proyectos, catalogo } = useAppData();
     const { engProjects, engTasks } = useEngineeringData();
@@ -149,9 +147,11 @@ export default function Sidebar() {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [openPanel]);
 
-    // Close panel on route change
     useEffect(() => {
-        setOpenPanel(null);
+        // Debounce to prevent React warning "Calling setState synchronously within an effect"
+        // if this effect runs during an existing render cycle edge case.
+        const timer = setTimeout(() => setOpenPanel(null), 0);
+        return () => clearTimeout(timer);
     }, [location.pathname]);
 
     const handleIconClick = useCallback((section) => {
@@ -257,15 +257,7 @@ export default function Sidebar() {
 
                     <div className="w-8 h-px bg-slate-800 my-2" />
 
-                    {/* User Avatar */}
                     <div className="flex flex-col items-center gap-2 pb-1">
-                        <button
-                            onClick={signOut}
-                            title="Cerrar Sesión"
-                            className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:text-red-400 hover:bg-red-950/30 transition-all duration-200"
-                        >
-                            <LogOut className="w-[18px] h-[18px]" />
-                        </button>
                         <button
                             onClick={toggleTheme}
                             title={isDark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
@@ -273,22 +265,6 @@ export default function Sidebar() {
                         >
                             {isDark ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
                         </button>
-                        {user.photoURL ? (
-                            <img
-                                src={user.photoURL}
-                                alt=""
-                                className="w-8 h-8 rounded-full ring-2 ring-slate-800 hover:ring-indigo-500 transition-all cursor-pointer"
-                                referrerPolicy="no-referrer"
-                                title={user.displayName || user.email}
-                            />
-                        ) : (
-                            <div
-                                className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold ring-2 ring-slate-800"
-                                title={user.displayName || user.email}
-                            >
-                                {(user.displayName || user.email || '?')[0].toUpperCase()}
-                            </div>
-                        )}
                     </div>
                 </div>
 

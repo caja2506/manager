@@ -35,7 +35,7 @@ const UTILIZATION_CONFIG = {
  * Calculate utilization for a single team member.
  */
 export function calculateMemberUtilization(userId, tasks, timeLogs, profile = {}) {
-    const capacity = profile.weeklyCapacityHours || 40;
+    const capacity = Number(profile.weeklyCapacityHours) || 40;
     const userTasks = tasks.filter(t => t.assignedTo === userId);
     const activeTasks = userTasks.filter(t => !['completed', 'cancelled'].includes(t.status));
     const inProgressTasks = activeTasks.filter(t => t.status === 'in_progress');
@@ -46,11 +46,11 @@ export function calculateMemberUtilization(userId, tasks, timeLogs, profile = {}
     const userLogs = timeLogs.filter(l =>
         l.userId === userId && new Date(l.startTime || l.date) >= sevenDaysAgo
     );
-    const weeklyHours = userLogs.reduce((sum, l) => sum + (l.totalHours || l.hours || 0), 0);
-    const weeklyOvertime = userLogs.reduce((sum, l) => sum + (l.overtimeHours || 0), 0);
+    const weeklyHours = userLogs.reduce((sum, l) => sum + Number(l.totalHours || l.hours || 0), 0);
+    const weeklyOvertime = userLogs.reduce((sum, l) => sum + Number(l.overtimeHours || 0), 0);
 
     // Planned hours from active task estimates
-    const plannedHours = activeTasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
+    const plannedHours = activeTasks.reduce((sum, t) => sum + Number(t.estimatedHours || 0), 0);
 
     // Utilization %
     const utilizationPercent = capacity > 0 ? (weeklyHours / capacity) * 100 : 0;

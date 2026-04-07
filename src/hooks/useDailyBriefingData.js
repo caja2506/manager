@@ -22,6 +22,7 @@ import { buildDailyScrumData, buildSummary } from '../core/dailyScrum/dailyScrum
 import { getActiveAssignments } from '../services/resourceAssignmentService';
 import { fetchAuditHistory } from '../services/auditPersistence';
 import { subscribeToNotifications } from '../services/notificationService';
+import { getActiveTeamMembers } from '../utils/teamFilters';
 
 const URGENT_PRIORITIES = [TASK_PRIORITY.CRITICAL, TASK_PRIORITY.HIGH];
 
@@ -267,8 +268,7 @@ export function useDailyBriefingData() {
     const teamOverview = useMemo(() => {
         if (!isLeader) return [];
 
-        return teamMembers
-            .filter(m => ['engineer', 'technician', 'team_lead', 'manager'].includes(m.teamRole) || !m.teamRole)
+        return getActiveTeamMembers(teamMembers, engTasks, timeLogs)
             .map(member => {
                 const memberTasks = engTasks.filter(t =>
                     t.assignedTo === member.uid && !['completed', 'cancelled'].includes(t.status)

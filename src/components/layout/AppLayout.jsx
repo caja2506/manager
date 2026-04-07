@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import MobileNav from './MobileNav';
+import TopBar from './TopBar';
 import { useAppData } from '../../contexts/AppDataContext';
 import {
     Activity, X
@@ -150,10 +151,15 @@ export default function AppLayout() {
             {/* ===== MOBILE NAV ===== */}
             <MobileNav />
 
-            {/* ===== MAIN CONTENT — React Router Outlet ===== */}
-            <main className="flex-1 overflow-y-auto pb-20 md:pb-4 p-4 md:p-8" style={{ background: 'var(--bg-app)', color: 'var(--text-primary)' }}>
-                <Outlet />
-            </main>
+            {/* ===== MIDDLE WRAPPER (TopBar + Main) ===== */}
+            <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+                <TopBar />
+
+                {/* ===== MAIN CONTENT — React Router Outlet ===== */}
+                <main className="flex-1 overflow-y-auto pb-20 md:pb-4 p-4 md:p-8 relative" style={{ background: 'var(--bg-app)', color: 'var(--text-primary)' }}>
+                    <Outlet />
+                </main>
+            </div>
         </div>
     );
 }

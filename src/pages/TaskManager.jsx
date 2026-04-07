@@ -130,7 +130,7 @@ export default function TaskManager() {
             const s = search.toLowerCase();
             const matchSearch = !s || (task.title || '').toLowerCase().includes(s) || (task.description || '').toLowerCase().includes(s);
             const matchProject = !filterProject || task.projectId === filterProject;
-            const matchAssignee = !filterAssignee || task.assignedBy === filterAssignee || task.assignedTo === filterAssignee;
+            const matchAssignee = !filterAssignee || task.assignedTo === filterAssignee;
             const matchPriority = !filterPriority || task.priority === filterPriority;
             return matchSearch && matchProject && matchAssignee && matchPriority;
         });

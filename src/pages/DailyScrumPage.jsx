@@ -29,6 +29,7 @@ import {
     STATUS_CONFIG,
     PERSON_STATUS,
 } from '../core/dailyScrum/dailyScrumEngine';
+import { getActiveTeamMembers } from '../utils/teamFilters';
 
 // ─── Role config (match Team page) ───
 const ROLE_CONFIG = {
@@ -362,7 +363,8 @@ export default function DailyScrumPage() {
     // Build scrum data
     const scrumData = useMemo(() => {
         if (loading) return [];
-        return buildDailyScrumData(teamMembers, engTasks, timeLogs, delays, assignments);
+        const operationalMembers = getActiveTeamMembers(teamMembers, engTasks, timeLogs);
+        return buildDailyScrumData(operationalMembers, engTasks, timeLogs, delays, assignments);
     }, [teamMembers, engTasks, timeLogs, delays, assignments, loading]);
 
     const summary = useMemo(() => buildSummary(scrumData), [scrumData]);

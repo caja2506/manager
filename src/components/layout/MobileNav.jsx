@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useRole } from '../../contexts/RoleContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import {
     LayoutDashboard, User, ListTodo, Shield, FolderGit2,
     Database, Clock, FileText, BarChart3, Users, Bell, Settings,
     Briefcase, LineChart, CalendarDays, GanttChartSquare, Radar, Zap,
-    LayoutList, Activity, Map, Menu, X, ChevronRight, Award, LayoutGrid, Sun, Moon
+    LayoutList, Activity, Map, Menu, X, ChevronRight, Award, LayoutGrid,
+    Sun, Moon
 } from 'lucide-react';
 
 // ─── Quick Access (bottom bar — always visible) ───
@@ -86,11 +88,13 @@ export default function MobileNav() {
     const [isOpen, setIsOpen] = useState(false);
     const location = useLocation();
     const { isAdmin } = useRole();
+    const { logout } = useAuth();
     const { toggleTheme, isDark } = useTheme();
 
-    // Close drawer on navigation
     useEffect(() => {
-        setIsOpen(false);
+        // Debounce to prevent React warning "Calling setState synchronously within an effect"
+        const timer = setTimeout(() => setIsOpen(false), 0);
+        return () => clearTimeout(timer);
     }, [location.pathname]);
 
     // Prevent body scroll when drawer is open
@@ -128,13 +132,7 @@ export default function MobileNav() {
                         {/* Header */}
                         <div className="flex items-center justify-between px-5 pb-3 border-b border-slate-800">
                             <h2 className="text-lg font-black text-white">Navegación</h2>
-                            <button
-                                onClick={toggleTheme}
-                                title={isDark ? 'Tema claro' : 'Tema oscuro'}
-                                className="p-2 rounded-xl bg-slate-800 text-amber-400 hover:text-amber-300 transition-colors"
-                            >
-                                {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-                            </button>
+
                             <button
                                 onClick={() => setIsOpen(false)}
                                 className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition-colors"
