@@ -2,6 +2,7 @@ import React from 'react';
 import { FileText, BarChart2, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import SubtaskList from '../SubtaskList';
+import TaskComments from '../TaskComments';
 
 /**
  * TaskMainPanel — left column of the task editor.
@@ -95,6 +96,18 @@ export default function TaskMainPanel({
                     <p className="text-xs text-slate-500 italic">
                         Las subtareas podrán agregarse después de crear la tarea.
                     </p>
+                </div>
+            )}
+
+            {/* Comments */}
+            {!isNew && task?.id && (
+                <div className="border-t border-slate-700 pt-4">
+                    <TaskComments
+                        taskId={task.id}
+                        readOnly={!canEdit}
+                        userId={userId}
+                        userName={userName}
+                    />
                 </div>
             )}
 

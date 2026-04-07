@@ -50,7 +50,7 @@ async function execute(adminDb, token, targets, context) {
     const [
         tasksSnap, timeLogsSnap, delaysSnap, usersSnap,
         subtasksSnap, planItemsTodaySnap, planItemsTomorrowSnap,
-        telegramReportsSnap,
+        telegramReportsSnap, commentsSnap,
     ] = await Promise.all([
         adminDb.collection(paths.TASKS).get(),
         adminDb.collection(paths.TIME_LOGS).get(),
@@ -61,6 +61,11 @@ async function execute(adminDb, token, targets, context) {
         adminDb.collection("weeklyPlanItems").where("date", "==", tomorrow).get(),
         adminDb.collection(paths.TELEGRAM_REPORTS)
             .where("reportDate", "==", today).get(),
+        // Fetch today's comments from all tasks (collectionGroup)
+        adminDb.collectionGroup("comments")
+            .where("createdAt", ">=", startOfDay.toISOString())
+            .where("createdAt", "<=", endOfDay.toISOString())
+            .get(),
     ]);
 
     const allTasks = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -71,8 +76,9 @@ async function execute(adminDb, token, targets, context) {
     const planItemsToday = planItemsTodaySnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const planItemsTomorrow = planItemsTomorrowSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const telegramReportsToday = telegramReportsSnap.docs.map(d => d.data());
+    const todayComments = commentsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-    console.log(`[perfReport] Loaded: ${allTasks.length} tasks, ${allTimeLogs.length} timeLogs, ${allSubtasks.length} subtasks, ${planItemsToday.length} planItems today, ${planItemsTomorrow.length} tomorrow`);
+    console.log(`[perfReport] Loaded: ${allTasks.length} tasks, ${allTimeLogs.length} timeLogs, ${allSubtasks.length} subtasks, ${planItemsToday.length} planItems today, ${planItemsTomorrow.length} tomorrow, ${todayComments.length} comments today`);
 
     // ══════════════════════════════════════════
     // 2. BUILD REPORT DATA
@@ -81,6 +87,7 @@ async function execute(adminDb, token, targets, context) {
         today, tomorrow, now, startOfDay, endOfDay,
         allTasks, allTimeLogs, allDelays, allUsers, allSubtasks,
         planItemsToday, planItemsTomorrow, telegramReportsToday,
+        todayComments,
     });
 
     console.log(`[perfReport] Report built: ${reportData.pulseOfDay.hoursReal}h real / ${reportData.pulseOfDay.hoursPlanned}h planned, ${reportData.teamNarratives.length} members, ${reportData.productivityAlerts.length} alerts`);
@@ -159,6 +166,110 @@ async function execute(adminDb, token, targets, context) {
     }
 
     // ══════════════════════════════════════════
+    // 5.5 PERSIST NOTIFICATIONS TO FIRESTORE
+    // ══════════════════════════════════════════
+    if (!dryRun) {
+        try {
+            const notifBatch = adminDb.batch();
+            let notifCount = 0;
+            const notifCollection = adminDb.collection(paths.NOTIFICATIONS);
+            const todayStr = now.toISOString().substring(0, 10);
+
+            // Helper: create a notification doc
+            const addNotif = (userId, type, title, message, metadata = {}) => {
+                if (!userId) return;
+                const ref = notifCollection.doc();
+                notifBatch.set(ref, {
+                    userId,
+                    type,
+                    title,
+                    message,
+                    read: false,
+                    createdAt: now.toISOString(),
+                    ruleKey: `${type}_${todayStr}`,
+                    ...metadata,
+                });
+                notifCount++;
+            };
+
+            // A) Overdue tasks → notify assignee
+            for (const t of reportData.overdueTasks) {
+                const task = allTasks.find(tk => tk.title === t.title);
+                if (task?.assignedTo) {
+                    addNotif(
+                        task.assignedTo,
+                        'risk_alert',
+                        `Tarea vencida: ${t.title}`,
+                        `Venció hace ${t.daysOverdue} día${t.daysOverdue !== 1 ? 's' : ''}. Actualiza el estado o solicita extensión.`,
+                        { taskId: task.id, entityId: task.id }
+                    );
+                }
+            }
+
+            // B) Blocked tasks → notify assignee
+            if (reportData.pulseOfDay.blockedTasks > 0) {
+                const blocked = allTasks.filter(t => t.status === 'blocked');
+                for (const task of blocked) {
+                    if (task.assignedTo) {
+                        addNotif(
+                            task.assignedTo,
+                            'task_blocked',
+                            `Tarea bloqueada: ${task.title}`,
+                            'Registra la causa del bloqueo y solicita apoyo si es necesario.',
+                            { taskId: task.id, entityId: task.id }
+                        );
+                    }
+                }
+            }
+
+            // C) Productivity alerts → notify the person
+            for (const alert of reportData.productivityAlerts) {
+                const userDoc = allUsers.find(u => u.displayName === alert.name);
+                if (userDoc?.id) {
+                    addNotif(
+                        userDoc.id,
+                        alert.severity === 'critical' ? 'audit_critical' : 'audit_warning',
+                        `Revisión de productividad`,
+                        `${alert.hours}h registradas. ${alert.details.join(' ')}`,
+                        { entityId: userDoc.id }
+                    );
+                }
+            }
+
+            // D) Tasks with no hours in 3 days → notify assignee
+            const threeDaysAgo = new Date(now);
+            threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+            const inProgressTasks = allTasks.filter(t => t.status === 'in_progress');
+            
+            for (const task of inProgressTasks) {
+                if (!task.assignedTo) continue;
+                const hasRecentLog = allTimeLogs.some(log =>
+                    log.taskId === task.id &&
+                    log.userId === task.assignedTo &&
+                    log.startTime &&
+                    new Date(log.startTime) >= threeDaysAgo
+                );
+                if (!hasRecentLog) {
+                    addNotif(
+                        task.assignedTo,
+                        'reminder',
+                        `Sin registro de horas: ${task.title}`,
+                        'Llevas 3+ días sin registrar horas en esta tarea. Actualiza tu progreso.',
+                        { taskId: task.id, entityId: task.id }
+                    );
+                }
+            }
+
+            if (notifCount > 0) {
+                await notifBatch.commit();
+                console.log(`[perfReport] Persisted ${notifCount} notifications to Firestore`);
+            }
+        } catch (err) {
+            console.warn("[perfReport] Failed to persist notifications:", err.message);
+        }
+    }
+
+    // ══════════════════════════════════════════
     // 6. LOG
     // ══════════════════════════════════════════
     if (!dryRun) {
@@ -188,6 +299,7 @@ function buildReportData({
     today, tomorrow, now, startOfDay, endOfDay,
     allTasks, allTimeLogs, allDelays, allUsers, allSubtasks,
     planItemsToday, planItemsTomorrow, telegramReportsToday,
+    todayComments = [],
 }) {
     // ── Active team: users with operational roles ──
     const teamUsers = allUsers.filter(u =>
@@ -581,6 +693,36 @@ function buildReportData({
         };
     });
 
+    // ══════════════════════════════════════════
+    // SECTION 6: COMENTARIOS DEL DÍA
+    // ══════════════════════════════════════════
+    const commentsByTask = [];
+    if (todayComments.length > 0) {
+        // Group comments by taskId
+        const grouped = {};
+        for (const c of todayComments) {
+            if (!c.taskId) continue;
+            if (!grouped[c.taskId]) grouped[c.taskId] = [];
+            grouped[c.taskId].push(c);
+        }
+        // Map groups to { taskTitle, comments: [{ userName, text, time }] }
+        for (const [taskId, cmts] of Object.entries(grouped)) {
+            const task = allTasks.find(t => t.id === taskId);
+            const sortedCmts = cmts.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+            commentsByTask.push({
+                taskTitle: task?.title || 'Tarea desconocida',
+                taskId,
+                comments: sortedCmts.map(c => ({
+                    userName: c.userName || 'Desconocido',
+                    text: c.text || '',
+                    time: c.createdAt ? new Date(c.createdAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false }) : '',
+                })),
+            });
+        }
+        // Sort by number of comments desc
+        commentsByTask.sort((a, b) => b.comments.length - a.comments.length);
+    }
+
     return {
         date: today,
         datePretty: formatDateES(today),
@@ -592,6 +734,7 @@ function buildReportData({
         overdueTasks: overdueTasks.slice(0, 10),
         tomorrowView,
         achievements,
+        commentsByTask,
     };
 }
 

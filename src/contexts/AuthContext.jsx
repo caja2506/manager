@@ -1,5 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { onAuthStateChanged, signInWithPopup, signOut as firebaseSignOut } from 'firebase/auth';
+import {
+    onAuthStateChanged,
+    signInWithPopup,
+    signInWithEmailAndPassword,
+    createUserWithEmailAndPassword,
+    signOut as firebaseSignOut,
+    updateProfile,
+} from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
 
 const AuthContext = createContext(null);
@@ -31,6 +38,28 @@ export function AuthProvider({ children }) {
         }
     };
 
+    const signInWithEmail = async (email, password) => {
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+        } catch (error) {
+            console.error('Error signing in with email:', error);
+            throw error;
+        }
+    };
+
+    const signUpWithEmail = async (email, password, displayName) => {
+        try {
+            const cred = await createUserWithEmailAndPassword(auth, email, password);
+            // Set display name if provided
+            if (displayName && cred.user) {
+                await updateProfile(cred.user, { displayName });
+            }
+        } catch (error) {
+            console.error('Error creating account:', error);
+            throw error;
+        }
+    };
+
     const signOut = async () => {
         try {
             await firebaseSignOut(auth);
@@ -44,8 +73,11 @@ export function AuthProvider({ children }) {
         user,
         loading,
         signInWithGoogle,
+        signInWithEmail,
+        signUpWithEmail,
         signOut,
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
+

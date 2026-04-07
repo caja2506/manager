@@ -181,6 +181,16 @@ service cloud.firestore {
         allow create: if isAuthenticated();
         allow update, delete: if isAuthenticated();
       }
+
+      // --- comments (sub-collection) ---
+      // Task comments — any authenticated user can add/read.
+      // Only the comment author can edit/delete their own comments.
+      match /comments/{commentId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+        allow update, delete: if isAuthenticated()
+          && resource.data.userId == request.auth.uid;
+      }
     }
 
     // --- subtasks ---

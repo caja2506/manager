@@ -11,6 +11,7 @@ function dailyPerformanceReport(data) {
     const {
         datePretty, pulseOfDay, teamNarratives, actionableAlerts,
         productivityAlerts, overdueTasks, tomorrowView, achievements,
+        commentsByTask,
     } = data;
 
     return `<!DOCTYPE html>
@@ -33,7 +34,7 @@ function dailyPerformanceReport(data) {
   <table width="100%" cellpadding="0" cellspacing="0">
     <tr>
       ${pulseCard("", "Horas Reales", pulseOfDay.hoursReal + "h", pulseOfDay.hoursPct >= 80 ? "#22c55e" : pulseOfDay.hoursPct >= 60 ? "#f59e0b" : "#ef4444", "de " + pulseOfDay.hoursExpected + "h esperadas (" + pulseOfDay.teamSize + " personas x " + pulseOfDay.dailyHours + "h) - " + pulseOfDay.hoursPct + "%")}
-      ${pulseCard("", "Planificadas", pulseOfDay.hoursPlanned + "h", "#3b82f6", "en el planner")}
+      ${pulseCard("", "Planificadas", pulseOfDay.hoursPlanned + "h", "#3b82f6", "de " + pulseOfDay.hoursExpected + "h esperadas - " + (pulseOfDay.hoursExpected > 0 ? Math.round((pulseOfDay.hoursPlanned / pulseOfDay.hoursExpected) * 100) : 0) + "%")}
       ${pulseCard("", "Completadas", pulseOfDay.tasksCompletedToday, "#22c55e", "de " + pulseOfDay.activeTasks + " activas")}
     </tr>
     <tr>
@@ -77,6 +78,26 @@ ${achievements.length > 0 ? `
     <div style="background:#064e3b;border-radius:8px;padding:10px 14px;margin-bottom:6px;border-left:3px solid #22c55e;">
       <p style="margin:0;color:#d1fae5;font-size:13px;"><strong>${a.title}</strong></p>
       <p style="margin:4px 0 0;color:#6ee7b7;font-size:11px;">Completada por ${a.completedBy}</p>
+    </div>
+  `).join("")}
+</td></tr>
+` : ""}
+
+<!-- SECTION 5.5: COMENTARIOS DEL DÍA -->
+${(commentsByTask || []).length > 0 ? `
+<tr><td style="padding:8px 40px 20px;">
+  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">💬 Que dijeron? (${commentsByTask.reduce((s, g) => s + g.comments.length, 0)} comentarios)</h2>
+  ${commentsByTask.slice(0, 10).map(group => `
+    <div style="background:#0f172a;border-radius:8px;padding:14px;margin-bottom:10px;border-left:3px solid #818cf8;">
+      <p style="margin:0 0 8px;color:#c7d2fe;font-size:13px;font-weight:700;">📋 ${group.taskTitle}</p>
+      ${group.comments.map(c => `
+        <div style="background:#1e293b;border-radius:6px;padding:8px 12px;margin-bottom:4px;">
+          <p style="margin:0;color:#94a3b8;font-size:10px;">
+            <strong style="color:#a5b4fc;">${c.userName}</strong> · ${c.time}
+          </p>
+          <p style="margin:4px 0 0;color:#e2e8f0;font-size:12px;line-height:1.4;">${c.text}</p>
+        </div>
+      `).join("")}
     </div>
   `).join("")}
 </td></tr>
@@ -149,9 +170,9 @@ ${overdueTasks.length > 0 ? `
 // ===================================
 
 function pulseCard(icon, label, value, color, subtitle) {
-    return `<td width="33%" style="padding:6px;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;border-radius:10px;border-left:4px solid ${color};">
-    <tr><td style="padding:14px 16px;">
+    return `<td width="33%" style="padding:6px;vertical-align:top;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;border-radius:10px;border-left:4px solid ${color};height:100%;">
+    <tr><td style="padding:14px 16px;vertical-align:top;">
       <p style="margin:0;color:${color};font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">${label}</p>
       <p style="margin:6px 0 0;color:#ffffff;font-size:26px;font-weight:800;line-height:1;">${value}</p>
       ${subtitle ? `<p style="margin:4px 0 0;color:#94a3b8;font-size:11px;">${subtitle}</p>` : ""}

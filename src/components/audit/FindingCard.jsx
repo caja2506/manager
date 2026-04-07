@@ -95,7 +95,7 @@ export function FindingCard({ finding, showEntityLink = true, onOpenTask }) {
             <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                     {/* Header: severity + entity */}
-                    <div className="flex items-center gap-2 mb-1.5">
+                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                         <FindingSeverityBadge severity={finding.severity} />
                         <EntityTypeBadge entityType={finding.entityType} />
                         <span className="text-[9px] font-mono text-slate-600 ml-auto">{finding.ruleId}</span>
@@ -106,6 +106,55 @@ export function FindingCard({ finding, showEntityLink = true, onOpenTask }) {
 
                     {/* Message */}
                     <p className="text-xs text-slate-400 mt-1 leading-relaxed">{finding.message}</p>
+
+                    {/* Entity ID (Firebase) */}
+                    {finding.entityId && (
+                        <div className="mt-1.5 flex items-center gap-1.5">
+                            <span className="text-[9px] font-black text-slate-600 uppercase">ID:</span>
+                            <code className="text-[9px] font-mono text-indigo-400/80 bg-indigo-500/10 px-1.5 py-0.5 rounded select-all">{finding.entityId}</code>
+                        </div>
+                    )}
+
+                    {/* Metadata: affected task list */}
+                    {finding.metadata?.tasksWithoutLogs?.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Tareas afectadas:</span>
+                            {finding.metadata.tasksWithoutLogs.map(t => (
+                                <div key={t.id} className="flex items-center gap-2 ml-2">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onOpenTask?.(t.id); }}
+                                        className="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold truncate max-w-[200px] hover:underline"
+                                        title={t.title}
+                                    >
+                                        {t.title}
+                                    </button>
+                                    <code className="text-[8px] font-mono text-slate-600 bg-slate-800 px-1 rounded select-all shrink-0">{t.id}</code>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Metadata: stale tasks list */}
+                    {finding.metadata?.staleTasks?.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Tareas sin actualizar:</span>
+                            {finding.metadata.staleTasks.map(t => (
+                                <div key={t.id} className="flex items-center gap-2 ml-2">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onOpenTask?.(t.id); }}
+                                        className="text-[10px] text-amber-400 hover:text-amber-300 font-bold truncate max-w-[200px] hover:underline"
+                                        title={t.title}
+                                    >
+                                        {t.title}
+                                    </button>
+                                    <code className="text-[8px] font-mono text-slate-600 bg-slate-800 px-1 rounded select-all shrink-0">{t.id}</code>
+                                    {t.lastUpdated && (
+                                        <span className="text-[9px] text-slate-600">({new Date(t.lastUpdated).toLocaleDateString('es-MX')})</span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
 
                     {/* Recommendation */}
                     {finding.recommendedAction && (

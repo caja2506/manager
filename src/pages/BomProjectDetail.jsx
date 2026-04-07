@@ -285,10 +285,10 @@ export default function BomProjectDetail() {
                                                     );
                                                 })()}
                                             </td>
-                                            <td className="p-5 font-black text-lg text-slate-700">{item.quantity}</td>
+                                            <td className="p-5 font-black text-lg" style={{ color: 'var(--text-primary)' }}>{item.quantity}</td>
                                             <td className="p-5">
-                                                <div className="font-bold text-slate-900 leading-tight">{details.name || 'Sin nombre'}</div>
-                                                <div className="text-[10px] font-mono text-slate-400 mt-1">{details.partNumber || 'S/N'}</div>
+                                                <div className="font-bold leading-tight" style={{ color: 'var(--text-heading)' }}>{details.name || 'Sin nombre'}</div>
+                                                <div className="text-[10px] font-mono mt-1" style={{ color: 'var(--text-muted)' }}>{details.partNumber || 'S/N'}</div>
                                                 <div className="flex items-center flex-wrap gap-2 mt-2">
                                                     {details.brandName && <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-gray-600 bg-gray-100 border-gray-200"><Tag className="w-3 h-3 mr-1.5 flex-shrink-0" />{details.brandName}</div>}
                                                     {details.categoryName && <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-purple-600 bg-purple-50 border-purple-100"><Tag className="w-3 h-3 mr-1.5 flex-shrink-0" />{details.categoryName}</div>}
@@ -310,7 +310,7 @@ export default function BomProjectDetail() {
                                                 })()}
                                             </td>
                                             <td className="p-5 text-right">
-                                                <div className="font-black text-slate-900 text-lg">${(item.totalPrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                                                <div className="font-black text-lg" style={{ color: 'var(--text-primary)' }}>${(item.totalPrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
                                                 <div className="text-[10px] text-slate-400">${item.unitPrice}/u</div>
                                             </td>
                                             {isBomEditMode && (

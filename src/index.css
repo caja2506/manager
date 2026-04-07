@@ -84,37 +84,25 @@
    Sidebar stays dark because it lives outside <main>.
    ══════════════════════════════════════════════ */
 
-/* ── Backgrounds ── */
-[data-theme="light"] main .bg-slate-950,
-[data-theme="light"] main .bg-slate-950\/40,
-[data-theme="light"] main .bg-slate-950\/60 {
+/* ── Backgrounds: wildcard to catch all opacity variants ── */
+[data-theme="light"] main [class*="bg-slate-950"] {
   background-color: #f1f5f9 !important;
 }
 
-[data-theme="light"] main .bg-slate-900,
-[data-theme="light"] main .bg-slate-900\/30,
-[data-theme="light"] main .bg-slate-900\/40,
-[data-theme="light"] main .bg-slate-900\/50,
-[data-theme="light"] main .bg-slate-900\/60,
-[data-theme="light"] main .bg-slate-900\/95 {
-  background-color: #f8fafc !important;
+[data-theme="light"] main [class*="bg-slate-900"] {
+  background-color: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
-[data-theme="light"] main .bg-slate-800,
-[data-theme="light"] main .bg-slate-800\/20,
-[data-theme="light"] main .bg-slate-800\/30,
-[data-theme="light"] main .bg-slate-800\/40,
-[data-theme="light"] main .bg-slate-800\/50,
-[data-theme="light"] main .bg-slate-800\/60,
-[data-theme="light"] main .bg-slate-800\/70,
-[data-theme="light"] main .bg-slate-800\/80 {
+[data-theme="light"] main [class*="bg-slate-800"] {
   background-color: #ffffff !important;
 }
 
-[data-theme="light"] main .bg-slate-700,
-[data-theme="light"] main .bg-slate-700\/50 {
+[data-theme="light"] main [class*="bg-slate-700"]:not(.h-px):not([class*="bg-slate-700 rounded"]) {
   background-color: #e2e8f0 !important;
 }
+
 
 /* ── Special backgrounds ── */
 [data-theme="light"] main .bg-indigo-950\/80,
@@ -140,10 +128,38 @@
   background-color: rgba(16, 185, 129, 0.06) !important;
 }
 
-/* ── Text colors ── */
+/* ── Text colors ── 
+   ALL text-white in main becomes dark in light mode.
+   Then restore white for elements on accent-colored backgrounds. */
 [data-theme="light"] main .text-white {
   color: #0f172a !important;
 }
+
+/* Restore white text on/inside accent-colored backgrounds */
+[data-theme="light"] main [class*="bg-indigo-6"] .text-white,
+[data-theme="light"] main [class*="bg-indigo-5"] .text-white,
+[data-theme="light"] main [class*="bg-violet-6"] .text-white,
+[data-theme="light"] main [class*="bg-emerald-6"] .text-white,
+[data-theme="light"] main [class*="bg-emerald-5"] .text-white,
+[data-theme="light"] main [class*="bg-rose-6"] .text-white,
+[data-theme="light"] main [class*="bg-rose-5"] .text-white,
+[data-theme="light"] main [class*="bg-amber-6"] .text-white,
+[data-theme="light"] main [class*="bg-blue-6"] .text-white,
+[data-theme="light"] main [class*="bg-orange-6"] .text-white,
+[data-theme="light"] main [class*="bg-red-6"] .text-white,
+[data-theme="light"] main [class*="bg-red-5"] .text-white,
+[data-theme="light"] main [class*="bg-indigo-6"].text-white,
+[data-theme="light"] main [class*="bg-indigo-5"].text-white,
+[data-theme="light"] main [class*="bg-violet-6"].text-white,
+[data-theme="light"] main [class*="bg-emerald-6"].text-white,
+[data-theme="light"] main [class*="bg-rose-6"].text-white,
+[data-theme="light"] main [class*="bg-amber-6"].text-white,
+[data-theme="light"] main [class*="bg-red-6"].text-white {
+  color: #ffffff !important;
+}
+
+
+
 
 [data-theme="light"] main .text-slate-100,
 [data-theme="light"] main .text-slate-200 {
@@ -166,26 +182,20 @@
   color: #94a3b8 !important;
 }
 
+
 /* ── Border colors ── */
-[data-theme="light"] main .border-slate-800,
-[data-theme="light"] main .border-slate-800\/40,
-[data-theme="light"] main .border-slate-800\/50,
-[data-theme="light"] main .border-slate-800\/60 {
+[data-theme="light"] main [class*="border-slate-800"] {
   border-color: #e2e8f0 !important;
 }
 
-[data-theme="light"] main .border-slate-700,
-[data-theme="light"] main .border-slate-700\/30,
-[data-theme="light"] main .border-slate-700\/40,
-[data-theme="light"] main .border-slate-700\/50,
-[data-theme="light"] main .border-slate-700\/60 {
+[data-theme="light"] main [class*="border-slate-700"] {
   border-color: #cbd5e1 !important;
 }
 
-[data-theme="light"] main .border-indigo-500\/20,
-[data-theme="light"] main .border-indigo-500\/30 {
-  border-color: rgba(99, 102, 241, 0.15) !important;
+[data-theme="light"] main [class*="border-indigo-500"] {
+  border-color: rgba(99, 102, 241, 0.2) !important;
 }
+
 
 /* ── Ring colors ── */
 [data-theme="light"] main .ring-slate-800 {
@@ -205,9 +215,7 @@
 }
 
 /* ── Hover state overrides ── */
-[data-theme="light"] main .hover\:bg-slate-800:hover,
-[data-theme="light"] main .hover\:bg-slate-800\/60:hover,
-[data-theme="light"] main .hover\:bg-slate-800\/70:hover {
+[data-theme="light"] main [class*="hover:bg-slate-800"]:hover {
   background-color: #e2e8f0 !important;
 }
 
@@ -225,8 +233,52 @@
   background-color: #e2e8f0 !important;
 }
 
+/* ── Cards: add subtle shadow in light mode ── */
+[data-theme="light"] main .backdrop-blur-sm {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04) !important;
+}
+
+/* ── Hide dark-mode animated glow blobs ── */
+[data-theme="light"] main .bg-indigo-600\/5,
+[data-theme="light"] main .bg-violet-600\/5,
+[data-theme="light"] main .bg-emerald-600\/5,
+[data-theme="light"] main .bg-amber-600\/4 {
+  opacity: 0 !important;
+}
+
+/* ── Progress bar backgrounds ── */
+[data-theme="light"] main .bg-slate-700 {
+  background-color: #e2e8f0 !important;
+}
+
+/* ── Input focus ring lighter ── */
+[data-theme="light"] main .focus\:ring-indigo-500\/50:focus {
+  --tw-ring-color: rgba(99, 102, 241, 0.25) !important;
+}
+
 /* ── Smooth theme transition ── */
 [data-theme="light"] main,
 [data-theme="dark"] main {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
+
+/* ── Planner Grid: sticky header above break bands (z-index fix) ── */
+[data-theme="light"] main .sticky.top-0[class*="bg-slate-9"] {
+  z-index: 30 !important;
+}
+
+/* ── Planner weekend columns: convert amber-900 to light ── */
+[data-theme="light"] main [class*="bg-amber-900"] {
+  background-color: rgba(254, 243, 199, 0.5) !important;
+}
+
+/* ── BOM table: thead sticky stays distinguishable in light mode ── */
+[data-theme="light"] main thead[class*="bg-slate-8"],
+[data-theme="light"] main thead [class*="bg-slate-8"] {
+  background-color: #f1f5f9 !important;
+  border-bottom-color: #cbd5e1 !important;
+}
+
+
