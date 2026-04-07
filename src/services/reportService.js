@@ -38,9 +38,9 @@ export function generateDailyReport(date, userId, timeLogs, tasks, projects, del
     const notesArr = [];
 
     userLogsToday.forEach(log => {
-        totalHours += Number(log.totalHours || 0);
+        totalHours += (log.totalHours || 0);
         if (log.overtime) {
-            overtimeHours += Number(log.overtimeHours || log.totalHours || 0);
+            overtimeHours += (log.overtimeHours || log.totalHours || 0);
         }
 
         if (log.notes) {
@@ -63,7 +63,7 @@ export function generateDailyReport(date, userId, timeLogs, tasks, projects, del
                 });
             }
             const tData = tasksWorkedMap.get(log.taskId);
-            tData.hours += Number(log.totalHours || 0);
+            tData.hours += (log.totalHours || 0);
             tData.logCount += 1;
         } else {
             // Logs without a task — group by projectId
@@ -79,7 +79,7 @@ export function generateDailyReport(date, userId, timeLogs, tasks, projects, del
                 });
             }
             const tData = tasksWorkedMap.get(groupKey);
-            tData.hours += Number(log.totalHours || 0);
+            tData.hours += (log.totalHours || 0);
             tData.logCount += 1;
         }
     });
