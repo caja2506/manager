@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Play, Square, ExternalLink, Clock, Flag, Folder, Zap, Target, ChevronRight } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { startTimer, stopTimer, getActiveTimerFromLogs, formatElapsed } from '../../services/timeService';
 import { TASK_PRIORITY_CONFIG, TASK_STATUS_CONFIG } from '../../models/schemas';
+import { getDaysUntil, parseLocalDate } from '../../utils/dateUtils';
 
 const PRIORITY_STYLES = {
     critical: 'bg-red-500/15 text-red-400 border-red-500/30',
@@ -131,10 +132,10 @@ export default function FocusNowCard({ task, userId, engTasks, timeLogs, onOpenT
                         Real {(task.actualHours || 0).toFixed(1)}h
                     </span>
                     {task.dueDate && (
-                        <span className={`flex items-center gap-1 ${new Date(task.dueDate) < new Date() ? 'text-red-400 font-black' : 'text-slate-500'
+                        <span className={`flex items-center gap-1 ${getDaysUntil(task.dueDate) < 0 ? 'text-red-400 font-black' : 'text-slate-500'
                             }`}>
                             <Flag className="w-3.5 h-3.5" />
-                            {format(parseISO(task.dueDate), 'dd MMM')}
+                            {format(parseLocalDate(task.dueDate), 'dd MMM')}
                         </span>
                     )}
                 </div>

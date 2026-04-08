@@ -10,6 +10,7 @@ import {
     TASK_STATUS_CONFIG,
     TASK_PRIORITY_CONFIG,
 } from '../../models/schemas';
+import { getDaysUntil, parseLocalDate } from '../../utils/dateUtils';
 
 // ── Priority pill colors ──
 const PRIORITY_COLORS = {
@@ -66,7 +67,7 @@ export default function TaskCard({ task, project, teamMembers, subtasks = [], on
     const totalSubtasks = subtasks.length;
     const subtaskProgress = totalSubtasks > 0 ? Math.round((completedSubtasks / totalSubtasks) * 100) : null;
 
-    const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'completed' && task.status !== 'cancelled';
+    const isOverdue = task.dueDate && getDaysUntil(task.dueDate) < 0 && task.status !== 'completed' && task.status !== 'cancelled';
 
     // Live Timer — detect from Firestore timeLogs
     const [liveElapsed, setLiveElapsed] = useState(null);
@@ -294,7 +295,7 @@ export default function TaskCard({ task, project, teamMembers, subtasks = [], on
                             : 'bg-slate-800/60 text-slate-400 border-slate-700/50'
                             }`}>
                             <Calendar className={ICON} />
-                            {new Date(task.dueDate).toLocaleDateString('es', { day: '2-digit', month: 'short' })}
+                            {parseLocalDate(task.dueDate).toLocaleDateString('es', { day: '2-digit', month: 'short' })}
                         </span>
                     )}
                 </div>

@@ -344,6 +344,17 @@ export default function TopBar() {
                                                         {n.title}
                                                     </p>
                                                     {n.message && <p className="text-[10px] text-slate-500 line-clamp-1 mt-0.5">{n.message}</p>}
+                                                    {n.taskId && (() => {
+                                                        const nTask = engTasks.find(t => t.id === n.taskId);
+                                                        if (!nTask) return null;
+                                                        const asignador = teamMembers.find(m => m.uid === nTask.assignedBy)?.displayName || 'Desconocido';
+                                                        const asignado = teamMembers.find(m => m.uid === nTask.assignedTo)?.displayName || 'Sin asignar';
+                                                        return (
+                                                            <div className="mt-1 text-[9px] text-slate-400 bg-slate-100 dark:bg-slate-700/50 rounded px-1.5 py-0.5 inline-block">
+                                                                <span className="font-semibold text-slate-500 dark:text-slate-300">De:</span> {asignador} &nbsp;|&nbsp; <span className="font-semibold text-slate-500 dark:text-slate-300">Para:</span> {asignado}
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </div>
                                             </div>
                                         );

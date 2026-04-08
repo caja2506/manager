@@ -4,7 +4,7 @@ import {
     TASK_STATUS, TASK_PRIORITY,
 } from '../../models/schemas';
 import { createTask, updateTask, updateTaskStatus, deleteTask } from '../../services/taskService';
-import { startTimer, stopTimer, getActiveTimerForTask, canManageOthersTimers } from '../../services/timeService';
+import { startTimer, stopTimer, getActiveTimerForTask, canManageOthersTimers, addSimpleManualTimeLog } from '../../services/timeService';
 import { resolveAreaSync } from '../../services/mappingService';
 import { onProjectStations } from '../../services/stationService';
 import { logActivity, ACTIVITY_TYPES } from '../../services/activityLogService';
@@ -409,7 +409,6 @@ export default function TaskDetailModal({
         if (!task?.id) return;
         setIsSavingManualTime(true);
         try {
-            const { addSimpleManualTimeLog } = await import('../../services/timeService');
             await addSimpleManualTimeLog({
                 taskId: task.id,
                 projectId: form.projectId,
@@ -420,8 +419,7 @@ export default function TaskDetailModal({
                 overtime: false
             });
         } catch (err) {
-            console.error("Error agregando tiempo manual:", err);
-            alert("Hubo un error al agregar las horas manuales.");
+            console.error('Error adding manual time:', err);
         } finally {
             setIsSavingManualTime(false);
         }

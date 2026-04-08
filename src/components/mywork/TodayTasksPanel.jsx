@@ -3,9 +3,10 @@ import {
     Play, ExternalLink, Ban, CheckCircle2, AlarmClockOff,
     Inbox, ChevronsRight, Clock
 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG } from '../../models/schemas';
 import { getActiveTimerFromLogs, getActiveTimerForTask, startTimer } from '../../services/timeService';
+import { getDaysUntil, parseLocalDate } from '../../utils/dateUtils';
 
 const SOURCE_LABELS = {
     in_progress: { label: 'En Progreso', icon: ChevronsRight, color: 'text-amber-400 bg-amber-500/15 border-amber-500/30' },
@@ -85,9 +86,9 @@ export default function TodayTasksPanel({ tasks, userId, timeLogs, onOpenTask, o
                                     <span className="text-[10px] font-bold text-slate-400">{task.projectName}</span>
                                     {task.dueDate && (
                                         <span className={`text-[10px] font-bold ${
-                                            new Date(task.dueDate) < new Date() ? 'text-red-400' : 'text-slate-400'
+                                            getDaysUntil(task.dueDate) < 0 ? 'text-red-400' : 'text-slate-400'
                                         }`}>
-                                            · {format(parseISO(task.dueDate), 'dd MMM')}
+                                            · {format(parseLocalDate(task.dueDate), 'dd MMM')}
                                         </span>
                                     )}
                                 </div>

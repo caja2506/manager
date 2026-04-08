@@ -101,7 +101,10 @@ export default function ProjectDetailPage() {
         const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
         const overdue = projectTasks.filter(t => {
             if (t.status === 'completed' || t.status === 'cancelled') return false;
-            return t.dueDate && new Date(t.dueDate) < new Date();
+            if (!t.dueDate) return false;
+            const due = new Date(t.dueDate.includes('T') ? t.dueDate : t.dueDate.replace(/-/g, '/'));
+            due.setHours(23, 59, 59, 999);
+            return due < new Date();
         }).length;
         return { total, completed, blocked, inProgress, pending, progress, overdue };
     }, [projectTasks]);
@@ -241,7 +244,7 @@ export default function ProjectDetailPage() {
             </div>
 
             {/* ══════════════ STATS KPIs ══════════════ */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
                 <StatCard label="Tareas" value={stats.total} icon={<ListTodo className="w-5 h-5" />} color="indigo" />
                 <StatCard label="Completadas" value={stats.completed} icon={<CheckCircle2 className="w-5 h-5" />} color="emerald" />
                 <StatCard label="En Progreso" value={stats.inProgress} icon={<Activity className="w-5 h-5" />} color="blue" />
@@ -250,15 +253,8 @@ export default function ProjectDetailPage() {
                 <StatCard label="Vencidas" value={stats.overdue} icon={<AlertTriangle className="w-5 h-5" />} color="amber" />
             </div>
 
-            {/* ══════════════ STATION TASK MATRIX ══════════════ */}
-            <StationTaskMatrix
-                projectId={projectId}
-                canEdit={canEdit}
-                userId={user?.uid}
-            />
-
             {/* Progress bar */}
-            <div className="bg-slate-900/70 p-5 rounded-2xl border border-slate-800 shadow-lg">
+            <div className="bg-slate-900/70 p-5 rounded-2xl border border-slate-800 shadow-lg mb-6">
                 <div className="flex items-center justify-between text-sm mb-2">
                     <span className="font-bold text-slate-300">Avance General</span>
                     <span className="font-black text-white">{stats.progress}%</span>
@@ -270,6 +266,13 @@ export default function ProjectDetailPage() {
                     />
                 </div>
             </div>
+
+            {/* ══════════════ STATION TASK MATRIX ══════════════ */}
+            <StationTaskMatrix
+                projectId={projectId}
+                canEdit={canEdit}
+                userId={user?.uid}
+            />
 
             {/* ══════════════ MILESTONES & SETUP ══════════════ */}
             <div className="bg-slate-900/70 p-6 rounded-2xl border border-slate-800 shadow-lg">

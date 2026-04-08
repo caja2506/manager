@@ -114,12 +114,13 @@ function InlineDropdown({ value, options, onSelect, renderValue, className = '' 
             const rect = triggerRef.current.getBoundingClientRect();
             const spaceBelow = window.innerHeight - rect.bottom;
             const openUp = spaceBelow < 220;
-            const shiftLeft = (window.innerWidth - rect.left) < 200;
+            const shiftLeft = (window.innerWidth - rect.left) < 240;
             
             setPos({
-                top: openUp ? rect.top : rect.bottom + 4,
-                left: shiftLeft ? undefined : rect.left,
-                right: shiftLeft ? (window.innerWidth - rect.right) : undefined,
+                top: openUp ? undefined : Math.min(rect.bottom + 4, window.innerHeight - 220),
+                bottom: openUp ? Math.max(8, window.innerHeight - rect.top + 4) : undefined,
+                left: shiftLeft ? undefined : Math.max(8, rect.left),
+                right: shiftLeft ? Math.max(8, window.innerWidth - rect.right) : undefined,
                 openUp,
             });
         }
@@ -139,9 +140,8 @@ function InlineDropdown({ value, options, onSelect, renderValue, className = '' 
                         zIndex: 9999,
                         left: pos.left !== undefined ? pos.left : undefined,
                         right: pos.right !== undefined ? pos.right : undefined,
-                        ...(pos.openUp
-                            ? { bottom: window.innerHeight - pos.top + 4 }
-                            : { top: pos.top }),
+                        top: pos.top !== undefined ? pos.top : undefined,
+                        bottom: pos.bottom !== undefined ? pos.bottom : undefined,
                     }}
                 >
                     {options.map(opt => (

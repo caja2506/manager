@@ -7,10 +7,10 @@
 
 import { useMemo } from 'react';
 import {
-    format, startOfWeek, endOfWeek, addDays, parseISO,
-    isToday, isBefore, isAfter, startOfDay, endOfDay
+    format, startOfWeek, endOfWeek
 } from 'date-fns';
 import { TASK_PRIORITY } from '../models/schemas';
+import { getDaysUntil } from '../utils/dateUtils';
 
 const URGENT_PRIORITIES = [TASK_PRIORITY.CRITICAL, TASK_PRIORITY.HIGH];
 
@@ -39,8 +39,8 @@ export function useMyWorkData({ engTasks, engProjects, engSubtasks, timeLogs, we
 
     // ── 2. Categorized tasks ────────────────────────────────────────────
     const overdueTasks = useMemo(() =>
-        myTasks.filter(t => t.dueDate && isBefore(parseISO(t.dueDate), startOfDay(now)) && t.status !== 'completed'),
-    [myTasks, now]);
+        myTasks.filter(t => t.dueDate && getDaysUntil(t.dueDate) < 0 && t.status !== 'completed'),
+    [myTasks]);
 
     const urgentTasks = useMemo(() =>
         myTasks.filter(t => URGENT_PRIORITIES.includes(t.priority)),

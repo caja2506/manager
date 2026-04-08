@@ -307,6 +307,8 @@ export default function Notifications() {
                                     notification={notif}
                                     onMarkRead={markAsRead}
                                     onOpenTask={handleOpenTask}
+                                    engTasks={engTasks}
+                                    teamMembers={teamMembers}
                                 />
                             ))}
                         </div>
@@ -335,7 +337,7 @@ export default function Notifications() {
 // NOTIFICATION ITEM (Firestore)
 // ============================================================
 
-function NotificationItem({ notification, onMarkRead, onOpenTask }) {
+function NotificationItem({ notification, onMarkRead, onOpenTask, engTasks = [], teamMembers = [] }) {
     const config = TYPE_CONFIG[notification.type] || DEFAULT_TYPE;
     const Icon = config.icon;
 
@@ -383,6 +385,18 @@ function NotificationItem({ notification, onMarkRead, onOpenTask }) {
                 {notification.message && (
                     <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{notification.message}</p>
                 )}
+                {notification.taskId && (() => {
+                    const nTask = engTasks.find(t => t.id === notification.taskId);
+                    if (!nTask) return null;
+                    const asignador = teamMembers.find(m => m.uid === nTask.assignedBy)?.displayName || 'Desconocido';
+                    const asignado = teamMembers.find(m => m.uid === nTask.assignedTo)?.displayName || 'Sin asignar';
+                    return (
+                        <div className="mt-1.5 text-[11px] text-slate-400 bg-slate-800/50 rounded px-2 py-1 inline-flex gap-3 border border-slate-700/50">
+                            <div><span className="font-semibold text-slate-300">De:</span> {asignador}</div>
+                            <div><span className="font-semibold text-slate-300">Para:</span> {asignado}</div>
+                        </div>
+                    );
+                })()}
                 {/* Show entityId if present */}
                 {notification.entityId && (
                     <code className="text-[9px] font-mono text-indigo-400/60 bg-indigo-500/10 px-1.5 py-0.5 rounded mt-1 inline-block select-all">

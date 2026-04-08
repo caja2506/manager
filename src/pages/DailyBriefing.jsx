@@ -14,7 +14,7 @@ import { useEngineeringData } from '../hooks/useEngineeringData';
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
-import { isBefore, parseISO, startOfDay } from 'date-fns';
+import { getDaysUntil, parseLocalDate } from '../utils/dateUtils';
 import PageHeader from '../components/layout/PageHeader';
 
 // ─── Hook: Intersection Observer para animaciones por scroll ───
@@ -287,9 +287,8 @@ export default function DailyBriefing() {
                                     <div className="flex items-center gap-2 mt-0.5">
                                         <span className="text-[10px] font-bold text-slate-400">{priorityOne.projectName}</span>
                                         {priorityOne.dueDate && (() => {
-                                            const dueDate = typeof priorityOne.dueDate === 'string' ? parseISO(priorityOne.dueDate) : new Date();
-                                            const isOverdue = isBefore(dueDate, startOfDay(new Date()));
-                                            const daysUntil = Math.round((dueDate - new Date()) / (1000 * 60 * 60 * 24));
+                                            const isOverdue = getDaysUntil(priorityOne.dueDate) < 0;
+                                            const daysUntil = getDaysUntil(priorityOne.dueDate);
                                             const label = isOverdue ? `${Math.abs(daysUntil)}d vencida` : daysUntil === 0 ? 'Hoy' : `${daysUntil}d restantes`;
                                             return (
                                                 <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full border ${

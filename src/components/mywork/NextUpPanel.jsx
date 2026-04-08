@@ -1,7 +1,8 @@
 import React from 'react';
 import { ChevronRight, Flag, ExternalLink, Inbox } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { TASK_PRIORITY_CONFIG, TASK_STATUS_CONFIG } from '../../models/schemas';
+import { getDaysUntil, parseLocalDate } from '../../utils/dateUtils';
 
 const PRIORITY_DOT = {
     critical: 'bg-red-500',
@@ -51,7 +52,7 @@ export default function NextUpPanel({ tasks, onOpenTask }) {
                     const priorityBadge = PRIORITY_BADGE[task.priority] || PRIORITY_BADGE.medium;
                     const priorityCfg = TASK_PRIORITY_CONFIG[task.priority] || {};
                     const statusCfg = TASK_STATUS_CONFIG[task.status] || {};
-                    const isOverdue = task.dueDate && new Date(task.dueDate) < new Date();
+                    const isOverdue = task.dueDate && getDaysUntil(task.dueDate) < 0;
 
                     return (
                         <div
@@ -74,7 +75,7 @@ export default function NextUpPanel({ tasks, onOpenTask }) {
                                     {task.dueDate && (
                                         <span className={`text-[10px] font-bold flex items-center gap-0.5 ${isOverdue ? 'text-red-400' : 'text-slate-400'}`}>
                                             <Flag className="w-2.5 h-2.5" />
-                                            {format(parseISO(task.dueDate), 'dd MMM')}
+                                            {format(parseLocalDate(task.dueDate), 'dd MMM')}
                                         </span>
                                     )}
                                 </div>

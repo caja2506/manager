@@ -13,6 +13,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { format, startOfWeek, endOfWeek, parseISO, isBefore, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { getDaysUntil, parseLocalDate } from '../utils/dateUtils';
 import { useEngineeringData } from './useEngineeringData';
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
@@ -116,7 +117,7 @@ export function useDailyBriefingData() {
 
         // My personal KPIs
         const myActiveTasks = activeTasks.filter(t => t.assignedTo === userId);
-        const myOverdue = myActiveTasks.filter(t => t.dueDate && isBefore(parseISO(t.dueDate), startOfDay(now)));
+        const myOverdue = myActiveTasks.filter(t => t.dueDate && getDaysUntil(t.dueDate) < 0);
         const myBlocked = myActiveTasks.filter(t => t.status === 'blocked');
         const myInProgress = myActiveTasks.filter(t => t.status === 'in_progress');
 
@@ -148,7 +149,7 @@ export function useDailyBriefingData() {
                 return { ...t, projectName: project?.name || '—' };
             });
 
-        const overdue = myActive.filter(t => t.dueDate && isBefore(parseISO(t.dueDate), startOfDay(now)));
+        const overdue = myActive.filter(t => t.dueDate && getDaysUntil(t.dueDate) < 0);
         const blocked = myActive.filter(t => t.status === 'blocked');
         const inProgress = myActive.filter(t => t.status === 'in_progress');
         const urgent = myActive.filter(t => URGENT_PRIORITIES.includes(t.priority) && t.status !== 'blocked');
@@ -157,8 +158,8 @@ export function useDailyBriefingData() {
         const threeDays = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
         const upcoming = myActive.filter(t =>
             t.dueDate &&
-            !isBefore(parseISO(t.dueDate), startOfDay(now)) &&
-            isBefore(parseISO(t.dueDate), threeDays) &&
+            getDaysUntil(t.dueDate) >= 0 &&
+            isBefore(parseLocalDate(t.dueDate), threeDays) &&
             t.status !== 'blocked'
         );
 
@@ -178,7 +179,7 @@ export function useDailyBriefingData() {
                 const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
                 const blocked = projectTasks.filter(t => t.status === 'blocked').length;
                 const overdue = projectTasks.filter(t =>
-                    t.dueDate && isBefore(parseISO(t.dueDate), startOfDay(now)) && t.status !== 'completed'
+                    t.dueDate && getDaysUntil(t.dueDate) < 0 && t.status !== 'completed'
                 ).length;
 
                 return {
@@ -242,7 +243,7 @@ export function useDailyBriefingData() {
 
         // Overdue tasks (globally, not just user's)
         engTasks.filter(t =>
-            t.dueDate && isBefore(parseISO(t.dueDate), startOfDay(now))
+            t.dueDate && getDaysUntil(t.dueDate) < 0
             && !['completed', 'cancelled'].includes(t.status)
         ).slice(0, 5).forEach(t => {
             const project = engProjects.find(p => p.id === t.projectId);
@@ -276,7 +277,7 @@ export function useDailyBriefingData() {
                 const inProgress = memberTasks.filter(t => t.status === 'in_progress').length;
                 const blocked = memberTasks.filter(t => t.status === 'blocked').length;
                 const overdue = memberTasks.filter(t =>
-                    t.dueDate && isBefore(parseISO(t.dueDate), startOfDay(now)) && t.status !== 'completed'
+                    t.dueDate && getDaysUntil(t.dueDate) < 0 && t.status !== 'completed'
                 ).length;
 
                 // Today's hours for this member
@@ -491,9 +492,8 @@ export function useDailyBriefingData() {
                 projectMilestones.forEach(ms => {
                     const dueDate = ms.dueDate || ms.targetDate;
                     if (!dueDate) return;
-                    const due = parseISO(dueDate);
-                    if (isBefore(due, startOfDay(now)) && ms.status === 'completed') return; // skip completed past
-                    const daysUntil = Math.round((due - now) / (1000 * 60 * 60 * 24));
+                    const daysUntil = getDaysUntil(dueDate);
+                    if (daysUntil < 0 && ms.status === 'completed') return; // skip completed past
                     milestones.push({
                         id: ms.id || `${project.id}-${ms.name}`,
                         name: ms.name || ms.title || 'Hito sin nombre',
@@ -509,8 +509,7 @@ export function useDailyBriefingData() {
 
                 // Also check project-level dueDate as a milestone
                 if (project.dueDate) {
-                    const due = parseISO(project.dueDate);
-                    const daysUntil = Math.round((due - now) / (1000 * 60 * 60 * 24));
+                    const daysUntil = getDaysUntil(project.dueDate);
                     if (daysUntil <= 30 && project.status !== 'completed') {
                         milestones.push({
                             id: `proj-deadline-${project.id}`,
@@ -657,10 +656,10 @@ export function useDailyBriefingData() {
                 else if (t.priority === TASK_PRIORITY.HIGH) score += 60;
                 else if (t.priority === TASK_PRIORITY.MEDIUM) score += 30;
                 // Overdue urgency boost
-                if (t.dueDate && isBefore(parseISO(t.dueDate), startOfDay(now))) score += 80;
+                if (t.dueDate && getDaysUntil(t.dueDate) < 0) score += 80;
                 // Due soon boost
                 else if (t.dueDate) {
-                    const daysUntil = Math.round((parseISO(t.dueDate) - now) / (1000 * 60 * 60 * 24));
+                    const daysUntil = getDaysUntil(t.dueDate);
                     if (daysUntil <= 1) score += 50;
                     else if (daysUntil <= 3) score += 30;
                 }

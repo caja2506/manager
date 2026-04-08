@@ -18,6 +18,7 @@
 
 import { AUDIT_FINDING_SEVERITY } from '../../models/schemas';
 import { isActiveStatus, isTerminalStatus } from '../workflow/workflowModel';
+import { getDaysUntil } from '../../utils/dateUtils';
 
 // ============================================================
 // RULE DEFINITIONS
@@ -77,11 +78,10 @@ export function evaluateTaskOverdue(task) {
     if (isTerminalStatus(task.status)) return null;
     if (!task.dueDate) return null;
 
-    const now = new Date();
-    const dueDate = new Date(task.dueDate);
+    const daysUntil = getDaysUntil(task.dueDate);
 
-    if (dueDate < now) {
-        const daysOverdue = Math.ceil((now - dueDate) / (1000 * 60 * 60 * 24));
+    if (daysUntil < 0) {
+        const daysOverdue = Math.abs(daysUntil);
         const severity = daysOverdue > 7
             ? AUDIT_FINDING_SEVERITY.CRITICAL
             : AUDIT_FINDING_SEVERITY.WARNING;
