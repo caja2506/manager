@@ -149,9 +149,21 @@ export async function startTimerSafe({ taskId, projectId, userId, notes = '', ov
     if (!activeSnap.empty) {
         const activeData = activeSnap.docs[0].data();
 
+        // Resolve task title — fetch from tasks collection if not in timeLog
+        let activeTaskTitle = activeData.taskTitle;
+        if (!activeTaskTitle && activeData.taskId) {
+            try {
+                const taskSnap = await getDoc(doc(db, COLLECTIONS.TASKS, activeData.taskId));
+                activeTaskTitle = taskSnap.exists() ? taskSnap.data().title : activeData.taskId;
+            } catch {
+                activeTaskTitle = activeData.taskId;
+            }
+        }
+        activeTaskTitle = activeTaskTitle || 'tarea actual';
+
         if (onConfirm) {
             const confirmed = await onConfirm({
-                activeTaskTitle: activeData.taskTitle || activeData.taskId || 'tarea actual',
+                activeTaskTitle,
                 newTaskTitle: taskTitle || taskId || 'nueva tarea',
             });
             if (!confirmed) return null; // User cancelled
