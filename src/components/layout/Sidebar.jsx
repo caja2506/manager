@@ -9,7 +9,7 @@ import {
     Activity, LayoutDashboard, User, FolderGit2,
     ListTodo, Database, Clock, FileText, BarChart3, Users,
     Bell, Settings, Shield, LayoutList, Briefcase, LineChart, CalendarDays, GanttChartSquare, Radar, Zap,
-    ChevronRight, X, Target, Map, Award, LayoutGrid, Sun, Moon
+    ChevronRight, X, Target, Map, Award, LayoutGrid, Sun, Moon, DatabaseZap, ListTree
 } from 'lucide-react';
 
 // ─── Section Definitions ───
@@ -33,6 +33,7 @@ const SECTIONS = [
         items: [
             { to: '/bom/projects', label: 'Proyectos BOM', icon: FolderGit2, countKey: 'proyectos' },
             { to: '/catalog', label: 'Catálogo', icon: Database, countKey: 'catalogo' },
+            { to: '/bom/lists', label: 'Listas BOM', icon: DatabaseZap },
         ],
     },
     {
@@ -43,6 +44,7 @@ const SECTIONS = [
             { to: '/projects', label: 'Proyectos', icon: Briefcase, countKey: 'engProjects' },
             { to: '/tasks', label: 'Tareas', icon: ListTodo, countKey: 'engTasks' },
             { to: '/main-table', label: 'Main Table', icon: LayoutList },
+            { to: '/engineering/lists', label: 'Clasificadores', icon: ListTree },
             { to: '/daily-scrum', label: 'Equipo Hoy', icon: Users },
             { to: '/planner', label: 'Weekly Planner', icon: CalendarDays },
             { to: '/daily-board', label: 'Daily Board', icon: LayoutGrid },
@@ -78,14 +80,6 @@ const SECTIONS = [
         items: [
             { to: '/team', label: 'Equipo', icon: Users },
             { to: '/notifications', label: 'Notificaciones', icon: Bell },
-        ],
-    },
-    {
-        key: 'lists',
-        label: 'Listas',
-        icon: LayoutList,
-        items: [
-            { to: '/listas', label: 'Listas Gestionadas', icon: LayoutList },
         ],
     },
 ];

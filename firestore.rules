@@ -160,6 +160,13 @@ service cloud.firestore {
     match /projects/{docId} {
       allow create, update: if isEditor();
       allow delete: if isAdmin();
+
+      // --- stations (sub-collection) ---
+      // Production line stations managed by editors+
+      match /stations/{stationId} {
+        allow create, update: if isEditor();
+        allow delete: if isAdmin();
+      }
     }
 
     // --- tasks ---

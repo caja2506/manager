@@ -6,6 +6,7 @@ import {
 import { createTask, updateTask, updateTaskStatus, deleteTask } from '../../services/taskService';
 import { startTimer, stopTimer, getActiveTimerForTask, canManageOthersTimers } from '../../services/timeService';
 import { resolveAreaSync } from '../../services/mappingService';
+import { onProjectStations } from '../../services/stationService';
 import { logActivity, ACTIVITY_TYPES } from '../../services/activityLogService';
 import { useRole } from '../../contexts/RoleContext';
 import { useAppData } from '../../contexts/AppDataContext';
@@ -27,15 +28,20 @@ import TaskControlPanel from './editor/TaskControlPanel';
 import TaskFooter from './editor/TaskFooter';
 
 export default function TaskDetailModal({
-    isOpen, onClose, task, projects, teamMembers, subtasks,
-    taskTypes, userId, canEdit, canDelete
+    isOpen, onClose, task, projects = [], teamMembers = [], subtasks = [],
+    taskTypes = [], userId, canEdit, canDelete
 }) {
     const {
         setIsDelayReportOpen, setDelayReportTarget, setListManager,
     } = useAppData();
     const { role, teamRole, canEditDates } = useRole();
-    const { timeLogs, engTasks, delays } = useEngineeringData();
+    const { timeLogs, engTasks, delays, workAreaTypes } = useEngineeringData();
     const isNew = !task;
+    
+    // El usuario puede editar si tiene permisos globales, si es el encargado de la tarea, o si es una tarea nueva
+    const effectiveCanEdit = canEdit || (userId && task?.assignedTo === userId) || isNew;
+    // Si el usuario es el encargado pero es técnico, le quitamos canEditDates 
+    const effectiveCanEditDates = canEditDates || (effectiveCanEdit && teamRole !== 'technician');
 
     const [form, setForm] = useState({
         title: '',
@@ -46,7 +52,9 @@ export default function TaskDetailModal({
         priority: TASK_PRIORITY.MEDIUM,
         status: TASK_STATUS.BACKLOG,
         taskTypeId: '',
+        areaId: '',
         milestoneId: '',
+        stationId: '',
         dueDate: '',
         plannedStartDate: '',
         plannedEndDate: '',
@@ -64,6 +72,10 @@ export default function TaskDetailModal({
     // V5: Milestones and work areas for current project
     const [projectMilestones, setProjectMilestones] = useState([]);
     const [milestoneWorkAreas, setMilestoneWorkAreas] = useState([]);
+    // Station support
+    const [projectStations, setProjectStations] = useState([]);
+    // Manual time tracking state
+    const [isSavingManualTime, setIsSavingManualTime] = useState(false);
 
     useEffect(() => {
         const toDate = (iso) => iso ? iso.substring(0, 10) : '';
@@ -77,7 +89,9 @@ export default function TaskDetailModal({
                 priority: task.priority || TASK_PRIORITY.MEDIUM,
                 status: task.status || TASK_STATUS.BACKLOG,
                 taskTypeId: task.taskTypeId || '',
+                areaId: task.areaId || task.workAreaTypeId || '',
                 milestoneId: task.milestoneId || '',
+                stationId: task.stationId || '',
                 dueDate: toDate(task.dueDate),
                 plannedStartDate: toDate(task.plannedStartDate),
                 plannedEndDate: toDate(task.plannedEndDate),
@@ -89,13 +103,26 @@ export default function TaskDetailModal({
             setForm({
                 title: '', description: '', projectId: '', assignedBy: userId || '',
                 assignedTo: '', priority: TASK_PRIORITY.MEDIUM,
-                status: TASK_STATUS.BACKLOG, taskTypeId: '', milestoneId: '',
+                status: TASK_STATUS.BACKLOG, taskTypeId: '', areaId: '', milestoneId: '', stationId: '',
                 dueDate: '',
                 plannedStartDate: '', plannedEndDate: '',
                 estimatedHours: '', blockedReason: '', percentComplete: 0,
             });
         }
     }, [task]);
+
+    // Auto-resolve areaId if task has a taskTypeId but no areaId 
+    // (runs when workAreaTypes finish loading or when task loads)
+    useEffect(() => {
+        if (!form.areaId && form.taskTypeId && workAreaTypes.length > 0) {
+            const resolved = form.milestoneId
+                ? resolveAreaSync(form.taskTypeId, milestoneWorkAreas)
+                : resolveAreaSync(form.taskTypeId, workAreaTypes);
+            if (resolved) {
+                setForm(f => ({ ...f, areaId: resolved }));
+            }
+        }
+    }, [form.areaId, form.taskTypeId, form.milestoneId, workAreaTypes, milestoneWorkAreas]);
 
     // V5: Fetch milestones for the current project
     useEffect(() => {
@@ -110,6 +137,19 @@ export default function TaskDetailModal({
             .then(ms => { if (!cancelled) setProjectMilestones(ms); })
             .catch(err => console.warn('TaskDetailModal: error fetching milestones:', err));
         return () => { cancelled = true; };
+    }, [form.projectId]);
+
+    // Load stations for the current project (real-time)
+    useEffect(() => {
+        const projectId = form.projectId;
+        if (!projectId) {
+            setProjectStations([]);
+            return;
+        }
+        const unsub = onProjectStations(projectId, (stations) => {
+            setProjectStations(stations);
+        });
+        return unsub;
     }, [form.projectId]);
 
     // V5: Fetch work areas when milestone changes
@@ -152,6 +192,32 @@ export default function TaskDetailModal({
 
     // ── Handlers (business logic preserved) ──
 
+    const handleAreaChange = (newAreaId) => {
+        let newTypeId = form.taskTypeId;
+        if (newAreaId && form.taskTypeId) {
+            const selectedArea = workAreaTypes.find(a => a.id === newAreaId);
+            if (selectedArea) {
+                const allowedValues = selectedArea.taskTypeIds || selectedArea.defaultTaskTypes || [];
+                const currentType = taskTypes.find(t => t.id === form.taskTypeId);
+                if (currentType && allowedValues.length > 0 && !allowedValues.includes(currentType.id) && !allowedValues.includes(currentType.name)) {
+                    newTypeId = ''; // Clear it if it doesn't belong
+                }
+            }
+        }
+        setForm(f => ({ ...f, areaId: newAreaId, taskTypeId: newTypeId }));
+    };
+
+    const handleTaskTypeChange = (newTypeId) => {
+        let newAreaId = form.areaId;
+        if (newTypeId) {
+            const resolved = form.milestoneId
+                ? resolveAreaSync(newTypeId, milestoneWorkAreas)
+                : resolveAreaSync(newTypeId, workAreaTypes);
+            if (resolved) newAreaId = resolved;
+        }
+        setForm(f => ({ ...f, taskTypeId: newTypeId, areaId: newAreaId }));
+    };
+
     const handleSave = async () => {
         if (!form.title.trim()) return;
         setIsSaving(true);
@@ -164,15 +230,19 @@ export default function TaskDetailModal({
                 ? Math.round((taskSubtasks.filter(s => s.completed).length / taskSubtasks.length) * 100)
                 : null;
 
-            // V5: Resolve areaId from milestone work areas
-            const resolvedAreaId = form.milestoneId
-                ? resolveAreaSync(form.taskTypeId, milestoneWorkAreas)
-                : null;
+            // Resolve areaId (prioritize explicit selection, then milestone mapping, then global mapping)
+            let finalAreaId = form.areaId;
+            if (!finalAreaId && form.taskTypeId) {
+                finalAreaId = form.milestoneId 
+                    ? resolveAreaSync(form.taskTypeId, milestoneWorkAreas)
+                    : resolveAreaSync(form.taskTypeId, workAreaTypes);
+            }
 
             const data = {
                 ...form,
                 milestoneId: form.milestoneId || null,
-                areaId: resolvedAreaId,
+                areaId: finalAreaId || null,
+                workAreaTypeId: finalAreaId || null, // V5-legacy bridge
                 countsForScore: !!form.milestoneId,
                 dueDate: toISO(form.dueDate),
                 plannedStartDate: form.plannedStartDate || null,
@@ -335,6 +405,28 @@ export default function TaskDetailModal({
         }
     };
 
+    const handleAddManualTime = async (hours, date, notes) => {
+        if (!task?.id) return;
+        setIsSavingManualTime(true);
+        try {
+            const { addSimpleManualTimeLog } = await import('../../services/timeService');
+            await addSimpleManualTimeLog({
+                taskId: task.id,
+                projectId: form.projectId,
+                userId: userId,
+                dateIso: date,
+                hours: hours,
+                notes: notes,
+                overtime: false
+            });
+        } catch (err) {
+            console.error("Error agregando tiempo manual:", err);
+            alert("Hubo un error al agregar las horas manuales.");
+        } finally {
+            setIsSavingManualTime(false);
+        }
+    };
+
     // ── Render ──
 
     return createPortal(
@@ -353,11 +445,15 @@ export default function TaskDetailModal({
                     projects={projects}
                     teamMembers={teamMembers}
                     taskTypes={taskTypes}
-                    canEdit={canEdit}
+                    workAreas={workAreaTypes}
+                    stations={projectStations}
+                    canEdit={effectiveCanEdit}
                     canDelete={canDelete}
                     onClose={onClose}
                     onDelete={handleDelete}
                     onOpenListManager={setListManager}
+                    onTaskTypeChange={handleTaskTypeChange}
+                    onAreaChange={handleAreaChange}
                 />
 
                 {/* Horizontal Status Stepper — only for existing tasks */}
@@ -365,7 +461,7 @@ export default function TaskDetailModal({
                     <TaskStatusStepper
                         currentStatus={form.status}
                         onStatusChange={handleStatusChange}
-                        canEdit={canEdit}
+                        canEdit={effectiveCanEdit}
                     />
                 )}
 
@@ -389,7 +485,7 @@ export default function TaskDetailModal({
                         isNew={isNew}
                         task={task}
                         subtasks={subtasks}
-                        canEdit={canEdit}
+                        canEdit={effectiveCanEdit}
                         userId={userId}
                         userName={teamMembers?.find(m => m.uid === userId)?.displayName || null}
                     />
@@ -400,8 +496,8 @@ export default function TaskDetailModal({
                         setForm={setForm}
                         isNew={isNew}
                         task={task}
-                        canEdit={canEdit}
-                        canEditDates={canEditDates}
+                        canEdit={effectiveCanEdit}
+                        canEditDates={effectiveCanEditDates}
                         subtasks={subtasks}
                         teamMembers={teamMembers}
                         taskTypes={taskTypes}
@@ -416,6 +512,8 @@ export default function TaskDetailModal({
                         onOpenDelayReport={handleOpenDelayReport}
                         onOpenListManager={setListManager}
                         onDeleteDependency={handleDeleteDependency}
+                        onAddManualTime={handleAddManualTime}
+                        isSavingManualTime={isSavingManualTime}
                     />
                 </div>
 

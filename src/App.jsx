@@ -34,7 +34,8 @@ import Notifications from './pages/Notifications';
 import SettingsPage from './pages/Settings';
 import AuditFindings from './pages/AuditFindings';
 import ControlTower from './pages/ControlTower';
-import ManagedListsPage from './pages/ManagedListsPage';
+import BomListsPage from './pages/BomListsPage';
+import EngineeringListsPage from './pages/EngineeringListsPage';
 import AutomationControlCenter from './pages/AutomationControlCenter';
 import MilestoneDetailPage from './pages/MilestoneDetailPage';
 import MilestoneHistoryPage from './pages/MilestoneHistoryPage';
@@ -215,7 +216,8 @@ export default function App() {
           <Route path="/team" element={<ErrorBoundary module="Equipo"><Team /></ErrorBoundary>} />
           <Route path="/notifications" element={<ErrorBoundary module="Notificaciones"><Notifications /></ErrorBoundary>} />
           <Route path="/team-scores" element={<ErrorBoundary module="Team Scores"><TeamScoresPage /></ErrorBoundary>} />
-          <Route path="/listas" element={<ErrorBoundary module="Listas"><ManagedListsPage /></ErrorBoundary>} />
+          <Route path="/bom/lists" element={<ErrorBoundary module="Listas BOM"><BomListsPage /></ErrorBoundary>} />
+          <Route path="/engineering/lists" element={<ErrorBoundary module="Clasificadores"><EngineeringListsPage /></ErrorBoundary>} />
 
           {/* Admin */}
           <Route path="/automation" element={<ErrorBoundary module="Automatización"><AutomationControlCenter /></ErrorBoundary>} />

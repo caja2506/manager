@@ -155,7 +155,7 @@ export function createProjectDocument({
 export function createTaskDocument({
     projectId = null, subprojectId = null, title = '', description = '',
     status = TASK_STATUS.BACKLOG, priority = TASK_PRIORITY.MEDIUM, taskTypeId = null,
-    milestoneId = null, areaId = null, countsForScore = false,
+    milestoneId = null, areaId = null, countsForScore = false, stationId = null,
     assignedBy = null, assignedTo = null, estimatedHours = 0, actualHours = 0,
     dueDate = null, completedDate = null, blockedReason = '', tags = [], order = 0,
     showInGantt = false, plannedStartDate = null, plannedEndDate = null,
@@ -164,7 +164,7 @@ export function createTaskDocument({
 } = {}) {
     return {
         projectId, subprojectId, title, description, status, priority, taskTypeId,
-        milestoneId, areaId, countsForScore: milestoneId ? true : countsForScore,
+        milestoneId, areaId, countsForScore: milestoneId ? true : countsForScore, stationId,
         assignedBy, assignedTo, estimatedHours, actualHours, dueDate, completedDate,
         blockedReason, tags, order,
         showInGantt, plannedStartDate, plannedEndDate, plannedDurationHours,
@@ -233,4 +233,46 @@ export function createTaskDependencyDocument({
     predecessorTaskId = null, successorTaskId = null, type = 'FS', lagHours = 0, projectId = null, createdBy = null,
 } = {}) {
     return { predecessorTaskId, successorTaskId, type, lagHours, projectId, createdBy, createdAt: new Date().toISOString() };
+}
+
+// ── Station Factories & Helpers ──
+
+export function createStationDocument({
+    indx = 1,
+    stn = '',
+    abbreviation = '',
+    description = '',
+    order = 0,
+    active = true,
+    createdBy = null,
+} = {}) {
+    const now = new Date().toISOString();
+    return {
+        indx,
+        stn,
+        abbreviation,
+        description,
+        order,
+        active,
+        createdBy,
+        updatedBy: createdBy,
+        createdAt: now,
+        updatedAt: now,
+    };
+}
+
+/**
+ * Format a station label for display.
+ * - If the project has multiple indexers: "2-STN01"
+ * - If only one indexer: "STN01"
+ * @param {object} station - station document
+ * @param {boolean} hasMultipleIndexers - whether to show indexer prefix
+ * @returns {string}
+ */
+export function formatStationLabel(station, hasMultipleIndexers = false) {
+    if (!station) return '—';
+    const stnNum = String(station.stn).padStart(2, '0');
+    return hasMultipleIndexers
+        ? `${station.indx}-STN${stnNum}`
+        : `STN${stnNum}`;
 }

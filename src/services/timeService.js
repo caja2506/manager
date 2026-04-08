@@ -403,6 +403,54 @@ export async function createManualTimeLog({
     return ref.id;
 }
 
+export async function addSimpleManualTimeLog({
+    taskId, projectId, userId, dateIso, hours, notes, overtime
+}) {
+    const hrs = parseFloat(hours);
+    if (!hrs || hrs <= 0) return null;
+    
+    // Create a fake interval that exactly matches the requested hours 
+    // without crossing the break time (12:00PM - 1:00PM)
+    const baseDate = dateIso ? new Date(dateIso) : new Date();
+    baseDate.setHours(13, 0, 0, 0); // Start at 1:00 PM to avoid lunch deductions
+    
+    const startIso = baseDate.toISOString();
+    const endIso = new Date(baseDate.getTime() + (hrs * 3600000)).toISOString();
+    
+    const logData = createTimeLogDocument({
+        taskId,
+        projectId,
+        userId,
+        startTime: startIso,
+        endTime: endIso,
+        totalHours: hrs,
+        totalHoursGross: hrs,
+        breakHoursDeducted: 0,
+        overtime: !!overtime,
+        overtimeHours: overtime ? hrs : 0,
+        notes: notes || 'Registro manual',
+    });
+
+    const ref = doc(collection(db, COLLECTIONS.TIME_LOGS));
+    await setDoc(ref, logData);
+
+    if (taskId) {
+        await recalculateTaskHours(taskId);
+        logActivity(taskId, {
+            type: ACTIVITY_TYPES.TASK_UPDATED,
+            description: `Se agregaron ${hrs}h manualmente`,
+            userId,
+            meta: { logId: ref.id, hours: hrs }
+        });
+    }
+
+    if (projectId && (overtime || overtime ? hrs : 0 > 0)) {
+        await calculateProjectRisk(projectId);
+    }
+
+    return ref.id;
+}
+
 export async function updateTimeLog(logId, updates) {
     if (updates.startTime && updates.endTime) {
         const start = new Date(updates.startTime);

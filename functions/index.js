@@ -43,6 +43,7 @@ exports.generateInsights = aiExports.generateInsights;
 exports.testAIExtraction = aiExports.testAIExtraction;
 exports.testAIBriefing = aiExports.testAIBriefing;
 exports.reprocesarReporteConIA = aiExports.reprocesarReporteConIA;
+exports.analyzeStationImage = aiExports.analyzeStationImage;
 
 // ── Domain: Analytics ──
 const { createAnalyticsExports } = require("./exports/analytics");

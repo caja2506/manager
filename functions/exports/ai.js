@@ -209,7 +209,79 @@ ${text}`;
         }
     );
 
-    return { testGeminiConnection, analyzeQuotePdf, searchImages, generateInsights, testAIExtraction, testAIBriefing, reprocesarReporteConIA };
+    // ── Analyze Station Image (Vision) ──
+    const analyzeStationImage = onCall(
+        { secrets: [geminiApiKey], timeoutSeconds: 60 },
+        async (request) => {
+            if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
+            const { imageBase64, mimeType } = request.data;
+            if (!imageBase64) throw new HttpsError("invalid-argument", "imageBase64 is required.");
+
+            const apiKey = geminiApiKey.value();
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
+
+            const prompt = `Analiza esta imagen que contiene una tabla de estaciones de una línea de producción o ensamble.
+Extrae cada estación y devuelve EXCLUSIVAMENTE un JSON con la siguiente estructura:
+{
+  "stations": [
+    {
+      "stn": "01",
+      "description": "Descripción de la estación",
+      "abbreviation": "Abreviatura corta"
+    }
+  ]
+}
+
+Reglas:
+1. El campo "stn" debe ser el número de la estación con ceros a la izquierda (2 dígitos). Ejemplo: "01", "02", "09", "10".
+2. "description" es la descripción completa tal como aparece en la tabla.
+3. "abbreviation" es una abreviatura técnica derivada del nombre (ej: "Bag Spike Load" → "BSP LD", "Flow Test" → "FLW TST", "Vision Check" → "VIS CHK"). Si la tabla ya tiene abreviatura, úsala.
+4. Ignora estaciones marcadas como "SPARE", "EMPTY", "VACANT" o vacías — NO las incluyas.
+5. Si hay estaciones duplicadas (mismo número), inclúyelas todas (pueden ser sub-estaciones).
+6. Si la tabla tiene una columna "INDX" o "Indexer", agrega el campo "indx" (número) a cada estación.
+7. Devuelve SOLO el JSON sin delimitadores markdown ni texto adicional.`;
+
+            try {
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                {
+                                    inlineData: {
+                                        mimeType: mimeType || "image/png",
+                                        data: imageBase64,
+                                    },
+                                },
+                                { text: prompt },
+                            ],
+                        }],
+                        generationConfig: { response_mime_type: "application/json", temperature: 0.1 },
+                    }),
+                });
+
+                const result = await response.json();
+                if (!response.ok) {
+                    throw new HttpsError("internal", `Error de IA: ${result.error?.message || "Fallo desconocido"}`);
+                }
+
+                const rawJson = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!rawJson) throw new HttpsError("internal", "La IA no devolvió respuesta.");
+
+                const parsed = JSON.parse(rawJson.replace(/```json/g, "").replace(/```/g, "").trim());
+                return { data: parsed };
+            } catch (err) {
+                if (err instanceof HttpsError) throw err;
+                if (err instanceof SyntaxError) {
+                    throw new HttpsError("internal", "La IA devolvió JSON inválido. Intenta con otra imagen.");
+                }
+                throw new HttpsError("internal", err.message);
+            }
+        }
+    );
+
+    return { testGeminiConnection, analyzeQuotePdf, searchImages, generateInsights, testAIExtraction, testAIBriefing, reprocesarReporteConIA, analyzeStationImage };
 }
 
 module.exports = { createAiExports };

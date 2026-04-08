@@ -75,6 +75,10 @@ export const COLLECTIONS = {
     APPLIED_RECOMMENDATIONS: 'appliedRecommendations',
     OPTIMIZATION_HISTORY: 'optimizationHistory',
 
+    // ── Station Management (@classification: core) ──
+    // Subcollection: projects/{projectId}/stations
+    PROJECT_STATIONS: 'stations',
+
     // ── V5 Foundation (@classification: core) ──
     MILESTONES: 'milestones',
     WORK_AREAS: 'workAreas',

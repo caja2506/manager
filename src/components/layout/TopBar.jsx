@@ -12,16 +12,18 @@ import { useNotifications } from '../../hooks/useNotifications';
 import { useEngineeringData } from '../../hooks/useEngineeringData';
 import TaskDetailModal from '../tasks/TaskDetailModal';
 
+import { useRole } from '../../contexts/RoleContext';
+
 export default function TopBar() {
     const navigate = useNavigate();
     const { user, signOut } = useAuth();
+    const { canEdit, canDelete } = useRole();
 
     // Data Hooks
     const { auditResult, runClientAudit, isReady, isAuditing } = useAuditData();
     const { notifications, unreadCount, markAsRead, markAllRead } = useNotifications();
-    const { engProjects = [], engTasks = [] } = useEngineeringData();
+    const { engProjects = [], engTasks = [], engSubtasks = [], taskTypes = [], teamMembers = [] } = useEngineeringData();
 
-    // State
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
     const [isNotifOpen, setIsNotifOpen] = useState(false);
     
@@ -406,7 +408,12 @@ export default function TopBar() {
                 onClose={() => setSelectedTask(null)}
                 task={selectedTask}
                 projects={engProjects}
+                teamMembers={teamMembers}
+                subtasks={selectedTask ? engSubtasks.filter(s => s.taskId === selectedTask.id) : []}
+                taskTypes={taskTypes}
                 userId={user?.uid}
+                canEdit={canEdit}
+                canDelete={canDelete}
             />
 
         </div>

@@ -35,6 +35,8 @@ const FULL_SECTIONS = [
         items: [
             { to: '/projects', label: 'Proyectos', icon: Briefcase },
             { to: '/tasks', label: 'Tareas', icon: ListTodo },
+            { to: '/main-table', label: 'Main Table', icon: LayoutList },
+            { to: '/engineering/lists', label: 'Clasificadores', icon: Settings },
             { to: '/daily-scrum', label: 'Equipo Hoy', icon: Users },
             { to: '/planner', label: 'Weekly Planner', icon: CalendarDays },
             { to: '/daily-board', label: 'Daily Board', icon: LayoutGrid },
@@ -64,6 +66,7 @@ const FULL_SECTIONS = [
         items: [
             { to: '/bom/projects', label: 'Proyectos BOM', icon: FolderGit2 },
             { to: '/catalog', label: 'Catálogo', icon: Database },
+            { to: '/bom/lists', label: 'Listas BOM', icon: ListTodo },
         ],
     },
     {
@@ -71,7 +74,6 @@ const FULL_SECTIONS = [
         items: [
             { to: '/team', label: 'Equipo', icon: Users },
             { to: '/notifications', label: 'Notificaciones', icon: Bell },
-            { to: '/listas', label: 'Listas', icon: LayoutList },
         ],
     },
 ];

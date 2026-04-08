@@ -20,6 +20,8 @@ import {
 import { PROJECT_STATUS_CONFIG, TASK_PRIORITY_CONFIG, MILESTONE_TYPE } from '../models/schemas';
 import ProjectModal from '../components/tasks/ProjectModal';
 import MilestoneModal from '../components/milestones/MilestoneModal';
+import StationManager from '../components/projects/StationManager';
+import StationTaskMatrix from '../components/engineering/StationTaskMatrix';
 import { createMilestone, deleteMilestone, getMilestonesByProject } from '../services/milestoneService';
 
 const TYPE_LABELS = {
@@ -239,7 +241,7 @@ export default function ProjectDetailPage() {
             </div>
 
             {/* ══════════════ STATS KPIs ══════════════ */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
                 <StatCard label="Tareas" value={stats.total} icon={<ListTodo className="w-5 h-5" />} color="indigo" />
                 <StatCard label="Completadas" value={stats.completed} icon={<CheckCircle2 className="w-5 h-5" />} color="emerald" />
                 <StatCard label="En Progreso" value={stats.inProgress} icon={<Activity className="w-5 h-5" />} color="blue" />
@@ -247,6 +249,13 @@ export default function ProjectDetailPage() {
                 <StatCard label="Bloqueadas" value={stats.blocked} icon={<AlertTriangle className="w-5 h-5" />} color="red" />
                 <StatCard label="Vencidas" value={stats.overdue} icon={<AlertTriangle className="w-5 h-5" />} color="amber" />
             </div>
+
+            {/* ══════════════ STATION TASK MATRIX ══════════════ */}
+            <StationTaskMatrix
+                projectId={projectId}
+                canEdit={canEdit}
+                userId={user?.uid}
+            />
 
             {/* Progress bar */}
             <div className="bg-slate-900/70 p-5 rounded-2xl border border-slate-800 shadow-lg">
@@ -362,6 +371,14 @@ export default function ProjectDetailPage() {
                     </div>
                 )}
             </div>
+
+            {/* ══════════════ STATIONS ══════════════ */}
+            <StationManager
+                projectId={projectId}
+                canEdit={canEdit}
+                userId={user?.uid}
+            />
+
 
             {/* ══════════════ QUICK NAVIGATION ══════════════ */}
             <div className="grid md:grid-cols-3 gap-3">

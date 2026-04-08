@@ -62,6 +62,8 @@ export {
     createTaskTypeDocument,
     createTaskTypeCategoryDocument,
     createTaskDependencyDocument,
+    createStationDocument,
+    formatStationLabel,
 } from '../modules/tasks/domain/taskModel';
 
 // ── Planning Domain ──

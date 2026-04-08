@@ -1,11 +1,13 @@
 import React from 'react';
 import {
-    X, Trash2, ListTodo, FolderGit2, User, Flag, Menu, Wrench
+    X, Trash2, ListTodo, FolderGit2, User, Flag, Menu, Wrench, Layers, MapPin
 } from 'lucide-react';
 import {
     TASK_STATUS_CONFIG,
     TASK_PRIORITY_CONFIG,
+    formatStationLabel,
 } from '../../../models/schemas';
+import { hasMultipleIndexers } from '../../../services/stationService';
 
 /**
  * TaskHeader — top zone of the task editor.
@@ -15,11 +17,25 @@ import {
 
 export default function TaskHeader({
     form, setForm, isNew, task,
-    projects, teamMembers, taskTypes = [],
+    projects = [], teamMembers = [], taskTypes = [], workAreas = [], stations = [],
     canEdit, canDelete,
     onClose, onDelete, onOpenListManager,
+    onTaskTypeChange, onAreaChange
 }) {
     const currentStatusCfg = TASK_STATUS_CONFIG[form.status] || {};
+    const multiIdx = hasMultipleIndexers(stations);
+
+    // Filter task types by selected area exactly like MainTable
+    let filteredTaskTypes = taskTypes;
+    if (form.areaId) {
+        const selectedArea = workAreas.find(a => a.id === form.areaId);
+        if (selectedArea) {
+            const allowedValues = selectedArea.taskTypeIds || selectedArea.defaultTaskTypes || [];
+            if (allowedValues.length > 0) {
+                filteredTaskTypes = taskTypes.filter(t => allowedValues.includes(t.id) || allowedValues.includes(t.name));
+            }
+        }
+    }
 
     // Map config hex colors to Tailwind safe classes
     const STATUS_PILL_COLORS = {
@@ -85,7 +101,7 @@ export default function TaskHeader({
                     <FolderGit2 className="w-3 h-3 text-slate-400 flex-shrink-0" />
                     <select
                         value={form.projectId}
-                        onChange={e => setForm({ ...form, projectId: e.target.value })}
+                        onChange={e => setForm({ ...form, projectId: e.target.value, stationId: '' })}
                         className="bg-slate-800 text-xs font-bold text-slate-200 outline-none cursor-pointer min-w-0"
                         disabled={!canEdit}
                     >
@@ -95,6 +111,28 @@ export default function TaskHeader({
                         ))}
                     </select>
                 </div>
+
+                {/* Estación (Station) — only shows when project is selected and has stations */}
+                {form.projectId && stations.length > 0 && (
+                    <div className="flex items-center gap-1.5 bg-slate-800 rounded-lg px-2.5 py-1.5 border border-cyan-500/20 hover:border-cyan-500/40 transition-colors min-w-0">
+                        <MapPin className="w-3 h-3 text-cyan-400 shrink-0" />
+                        <select
+                            value={form.stationId || ''}
+                            onChange={e => setForm({ ...form, stationId: e.target.value || null })}
+                            className="bg-slate-800 text-xs font-bold text-cyan-300 outline-none cursor-pointer min-w-0"
+                            disabled={!canEdit}
+                        >
+                            <option value="">Estación</option>
+                            {stations.filter(s => s.active !== false).map(s => (
+                                <option key={s.id} value={s.id}>
+                                    {s.abbreviation
+                                        ? `${formatStationLabel(s, multiIdx)} — ${s.abbreviation}`
+                                        : formatStationLabel(s, multiIdx)}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
 
                 {/* Responsable */}
                 <div className="flex items-center gap-1.5 bg-slate-800 rounded-lg px-2.5 py-1.5 border border-slate-700 hover:border-slate-600 transition-colors min-w-0">
@@ -127,17 +165,42 @@ export default function TaskHeader({
                     </select>
                 </div>
 
+                {/* Área */}
+                <div className="flex items-center gap-1.5 bg-slate-800 rounded-lg px-2.5 py-1.5 border border-slate-700 hover:border-slate-600 transition-colors min-w-0">
+                    <Layers className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                    <select
+                        value={form.areaId || ''}
+                        onChange={e => onAreaChange ? onAreaChange(e.target.value) : setForm({ ...form, areaId: e.target.value })}
+                        className="bg-slate-800 text-xs font-bold text-slate-200 outline-none cursor-pointer min-w-0"
+                        disabled={!canEdit}
+                    >
+                        <option value="">Área</option>
+                        {workAreas.map(a => (
+                            <option key={a.id} value={a.id}>{a.name}</option>
+                        ))}
+                    </select>
+                    {canEdit && onOpenListManager && (
+                        <button
+                            type="button"
+                            onClick={() => onOpenListManager({ isOpen: true, type: 'workAreaType', title: 'Gestionar Áreas' })}
+                            className="text-[8px] font-bold text-indigo-500 hover:text-indigo-400 transition-colors whitespace-nowrap ml-0.5"
+                        >
+                            ⚙
+                        </button>
+                    )}
+                </div>
+
                 {/* Tipo de tarea */}
                 <div className="flex items-center gap-1.5 bg-slate-800 rounded-lg px-2.5 py-1.5 border border-slate-700 hover:border-slate-600 transition-colors min-w-0">
                     <Wrench className="w-3 h-3 text-slate-400 flex-shrink-0" />
                     <select
                         value={form.taskTypeId}
-                        onChange={e => setForm({ ...form, taskTypeId: e.target.value })}
+                        onChange={e => onTaskTypeChange ? onTaskTypeChange(e.target.value) : setForm({ ...form, taskTypeId: e.target.value })}
                         className="bg-slate-800 text-xs font-bold text-slate-200 outline-none cursor-pointer min-w-0"
                         disabled={!canEdit}
                     >
-                        <option value="">General</option>
-                        {taskTypes.map(t => (
+                        <option value="">Clasificación</option>
+                        {filteredTaskTypes.map(t => (
                             <option key={t.id} value={t.id}>{t.name}</option>
                         ))}
                     </select>

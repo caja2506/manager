@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
     Clock, BarChart2, AlertTriangle,
     ChevronDown, ChevronRight, Settings2, User,
-    Link2, ShieldAlert, CalendarRange, CalendarDays, Target, MapPin, X
+    Link2, ShieldAlert, CalendarRange, CalendarDays, Target, MapPin, X, Plus
 } from 'lucide-react';
 import {
     TASK_STATUS, TASK_STATUS_CONFIG,
@@ -49,10 +49,11 @@ function Section({ title, icon: Icon, defaultOpen = true, children, badge }) {
 
 export default function TaskControlPanel({
     form, setForm, isNew, task,
-    canEdit, canEditDates, subtasks, teamMembers, taskTypes,
+    canEdit, canEditDates, subtasks = [], teamMembers = [], taskTypes = [],
     timeLogs = [], allTasks = [], delays = [], dependencies = [], plannerItems = [],
     projectMilestones = [], milestoneWorkAreas = [],
     onStatusChange, onOpenDelayReport, onOpenListManager, onDeleteDependency,
+    onAddManualTime, isSavingManualTime
 }) {
     // ── Subtask-based auto progress ──
     const totalSubtasks = subtasks.length;
@@ -94,8 +95,24 @@ export default function TaskControlPanel({
         : [];
     const totalPlannedHours = taskPlannerItems.reduce((sum, p) => sum + (p.plannedHours || 0), 0);
 
+    // ── MANUAL TIME STATE ──
+    const [showManualTime, setShowManualTime] = useState(false);
+    const [manualHours, setManualHours] = useState('');
+    const [manualDate, setManualDate] = useState(() => new Date().toISOString().substring(0, 10));
+    const [manualNotes, setManualNotes] = useState('');
+
+    const handleSubmitManualTime = async () => {
+        if (!manualHours || isSavingManualTime) return;
+        if (onAddManualTime) {
+            await onAddManualTime(manualHours, manualDate, manualNotes);
+            setShowManualTime(false);
+            setManualHours('');
+            setManualNotes('');
+        }
+    };
+
     return (
-        <div className="w-full lg:w-1/2 flex flex-col bg-slate-850 lg:bg-transparent overflow-y-auto">
+        <div className="w-full lg:w-1/2 flex flex-col bg-slate-850 lg:bg-transparent overflow-y-auto relative">
             <div className="p-4 lg:p-5 space-y-3">
 
                 {/* ─── QUICK ACTIONS ─── */}
@@ -201,16 +218,6 @@ export default function TaskControlPanel({
                             })()}
                         </div>
                     )}
-
-                    {/* Critical task warning */}
-                    {!form.milestoneId && form.priority === 'critical' && (
-                        <div className="px-2.5 py-2 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2">
-                            <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
-                            <p className="text-[10px] text-amber-300 leading-snug">
-                                Esta tarea es <strong>crítica</strong>. Considere asignarla a un milestone para seguimiento de score.
-                            </p>
-                        </div>
-                    )}
                 </Section>
 
                 {/* ─── TIME ─── */}
@@ -230,7 +237,19 @@ export default function TaskControlPanel({
                             />
                         </div>
                         <div>
-                            <span className="text-[9px] font-bold text-slate-500 block mb-0.5">Horas reales</span>
+                            <div className="flex items-center justify-between mb-0.5">
+                                <span className="text-[9px] font-bold text-slate-500">Horas reales</span>
+                                {canEdit && !isNew && (
+                                    <button 
+                                        type="button"
+                                        onClick={() => setShowManualTime(!showManualTime)}
+                                        className="text-[9px] text-indigo-400 hover:text-indigo-300 flex items-center gap-0.5 font-bold"
+                                        title="Agregar horas manuales"
+                                    >
+                                        <Plus className="w-3 h-3" /> Manual
+                                    </button>
+                                )}
+                            </div>
                             <div className="px-2.5 py-1.5 border border-slate-700/50 rounded-lg text-xs bg-slate-800/50 text-slate-300 font-bold">
                                 {actualHours.toFixed(1)}h
                                 {form.estimatedHours > 0 && (
@@ -241,7 +260,60 @@ export default function TaskControlPanel({
                             </div>
                         </div>
                     </div>
-                    <div>
+
+                    {showManualTime && !isNew && canEdit && (
+                        <div className="mt-2 p-2 relative bg-slate-800/80 border border-slate-700 rounded-lg animate-in fade-in slide-in-from-top-2">
+                            <button
+                                type="button" 
+                                onClick={() => setShowManualTime(false)}
+                                className="absolute right-1 top-1 p-1 text-slate-500 hover:text-slate-300"
+                            >
+                                <X className="w-3 h-3"/>
+                            </button>
+                            <span className="text-[10px] font-bold text-indigo-400 block mb-2">Agregar Registro Manual</span>
+                            <div className="grid grid-cols-2 gap-2 mb-2">
+                                <div>
+                                    <label className="text-[9px] text-slate-400 block mb-0.5">Horas</label>
+                                    <input 
+                                        type="number" min="0.1" step="0.1"
+                                        value={manualHours} 
+                                        onChange={e => setManualHours(e.target.value)}
+                                        placeholder="Ej: 1.5"
+                                        className="w-full px-2 py-1 text-xs bg-slate-900 border border-slate-700 rounded outline-none text-white focus:border-indigo-500 transition-colors"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[9px] text-slate-400 block mb-0.5">Fecha</label>
+                                    <input 
+                                        type="date" 
+                                        value={manualDate} 
+                                        onChange={e => setManualDate(e.target.value)}
+                                        className="w-full px-2 py-1 text-xs bg-slate-900 border border-slate-700 rounded outline-none text-white focus:border-indigo-500 transition-colors"
+                                    />
+                                </div>
+                            </div>
+                            <div className="mb-2">
+                                <label className="text-[9px] text-slate-400 block mb-0.5">Notas (Opcional)</label>
+                                <input 
+                                    type="text" 
+                                    value={manualNotes} 
+                                    onChange={e => setManualNotes(e.target.value)}
+                                    placeholder="Motivo del registro..."
+                                    className="w-full px-2 py-1 text-xs bg-slate-900 border border-slate-700 rounded outline-none text-white focus:border-indigo-500 transition-colors"
+                                />
+                            </div>
+                            <button
+                                type="button"
+                                onClick={handleSubmitManualTime}
+                                disabled={!manualHours || isSavingManualTime}
+                                className="w-full text-[10px] font-bold bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded py-1.5 transition-colors"
+                            >
+                                {isSavingManualTime ? 'Guardando...' : 'Guardar Horas'}
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="mt-2">
                         <span className="text-[9px] font-bold text-slate-500 block mb-0.5">Fecha límite</span>
                         <input
                             type="date"

@@ -10,8 +10,9 @@ import { useWorkflowTransition } from '../hooks/useWorkflowTransition';
 import { updateTask, updateTaskStatus, toggleSubtask, createSubtask, createTask } from '../services/taskService';
 import { logActivity, ACTIVITY_TYPES } from '../services/activityLogService';
 import {
-    TASK_STATUS, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG
+    TASK_STATUS, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG, formatStationLabel
 } from '../models/schemas';
+import { onProjectStations, hasMultipleIndexers } from '../services/stationService';
 import {
     Search, Filter, X, ChevronDown, ChevronRight, User, Calendar,
     Check, Plus, Maximize2
@@ -31,8 +32,8 @@ const STATUS_GROUPS = [
     { status: TASK_STATUS.CANCELLED,   label: 'Cancelado',   color: '#6b7280' },
 ];
 
-// 14-column grid: ☐ | Task | Owner | Status | Área | Tipo | Avance | Health | Score | Timeline | Hours | Priority | Project | Asig.
-const GRID_COLS = '28px minmax(110px,250px) 36px 86px 68px 68px 56px 48px 48px minmax(105px,150px) minmax(65px,95px) 76px 68px 36px';
+// 15-column grid: ☐ | Task | Owner | Project | STN | Status | Área | Tipo | Avance | Health | Score | Timeline | Hours | Priority | Asig.
+const GRID_COLS = '28px minmax(200px, 1fr) 36px 68px 55px 86px 68px 68px 56px 48px 48px minmax(105px,150px) minmax(65px,95px) 76px 36px';
 
 // ============================================================
 // SAVE FEEDBACK HOOK
@@ -80,7 +81,7 @@ function InlineEditText({ value, onSave, className = '', placeholder = '' }) {
             onBlur={handleSave}
             onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') { setDraft(value); setEditing(false); } }}
             onClick={e => e.stopPropagation()}
-            className="w-full bg-slate-800 border border-indigo-500/50 rounded px-1.5 py-0.5 text-sm text-white outline-none focus:ring-1 focus:ring-indigo-500/50"
+            className="w-full bg-slate-800 border border-indigo-500/50 rounded px-1.5 py-0.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-indigo-500/50"
             placeholder={placeholder}
         />
     );
@@ -113,9 +114,12 @@ function InlineDropdown({ value, options, onSelect, renderValue, className = '' 
             const rect = triggerRef.current.getBoundingClientRect();
             const spaceBelow = window.innerHeight - rect.bottom;
             const openUp = spaceBelow < 220;
+            const shiftLeft = (window.innerWidth - rect.left) < 200;
+            
             setPos({
                 top: openUp ? rect.top : rect.bottom + 4,
-                left: rect.left,
+                left: shiftLeft ? undefined : rect.left,
+                right: shiftLeft ? (window.innerWidth - rect.right) : undefined,
                 openUp,
             });
         }
@@ -133,7 +137,8 @@ function InlineDropdown({ value, options, onSelect, renderValue, className = '' 
                     className="fixed bg-slate-800 border border-slate-700 rounded-lg shadow-2xl py-1 min-w-[160px] max-h-[220px] overflow-auto animate-in fade-in zoom-in-95 duration-150"
                     style={{
                         zIndex: 9999,
-                        left: pos.left,
+                        left: pos.left !== undefined ? pos.left : undefined,
+                        right: pos.right !== undefined ? pos.right : undefined,
                         ...(pos.openUp
                             ? { bottom: window.innerHeight - pos.top + 4 }
                             : { top: pos.top }),
@@ -201,7 +206,7 @@ function InlineEditNumber({ value, onSave, suffix = 'h' }) {
             onBlur={handleSave}
             onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') { setDraft(value || 0); setEditing(false); } }}
             onClick={e => e.stopPropagation()}
-            className="w-14 bg-slate-800 border border-indigo-500/50 rounded px-1 py-0.5 text-[10px] text-white outline-none focus:ring-1 focus:ring-indigo-500/50"
+            className="w-14 bg-slate-800 border border-indigo-500/50 rounded px-1 py-0.5 text-[10px] text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-indigo-500/50"
         />
     );
 }
@@ -430,6 +435,80 @@ function SubtaskExpander({ subtasks, taskId, canEdit }) {
 }
 
 // ============================================================
+// STATION CELL — shows station label for a task
+// ============================================================
+
+// Module-level cache to avoid refetching stations per row
+const _stationCache = {};
+
+function StationCell({ task, canEdit, onSave }) {
+    const [stations, setStations] = useState(() => _stationCache[task.projectId] || []);
+
+    useEffect(() => {
+        if (!task.projectId || _stationCache[task.projectId]) return;
+
+        const unsub = onProjectStations(task.projectId, (data) => {
+            _stationCache[task.projectId] = data;
+            setStations(data);
+        });
+        return unsub;
+    }, [task.projectId]);
+
+    const multiIdx = useMemo(() => hasMultipleIndexers(stations), [stations]);
+
+    const label = useMemo(() => {
+        if (!task.stationId || stations.length === 0) return '';
+        const stn = stations.find(s => s.id === task.stationId);
+        if (!stn) return '';
+        return formatStationLabel(stn, multiIdx);
+    }, [task.stationId, stations, multiIdx]);
+
+    const stationOptions = useMemo(() => [
+        { value: '', label: 'Sin estación' },
+        ...stations.filter(s => s.active !== false).map(s => {
+            const base = formatStationLabel(s, multiIdx);
+            let text = base;
+            if (s.description) text = `${base} — ${s.description}`;
+            else if (s.abbreviation) text = `${base} — ${s.abbreviation}`;
+            return { value: s.id, label: text };
+        }),
+    ], [stations, multiIdx]);
+
+    if (!task.projectId || stations.length === 0) {
+        return (
+            <div className="flex items-center justify-center min-w-0">
+                <span className="text-[10px] text-slate-700">—</span>
+            </div>
+        );
+    }
+
+    if (canEdit) {
+        return (
+            <div className="flex items-center justify-center min-w-0">
+                <InlineDropdown
+                    value={task.stationId || ''}
+                    options={stationOptions}
+                    onSelect={v => onSave(v || null)}
+                    renderValue={() => (
+                        <span className={`text-[10px] font-bold truncate ${label ? 'text-cyan-400' : 'text-slate-700'}`}>
+                            {label || '—'}
+                        </span>
+                    )}
+                />
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex items-center justify-center min-w-0">
+            <span className={`text-[10px] font-bold truncate ${label ? 'text-cyan-400' : 'text-slate-700'}`}>
+                {label || '—'}
+            </span>
+        </div>
+    );
+}
+
+// ============================================================
 // TASK ROW
 // ============================================================
 
@@ -644,6 +723,26 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                     )}
                 </div>
 
+                {/* Project */}
+                <div className="flex items-center justify-center min-w-0">
+                    {canEdit ? (
+                        <InlineDropdown
+                            value={task.projectId || ''}
+                            options={projectOptions}
+                            onSelect={v => saveField('projectId', v || null)}
+                            renderValue={(val) => {
+                                const p = engProjects.find(pr => pr.id === val);
+                                return <span className="text-[11px] truncate block max-w-[100px] text-slate-400 italic text-center">{p?.name || '—'}</span>;
+                            }}
+                        />
+                    ) : (
+                        <span className="text-[11px] text-slate-400 italic truncate block text-center">{project?.name || '—'}</span>
+                    )}
+                </div>
+
+                {/* Station (STN) */}
+                <StationCell task={task} canEdit={canEdit} onSave={v => saveField('stationId', v)} />
+
                 {/* Status — Monday.com full-width colored cell */}
                 <div className="flex items-stretch p-0.5" onClick={e => e.stopPropagation()}>
                     {canEdit ? (
@@ -835,7 +934,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                     {(actual > 0 || estimated > 0) ? (
                         <>
                             <div className="flex items-center justify-center gap-1 text-[11px] min-w-0 w-full mt-auto">
-                                <span className="text-white font-bold shrink-0">{actual.toFixed(1)}h</span>
+                                <span className="text-slate-400 font-bold shrink-0">{actual.toFixed(1)}h</span>
                                 <span className="text-slate-600 shrink-0">/</span>
                                 {canEdit ? (
                                     <InlineEditNumber value={estimated} onSave={v => saveField('estimatedHours', v)} />
@@ -891,22 +990,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                     )}
                 </div>
 
-                {/* Project */}
-                <div className="flex items-center justify-center min-w-0">
-                    {canEdit ? (
-                        <InlineDropdown
-                            value={task.projectId || ''}
-                            options={projectOptions}
-                            onSelect={v => saveField('projectId', v || null)}
-                            renderValue={(val) => {
-                                const p = engProjects.find(pr => pr.id === val);
-                                return <span className="text-[11px] truncate block max-w-[100px] text-slate-400 italic text-center">{p?.name || '—'}</span>;
-                            }}
-                        />
-                    ) : (
-                        <span className="text-[11px] text-slate-400 italic truncate block text-center">{project?.name || '—'}</span>
-                    )}
-                </div>
+
 
                 {/* Assigned By (who assigned — far right) */}
                 <div className="flex items-center justify-center">
@@ -1202,6 +1286,8 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                             <div></div>
                             <div className="text-left">Tarea</div>
                             <div>Resp</div>
+                            <div>Proyecto</div>
+                            <div>STN</div>
                             <div>Estado</div>
                             <div>Área</div>
                             <div>Tipo</div>
@@ -1211,7 +1297,6 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                             <div>Timeline</div>
                             <div>Horas</div>
                             <div>Prioridad</div>
-                            <div>Proyecto</div>
                             <div>Asig.</div>
                         </div>
 
@@ -1287,8 +1372,10 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                 <div></div> {/* 1. Checkbox */}
                                 <div></div> {/* 2. Task */}
                                 <div></div> {/* 3. Owner */}
+                                <div></div> {/* 4. Project placeholder */}
+                                <div></div> {/* 5. STN placeholder */}
                                 
-                                {/* 4. Status distribution mini bars */}
+                                {/* 6. Status distribution mini bars */}
                                 <div className="flex h-5 rounded overflow-hidden mx-1" title="Distribución de estados">
                                     {Object.entries(statusDist).map(([status, count]) => {
                                         const cfg = TASK_STATUS_CONFIG[status] || {};
@@ -1303,13 +1390,13 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                     })}
                                 </div>
                                 
-                                <div></div> {/* 5. Área */}
-                                <div></div> {/* 6. Tipo */}
-                                <div></div> {/* 7. Avance placeholder */}
-                                <div></div> {/* 8. Health placeholder */}
-                                <div></div> {/* 9. Score placeholder */}
+                                <div></div> {/* 7. Área */}
+                                <div></div> {/* 8. Tipo */}
+                                <div></div> {/* 9. Avance placeholder */}
+                                <div></div> {/* 10. Health placeholder */}
+                                <div></div> {/* 11. Score placeholder */}
                                 
-                                {/* 10. Date range (Timeline) */}
+                                {/* 12. Date range (Timeline) */}
                                 <div className="flex items-center justify-center">
                                     {dateRange && (
                                         <span className="text-[9px] font-bold text-slate-400 bg-slate-800 px-2 py-1 rounded-full whitespace-nowrap">
@@ -1318,9 +1405,9 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                     )}
                                 </div>
                                 
-                                <div></div> {/* 11. Horas placeholder */}
+                                <div></div> {/* 13. Horas placeholder */}
                                 
-                                {/* 12. Priority distribution mini bars */}
+                                {/* 14. Priority distribution mini bars */}
                                 <div className="flex h-5 rounded overflow-hidden mx-1" title="Distribución de prioridades">
                                     {Object.entries(priorityDist).map(([pri, count]) => {
                                         const colors = { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' };
@@ -1335,8 +1422,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                     })}
                                 </div>
                                 
-                                <div></div> {/* 13. Project placeholder */}
-                                <div></div> {/* 14. Asig. placeholder */}
+                                <div></div> {/* 15. Asig. placeholder */}
                             </div>
                         )}
                     </div>

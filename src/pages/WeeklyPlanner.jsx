@@ -29,7 +29,7 @@ export default function WeeklyPlanner() {
 
     // ──────────────── Week navigation ────────────────
     const [weekOffset, setWeekOffset] = useState(0);
-    const [filterAssignee, setFilterAssignee] = useState('all');
+    const [filterAssignee, setFilterAssignee] = useState(user?.uid || 'all');
     const [filterProject, setFilterProject] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
 
