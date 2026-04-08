@@ -182,11 +182,12 @@ export function createTimeLogDocument({
     taskId = null, projectId = null, userId = null, startTime = null, endTime = null,
     totalHours = 0, overtime = false, overtimeHours = 0, notes = '', createdBy = null,
     taskTitle = '', projectName = '', displayName = '',
+    source = 'manual', // 'manual' | 'planner_auto' | 'kanban_auto' | 'open_day' | 'legacy'
 } = {}) {
     const now = new Date().toISOString();
     return {
         taskId, projectId, userId, startTime, endTime, totalHours, overtime, overtimeHours, notes,
-        taskTitle, projectName, displayName,
+        taskTitle, projectName, displayName, source,
         createdBy: createdBy || userId, updatedBy: createdBy || userId, createdAt: now, updatedAt: now,
     };
 }

@@ -14,6 +14,7 @@ const { sendToTargets, sendToUser } = require("../telegram/telegramProvider");
 const templates = require("../telegram/telegramTemplates");
 const paths = require("../automation/firestorePaths");
 const { OPERATIONAL_ROLES } = require("../automation/constants");
+const { loadBreakBands, getBreakHoursInRange } = require("../utils/breakTimeUtils");
 
 /**
  * Execute the day close routine.
@@ -24,6 +25,9 @@ async function execute(adminDb, token, targets, context) {
     const today = now.toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
     const startOfDay = new Date(today + "T00:00:00-06:00");
     const endOfDay = new Date(today + "T23:59:59-06:00");
+
+    // Load break bands from Firestore for accurate hour calculations
+    await loadBreakBands(adminDb);
 
     // ── 1. Load all data ──
     const [timeLogsSnap, tasksSnap, projectsSnap, delaysSnap, reportsSnap] = await Promise.all([
@@ -48,13 +52,16 @@ async function execute(adminDb, token, targets, context) {
         for (const log of activeTimers) {
             try {
                 const startTime = new Date(log.startTime);
-                const totalMs = now - startTime;
-                let totalHours = parseFloat((totalMs / 3600000).toFixed(6));
+                const grossHours = parseFloat(((now - startTime) / 3600000).toFixed(6));
+                const breakHours = getBreakHoursInRange(startTime, now);
+                let totalHours = parseFloat(Math.max(0, grossHours - breakHours).toFixed(6));
                 if (totalHours < 0.016666) totalHours = 0.016666;
 
                 await adminDb.collection(paths.TIME_LOGS).doc(log.id).update({
                     endTime: now.toISOString(),
                     totalHours,
+                    totalHoursGross: parseFloat(grossHours.toFixed(6)),
+                    breakHoursDeducted: parseFloat(breakHours.toFixed(4)),
                     autoStopped: true,
                     notes: (log.notes || "") + " [Auto-cerrado al cierre de día]",
                 });

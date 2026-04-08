@@ -9,18 +9,19 @@ function createAutomationExports(adminDb, secrets) {
     const { telegramBotToken, geminiApiKey, resendApiKey } = secrets;
 
     const unifiedRoutineScheduler = onSchedule(
-        { schedule: "*/15 * * * *", timeZone: "America/Mexico_City", timeoutSeconds: 180, secrets: [telegramBotToken, geminiApiKey, resendApiKey] },
+        { schedule: "*/15 * * * *", timeZone: "America/Costa_Rica", timeoutSeconds: 180, secrets: [telegramBotToken, geminiApiKey, resendApiKey] },
         async () => {
             console.log("[scheduler] Unified scheduler tick...");
             try {
                 const { executeRoutine } = require("../automation/routineExecutor");
                 const routinePaths = require("../automation/firestorePaths");
                 const { TRIGGER_TYPE } = require("../automation/constants");
+                const { DEFAULT_TIMEZONE } = require("../utils/timezoneConfig");
                 const token = telegramBotToken.value();
 
                 const routinesSnap = await adminDb.collection(routinePaths.AUTOMATION_ROUTINES).get();
                 const now = new Date();
-                const tz = "America/Mexico_City";
+                const tz = DEFAULT_TIMEZONE;
                 const nowInTz = new Date(now.toLocaleString("en-US", { timeZone: tz }));
                 const currentHour = nowInTz.getHours();
                 const currentMinute = nowInTz.getMinutes();
@@ -131,6 +132,15 @@ function createAutomationExports(adminDb, secrets) {
                                     console.log(`[scheduler] planner_timer_sync result:`, JSON.stringify(result));
                                 } catch (e) {
                                     console.error(`[scheduler] planner_timer_sync failed:`, e);
+                                }
+
+                                // ── Scheduled Timer Events (event-driven, every tick) ──
+                                try {
+                                    console.log(`[scheduler] ⏱ scheduled_timer_events triggered`);
+                                    const result = await executeRoutine(adminDb, token, "scheduled_timer_events", TRIGGER_TYPE.DAY_SCHEDULE, {});
+                                    console.log(`[scheduler] scheduled_timer_events result:`, JSON.stringify(result));
+                                } catch (e) {
+                                    console.error(`[scheduler] scheduled_timer_events failed:`, e);
                                 }
                             } else {
                                 console.log(`[scheduler] daySchedule: weekend (day=${dsDay}), skipping close/open`);

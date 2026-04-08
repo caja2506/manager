@@ -91,3 +91,8 @@ const optimizationExports = createOptimizationExports(adminDb);
 exports.runOptimizationScan = optimizationExports.runOptimizationScan;
 exports.simulateChange = optimizationExports.simulateChange;
 exports.getOptimizationDashboard = optimizationExports.getOptimizationDashboard;
+
+// ── Domain: Planner Triggers (event-driven timer scheduling) ──
+const { createPlannerTriggerExports } = require("./exports/plannerTriggers");
+const plannerTriggerExports = createPlannerTriggerExports(adminDb);
+exports.onPlanItemChanged = plannerTriggerExports.onPlanItemChanged;

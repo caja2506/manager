@@ -22,16 +22,15 @@ async function execute(adminDb, token, targets, context) {
     const now = new Date().toISOString();
 
     // ── 1. Find auto-stopped timers from the last 24 hours ──
+    // Use targeted query instead of full collection scan
+    const yesterdayISO = yesterday.toISOString();
     const timeLogsSnap = await adminDb.collection(paths.TIME_LOGS)
         .where("autoStopped", "==", true)
+        .where("endTime", ">=", yesterdayISO)
         .get();
 
     const autoStoppedTimers = timeLogsSnap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter(log => {
-            if (!log.endTime) return false;
-            return new Date(log.endTime) >= yesterday;
-        });
+        .map(d => ({ id: d.id, ...d.data() }));
 
     if (autoStoppedTimers.length === 0) {
         console.log("[openDay] No auto-stopped timers found. Nothing to restart.");

@@ -51,7 +51,6 @@ export {
 export {
     startTimer,
     stopTimer,
-    forceStopTimer,
     createManualTimeLog,
     updateTimeLog,
     deleteTimeLog,

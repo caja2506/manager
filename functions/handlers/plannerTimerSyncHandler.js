@@ -133,9 +133,31 @@ async function execute(adminDb, token, targets, context) {
         .get();
 
     const activeTimers = activeTimersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Use ARRAY per user to detect ghost/duplicate timers (F-14)
     const timersByUser = {};
+    const now = new Date().toISOString();
     for (const timer of activeTimers) {
-        timersByUser[timer.userId] = timer;
+        if (!timersByUser[timer.userId]) timersByUser[timer.userId] = [];
+        timersByUser[timer.userId].push(timer);
+    }
+
+    // ── 6b. Detect and clean up ghost timers ──
+    for (const [uid, timers] of Object.entries(timersByUser)) {
+        if (timers.length > 1) {
+            console.warn(`${tag} GHOST DETECTED: ${uid} has ${timers.length} active timers! Cleaning...`);
+            // Keep the most recent one, stop the rest
+            const sorted = timers.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+            for (let i = 1; i < sorted.length; i++) {
+                try {
+                    await stopPlannerTimer(adminDb, sorted[i], now);
+                    console.warn(`${tag} Cleaned ghost timer ${sorted[i].id} for ${uid}`);
+                } catch (err) {
+                    console.error(`${tag} Error cleaning ghost timer:`, err.message);
+                }
+            }
+            // Keep only the first (most recent) in the list
+            timersByUser[uid] = [sorted[0]];
+        }
     }
 
     // ── 7. Sync each user ──
@@ -143,7 +165,6 @@ async function execute(adminDb, token, targets, context) {
     let stopped = 0;
     let switched = 0;
     const errors = [];
-    const now = new Date().toISOString();
 
     // Get all unique users (from planner + active planner_auto timers)
     const allUsers = new Set([
@@ -153,7 +174,7 @@ async function execute(adminDb, token, targets, context) {
 
     for (const userId of allUsers) {
         const userItems = itemsByUser[userId] || [];
-        const activeTimer = timersByUser[userId] || null;
+        const activeTimer = (timersByUser[userId] || [])[0] || null;  // First (most recent) timer
 
         // Find the block that covers NOW
         const activeBlock = findActiveBlock(userItems, currentHour);
@@ -255,6 +276,26 @@ function getDecimalHour(d) {
  * Also transitions the task to in_progress if it's in a valid starting state.
  */
 async function startPlannerTimer(adminDb, userId, block, now) {
+    // GUARD: Verify no active timer exists (mutex)
+    const existingSnap = await adminDb.collection(paths.TIME_LOGS)
+        .where("userId", "==", userId)
+        .where("endTime", "==", null)
+        .limit(1)
+        .get();
+
+    if (!existingSnap.empty) {
+        const existing = existingSnap.docs[0].data();
+        if (existing.taskId === block.taskId) {
+            console.log(`[plannerTimerSync] Timer already running for ${userId} on ${block.taskId}, skipping.`);
+            return;
+        }
+        if (existing.source !== PLANNER_SOURCE) {
+            console.log(`[plannerTimerSync] ${userId} has manual timer on ${existing.taskId}, not starting planner timer.`);
+            return;
+        }
+        // It's a planner timer for a different task — should have been stopped by caller
+    }
+
     const newLogRef = adminDb.collection(paths.TIME_LOGS).doc();
     await newLogRef.set({
         taskId: block.taskId || null,

@@ -289,6 +289,14 @@ service cloud.firestore {
       allow create, update, delete: if isAuthenticated();
     }
 
+    // --- scheduledTimerEvents ---
+    // Written by Firestore triggers (onPlanItemChanged) via Admin SDK.
+    // Processed by scheduledTimerEventHandler. Admin can inspect from UI.
+    match /scheduledTimerEvents/{docId} {
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
     // --- taskDependencies ---
     // Any authenticated user can create/manage task dependencies (Gantt linking)
     match /taskDependencies/{docId} {

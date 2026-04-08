@@ -42,6 +42,18 @@ export function getActiveTimerFromLogs(timeLogs, userId) {
 }
 
 /**
+ * Find ALL active (open) timers for a given user.
+ * Unlike getActiveTimerFromLogs which returns only the first,
+ * this returns ALL — useful for detecting ghost/duplicate timers.
+ */
+export function getAllActiveTimersForUser(timeLogs, userId) {
+    if (!timeLogs || !userId) return [];
+    return timeLogs.filter(
+        log => log.userId === userId && !log.endTime && log.startTime
+    );
+}
+
+/**
  * Find the active timer for a specific task (regardless of user).
  * Useful for checking if a task already has a running timer.
  *
@@ -83,7 +95,7 @@ export function canManageOthersTimers(role, teamRole) {
  *
  * @returns {Object} — { logId, taskId, projectId, startTime, userId }
  */
-export async function startTimer({ taskId, projectId, userId, notes = '', overtime = false, taskTitle = '', projectName = '', displayName = '' }) {
+export async function startTimer({ taskId, projectId, userId, notes = '', overtime = false, taskTitle = '', projectName = '', displayName = '', source = 'manual' }) {
     const now = new Date().toISOString();
     const logData = createTimeLogDocument({
         taskId,
@@ -97,6 +109,7 @@ export async function startTimer({ taskId, projectId, userId, notes = '', overti
         taskTitle,
         projectName,
         displayName,
+        source,
     });
     const ref = doc(collection(db, COLLECTIONS.TIME_LOGS));
     await setDoc(ref, logData);
@@ -107,11 +120,88 @@ export async function startTimer({ taskId, projectId, userId, notes = '', overti
             type: ACTIVITY_TYPES.TIMER_STARTED,
             description: 'Timer iniciado',
             userId,
-            meta: { logId: ref.id, notes },
+            meta: { logId: ref.id, notes, source },
         });
     }
 
     return { logId: ref.id, taskId, projectId, startTime: now, userId };
+}
+
+/**
+ * Safe timer start with mutex: checks for active timers, asks for confirmation,
+ * auto-stops existing timers, then starts the new one.
+ *
+ * @param {Object} params — same as startTimer, plus:
+ * @param {Function} onConfirm — async (info) => boolean — called if there's an active timer.
+ *   Receives { activeTaskTitle, newTaskTitle }. Return true to proceed, false to cancel.
+ */
+export async function startTimerSafe({ taskId, projectId, userId, notes = '', overtime = false,
+    taskTitle = '', projectName = '', displayName = '', source = 'manual', onConfirm }) {
+    // 1. Query Firestore for ANY active timer for this user (real-time, not snapshot)
+    const activeQuery = query(
+        collection(db, COLLECTIONS.TIME_LOGS),
+        where('userId', '==', userId),
+        where('endTime', '==', null)
+    );
+    const activeSnap = await getDocs(activeQuery);
+
+    // 2. If active timer exists → ask for confirmation
+    if (!activeSnap.empty) {
+        const activeData = activeSnap.docs[0].data();
+
+        if (onConfirm) {
+            const confirmed = await onConfirm({
+                activeTaskTitle: activeData.taskTitle || activeData.taskId || 'tarea actual',
+                newTaskTitle: taskTitle || taskId || 'nueva tarea',
+            });
+            if (!confirmed) return null; // User cancelled
+        }
+
+        // Auto-stop ALL active timers (including ghosts)
+        for (const activeDoc of activeSnap.docs) {
+            try {
+                await stopTimer(activeDoc.id, { notes: '[Auto-detenido al iniciar nuevo timer]' });
+            } catch (err) {
+                console.warn('[timeService] Error auto-stopping timer:', activeDoc.id, err.message);
+            }
+        }
+    }
+
+    // 3. Start new timer
+    return await startTimer({ taskId, projectId, userId, notes, overtime, taskTitle, projectName, displayName, source });
+}
+
+/**
+ * Central handler for task status changes that affect timers.
+ * Replaces duplicate logic in TaskDetailModal, TaskManager, TaskCard.
+ *
+ * @param {string} newStatus — the new status of the task
+ * @param {Function} onConfirm — confirmation callback for startTimerSafe
+ */
+export async function handleTaskStatusTimerSync({
+    taskId, projectId, newStatus, userId, timeLogs,
+    taskTitle = '', projectName = '', displayName = '', onConfirm,
+}) {
+    if (newStatus === 'in_progress') {
+        // Check if this task already has a timer running
+        const existing = getActiveTimerForTask(timeLogs, taskId);
+        if (existing) return null; // Already running for this task
+
+        return await startTimerSafe({
+            taskId, projectId, userId,
+            taskTitle, projectName, displayName,
+            source: 'kanban_auto',
+            timeLogs, onConfirm,
+        });
+    }
+
+    if (['completed', 'cancelled', 'blocked'].includes(newStatus)) {
+        const activeLog = getActiveTimerForTask(timeLogs, taskId);
+        if (activeLog) {
+            return await stopTimer(activeLog.id, { notes: `Auto-detenido: tarea → ${newStatus}` });
+        }
+    }
+    return null;
 }
 
 /**
@@ -294,6 +384,7 @@ export async function openDay(timeLogs, tasks) {
                 userId: log.userId,
                 notes: 'Auto-iniciado al abrir el día',
                 overtime: false,
+                source: 'open_day',
             });
 
             // Clear the autoStopped flag on the original log

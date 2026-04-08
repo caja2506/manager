@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Square, Clock, Zap, ListTodo, FolderGit2, Play, AlertTriangle, Info } from 'lucide-react';
 import {
-    formatElapsed, stopTimer, startTimer,
+    formatElapsed, stopTimer, startTimerSafe,
     getActiveTimerFromLogs, clearLegacyTimer
 } from '../../services/timeService';
 
@@ -52,12 +52,14 @@ export default function ActiveTimerCard({ tasks, allTasks, projects, userId, tim
         setIsStarting(true);
         try {
             const task = tasks.find(t => t.id === formTask);
-            await startTimer({
+            await startTimerSafe({
                 taskId: formTask || null,
                 projectId: formProject || task?.projectId || null,
                 userId,
                 notes: '',
                 overtime: false,
+                onConfirm: ({ activeTaskTitle, newTaskTitle }) =>
+                    window.confirm(`Ya tienes un timer activo en "${activeTaskTitle}". ¿Detenerlo e iniciar "${newTaskTitle}"?`),
             });
             setShowStartForm(false);
             setFormTask(''); setFormProject('');

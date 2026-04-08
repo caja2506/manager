@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG } from '../../models/schemas';
-import { getActiveTimerFromLogs, getActiveTimerForTask, startTimer } from '../../services/timeService';
+import { getActiveTimerForTask, startTimerSafe } from '../../services/timeService';
 import { getDaysUntil, parseLocalDate } from '../../utils/dateUtils';
 
 const SOURCE_LABELS = {
@@ -26,11 +26,14 @@ export default function TodayTasksPanel({ tasks, userId, timeLogs, onOpenTask, o
     const [startingId, setStartingId] = useState(null);
 
     const handleStartTimer = async (task) => {
-        const active = getActiveTimerFromLogs(timeLogs, userId);
-        if (active) { alert('Ya tienes un timer activo. Por favor detenlo antes.'); return; }
         setStartingId(task.id);
         try {
-            await startTimer({ taskId: task.id, projectId: task.projectId, userId });
+            await startTimerSafe({
+                taskId: task.id, projectId: task.projectId, userId,
+                taskTitle: task.title || '',
+                onConfirm: ({ activeTaskTitle, newTaskTitle }) =>
+                    window.confirm(`Ya tienes un timer activo en "${activeTaskTitle}". ¿Detenerlo e iniciar "${newTaskTitle}"?`),
+            });
         } catch (e) { console.error(e); }
         setStartingId(null);
     };

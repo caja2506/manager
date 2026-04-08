@@ -6,6 +6,7 @@ import { plannerService } from '../services/plannerService';
 import { syncPlannerToGantt } from '../services/ganttPlannerSync';
 import { enrichPlanItemsWithTasks } from '../utils/plannerUtils';
 import { getEffectiveHours } from '../utils/breakTimeUtils';
+import { usePlannerTimerStatus } from '../hooks/usePlannerTimerSync';
 import PlannerSidebar from '../components/planner/PlannerSidebar';
 import PlannerGrid from '../components/planner/PlannerGrid';
 import WeeklyCapacitySummary from '../components/planner/WeeklyCapacitySummary';
@@ -125,6 +126,9 @@ export default function WeeklyPlanner() {
             return true;
         });
     }, [planItems, filterAssignee, filterProject]);
+
+    // Timer status map for visual indicators on planner blocks
+    const timerStatusMap = usePlannerTimerStatus({ timeLogs, planItems: visiblePlanItems });
 
     // ──────────────── Drop handler ────────────────
     const handleDropTask = useCallback(async ({ taskId, date, hour, minute }) => {
@@ -465,6 +469,7 @@ export default function WeeklyPlanner() {
                                     onBlockDelete={handleBlockDelete}
                                     placingTask={placingTask}
                                     onPlacementComplete={handlePlacementComplete}
+                                    timerStatusMap={timerStatusMap}
                                 />
                             </div>
                             <WeeklyCapacitySummary

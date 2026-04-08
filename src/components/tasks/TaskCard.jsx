@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { formatDuration, getActiveTimerForTask, formatElapsed, startTimer, stopTimer, canManageOthersTimers } from '../../services/timeService';
+import { formatDuration, getActiveTimerForTask, formatElapsed, startTimerSafe, stopTimer, canManageOthersTimers } from '../../services/timeService';
 import {
     AlertTriangle, CheckCheck, User, Calendar, Clock,
     GripVertical, Play, Square, ArrowRightLeft
@@ -104,7 +104,7 @@ export default function TaskCard({ task, project, teamMembers, subtasks = [], on
             if (activeLog) {
                 await stopTimer(activeLog.id);
             } else {
-                await startTimer({
+                await startTimerSafe({
                     taskId: task.id,
                     projectId: task.projectId,
                     userId: taskOwner,
@@ -112,6 +112,8 @@ export default function TaskCard({ task, project, teamMembers, subtasks = [], on
                     taskTitle: task.title || '',
                     projectName: project?.name || '',
                     displayName: assignee?.displayName || assignee?.email || '',
+                    onConfirm: ({ activeTaskTitle, newTaskTitle }) =>
+                        window.confirm(`Ya tienes un timer activo en "${activeTaskTitle}". ¿Detenerlo e iniciar "${newTaskTitle}"?`),
                 });
             }
         } catch (err) {

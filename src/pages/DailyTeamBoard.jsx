@@ -7,6 +7,7 @@ import { syncPlannerToGantt } from '../services/ganttPlannerSync';
 import { updateTask } from '../services/taskService';
 import { enrichPlanItemsWithTasks } from '../utils/plannerUtils';
 import { getEffectiveHours } from '../utils/breakTimeUtils';
+import { usePlannerTimerStatus } from '../hooks/usePlannerTimerSync';
 import PlannerSidebar from '../components/planner/PlannerSidebar';
 import DailyTeamGrid from '../components/planner/DailyTeamGrid';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
@@ -25,7 +26,7 @@ const PROJECT_COLOR_KEYS = ['indigo', 'violet', 'emerald', 'amber', 'rose', 'cya
 export default function DailyTeamBoard() {
     const { user } = useAuth();
     const { canEdit, canDelete } = useRole();
-    const { engTasks, engProjects, engSubtasks, teamMembers, taskTypes } = useEngineeringData();
+    const { engTasks, engProjects, engSubtasks, teamMembers, taskTypes, timeLogs } = useEngineeringData();
 
     // ──────────────── Day navigation ────────────────
     const [dayOffset, setDayOffset] = useState(0);
@@ -73,6 +74,9 @@ export default function DailyTeamBoard() {
         if (filterProject !== 'all') items = items.filter(pi => pi.projectId === filterProject);
         return items;
     }, [allPlanItems, selectedDateStr, filterProject]);
+
+    // Timer status map — maps planItem.id → { status, timerId, elapsedMin }
+    const timerStatusMap = usePlannerTimerStatus({ timeLogs, planItems: dayPlanItems });
 
     // Project color map
     const projectColorMap = useMemo(() => {
@@ -427,6 +431,7 @@ export default function DailyTeamBoard() {
                             onMemberClick={(uid) => setFilterMember(filterMember === uid ? 'all' : uid)}
                             activeMemberFilter={filterMember}
                             allMemberUids={teamMembers.filter(m => m.teamRole !== 'manager').map(m => m.uid)}
+                            timerStatusMap={timerStatusMap}
                         />
                     )}
                 </div>

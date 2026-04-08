@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Play, Square, ExternalLink, Clock, Flag, Folder, Zap, Target, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
-import { startTimer, stopTimer, getActiveTimerFromLogs, formatElapsed } from '../../services/timeService';
+import { startTimerSafe, stopTimer, getActiveTimerFromLogs, formatElapsed } from '../../services/timeService';
 import { TASK_PRIORITY_CONFIG, TASK_STATUS_CONFIG } from '../../models/schemas';
 import { getDaysUntil, parseLocalDate } from '../../utils/dateUtils';
 
@@ -42,17 +42,19 @@ export default function FocusNowCard({ task, userId, engTasks, timeLogs, onOpenT
     }, [activeTimer?.startTime, activeTimer?.id, timerIsForThisTask]);
 
     const handleStartTimer = useCallback(async () => {
-        if (!task || anyActiveTimer) return;
+        if (!task) return;
         setIsStarting(true);
         try {
-            await startTimer({
+            await startTimerSafe({
                 taskId: task.id,
                 projectId: task.projectId,
                 userId,
+                onConfirm: ({ activeTaskTitle, newTaskTitle }) =>
+                    window.confirm(`Ya tienes un timer activo en "${activeTaskTitle}". ¿Detenerlo e iniciar "${newTaskTitle}"?`),
             });
         } catch (e) { console.error(e); }
         setIsStarting(false);
-    }, [task, userId, anyActiveTimer]);
+    }, [task, userId]);
 
     const handleStopTimer = useCallback(async () => {
         if (!activeTimer) return;

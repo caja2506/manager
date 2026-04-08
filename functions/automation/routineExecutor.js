@@ -26,6 +26,7 @@ const HANDLER_REGISTRY = {
     open_day: () => require("../handlers/openDayHandler"),
     daily_performance_report: () => require("../handlers/dailyPerformanceReportHandler"),
     planner_timer_sync: () => require("../handlers/plannerTimerSyncHandler"),
+    scheduled_timer_events: () => require("../handlers/scheduledTimerEventHandler"),
 };
 
 /**

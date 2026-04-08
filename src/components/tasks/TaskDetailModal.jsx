@@ -4,7 +4,7 @@ import {
     TASK_STATUS, TASK_PRIORITY,
 } from '../../models/schemas';
 import { createTask, updateTask, updateTaskStatus, deleteTask } from '../../services/taskService';
-import { startTimer, stopTimer, getActiveTimerForTask, canManageOthersTimers, addSimpleManualTimeLog } from '../../services/timeService';
+import { handleTaskStatusTimerSync, canManageOthersTimers, addSimpleManualTimeLog } from '../../services/timeService';
 import { resolveAreaSync } from '../../services/mappingService';
 import { onProjectStations } from '../../services/stationService';
 import { logActivity, ACTIVITY_TYPES } from '../../services/activityLogService';
@@ -344,26 +344,25 @@ export default function TaskDetailModal({
         if (newStatus === TASK_STATUS.IN_PROGRESS && oldStatus !== TASK_STATUS.IN_PROGRESS) {
             // Only start if: user is the assignee OR has permission to manage others
             if (taskOwner && (isSelf || canManageOthers)) {
-                const existingTimer = getActiveTimerForTask(timeLogs, task.id);
-                if (!existingTimer) {
-                    const proj = projects?.find(p => p.id === (task.projectId || form.projectId));
-                    const owner = teamMembers?.find(m => (m.uid || m.id) === taskOwner);
-                    await startTimer({
-                        taskId: task.id, projectId: task.projectId || form.projectId, userId: taskOwner,
-                        notes: 'Auto-started in detail modal',
-                        taskTitle: form.title || task.title || '',
-                        projectName: proj?.name || '',
-                        displayName: owner?.displayName || owner?.email || '',
-                    });
-                }
+                const proj = projects?.find(p => p.id === (task.projectId || form.projectId));
+                const owner = teamMembers?.find(m => (m.uid || m.id) === taskOwner);
+                await handleTaskStatusTimerSync({
+                    taskId: task.id, projectId: task.projectId || form.projectId,
+                    newStatus, userId: taskOwner, timeLogs,
+                    taskTitle: form.title || task.title || '',
+                    projectName: proj?.name || '',
+                    displayName: owner?.displayName || owner?.email || '',
+                    onConfirm: ({ activeTaskTitle, newTaskTitle }) =>
+                        window.confirm(`Ya tienes un timer activo en "${activeTaskTitle}". ¿Detenerlo e iniciar "${newTaskTitle}"?`),
+                });
             }
         } else if (oldStatus === TASK_STATUS.IN_PROGRESS && newStatus !== TASK_STATUS.IN_PROGRESS) {
             // Stop the task's active timer (if any)
             if (isSelf || canManageOthers) {
-                const activeLog = getActiveTimerForTask(timeLogs, task.id);
-                if (activeLog) {
-                    await stopTimer(activeLog.id);
-                }
+                await handleTaskStatusTimerSync({
+                    taskId: task.id, projectId: task.projectId || form.projectId,
+                    newStatus, userId: taskOwner, timeLogs,
+                });
             }
         }
     };

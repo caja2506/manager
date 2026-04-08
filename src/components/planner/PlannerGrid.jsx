@@ -96,6 +96,7 @@ export default function PlannerGrid({
     onBlockDelete,
     placingTask,
     onPlacementComplete,
+    timerStatusMap,
 }) {
     const totalHours   = PLANNER_END_HOUR - PLANNER_START_HOUR;
     const scrollBodyRef = useRef(null);
@@ -397,6 +398,7 @@ export default function PlannerGrid({
                                             onClick={() => onBlockClick && onBlockClick(item)}
                                             onDelete={() => onBlockDelete && onBlockDelete(item.id)}
                                             onResize={newEnd => onBlockResize && onBlockResize(item.id, newEnd)}
+                                            timerStatus={timerStatusMap?.get(item.id)}
                                         />
                                     );
                                 })}

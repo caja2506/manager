@@ -16,7 +16,7 @@ import TaskDetailModal from '../components/tasks/TaskDetailModal';
 import TransitionConfirmModal from '../components/workflow/TransitionConfirmModal';
 import TaskModuleBanner from '../components/layout/TaskModuleBanner';
 import { useWorkflowTransition } from '../hooks/useWorkflowTransition';
-import { startTimer, stopTimer, getActiveTimerForTask, canManageOthersTimers } from '../services/timeService';
+import { handleTaskStatusTimerSync, canManageOthersTimers } from '../services/timeService';
 import {
     TASK_STATUS, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG
 } from '../models/schemas';
@@ -201,25 +201,24 @@ export default function TaskManager() {
 
             if (targetStatus === TASK_STATUS.IN_PROGRESS && task.status !== TASK_STATUS.IN_PROGRESS) {
                 if (taskOwner && (isSelf || canManageOthers)) {
-                    const existingTimer = getActiveTimerForTask(timeLogs, taskId);
-                    if (!existingTimer) {
-                        const proj = engProjects.find(p => p.id === task.projectId);
-                        const owner = teamMembers.find(m => (m.uid || m.id) === taskOwner);
-                        await startTimer({
-                            taskId, projectId: task.projectId, userId: taskOwner,
-                            notes: 'Auto-started from Kanban',
-                            taskTitle: task.title || '',
-                            projectName: proj?.name || '',
-                            displayName: owner?.displayName || owner?.email || '',
-                        });
-                    }
+                    const proj = engProjects.find(p => p.id === task.projectId);
+                    const owner = teamMembers.find(m => (m.uid || m.id) === taskOwner);
+                    await handleTaskStatusTimerSync({
+                        taskId, projectId: task.projectId, newStatus: targetStatus,
+                        userId: taskOwner, timeLogs,
+                        taskTitle: task.title || '',
+                        projectName: proj?.name || '',
+                        displayName: owner?.displayName || owner?.email || '',
+                        onConfirm: ({ activeTaskTitle, newTaskTitle }) =>
+                            window.confirm(`Ya tienes un timer activo en "${activeTaskTitle}". ¿Detenerlo e iniciar "${newTaskTitle}"?`),
+                    });
                 }
             } else if (task.status === TASK_STATUS.IN_PROGRESS && targetStatus !== TASK_STATUS.IN_PROGRESS) {
                 if (isSelf || canManageOthers) {
-                    const activeLog = getActiveTimerForTask(timeLogs, taskId);
-                    if (activeLog) {
-                        await stopTimer(activeLog.id);
-                    }
+                    await handleTaskStatusTimerSync({
+                        taskId, projectId: task.projectId, newStatus: targetStatus,
+                        userId: taskOwner, timeLogs,
+                    });
                 }
             }
         } catch (err) {
@@ -259,25 +258,24 @@ export default function TaskManager() {
 
             if (targetStatus === TASK_STATUS.IN_PROGRESS && task.status !== TASK_STATUS.IN_PROGRESS) {
                 if (taskOwner && (isSelf || canManageOthers)) {
-                    const existingTimer = getActiveTimerForTask(timeLogs, task.id);
-                    if (!existingTimer) {
-                        const proj = engProjects.find(p => p.id === task.projectId);
-                        const owner = teamMembers.find(m => (m.uid || m.id) === taskOwner);
-                        await startTimer({
-                            taskId: task.id, projectId: task.projectId, userId: taskOwner,
-                            notes: 'Auto-started from Kanban placement',
-                            taskTitle: task.title || '',
-                            projectName: proj?.name || '',
-                            displayName: owner?.displayName || owner?.email || '',
-                        });
-                    }
+                    const proj = engProjects.find(p => p.id === task.projectId);
+                    const owner = teamMembers.find(m => (m.uid || m.id) === taskOwner);
+                    await handleTaskStatusTimerSync({
+                        taskId: task.id, projectId: task.projectId, newStatus: targetStatus,
+                        userId: taskOwner, timeLogs,
+                        taskTitle: task.title || '',
+                        projectName: proj?.name || '',
+                        displayName: owner?.displayName || owner?.email || '',
+                        onConfirm: ({ activeTaskTitle, newTaskTitle }) =>
+                            window.confirm(`Ya tienes un timer activo en "${activeTaskTitle}". ¿Detenerlo e iniciar "${newTaskTitle}"?`),
+                    });
                 }
             } else if (task.status === TASK_STATUS.IN_PROGRESS && targetStatus !== TASK_STATUS.IN_PROGRESS) {
                 if (isSelf || canManageOthers) {
-                    const activeLog = getActiveTimerForTask(timeLogs, task.id);
-                    if (activeLog) {
-                        await stopTimer(activeLog.id);
-                    }
+                    await handleTaskStatusTimerSync({
+                        taskId: task.id, projectId: task.projectId, newStatus: targetStatus,
+                        userId: taskOwner, timeLogs,
+                    });
                 }
             }
         } catch (err) {

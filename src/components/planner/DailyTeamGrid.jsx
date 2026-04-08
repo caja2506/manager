@@ -71,6 +71,7 @@ export default function DailyTeamGrid({
     onMemberClick,
     activeMemberFilter,
     allMemberUids,       // all team member UIDs (not just visible), to distinguish truly unassigned
+    timerStatusMap,      // Map: blockId → { status: 'active'|'idle'|'overflow', timerId, elapsedMin }
 }) {
     const totalHours   = PLANNER_END_HOUR - PLANNER_START_HOUR;
     const scrollBodyRef = useRef(null);
@@ -330,6 +331,7 @@ export default function DailyTeamGrid({
                                                     onClick={() => onBlockClick?.(item)}
                                                     onDelete={() => onBlockDelete?.(item.id)}
                                                     onResize={newEnd => onBlockResize?.(item.id, newEnd)}
+                                                    timerStatus={timerStatusMap?.get(item.id)}
                                                 />
                                             );
                                         })}

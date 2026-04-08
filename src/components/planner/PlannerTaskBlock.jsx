@@ -34,6 +34,7 @@ export default function PlannerTaskBlock({
     onClick,
     onDelete,
     onResize,
+    timerStatus,  // { status: 'active'|'idle'|'overflow', timerId?, elapsedMin?, source? }
 }) {
     const blockRef      = useRef(null);
     const resizingRef   = useRef(false);
@@ -52,6 +53,14 @@ export default function PlannerTaskBlock({
         : isOrphan
             ? 'bg-slate-600 border-slate-700 text-white ring-1 ring-amber-500/50'
             : (PRIORITY_STYLES[item.priority] || PRIORITY_STYLES.medium);
+
+    // Timer indicator styles
+    const tsStatus = timerStatus?.status || 'idle';
+    const timerRingClass = tsStatus === 'active'
+        ? 'ring-2 ring-emerald-400/60'
+        : tsStatus === 'overflow'
+            ? 'ring-2 ring-rose-400/70 animate-pulse'
+            : '';
 
     const isCompact  = totalColumns === 2;
     const isVertical = totalColumns >= 3;
@@ -134,10 +143,27 @@ export default function PlannerTaskBlock({
             ref={blockRef}
             draggable
             onDragStart={handleDragStart}
-            className={`absolute rounded-xl border-l-4 ${styleClass} shadow-md cursor-grab active:cursor-grabbing overflow-hidden z-20 group hover:shadow-xl hover:z-30 transition-shadow`}
+            className={`absolute rounded-xl border-l-4 ${styleClass} ${timerRingClass} shadow-md cursor-grab active:cursor-grabbing overflow-hidden z-20 group hover:shadow-xl hover:z-30 transition-shadow`}
             style={wrapperStyle}
             onClick={e => { if (!resizingRef.current) { e.stopPropagation(); onClick && onClick(); } }}
         >
+            {/* ── Timer status indicator dot ── */}
+            {tsStatus === 'active' && (
+                <div className="absolute top-1.5 right-1.5 z-30 flex items-center gap-1" title={`Timer activo: ${timerStatus.elapsedMin || 0} min`}>
+                    <span className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                    </span>
+                </div>
+            )}
+            {tsStatus === 'overflow' && (
+                <div className="absolute top-1.5 right-1.5 z-30 flex items-center gap-1" title={`Timer desbordado: ${timerStatus.elapsedMin || 0} min`}>
+                    <span className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" />
+                    </span>
+                </div>
+            )}
 
             {/* ══════════════════════════════════════════════════
                 VERTICAL MODE (3+ concurrent blocks)

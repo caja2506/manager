@@ -4,7 +4,7 @@ import {
     FileText, ChevronDown, Timer as TimerIcon
 } from 'lucide-react';
 import {
-    startTimer, stopTimer, getActiveTimerFromLogs, formatElapsed
+    startTimerSafe, stopTimer, getActiveTimerFromLogs, formatElapsed
 } from '../../services/timeService';
 
 export default function ActiveTimer({
@@ -40,12 +40,14 @@ export default function ActiveTimer({
         if (!formTask && !formProject) return;
         setIsStarting(true);
         try {
-            await startTimer({
+            await startTimerSafe({
                 taskId: formTask || null,
                 projectId: formProject || null,
                 userId,
                 notes: formNotes,
                 overtime: formOvertime,
+                onConfirm: ({ activeTaskTitle, newTaskTitle }) =>
+                    window.confirm(`Ya tienes un timer activo en "${activeTaskTitle}". ¿Detenerlo e iniciar "${newTaskTitle}"?`),
             });
             setShowForm(false);
             setFormTask(''); setFormProject(''); setFormNotes(''); setFormOvertime(false);
