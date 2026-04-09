@@ -27,7 +27,7 @@ const PROJECT_COLOR_KEYS = ['indigo', 'violet', 'emerald', 'amber', 'rose', 'cya
 
 export default function WeeklyPlanner() {
     const { user } = useAuth();
-    const { canEdit, canDelete, teamRole } = useRole();
+    const { canEdit, canDelete, teamRole, isAdmin } = useRole();
     const { engTasks, engProjects, engSubtasks, timeLogs, teamMembers, taskTypes } = useEngineeringData();
 
     // ──────────────── Week navigation ────────────────
@@ -121,6 +121,26 @@ export default function WeeklyPlanner() {
                 plannedHours: taskPlannedMap[t.id] || 0
             }));
     }, [engTasks, engProjects, planItems, filterAssignee, filterProject]);
+
+    // ──────────────── ALL unscheduled tasks (unfiltered — for auto-planner) ────────────────
+    const allUnscheduledTasks = useMemo(() => {
+        const taskPlannedMap = {};
+        planItems.forEach(pi => {
+            taskPlannedMap[pi.taskId] = (taskPlannedMap[pi.taskId] || 0) + (pi.plannedHours || 0);
+        });
+
+        return engTasks
+            .filter(t => !['completed', 'cancelled'].includes(t.status))
+            .filter(t => {
+                const planned = taskPlannedMap[t.id] || 0;
+                return planned < (t.estimatedHours || 0.1);
+            })
+            .map(t => ({
+                ...t,
+                projectName: engProjects.find(p => p.id === t.projectId)?.name || '',
+                plannedHours: taskPlannedMap[t.id] || 0
+            }));
+    }, [engTasks, engProjects, planItems]);
 
     // ──────────────── Filtered plan items for grid ────────────────
     const visiblePlanItems = useMemo(() => {
@@ -450,10 +470,10 @@ export default function WeeklyPlanner() {
                         onTaskEdit={(task) => { setTaskModalTask(task); setSidebarOpen(false); }}
                         placingTask={placingTask}
                         onCancelPlacement={handleCancelPlacement}
-                        showAutoSchedule={canEdit && ['manager', 'team_lead', 'engineer'].includes(teamRole)}
+                        showAutoSchedule={canEdit && (isAdmin || ['manager', 'team_lead', 'engineer'].includes(teamRole))}
                         onAutoScheduleAll={() => {
-                            const eligible = unscheduledTasks.filter(t =>
-                                canAutoScheduleFor(teamRole, user.uid, t.assignedTo)
+                            const eligible = allUnscheduledTasks.filter(t =>
+                                isAdmin || canAutoScheduleFor(teamRole, user.uid, t.assignedTo)
                             );
                             setAutoPlannerTasks(eligible);
                             setAutoPlannerOpen(true);
