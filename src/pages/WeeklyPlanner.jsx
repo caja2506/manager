@@ -7,9 +7,11 @@ import { syncPlannerToGantt } from '../services/ganttPlannerSync';
 import { enrichPlanItemsWithTasks } from '../utils/plannerUtils';
 import { getEffectiveHours } from '../utils/breakTimeUtils';
 import { usePlannerTimerStatus } from '../hooks/usePlannerTimerSync';
+import { canAutoScheduleFor } from '../services/autoPlannerService';
 import PlannerSidebar from '../components/planner/PlannerSidebar';
 import PlannerGrid from '../components/planner/PlannerGrid';
 import WeeklyCapacitySummary from '../components/planner/WeeklyCapacitySummary';
+import AutoPlannerModal from '../components/planner/AutoPlannerModal';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
 import TaskModuleBanner from '../components/layout/TaskModuleBanner';
 import {
@@ -25,7 +27,7 @@ const PROJECT_COLOR_KEYS = ['indigo', 'violet', 'emerald', 'amber', 'rose', 'cya
 
 export default function WeeklyPlanner() {
     const { user } = useAuth();
-    const { canEdit, canDelete } = useRole();
+    const { canEdit, canDelete, teamRole } = useRole();
     const { engTasks, engProjects, engSubtasks, timeLogs, teamMembers, taskTypes } = useEngineeringData();
 
     // ──────────────── Week navigation ────────────────
@@ -63,6 +65,8 @@ export default function WeeklyPlanner() {
     const [plannerError, setPlannerError] = useState(null); // user-facing validation error
     const [plannerWarnings, setPlannerWarnings] = useState([]); // non-blocking warnings
     const [sidebarOpen, setSidebarOpen] = useState(false); // mobile sidebar toggle
+    const [autoPlannerOpen, setAutoPlannerOpen] = useState(false); // auto-planner modal
+    const [autoPlannerTasks, setAutoPlannerTasks] = useState([]); // tasks to auto-plan
 
     // Fetch plan items for the visible week
     const fetchPlanItems = useCallback(async () => {
@@ -446,6 +450,15 @@ export default function WeeklyPlanner() {
                         onTaskEdit={(task) => { setTaskModalTask(task); setSidebarOpen(false); }}
                         placingTask={placingTask}
                         onCancelPlacement={handleCancelPlacement}
+                        showAutoSchedule={canEdit && ['manager', 'team_lead', 'engineer'].includes(teamRole)}
+                        onAutoScheduleAll={() => {
+                            const eligible = unscheduledTasks.filter(t =>
+                                canAutoScheduleFor(teamRole, user.uid, t.assignedTo)
+                            );
+                            setAutoPlannerTasks(eligible);
+                            setAutoPlannerOpen(true);
+                            setSidebarOpen(false);
+                        }}
                     />
                 </div>
 
@@ -497,6 +510,31 @@ export default function WeeklyPlanner() {
                     canDelete={canDelete}
                 />
             )}
+
+            {/* ── Auto-Planner Modal ── */}
+            <AutoPlannerModal
+                isOpen={autoPlannerOpen}
+                onClose={() => { setAutoPlannerOpen(false); setAutoPlannerTasks([]); }}
+                tasks={autoPlannerTasks}
+                existingPlanItems={rawPlanItems}
+                options={{
+                    createdBy: user.uid,
+                    projectColorMap,
+                    projects: engProjects,
+                    teamMembers,
+                }}
+                onConfirm={async (blocks) => {
+                    for (const block of blocks) {
+                        try {
+                            const { id: newId } = await plannerService.createPlanItem(block);
+                            setRawPlanItems(prev => [...prev, { id: newId, ...block }]);
+                            syncPlannerToGantt(block.taskId).catch(console.warn);
+                        } catch (err) {
+                            console.error('[AutoPlanner] Error creating block:', err);
+                        }
+                    }
+                }}
+            />
         </div>
     );
 }

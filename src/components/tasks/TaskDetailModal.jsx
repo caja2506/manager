@@ -6,6 +6,8 @@ import {
 import { createTask, updateTask, updateTaskStatus, deleteTask } from '../../services/taskService';
 import { handleTaskStatusTimerSync, canManageOthersTimers, addSimpleManualTimeLog } from '../../services/timeService';
 import { resolveAreaSync } from '../../services/mappingService';
+import { canAutoScheduleFor } from '../../services/autoPlannerService';
+import { plannerService } from '../../services/plannerService';
 import { onProjectStations } from '../../services/stationService';
 import { logActivity, ACTIVITY_TYPES } from '../../services/activityLogService';
 import { useRole } from '../../contexts/RoleContext';
@@ -26,6 +28,7 @@ import TaskHealthScore from './editor/TaskHealthScore';
 import TaskMainPanel from './editor/TaskMainPanel';
 import TaskControlPanel from './editor/TaskControlPanel';
 import TaskFooter from './editor/TaskFooter';
+import AutoPlannerModal from '../planner/AutoPlannerModal';
 
 export default function TaskDetailModal({
     isOpen, onClose, task, projects = [], teamMembers = [], subtasks = [],
@@ -35,7 +38,7 @@ export default function TaskDetailModal({
         setIsDelayReportOpen, setDelayReportTarget, setListManager,
     } = useAppData();
     const { role, teamRole, canEditDates } = useRole();
-    const { timeLogs, engTasks, delays, workAreaTypes } = useEngineeringData();
+    const { timeLogs, engTasks, engProjects, delays, workAreaTypes } = useEngineeringData();
     const isNew = !task;
     
     // El usuario puede editar si tiene permisos globales, si es el encargado de la tarea, o si es una tarea nueva
@@ -76,6 +79,7 @@ export default function TaskDetailModal({
     const [projectStations, setProjectStations] = useState([]);
     // Manual time tracking state
     const [isSavingManualTime, setIsSavingManualTime] = useState(false);
+    const [autoPlannerOpen, setAutoPlannerOpen] = useState(false);
 
     useEffect(() => {
         const toDate = (iso) => iso ? iso.substring(0, 10) : '';
@@ -473,6 +477,31 @@ export default function TaskDetailModal({
                 )}
 
                 {/* Body — Two Columns */}
+
+                {/* ── Auto-Planner Button ── */}
+                {!isNew && task?.assignedTo && canAutoScheduleFor(teamRole, userId, task.assignedTo) && (
+                    (() => {
+                        const hasData = form.plannedStartDate || form.estimatedHours;
+                        const totalPlanned = plannerItems.reduce((s, pi) => s + (pi.plannedHours || 0), 0);
+                        const isFullyPlanned = form.estimatedHours && totalPlanned >= form.estimatedHours;
+                        return hasData && !isFullyPlanned ? (
+                            <div className="px-6 pb-2">
+                                <button
+                                    onClick={() => setAutoPlannerOpen(true)}
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 hover:border-indigo-500/40 text-indigo-400 text-sm font-bold transition-all active:scale-[0.98]"
+                                >
+                                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                    🗓️ Auto-planificar
+                                    {form.estimatedHours > 0 && (
+                                        <span className="text-[10px] ml-1 opacity-70">({form.estimatedHours}h est. — {totalPlanned.toFixed(1)}h plan.)</span>
+                                    )}
+                                </button>
+                            </div>
+                        ) : null;
+                    })()
+                )}
                 <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
 
                     {/* Left: Content & Execution */}
@@ -575,6 +604,35 @@ export default function TaskDetailModal({
                     </div>
                 )}
             </div>
+
+            {/* ── Auto-Planner Modal ── */}
+            {!isNew && task && (
+                <AutoPlannerModal
+                    isOpen={autoPlannerOpen}
+                    onClose={() => setAutoPlannerOpen(false)}
+                    tasks={[{ ...task, ...form, id: task.id }]}
+                    existingPlanItems={plannerItems}
+                    options={{
+                        createdBy: userId,
+                        projects: engProjects,
+                        teamMembers,
+                    }}
+                    onConfirm={async (blocks) => {
+                        for (const block of blocks) {
+                            try {
+                                await plannerService.createPlanItem(block);
+                            } catch (err) {
+                                console.error('[AutoPlanner] Error creating block:', err);
+                            }
+                        }
+                        // Refresh planner items
+                        if (task.id) {
+                            const updated = await fetchTaskPlannerItems(task.id);
+                            setPlannerItems(updated);
+                        }
+                    }}
+                />
+            )}
         </div>,
         document.body
     );

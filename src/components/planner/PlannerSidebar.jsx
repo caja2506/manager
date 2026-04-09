@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Clock, Briefcase, Plus, GripVertical, MousePointerClick, Move, ArrowDownUp, HelpCircle, X, ChevronDown, ChevronUp, Pencil, User } from 'lucide-react';
+import { Clock, Briefcase, Plus, GripVertical, MousePointerClick, Move, ArrowDownUp, HelpCircle, X, ChevronDown, ChevronUp, Pencil, User, Zap } from 'lucide-react';
 
 /**
  * Unscheduled tasks panel for the Weekly Planner sidebar.
@@ -14,6 +14,8 @@ export default function PlannerSidebar({
     onTaskEdit,
     placingTask,
     onCancelPlacement,
+    showAutoSchedule = false,
+    onAutoScheduleAll,
 }) {
     const [showHelp, setShowHelp] = useState(false);
 
@@ -28,8 +30,18 @@ export default function PlannerSidebar({
 
     return (
         <aside className="w-72 shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col h-full overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
-                <h2 className="font-black text-slate-400 text-sm uppercase tracking-wider">Sin Planificar</h2>
+            <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between gap-2">
+                <h2 className="font-black text-slate-400 text-sm uppercase tracking-wider flex-1">Sin Planificar</h2>
+                {showAutoSchedule && filtered.length > 0 && (
+                    <button
+                        onClick={onAutoScheduleAll}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-400 text-[10px] font-black uppercase transition-all hover:shadow-md hover:shadow-indigo-500/10 active:scale-95"
+                        title="Auto-planificar todas las tareas"
+                    >
+                        <Zap className="w-3 h-3" />
+                        Auto
+                    </button>
+                )}
                 <span className="text-[10px] font-bold bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">{filtered.length}</span>
             </div>
 
