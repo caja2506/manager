@@ -41,7 +41,7 @@ export function createAutomationCoreConfig(overrides = {}) {
         dryRun: true,                          // Safe default: dry-run ON
         metricsEnabled: true,
         opsConsoleEnabled: true,
-        defaultTimezone: 'America/Mexico_City',
+        defaultTimezone: 'America/Costa_Rica',
         allowedChannels: [AUTOMATION_CHANNELS.TELEGRAM],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -67,7 +67,7 @@ export function createTelegramOpsConfig(overrides = {}) {
         techCheckTime: '16:00',                // HH:mm format
         gracePeriodMinutes: 30,
         alertGroupId: null,                    // Telegram group chat ID
-        timezone: 'America/Mexico_City',
+        timezone: 'America/Costa_Rica',
         escalationEnabled: true,
         multimodalEnabled: false,              // Audio processing OFF by default
         debugMode: false,

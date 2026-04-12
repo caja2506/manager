@@ -307,7 +307,7 @@ async function handleCommand(adminDb, token, chatId, userId, cmd, session) {
  */
 async function handleReportSubmission(adminDb, token, chatId, userId, text, session, extras = {}) {
     const now = new Date().toISOString();
-    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
     const userName = await getUserName(adminDb, userId);
 
     // Check if AI is enabled
@@ -382,7 +382,7 @@ async function handleReportSubmission(adminDb, token, chatId, userId, text, sess
  */
 async function handleAudioReport(adminDb, token, chatId, userId, message, session, extras = {}) {
     const now = new Date().toISOString();
-    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
     const userName = await getUserName(adminDb, userId);
 
     // Check AI config
@@ -455,7 +455,7 @@ async function handleAudioReport(adminDb, token, chatId, userId, message, sessio
  */
 async function handleReportConfirmation(adminDb, token, chatId, userId, text, session) {
     const now = new Date().toISOString();
-    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
     const userName = await getUserName(adminDb, userId);
     const lower = (text || "").toLowerCase().trim();
 
@@ -869,7 +869,7 @@ async function handleCreateTask(adminDb, token, chatId, userId, text, session, r
 
     // Create task in Firestore
     const now = new Date().toISOString();
-    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
     const taskRef = await adminDb.collection(paths.TASKS).add({
         title: taskTitle.trim(),
         assignedTo: userId,
@@ -902,7 +902,7 @@ async function handleCreateTask(adminDb, token, chatId, userId, text, session, r
  */
 async function handleTaskReportText(adminDb, token, chatId, userId, text, session, extras) {
     const now = new Date().toISOString();
-    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
     const userName = await getUserName(adminDb, userId);
     const taskId = session.metadata?.selectedTaskId;
     const taskTitle = session.metadata?.selectedTaskTitle || "Tarea";
@@ -945,7 +945,7 @@ async function handleTaskReportText(adminDb, token, chatId, userId, text, sessio
  */
 async function handleTaskReportAudio(adminDb, token, chatId, userId, rawMessage, session, extras) {
     const now = new Date().toISOString();
-    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
     const userName = await getUserName(adminDb, userId);
     const taskId = session.metadata?.selectedTaskId;
     const taskTitle = session.metadata?.selectedTaskTitle || "Tarea";
@@ -1147,7 +1147,7 @@ async function handleOvertimeForTask(adminDb, token, chatId, userId, taskId, ses
     const taskTitle = task?.title || "Tarea";
     const userName = await getUserName(adminDb, userId);
     const now = new Date().toISOString();
-    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
 
     // Create overtime timeLog (schema-compatible)
     const startHour = new Date(`${today}T18:00:00`);

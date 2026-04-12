@@ -3,6 +3,7 @@
  * [Phase M.5] Team management: get members, link codes, unlink, update.
  */
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { requireAdmin } = require("../middleware/authGuard");
 
 function createTeamExports(adminDb) {
     const teamMgmt = require("../handlers/teamManagementHandler");
@@ -11,8 +12,7 @@ function createTeamExports(adminDb) {
         { timeoutSeconds: 15 },
         async (request) => {
             if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
-            const roleDoc = await adminDb.collection("users_roles").doc(request.auth.uid).get();
-            if (!roleDoc.exists || roleDoc.data().role !== "admin") throw new HttpsError("permission-denied", "Admin access required.");
+            await requireAdmin(adminDb, request);
             try { return await teamMgmt.getTeamMembers(adminDb); }
             catch (err) { throw new HttpsError("internal", `Failed to get team members: ${err.message}`); }
         }
@@ -22,8 +22,7 @@ function createTeamExports(adminDb) {
         { timeoutSeconds: 15 },
         async (request) => {
             if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
-            const roleDoc = await adminDb.collection("users_roles").doc(request.auth.uid).get();
-            if (!roleDoc.exists || roleDoc.data().role !== "admin") throw new HttpsError("permission-denied", "Admin access required.");
+            await requireAdmin(adminDb, request);
             const { userId } = request.data;
             if (!userId) throw new HttpsError("invalid-argument", "userId is required.");
             try { return await teamMgmt.generateLinkCode(adminDb, userId); }
@@ -35,8 +34,7 @@ function createTeamExports(adminDb) {
         { timeoutSeconds: 15 },
         async (request) => {
             if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
-            const roleDoc = await adminDb.collection("users_roles").doc(request.auth.uid).get();
-            if (!roleDoc.exists || roleDoc.data().role !== "admin") throw new HttpsError("permission-denied", "Admin access required.");
+            await requireAdmin(adminDb, request);
             const { userId } = request.data;
             if (!userId) throw new HttpsError("invalid-argument", "userId is required.");
             try { return await teamMgmt.unlinkTelegramUser(adminDb, userId); }
@@ -48,8 +46,7 @@ function createTeamExports(adminDb) {
         { timeoutSeconds: 15 },
         async (request) => {
             if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
-            const roleDoc = await adminDb.collection("users_roles").doc(request.auth.uid).get();
-            if (!roleDoc.exists || roleDoc.data().role !== "admin") throw new HttpsError("permission-denied", "Admin access required.");
+            await requireAdmin(adminDb, request);
             const { userId, fields } = request.data;
             if (!userId || !fields) throw new HttpsError("invalid-argument", "userId and fields are required.");
             try { return await teamMgmt.updateTeamMember(adminDb, userId, fields); }

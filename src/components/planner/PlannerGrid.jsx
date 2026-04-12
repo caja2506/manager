@@ -241,7 +241,7 @@ export default function PlannerGrid({
 
                     {/* Sticky header row */}
                     <div
-                        className="flex shrink-0 border-b border-slate-700 bg-slate-900 z-20 sticky top-0"
+                        className="flex shrink-0 border-b border-slate-700 bg-slate-900 z-30 sticky top-0"
                         style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
                     >
                         {/* Corner cell above time ruler */}

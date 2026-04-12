@@ -31,7 +31,7 @@ describe('Automation Schemas — Generic', () => {
             expect(config.dryRun).toBe(true);  // Safe default
             expect(config.debugMode).toBe(false);
             expect(config.metricsEnabled).toBe(true);
-            expect(config.defaultTimezone).toBe('America/Mexico_City');
+            expect(config.defaultTimezone).toBe('America/Costa_Rica');
             expect(Array.isArray(config.allowedChannels)).toBe(true);
             expect(config.createdAt).toBeTruthy();
             expect(config.updatedAt).toBeTruthy();

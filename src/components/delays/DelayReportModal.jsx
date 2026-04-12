@@ -3,6 +3,7 @@ import { useAppData } from '../../contexts/AppDataContext';
 import { useEngineeringData } from '../../hooks/useEngineeringData';
 import { useAuth } from '../../contexts/AuthContext';
 import { createDelay, createDelayCause, deleteDelayCause } from '../../services/delayService';
+import { updateTaskStatus } from '../../services/taskService';
 import { TASK_STATUS } from '../../models/schemas';
 import { AlertOctagon, X, Check, ChevronDown, Plus } from 'lucide-react';
 import ListManagerModal from '../ui/ListManagerModal';
@@ -64,6 +65,12 @@ export default function DelayReportModal() {
                 causeId: cause.id, causeName: cause.name,
                 comment, impact,
             }, user.uid);
+
+            // Actually set the task status to blocked
+            if (taskId) {
+                await updateTaskStatus(taskId, TASK_STATUS.BLOCKED, projectId);
+            }
+
             handleClose();
         } catch (error) {
             console.error("Error creating delay report:", error);

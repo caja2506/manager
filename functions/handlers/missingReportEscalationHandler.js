@@ -28,7 +28,7 @@ const {
 async function execute(adminDb, token, targets, context) {
     const { dryRun, runId } = context;
     const now = new Date();
-    const today = now.toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+    const today = now.toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
 
     // Find pending reports for today
     const pendingSnap = await adminDb.collection(paths.TELEGRAM_REPORTS)

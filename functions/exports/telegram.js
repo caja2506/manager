@@ -6,7 +6,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onRequest } = require("firebase-functions/v2/https");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
-const { getUserRbacRole } = require("../middleware/authGuard");
+const { getUserRbacRole, requireAdmin } = require("../middleware/authGuard");
 
 function createTelegramExports(adminDb, secrets) {
     const { telegramBotToken, geminiApiKey } = secrets;
@@ -32,8 +32,7 @@ function createTelegramExports(adminDb, secrets) {
         { timeoutSeconds: 15 },
         async (request) => {
             if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
-            const roleDoc = await adminDb.collection("users_roles").doc(request.auth.uid).get();
-            if (!roleDoc.exists || roleDoc.data().role !== "admin") throw new HttpsError("permission-denied", "Admin access required.");
+            await requireAdmin(adminDb, request);
             const { userId, chatId } = request.data;
             if (!userId || !chatId) throw new HttpsError("invalid-argument", "userId and chatId are required.");
 
@@ -83,7 +82,7 @@ function createTelegramExports(adminDb, secrets) {
                 const message = `🚨 *Nuevo Bloqueo Reportado*\n\n📋 *Causa:* ${delay.causeName || "Sin especificar"}\n` +
                     (taskName ? `🎯 *Tarea:* ${taskName}\n` : "") + (projectName ? `📁 *Proyecto:* ${projectName}\n` : "") +
                     (delay.notes ? `📝 *Notas:* ${delay.notes}\n` : "") +
-                    `👤 *Reportado por:* ${reporterName}\n🕒 *Fecha:* ${new Date().toLocaleString("es-MX", { timeZone: "America/Mexico_City" })}`;
+                    `👤 *Reportado por:* ${reporterName}\n🕒 *Fecha:* ${new Date().toLocaleString("es-CR", { timeZone: "America/Costa_Rica" })}`;
 
                 const sessionsSnap = await adminDb.collection("telegramSessions").get();
                 let sent = 0;

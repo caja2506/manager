@@ -20,7 +20,7 @@ const {
 async function execute(adminDb, token, targets, context) {
     const { dryRun, runId } = context;
     const now = new Date().toISOString();
-    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
 
     // Pre-processing: create pending report records + transition sessions
     for (const target of targets) {

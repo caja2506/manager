@@ -33,7 +33,7 @@ async function execute(adminDb, token, targets, context) {
     const now = new Date();
 
     // Allow manual date override for testing
-    const today = options.reportDate || now.toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+    const today = options.reportDate || now.toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
     const startOfDay = new Date(today + "T00:00:00-06:00");
     const endOfDay = new Date(today + "T23:59:59-06:00");
 
@@ -41,6 +41,14 @@ async function execute(adminDb, token, targets, context) {
     const tomorrowDate = new Date(startOfDay);
     tomorrowDate.setDate(tomorrowDate.getDate() + 1);
     const tomorrow = tomorrowDate.toLocaleDateString("en-CA");
+
+    // Yesterday range (for comments)
+    const ydDate = new Date(startOfDay);
+    ydDate.setDate(ydDate.getDate() - 1);
+    if (ydDate.getDay() === 0) ydDate.setDate(ydDate.getDate() - 2);
+    if (ydDate.getDay() === 6) ydDate.setDate(ydDate.getDate() - 1);
+    const yesterdayStart = new Date(ydDate.toLocaleDateString("en-CA") + "T00:00:00-06:00");
+    const yesterdayEnd = new Date(ydDate.toLocaleDateString("en-CA") + "T23:59:59-06:00");
 
     console.log(`[perfReport] Building V2 report for ${today} (override: ${!!options.reportDate})...`);
 
@@ -50,7 +58,8 @@ async function execute(adminDb, token, targets, context) {
     const [
         tasksSnap, timeLogsSnap, delaysSnap, usersSnap,
         subtasksSnap, planItemsTodaySnap, planItemsTomorrowSnap,
-        telegramReportsSnap, commentsSnap,
+        telegramReportsSnap, commentsSnap, yesterdayCommentsSnap,
+        projectsSnap,
     ] = await Promise.all([
         adminDb.collection(paths.TASKS).get(),
         adminDb.collection(paths.TIME_LOGS).get(),
@@ -61,11 +70,17 @@ async function execute(adminDb, token, targets, context) {
         adminDb.collection("weeklyPlanItems").where("date", "==", tomorrow).get(),
         adminDb.collection(paths.TELEGRAM_REPORTS)
             .where("reportDate", "==", today).get(),
-        // Fetch today's comments from all tasks (collectionGroup)
+        // Fetch today's comments
         adminDb.collectionGroup("comments")
             .where("createdAt", ">=", startOfDay.toISOString())
             .where("createdAt", "<=", endOfDay.toISOString())
             .get(),
+        // Fetch yesterday's comments
+        adminDb.collectionGroup("comments")
+            .where("createdAt", ">=", yesterdayStart.toISOString())
+            .where("createdAt", "<=", yesterdayEnd.toISOString())
+            .get(),
+        adminDb.collection(paths.PROJECTS).get(),
     ]);
 
     const allTasks = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -77,8 +92,15 @@ async function execute(adminDb, token, targets, context) {
     const planItemsTomorrow = planItemsTomorrowSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const telegramReportsToday = telegramReportsSnap.docs.map(d => d.data());
     const todayComments = commentsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const yesterdayComments = yesterdayCommentsSnap.docs.map(d => {
+        // Extract taskId from the doc path: tasks/{taskId}/comments/{commentId}
+        const pathParts = d.ref.path.split('/');
+        const taskId = pathParts.length >= 2 ? pathParts[pathParts.length - 3] : null;
+        return { id: d.id, taskId, ...d.data() };
+    });
+    const allProjects = projectsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-    console.log(`[perfReport] Loaded: ${allTasks.length} tasks, ${allTimeLogs.length} timeLogs, ${allSubtasks.length} subtasks, ${planItemsToday.length} planItems today, ${planItemsTomorrow.length} tomorrow, ${todayComments.length} comments today`);
+    console.log(`[perfReport] Loaded: ${allTasks.length} tasks, ${allTimeLogs.length} timeLogs, ${allSubtasks.length} subtasks, ${allProjects.length} projects, ${planItemsToday.length} planItems today, ${planItemsTomorrow.length} tomorrow, ${todayComments.length} comments today, ${yesterdayComments.length} comments yesterday`);
 
     // ══════════════════════════════════════════
     // 2. BUILD REPORT DATA
@@ -87,7 +109,7 @@ async function execute(adminDb, token, targets, context) {
         today, tomorrow, now, startOfDay, endOfDay,
         allTasks, allTimeLogs, allDelays, allUsers, allSubtasks,
         planItemsToday, planItemsTomorrow, telegramReportsToday,
-        todayComments,
+        todayComments, yesterdayComments, allProjects,
     });
 
     console.log(`[perfReport] Report built: ${reportData.pulseOfDay.hoursReal}h real / ${reportData.pulseOfDay.hoursPlanned}h planned, ${reportData.teamNarratives.length} members, ${reportData.productivityAlerts.length} alerts`);
@@ -122,7 +144,7 @@ async function execute(adminDb, token, targets, context) {
                 const html = dailyPerformanceReport(reportData);
                 emailResult = await sendAndLogEmail(adminDb, resendApiKey, {
                     to: config.recipients,
-                    subject: `📊 Briefing del Equipo — ${reportData.date}`,
+                    subject: `📊 Passdown AME CR — ${reportData.datePretty}`,
                     html,
                 }, { routineKey: "daily_performance_report", runId });
             } else {
@@ -300,11 +322,17 @@ function buildReportData({
     allTasks, allTimeLogs, allDelays, allUsers, allSubtasks,
     planItemsToday, planItemsTomorrow, telegramReportsToday,
     todayComments = [],
+    yesterdayComments = [],
+    allProjects = [],
 }) {
-    // ── Active team: users with operational roles ──
+    // ── Active team: users with operational roles (exclude manager from report) ──
     const teamUsers = allUsers.filter(u =>
-        u.operationalRole && !["none", "viewer"].includes(u.operationalRole)
+        u.operationalRole && !["none", "viewer", "manager"].includes(u.operationalRole)
     );
+
+    // ── Project name map ──
+    const projectMap = {};
+    allProjects.forEach(p => { projectMap[p.id] = p.name || p.title || '?'; });
 
     // ── Tasks by status ──
     const activeTasks = allTasks.filter(t => !["completed", "cancelled"].includes(t.status));
@@ -575,12 +603,23 @@ function buildReportData({
             const daysBlocked = Math.ceil((now - new Date(blockedSince)) / 86400000);
             if (daysBlocked >= 3) {
                 const user = allUsers.find(u => u.id === t.assignedTo);
+                const taskSubs = subtasksByTask[t.id] || [];
+                const completedSubs = taskSubs.filter(s => s.completed);
+                const pendingSubs = taskSubs.filter(s => !s.completed);
                 actionableAlerts.push({
                     severity: "critical",
                     icon: "🔴",
                     text: `"${t.title}" lleva ${daysBlocked} días bloqueada`,
                     detail: `Responsable: ${user?.displayName || "Sin asignar"}${t.blockedReason ? ` | Razón: ${t.blockedReason}` : ""}`,
                     action: "Desbloquear o reasignar",
+                    projectName: t.projectId ? (projectMap[t.projectId] || null) : null,
+                    subtasks: {
+                        total: taskSubs.length,
+                        completed: completedSubs.length,
+                        pending: pendingSubs.length,
+                        completedList: completedSubs.slice(0, 3).map(s => s.title || s.name || '?'),
+                        pendingList: pendingSubs.slice(0, 5).map(s => s.title || s.name || '?'),
+                    },
                 });
             }
         }
@@ -588,12 +627,24 @@ function buildReportData({
 
     // Overdue > 5 days
     overdueTasks.filter(t => t.daysOverdue >= 5).forEach(t => {
+        const origTask = activeTasks.find(at => at.title === t.title);
+        const taskSubs = origTask ? (subtasksByTask[origTask.id] || []) : [];
+        const completedSubs = taskSubs.filter(s => s.completed);
+        const pendingSubs = taskSubs.filter(s => !s.completed);
         actionableAlerts.push({
             severity: "high",
             icon: "🟠",
             text: `"${t.title}" venció hace ${t.daysOverdue} días`,
             detail: `Responsable: ${t.assignedTo}`,
             action: "Cerrar, reprogramar o cancelar",
+            projectName: origTask?.projectId ? (projectMap[origTask.projectId] || null) : null,
+            subtasks: {
+                total: taskSubs.length,
+                completed: completedSubs.length,
+                pending: pendingSubs.length,
+                completedList: completedSubs.slice(0, 3).map(s => s.title || s.name || '?'),
+                pendingList: pendingSubs.slice(0, 5).map(s => s.title || s.name || '?'),
+            },
         });
     });
 
@@ -723,11 +774,164 @@ function buildReportData({
         commentsByTask.sort((a, b) => b.comments.length - a.comments.length);
     }
 
+    // ══════════════════════════════════════════
+    // SECTION 7: DAILY SCRUM TABLE DATA
+    // ══════════════════════════════════════════
+    // Yesterday (skip weekends)
+    const yd = new Date(startOfDay);
+    yd.setDate(yd.getDate() - 1);
+    if (yd.getDay() === 0) yd.setDate(yd.getDate() - 2);
+    if (yd.getDay() === 6) yd.setDate(yd.getDate() - 1);
+    const yesterdayStr = yd.toLocaleDateString("en-CA");
+    const ydStart = new Date(yesterdayStr + "T00:00:00-06:00");
+    const ydEnd = new Date(yesterdayStr + "T23:59:59-06:00");
+
+    // Yesterday's time logs (for Ayer (h) column)
+    const yesterdayTimeLogs = allTimeLogs.filter(log => {
+        if (!log.startTime && !log.date) return false;
+        if (log.date) return log.date === yesterdayStr;
+        const logStart = new Date(log.startTime);
+        return logStart >= ydStart && logStart <= ydEnd;
+    });
+    const yesterdayHoursMap = {};
+    yesterdayTimeLogs.forEach(log => {
+        const uid = log.userId;
+        if (!uid) return;
+        if (!yesterdayHoursMap[uid]) yesterdayHoursMap[uid] = 0;
+        yesterdayHoursMap[uid] += (log.totalHours || 0);
+    });
+
+    const activeDelays = allDelays.filter(d => !d.resolved);
+
+    const scrumTable = teamUsers.map(user => {
+        const uid = user.id;
+        const yesterdayHours = parseFloat((yesterdayHoursMap[uid] || 0).toFixed(1));
+        const nameParts = (user.displayName || user.name || '?').split(' ');
+        const shortName = nameParts.length > 1 ? `${nameParts[0]} ${nameParts[1][0]}.` : nameParts[0];
+        const initials = nameParts.map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
+        // Status (based on yesterday hours — email sent in the morning)
+        const userTasks = allTasks.filter(t => t.assignedTo === uid && !['completed', 'cancelled'].includes(t.status));
+        const hasBlocker = activeDelays.some(d => userTasks.some(t => t.id === d.taskId));
+        let status = 'ok';
+        if (hasBlocker) status = 'bloqueado';
+        else if (userTasks.length === 0) status = 'sin_tareas';
+        else if (yesterdayHours === 0) status = 'sin_reporte';
+
+        // Avg % avance
+        const avgPct = userTasks.length > 0
+            ? Math.round(userTasks.reduce((s, t) => s + (t.percentComplete || 0), 0) / userTasks.length)
+            : 0;
+
+        // Yesterday completed subtasks
+        const userTaskIds = new Set(allTasks.filter(t => t.assignedTo === uid).map(t => t.id));
+        const yesterdaySubs = allSubtasks.filter(st => {
+            if (!st.completed || !st.completedAt || !userTaskIds.has(st.taskId)) return false;
+            const d = new Date(st.completedAt);
+            return d.toLocaleDateString("en-CA") === yesterdayStr;
+        });
+        // Group by parent task — include task title + project for context
+        const yesterdayByTask = {};
+        yesterdaySubs.forEach(st => {
+            if (!yesterdayByTask[st.taskId]) {
+                const parentTask = allTasks.find(t => t.id === st.taskId);
+                yesterdayByTask[st.taskId] = {
+                    taskTitle: parentTask?.title || '?',
+                    projectName: parentTask?.projectId ? (projectMap[parentTask.projectId] || null) : null,
+                    subs: [],
+                    hours: 0,
+                };
+            }
+            yesterdayByTask[st.taskId].subs.push(st.title || st.name || '?');
+        });
+
+        // Also include tasks with time logged yesterday (even without subtask completions)
+        const userYdTimeLogs = yesterdayTimeLogs.filter(log => log.userId === uid);
+        userYdTimeLogs.forEach(log => {
+            const taskId = log.taskId;
+            if (!taskId) return;
+            if (!yesterdayByTask[taskId]) {
+                const parentTask = allTasks.find(t => t.id === taskId);
+                if (!parentTask) return;
+                yesterdayByTask[taskId] = {
+                    taskTitle: parentTask.title || '?',
+                    projectName: parentTask.projectId ? (projectMap[parentTask.projectId] || null) : null,
+                    subs: [],
+                    hours: 0,
+                };
+            }
+            yesterdayByTask[taskId].hours += (log.totalHours || 0);
+        });
+
+        // Yesterday comments for this person's tasks
+        const userYesterdayComments = yesterdayComments.filter(c => userTaskIds.has(c.taskId));
+        const yesterdayCommentsByTask = {};
+        userYesterdayComments.forEach(c => {
+            if (!c.taskId) return;
+            if (!yesterdayCommentsByTask[c.taskId]) yesterdayCommentsByTask[c.taskId] = [];
+            yesterdayCommentsByTask[c.taskId].push({
+                userName: c.userName || c.userDisplayName || '?',
+                text: (c.text || '').slice(0, 120),
+            });
+        });
+
+        // Today tasks: same as UI — only in_progress tasks
+        const todayTasksData = userTasks
+            .filter(task => task.status === 'in_progress')
+            .map(task => {
+                const taskSubs = allSubtasks.filter(s => s.taskId === task.id);
+                const pendingSubs = taskSubs.filter(s => !s.completed);
+                const doneCount = taskSubs.filter(s => s.completed).length;
+                const totalCount = taskSubs.length;
+                const taskPct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : (task.percentComplete || 0);
+                const taskBlockers = activeDelays.filter(d => d.taskId === task.id);
+                return {
+                    title: task.title,
+                    projectName: projectMap[task.projectId] || null,
+                    pct: taskPct,
+                    pendingSubs: pendingSubs.slice(0, 5).map(s => s.title || s.name || '?'),
+                    blockers: taskBlockers.map(b => b.causeName || b.cause || 'Bloqueo'),
+                };
+            });
+
+        return { uid, shortName, initials, hours: yesterdayHours, status, avgPct, yesterdayByTask, yesterdayCommentsByTask, todayTasksData };
+    }).sort((a, b) => {
+        const order = { ok: 0, bloqueado: 1, sin_tareas: 2, sin_reporte: 3 };
+        return (order[a.status] ?? 9) - (order[b.status] ?? 9);
+    });
+
+    // DEBUG: Verify todayTasksData content
+    scrumTable.forEach(p => {
+        console.log(`[perfReport] scrumTable ${p.shortName}: todayTasksData=${JSON.stringify((p.todayTasksData || []).map(t => ({ title: t.title, projectName: t.projectName, pct: t.pct, subs: (t.pendingSubs || []).length })))}`);
+    });
+
+    // Build yesterday's pulse from scrumTable data
+    const yesterdayTotalHours = scrumTable.reduce((s, p) => s + p.hours, 0);
+    const yesterdayCompletedSubs = allSubtasks.filter(st => {
+        if (!st.completed || !st.completedAt) return false;
+        const d = new Date(st.completedAt);
+        return d.toLocaleDateString("en-CA") === yesterdayStr;
+    }).length;
+    const yesterdayPeopleWithHours = scrumTable.filter(p => p.hours > 0).length;
+
+    const yesterdayPulse = {
+        hoursReal: parseFloat(yesterdayTotalHours.toFixed(1)),
+        hoursExpected: teamSize * DAILY_AVAILABLE_HOURS,
+        hoursPct: (teamSize * DAILY_AVAILABLE_HOURS) > 0 ? Math.round((yesterdayTotalHours / (teamSize * DAILY_AVAILABLE_HOURS)) * 100) : 0,
+        teamSize,
+        dailyHours: DAILY_AVAILABLE_HOURS,
+        peopleWithHours: yesterdayPeopleWithHours,
+        subtasksCompleted: yesterdayCompletedSubs,
+        blockedTasks: blockedTasks.length,
+    };
+
     return {
         date: today,
         datePretty: formatDateES(today),
+        yesterdayDatePretty: formatDateES(yesterdayStr),
         generatedAt: now.toISOString(),
         pulseOfDay,
+        yesterdayPulse,
         teamNarratives,
         actionableAlerts,
         productivityAlerts,
@@ -735,6 +939,7 @@ function buildReportData({
         tomorrowView,
         achievements,
         commentsByTask,
+        scrumTable,
     };
 }
 

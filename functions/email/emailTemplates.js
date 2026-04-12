@@ -1,161 +1,185 @@
 /**
- * Email Templates - V2 "Manager Briefing"
+ * Email Templates - V3 "Light Theme"
  * ==========================================
- * Professional HTML email with 5 actionable sections.
- * Uses inline CSS for Gmail/Outlook compatibility.
+ * Light-themed email that adapts naturally to dark mode.
+ * Gmail/Outlook dark mode inverts light→dark automatically.
  *
  * @module email/emailTemplates
  */
 
 function dailyPerformanceReport(data) {
     const {
-        datePretty, pulseOfDay, teamNarratives, actionableAlerts,
-        productivityAlerts, overdueTasks, tomorrowView, achievements,
-        commentsByTask,
+        datePretty, yesterdayPulse, actionableAlerts,
+        overdueTasks, scrumTable, yesterdayDatePretty,
     } = data;
 
+    const yp = yesterdayPulse || {};
+
     return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:20px 0;">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<style>
+:root { color-scheme: light dark; }
+</style>
+</head>
+<body style="margin:0;padding:0;background-color:#f0f2f5;font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;" bgcolor="#f0f2f5">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0f2f5;padding:20px 0;" bgcolor="#f0f2f5" role="presentation">
 <tr><td align="center">
-<table width="800" cellpadding="0" cellspacing="0" style="background:#1e293b;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.3);max-width:100%;">
+<table width="800" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);max-width:100%;" bgcolor="#ffffff">
 
 <!-- Header -->
 <tr><td style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:32px 40px;">
-  <h1 style="margin:0;color:#fff;font-size:24px;font-weight:800;letter-spacing:-0.5px;">Briefing del Equipo</h1>
-  <p style="margin:8px 0 0;color:#c7d2fe;font-size:14px;">${datePretty} - AnalyzeOps</p>
+  <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:800;letter-spacing:-0.5px;">Passdown AME CR</h1>
+  <p style="margin:8px 0 0;color:#ffffff;font-size:18px;font-weight:700;">${datePretty}</p>
+  <p style="margin:4px 0 0;color:#c7d2fe;font-size:12px;">AnalyzeOps</p>
 </td></tr>
 
-<!-- SECTION 1: PULSO DEL DIA -->
+<!-- SECTION 1: ¿CÓMO NOS FUE AYER? -->
 <tr><td style="padding:28px 40px 20px;">
-  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">Como vamos hoy?</h2>
+  <h2 style="margin:0 0 4px;color:#1a1a2e;font-size:18px;font-weight:700;">¿Cómo nos fue ayer?</h2>
+  <p style="margin:0 0 16px;color:#4f46e5;font-size:16px;font-weight:800;border-bottom:2px solid #e5e7eb;padding-bottom:8px;">${yesterdayDatePretty || ''}</p>
   <table width="100%" cellpadding="0" cellspacing="0">
     <tr>
-      ${pulseCard("", "Horas Reales", pulseOfDay.hoursReal + "h", pulseOfDay.hoursPct >= 80 ? "#22c55e" : pulseOfDay.hoursPct >= 60 ? "#f59e0b" : "#ef4444", "de " + pulseOfDay.hoursExpected + "h esperadas (" + pulseOfDay.teamSize + " personas x " + pulseOfDay.dailyHours + "h) - " + pulseOfDay.hoursPct + "%")}
-      ${pulseCard("", "Planificadas", pulseOfDay.hoursPlanned + "h", "#3b82f6", "de " + pulseOfDay.hoursExpected + "h esperadas - " + (pulseOfDay.hoursExpected > 0 ? Math.round((pulseOfDay.hoursPlanned / pulseOfDay.hoursExpected) * 100) : 0) + "%")}
-      ${pulseCard("", "Completadas", pulseOfDay.tasksCompletedToday, "#22c55e", "de " + pulseOfDay.activeTasks + " activas")}
-    </tr>
-    <tr>
-      ${pulseCard("", "Subtareas Hoy", "+" + (pulseOfDay.subtasksCompletedToday || 0), (pulseOfDay.subtasksCompletedToday || 0) > 0 ? "#22c55e" : "#f59e0b", pulseOfDay.subtasksCompleted + "/" + pulseOfDay.subtasksTotal + " total (" + pulseOfDay.subtasksPct + "%)")}
-      ${pulseCard("", "Bloqueadas", pulseOfDay.blockedTasks, pulseOfDay.blockedTasks > 0 ? "#ef4444" : "#22c55e", "")}
-      ${pulseCard("", "Vencidas", pulseOfDay.newOverdue, pulseOfDay.newOverdue > 0 ? "#ef4444" : "#22c55e", overdueTasks.length + " total")}
+      ${pulseCard("Horas Registradas", (yp.hoursReal || 0) + "h", (yp.hoursPct || 0) >= 80 ? "#16a34a" : (yp.hoursPct || 0) >= 60 ? "#d97706" : "#dc2626", "de " + (yp.hoursExpected || 0) + "h esperadas (" + (yp.teamSize || 0) + " x " + (yp.dailyHours || 8) + "h) - " + (yp.hoursPct || 0) + "%")}
+      ${pulseCard("Personas Activas", (yp.peopleWithHours || 0) + "/" + (yp.teamSize || 0), (yp.peopleWithHours || 0) >= (yp.teamSize || 1) ? "#16a34a" : "#d97706", "con horas registradas")}
+      ${pulseCard("Subtareas Completadas", "+" + (yp.subtasksCompleted || 0), (yp.subtasksCompleted || 0) > 0 ? "#16a34a" : "#d97706", "ayer")}
     </tr>
   </table>
 </td></tr>
 
-<!-- SECTION 2: EQUIPO (Narrativa) -->
-${teamNarratives.length > 0 ? `
-<tr><td style="padding:8px 40px 20px;">
-  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">Quien Hizo Que?</h2>
-  ${teamNarratives.map(n => narrativeCard(n)).join("")}
+<!-- SECTION 2: DAILY SCRUM TABLE -->
+${(scrumTable || []).length > 0 ? `
+<tr><td style="padding:8px 24px 20px;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+    <tr style="background-color:#f8fafc;" bgcolor="#f8fafc">
+      <th style="padding:8px 10px;text-align:left;color:#6b7280;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid #e5e7eb;">Miembro</th>
+      <th style="padding:8px 10px;text-align:left;color:#6b7280;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid #e5e7eb;">Estado</th>
+      <th style="padding:8px 10px;text-align:center;color:#6b7280;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid #e5e7eb;">Ayer (h)</th>
+      <th style="padding:8px 10px;text-align:left;color:#6b7280;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid #e5e7eb;">Tareas de Ayer</th>
+      <th style="padding:8px 10px;text-align:center;color:#6b7280;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid #e5e7eb;">% Avance</th>
+      <th style="padding:8px 10px;text-align:left;color:#6b7280;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid #e5e7eb;">Tareas Hoy</th>
+    </tr>
+    ${scrumTable.map(p => {
+        const statusCfg = {
+            ok: { label: 'OK', bg: '#dcfce7', border: '#16a34a', color: '#15803d' },
+            bloqueado: { label: 'BLOQUEADO', bg: '#fee2e2', border: '#dc2626', color: '#b91c1c' },
+            sin_tareas: { label: 'SIN TAREAS', bg: '#fef9c3', border: '#d97706', color: '#92400e' },
+            sin_reporte: { label: 'SIN REPORTE', bg: '#fee2e2', border: '#dc2626', color: '#b91c1c' },
+        }[p.status] || { label: '?', bg: '#f3f4f6', border: '#9ca3af', color: '#6b7280' };
+
+        const yesterdayEntries = Object.entries(p.yesterdayByTask || {});
+        const yesterdaySubsHtml = yesterdayEntries.length > 0
+            ? yesterdayEntries.map(([, group]) => {
+                const hrs = group.hours ? parseFloat(group.hours.toFixed(1)) : 0;
+                let html = '<div style="border-left:2px solid #16a34a;padding-left:6px;margin-bottom:6px;">';
+                html += '<p style="margin:0;color:#1a1a2e;font-size:11px;font-weight:700;">' + (group.taskTitle || '?');
+                if (hrs > 0) {
+                    html += ' <span style="color:#16a34a;font-size:9px;font-weight:600;">' + hrs + 'h</span>';
+                }
+                html += '</p>';
+                if (group.projectName) {
+                    html += '<p style="margin:1px 0 0;color:#6366f1;font-size:9px;font-weight:600;">📁 ' + group.projectName + '</p>';
+                }
+                if (group.subs && group.subs.length > 0) {
+                    group.subs.forEach(s => {
+                        html += '<p style="margin:1px 0 0 8px;color:#15803d;font-size:10px;">&#10003; ' + s + '</p>';
+                    });
+                } else if (hrs > 0) {
+                    html += '<p style="margin:1px 0 0 8px;color:#6b7280;font-size:10px;">&#9201; ' + hrs + 'h registradas</p>';
+                }
+                html += '</div>';
+                return html;
+            }).join('')
+            : '';
+
+        // Yesterday comments
+        const yesterdayCommEntries = Object.entries(p.yesterdayCommentsByTask || {});
+        const yesterdayCommHtml = yesterdayCommEntries.length > 0
+            ? yesterdayCommEntries.map(([, cmts]) => {
+                return cmts.map(c => '<p style="margin:1px 0;color:#4f46e5;font-size:10px;">&#128172; <strong>' + c.userName + ':</strong> ' + c.text + '</p>').join('');
+            }).join('')
+            : '';
+
+        const yesterdayHtml = (yesterdaySubsHtml || yesterdayCommHtml)
+            ? yesterdaySubsHtml + yesterdayCommHtml
+            : '<span style="color:#d1d5db;font-size:11px;">&mdash;</span>';
+
+        let todayHtml = '';
+        if (p.todayTasksData && p.todayTasksData.length > 0) {
+            todayHtml = p.todayTasksData.map(t => {
+                const hasBlocker = t.blockers && t.blockers.length > 0;
+                const borderColor = hasBlocker ? '#dc2626' : '#4f46e5';
+                let html = '<div style="border-left:2px solid ' + borderColor + ';padding-left:6px;margin-bottom:6px;">';
+                html += '<p style="margin:0;color:#1a1a2e;font-size:11px;font-weight:700;">' + t.title + ' <span style="color:' + (t.pct >= 60 ? '#16a34a' : t.pct > 0 ? '#4f46e5' : '#9ca3af') + ';font-size:10px;">' + t.pct + '%</span></p>';
+                if (t.projectName) {
+                    html += '<p style="margin:1px 0 0;color:#6366f1;font-size:9px;font-weight:600;">📁 ' + t.projectName + '</p>';
+                }
+                if (hasBlocker) {
+                    t.blockers.forEach(b => {
+                        html += '<p style="margin:1px 0 0 8px;color:#dc2626;font-size:10px;">&#9940; ' + b + '</p>';
+                    });
+                }
+                if (t.pendingSubs && t.pendingSubs.length > 0) {
+                    t.pendingSubs.forEach(s => {
+                        html += '<p style="margin:1px 0 0 8px;color:#6b7280;font-size:10px;">&#9675; ' + s + '</p>';
+                    });
+                }
+                html += '</div>';
+                return html;
+            }).join('');
+        } else {
+            todayHtml = '<span style="color:#d97706;font-size:11px;">&#128993; Sin tareas</span>';
+        }
+
+        const pctColor = p.avgPct >= 60 ? '#16a34a' : p.avgPct >= 30 ? '#d97706' : '#9ca3af';
+
+        return '<tr style="border-bottom:1px solid #f3f4f6;">'
+            + '<td style="padding:10px;vertical-align:top;white-space:nowrap;"><span style="color:#1a1a2e;font-size:12px;font-weight:700;">' + p.shortName + '</span></td>'
+            + '<td style="padding:10px;vertical-align:top;white-space:nowrap;"><span style="background:' + statusCfg.bg + ';border:1px solid ' + statusCfg.border + ';color:' + statusCfg.color + ';font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px;text-transform:uppercase;white-space:nowrap;">' + statusCfg.label + '</span></td>'
+            + '<td style="padding:10px;text-align:center;vertical-align:top;white-space:nowrap;"><span style="color:' + (p.hours > 0 ? '#16a34a' : '#dc2626') + ';font-size:12px;font-weight:700;">' + (p.hours > 0 ? p.hours + 'h' : '&#9888; 0h') + '</span></td>'
+            + '<td style="padding:10px;vertical-align:top;">' + yesterdayHtml + '</td>'
+            + '<td style="padding:10px;text-align:center;vertical-align:top;white-space:nowrap;"><span style="color:' + pctColor + ';font-size:12px;font-weight:700;">' + p.avgPct + '%</span></td>'
+            + '<td style="padding:10px;vertical-align:top;">' + todayHtml + '</td>'
+            + '</tr>';
+    }).join('')}
+  </table>
 </td></tr>
 ` : ""}
 
-<!-- SECTION 3: PRODUCTIVIDAD -->
-${productivityAlerts.length > 0 ? `
-<tr><td style="padding:8px 40px 20px;">
-  <h2 style="margin:0 0 16px;color:#fca5a5;font-size:18px;font-weight:700;border-bottom:2px solid #7f1d1d;padding-bottom:8px;">Quien necesita atencion?</h2>
-  <p style="color:#94a3b8;font-size:11px;margin:0 0 12px;font-style:italic;">Personas con muchas horas registradas pero sin resultados medibles</p>
-  ${productivityAlerts.map(a => productivityCard(a)).join("")}
-</td></tr>
-` : ""}
-
-<!-- SECTION 4: ALERTAS ACCIONABLES -->
+<!-- SECTION 3: ALERTAS -->
 ${actionableAlerts.length > 0 ? `
 <tr><td style="padding:8px 40px 20px;">
-  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">Que nos esta frenando?</h2>
+  <h2 style="margin:0 0 16px;color:#1a1a2e;font-size:18px;font-weight:700;border-bottom:2px solid #e5e7eb;padding-bottom:8px;">¿Qué nos está frenando?</h2>
   ${actionableAlerts.slice(0, 8).map(a => alertCard(a)).join("")}
 </td></tr>
 ` : ""}
 
-<!-- SECTION 5: LOGROS -->
-${achievements.length > 0 ? `
-<tr><td style="padding:8px 40px 20px;">
-  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">Que logramos hoy?</h2>
-  ${achievements.map(a => `
-    <div style="background:#064e3b;border-radius:8px;padding:10px 14px;margin-bottom:6px;border-left:3px solid #22c55e;">
-      <p style="margin:0;color:#d1fae5;font-size:13px;"><strong>${a.title}</strong></p>
-      <p style="margin:4px 0 0;color:#6ee7b7;font-size:11px;">Completada por ${a.completedBy}</p>
-    </div>
-  `).join("")}
-</td></tr>
-` : ""}
-
-<!-- SECTION 5.5: COMENTARIOS DEL DÍA -->
-${(commentsByTask || []).length > 0 ? `
-<tr><td style="padding:8px 40px 20px;">
-  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">💬 Que dijeron? (${commentsByTask.reduce((s, g) => s + g.comments.length, 0)} comentarios)</h2>
-  ${commentsByTask.slice(0, 10).map(group => `
-    <div style="background:#0f172a;border-radius:8px;padding:14px;margin-bottom:10px;border-left:3px solid #818cf8;">
-      <p style="margin:0 0 8px;color:#c7d2fe;font-size:13px;font-weight:700;">📋 ${group.taskTitle}</p>
-      ${group.comments.map(c => `
-        <div style="background:#1e293b;border-radius:6px;padding:8px 12px;margin-bottom:4px;">
-          <p style="margin:0;color:#94a3b8;font-size:10px;">
-            <strong style="color:#a5b4fc;">${c.userName}</strong> · ${c.time}
-          </p>
-          <p style="margin:4px 0 0;color:#e2e8f0;font-size:12px;line-height:1.4;">${c.text}</p>
-        </div>
-      `).join("")}
-    </div>
-  `).join("")}
-</td></tr>
-` : ""}
-
-<!-- SECTION 6: VISTA DEL MANANA -->
-<tr><td style="padding:8px 40px 20px;">
-  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">Que viene manana?</h2>
-  <div style="background:#0f172a;border-radius:8px;padding:16px;border-left:3px solid #818cf8;">
-    <table width="100%" cellpadding="0" cellspacing="0">
-      <tr>
-        <td style="padding:4px 0;color:#c7d2fe;font-size:13px;">Personas planificadas</td>
-        <td align="right" style="color:#f1f5f9;font-size:14px;font-weight:700;">${tomorrowView.plannedUsers}</td>
-      </tr>
-      <tr>
-        <td style="padding:4px 0;color:#c7d2fe;font-size:13px;">Horas programadas</td>
-        <td align="right" style="color:#f1f5f9;font-size:14px;font-weight:700;">${tomorrowView.totalHours}h</td>
-      </tr>
-      ${tomorrowView.unassignedTasks > 0 ? `
-      <tr>
-        <td style="padding:4px 0;color:#fbbf24;font-size:13px;">Tareas sin asignar</td>
-        <td align="right" style="color:#fbbf24;font-size:14px;font-weight:700;">${tomorrowView.unassignedTasks}</td>
-      </tr>
-      ` : ""}
-    </table>
-    ${tomorrowView.tasksDueTomorrow.length > 0 ? `
-      <div style="margin-top:12px;border-top:1px solid #334155;padding-top:10px;">
-        <p style="margin:0 0 6px;color:#fca5a5;font-size:12px;font-weight:600;">Tareas que vencen manana:</p>
-        ${tomorrowView.tasksDueTomorrow.slice(0, 5).map(t => `
-          <p style="margin:2px 0;color:#e2e8f0;font-size:12px;">- ${t.title} <span style="color:#94a3b8;">(${t.assignedTo})</span></p>
-        `).join("")}
-      </div>
-    ` : ""}
-  </div>
-</td></tr>
-
-<!-- OVERDUE -->
+<!-- SECTION 4: OVERDUE -->
 ${overdueTasks.length > 0 ? `
 <tr><td style="padding:8px 40px 20px;">
-  <h2 style="margin:0 0 16px;color:#e2e8f0;font-size:18px;font-weight:700;border-bottom:2px solid #334155;padding-bottom:8px;">Que se nos paso? (${overdueTasks.length})</h2>
+  <h2 style="margin:0 0 16px;color:#1a1a2e;font-size:18px;font-weight:700;border-bottom:2px solid #e5e7eb;padding-bottom:8px;">¿Qué se nos pasó? (${overdueTasks.length})</h2>
   ${overdueTasks.slice(0, 8).map(t => `
-    <div style="background:#0f172a;border-radius:6px;padding:10px 14px;margin-bottom:6px;border-left:3px solid #ef4444;">
-      <p style="margin:0;color:#f1f5f9;font-size:13px;font-weight:500;">${t.title}</p>
-      <p style="margin:4px 0 0;color:#94a3b8;font-size:11px;">${t.assignedTo} - vencio hace ${t.daysOverdue} dia${t.daysOverdue !== 1 ? "s" : ""}</p>
+    <div style="background-color:#fef2f2;border-radius:6px;padding:10px 14px;margin-bottom:6px;border-left:3px solid #dc2626;" bgcolor="#fef2f2">
+      <p style="margin:0;color:#1a1a2e;font-size:13px;font-weight:500;">${t.title}</p>
+      <p style="margin:4px 0 0;color:#6b7280;font-size:11px;">${t.assignedTo} - venció hace ${t.daysOverdue} día${t.daysOverdue !== 1 ? "s" : ""}</p>
     </div>
   `).join("")}
-  ${overdueTasks.length > 8 ? `<p style="color:#64748b;font-size:12px;margin:8px 0;">... y ${overdueTasks.length - 8} mas</p>` : ""}
+  ${overdueTasks.length > 8 ? `<p style="color:#9ca3af;font-size:12px;margin:8px 0;">... y ${overdueTasks.length - 8} más</p>` : ""}
 </td></tr>
 ` : ""}
 
 <!-- Footer -->
-<tr><td style="padding:24px 40px;background:#0f172a;border-top:1px solid #334155;">
+<tr><td style="padding:24px 40px;background-color:#f8fafc;border-top:1px solid #e5e7eb;" bgcolor="#f8fafc">
   <table width="100%"><tr>
-    <td style="color:#64748b;font-size:12px;">
-      Generado automaticamente por <strong style="color:#818cf8;">AnalyzeOps</strong>
+    <td style="color:#9ca3af;font-size:12px;">
+      Generado automáticamente por <strong style="color:#4f46e5;">AnalyzeOps</strong>
     </td>
     <td align="right">
-      <a href="https://analyzeops.com" style="color:#818cf8;font-size:12px;text-decoration:none;">Ver Dashboard</a>
+      <a href="https://analyzeops.com" style="color:#4f46e5;font-size:12px;text-decoration:none;">Ver Dashboard</a>
     </td>
   </tr></table>
 </td></tr>
@@ -169,138 +193,50 @@ ${overdueTasks.length > 0 ? `
 // Helper components
 // ===================================
 
-function pulseCard(icon, label, value, color, subtitle) {
+function pulseCard(label, value, color, subtitle) {
     return `<td width="33%" style="padding:6px;vertical-align:top;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;border-radius:10px;border-left:4px solid ${color};height:100%;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;border-radius:10px;border-left:4px solid ${color};height:100%;" bgcolor="#f8fafc">
     <tr><td style="padding:14px 16px;vertical-align:top;">
       <p style="margin:0;color:${color};font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">${label}</p>
-      <p style="margin:6px 0 0;color:#ffffff;font-size:26px;font-weight:800;line-height:1;">${value}</p>
-      ${subtitle ? `<p style="margin:4px 0 0;color:#94a3b8;font-size:11px;">${subtitle}</p>` : ""}
+      <p style="margin:6px 0 0;color:#1a1a2e;font-size:26px;font-weight:800;line-height:1;">${value}</p>
+      ${subtitle ? `<p style="margin:4px 0 0;color:#6b7280;font-size:11px;">${subtitle}</p>` : ""}
     </td></tr>
   </table>
 </td>`;
 }
 
-function narrativeCard(n) {
-    const borderColor = getBorderColor(n.statusEmoji);
-    const reportedBadge = n.reported
-        ? '<span style="background:#22c55e;color:#fff;font-size:9px;padding:1px 5px;border-radius:3px;margin-left:6px;font-weight:700;">REPORTO</span>'
-        : "";
-
-    // Header: Name + role + active hours | Hours big on right
-    let header = '<table width="100%" cellpadding="0" cellspacing="0"><tr>';
-    header += '<td><p style="margin:0;color:#ffffff;font-size:15px;font-weight:800;">' + n.name + reportedBadge + '</p>';
-    header += '<p style="margin:2px 0 0;color:#94a3b8;font-size:11px;">' + n.role + (n.activeHoursStr ? ' | Activo: ' + n.activeHoursStr : '') + '</p></td>';
-    header += '<td align="right" style="vertical-align:top;">';
-    header += '<p style="margin:0;color:#ffffff;font-size:22px;font-weight:800;line-height:1;">' + n.hours + 'h</p>';
-    header += '<p style="margin:2px 0 0;color:#94a3b8;font-size:10px;">registradas</p></td>';
-    header += '</tr></table>';
-
-    // Subtask summary with percentage
-    var subtasksPctVal = n.subtasksPct || 0;
-    var subtaskColor = subtasksPctVal >= 80 ? '#22c55e' : subtasksPctVal >= 50 ? '#f59e0b' : '#ef4444';
-    var subtaskSummary = n.subtasksTotal > 0
-        ? '<p style="margin:6px 0 0;color:#c7d2fe;font-size:12px;">Sub: <strong style="color:#fff;">' + n.subtasksCompleted + '/' + n.subtasksTotal + '</strong> <span style="color:' + subtaskColor + ';font-weight:700;">(' + subtasksPctVal + '%)</span></p>'
-        : "";
-
-    // Tasks worked on - each with hours, score bar, subtask info
-    var tasksHtml = "";
-    if (n.workedOnTasks && n.workedOnTasks.length > 0) {
-        var taskRows = "";
-        n.workedOnTasks.slice(0, 5).forEach(function(t) {
-            var sc = t.score || 50;
-            var scoreColor = sc >= 80 ? "#22c55e" : sc >= 60 ? "#f59e0b" : "#ef4444";
-
-            var subInfo = (t.subtasksTotal || 0) > 0 ? t.subtasksCompleted + "/" + t.subtasksTotal + " (" + t.subtasksPct + "%)" : "-";
-            taskRows += '<tr>';
-            taskRows += '<td style="padding:4px 0;color:#e2e8f0;font-size:12px;font-weight:500;">' + t.title + '</td>';
-            taskRows += '<td align="center" style="padding:4px 8px;color:#ffffff;font-size:12px;font-weight:700;">' + t.hours + 'h</td>';
-            taskRows += '<td align="center" style="padding:4px 4px;color:#94a3b8;font-size:10px;">' + subInfo + '</td>';
-            taskRows += '<td align="center" style="padding:4px 4px;width:50px;">';
-            taskRows += '<span style="color:' + scoreColor + ';font-size:12px;font-weight:800;">' + sc + '</span>';
-            taskRows += '</td>';
-            taskRows += '</tr>';
-        });
-        tasksHtml = '<div style="margin-top:8px;">';
-        tasksHtml += '<p style="margin:0 0 4px;color:#64748b;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">TAREAS TRABAJADAS</p>';
-        tasksHtml += '<table width="100%" cellpadding="0" cellspacing="0">';
-        tasksHtml += '<tr><td style="padding:2px 0;color:#64748b;font-size:9px;">Tarea</td><td align="center" style="padding:2px 8px;color:#64748b;font-size:9px;">Horas</td><td align="center" style="padding:2px 4px;color:#64748b;font-size:9px;">Sub</td><td align="center" style="padding:2px 4px;color:#64748b;font-size:9px;">Score</td></tr>';
-        tasksHtml += taskRows;
-        tasksHtml += '</table></div>';
-    } else {
-        tasksHtml = '<p style="margin:8px 0 0;color:#f87171;font-size:12px;">Sin registro de trabajo</p>';
+function alertCard(a) {
+    var colors = { critical: "#dc2626", high: "#ea580c", medium: "#d97706" };
+    var color = colors[a.severity] || "#9ca3af";
+    var bgColors = { critical: "#fef2f2", high: "#fff7ed", medium: "#fffbeb" };
+    var bgColor = bgColors[a.severity] || "#f9fafb";
+    var html = '<div style="background-color:' + bgColor + ';border-radius:8px;padding:12px 16px;margin-bottom:8px;border-left:3px solid ' + color + ';" bgcolor="' + bgColor + '">';
+    html += '<p style="margin:0;color:#1a1a2e;font-size:13px;font-weight:600;">' + (a.icon || '') + ' ' + a.text + '</p>';
+    if (a.projectName) {
+        html += '<p style="margin:2px 0 0;color:#6366f1;font-size:10px;font-weight:600;">📁 ' + a.projectName + '</p>';
     }
-
-    // Completed tasks
-    var completedList = n.completedTasks.length > 0
-        ? '<div style="margin-top:6px;padding:6px 8px;background:#064e3b;border-radius:6px;"><p style="margin:0;color:#86efac;font-size:11px;font-weight:600;">Tareas completadas: ' + n.completedTasks.join(", ") + '</p></div>'
-        : "";
-
-    // Plan vs Real bar
-    var planBar = "";
-    if (n.plannedHours > 0) {
-        var planColor = n.planPct >= 80 ? "#22c55e" : n.planPct >= 60 ? "#f59e0b" : "#ef4444";
-        var planWidth = Math.min(100, n.planPct);
-        planBar = '<div style="margin-top:8px;">';
-        planBar += '<table width="100%" cellpadding="0" cellspacing="0"><tr>';
-        planBar += '<td style="color:#94a3b8;font-size:10px;white-space:nowrap;">Plan: ' + n.plannedHours + 'h</td>';
-        planBar += '<td style="padding:0 8px;width:100%;"><div style="background:#1e293b;border-radius:4px;height:8px;overflow:hidden;"><div style="background:' + planColor + ';height:100%;width:' + planWidth + '%;border-radius:4px;"></div></div></td>';
-        planBar += '<td style="color:' + planColor + ';font-size:11px;font-weight:700;white-space:nowrap;">' + n.planPct + '%</td>';
-        planBar += '</tr></table></div>';
+    if (a.detail) {
+        html += '<p style="margin:4px 0 0;color:#6b7280;font-size:11px;">' + a.detail + '</p>';
     }
-
-    // Subtasks completed today - grouped by parent task
-    var subtasksTodayHtml = "";
-    if (n.subtasksCompletedTodayList && n.subtasksCompletedTodayList.length > 0) {
-        var grouped = {};
-        n.subtasksCompletedTodayList.forEach(function(st) {
-            if (!grouped[st.parentTaskTitle]) grouped[st.parentTaskTitle] = [];
-            grouped[st.parentTaskTitle].push(st.title);
-        });
-        var items = "";
-        for (var parentTitle in grouped) {
-            items += '<p style="margin:3px 0 0;color:#a5b4fc;font-size:11px;font-weight:600;">' + parentTitle + '</p>';
-            grouped[parentTitle].forEach(function(sub) {
-                items += '<p style="margin:1px 0 0 12px;color:#86efac;font-size:11px;">&#10003; ' + sub + '</p>';
+    // Subtasks
+    if (a.subtasks && a.subtasks.total > 0) {
+        html += '<p style="margin:6px 0 2px;color:#6b7280;font-size:10px;font-weight:600;">Subtareas: ' + a.subtasks.completed + '/' + a.subtasks.total + ' completadas</p>';
+        if (a.subtasks.completedList && a.subtasks.completedList.length > 0) {
+            a.subtasks.completedList.forEach(function(s) {
+                html += '<p style="margin:1px 0 0 8px;color:#15803d;font-size:10px;">&#10003; ' + s + '</p>';
             });
         }
-        subtasksTodayHtml = '<div style="margin-top:8px;padding:8px 10px;background:#1e293b;border-radius:6px;border-left:2px solid #22c55e;">';
-        subtasksTodayHtml += '<p style="margin:0;color:#22c55e;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">AVANCE HOY: +' + n.subtasksCompletedTodayList.length + ' subtareas</p>';
-        subtasksTodayHtml += items + '</div>';
+        if (a.subtasks.pendingList && a.subtasks.pendingList.length > 0) {
+            a.subtasks.pendingList.forEach(function(s) {
+                html += '<p style="margin:1px 0 0 8px;color:#9ca3af;font-size:10px;">&#9675; ' + s + '</p>';
+            });
+        }
     }
-
-    return '<div style="background:#0f172a;border-radius:10px;padding:14px 18px;margin-bottom:10px;border-left:4px solid ' + borderColor + ';">'
-        + header + subtaskSummary + tasksHtml + completedList + planBar + subtasksTodayHtml
-        + '</div>';
-}
-
-function getBorderColor(emoji) {
-    if (!emoji) return "#ef4444";
-    if (emoji.indexOf("\uD83D\uDFE2") >= 0) return "#22c55e";
-    if (emoji.indexOf("\uD83D\uDFE1") >= 0) return "#f59e0b";
-    if (emoji.indexOf("\uD83D\uDFE0") >= 0) return "#f97316";
-    return "#ef4444";
-}
-
-function productivityCard(a) {
-    var borderColor = a.severity === "critical" ? "#dc2626" : "#f97316";
-    var detailsHtml = a.details.map(function(d) { return '<p style="margin:3px 0 0 12px;color:#e2e8f0;font-size:12px;">' + d + '</p>'; }).join("");
-    var workedOnHtml = a.workedOn ? '<p style="margin:4px 0 0 12px;color:#94a3b8;font-size:11px;">Trabajo en: ' + a.workedOn + '</p>' : "";
-    return '<div style="background:#1c1917;border-radius:8px;padding:12px 16px;margin-bottom:8px;border-left:3px solid ' + borderColor + ';">'
-        + '<p style="margin:0;color:#fca5a5;font-size:14px;font-weight:600;">' + a.name + ' <span style="color:#94a3b8;font-size:12px;font-weight:400;">(' + a.hours + 'h registradas)</span></p>'
-        + detailsHtml + workedOnHtml
-        + '<p style="margin:6px 0 0;color:#818cf8;font-size:11px;font-weight:600;">--> ' + a.action + '</p>'
-        + '</div>';
-}
-
-function alertCard(a) {
-    var colors = { critical: "#ef4444", high: "#f97316", medium: "#f59e0b" };
-    var color = colors[a.severity] || "#64748b";
-    return '<div style="background:#0f172a;border-radius:8px;padding:12px 16px;margin-bottom:8px;border-left:3px solid ' + color + ';">'
-        + '<p style="margin:0;color:#f1f5f9;font-size:13px;font-weight:600;">' + (a.icon || '') + ' ' + a.text + '</p>'
-        + (a.detail ? '<p style="margin:4px 0 0;color:#94a3b8;font-size:11px;">' + a.detail + '</p>' : '')
-        + (a.action ? '<p style="margin:4px 0 0;color:#818cf8;font-size:11px;font-weight:600;">--> ' + a.action + '</p>' : '')
-        + '</div>';
+    if (a.action) {
+        html += '<p style="margin:4px 0 0;color:#4f46e5;font-size:11px;font-weight:600;">--> ' + a.action + '</p>';
+    }
+    html += '</div>';
+    return html;
 }
 
 module.exports = { dailyPerformanceReport };

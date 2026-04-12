@@ -1,98 +1,64 @@
 /**
- * Auth Guard — V5 Centralized Admin/Role Check (O1)
- * ====================================================
+ * Auth Guard — Centralized Middleware for Cloud Functions
+ * ========================================================
  * 
- * Replaces 14+ copy-paste admin checks in Cloud Functions with a
- * single helper that:
- *   1. Reads `users.rbacRole` (V5 source of truth)
- *   2. Falls back to `users_roles.role` during migration
- *   3. Returns the resolved role
- *   4. Throws HttpsError for auth/permission failures
+ * Unified RBAC check for Cloud Functions.
+ * Reads from `users/{uid}.rbacRole` as the single source of truth.
  * 
- * MIGRATION PLAN:
- *   M7: Client RoleContext reads from users.rbacRole
- *   M8: This helper reads from users first (current phase)
- *   Post-M8: Remove fallback, freeze users_roles
+ * Usage:
+ *   const { requireAdmin, requireEditor } = require("../middleware/authGuard");
+ *   await requireAdmin(adminDb, request);
  */
-
 const { HttpsError } = require("firebase-functions/v2/https");
 
 /**
- * Get the RBAC role for a user from Firestore.
- * Reads from `users.rbacRole` first (V5), falls back to `users_roles.role`.
- *
+ * Get RBAC role from users/{uid}.rbacRole.
+ * Returns "viewer" if no role is found.
+ * 
  * @param {FirebaseFirestore.Firestore} adminDb
- * @param {string} uid - Firebase Auth UID
- * @returns {Promise<string>} The role: 'admin', 'editor', or 'viewer'
+ * @param {string} uid
+ * @returns {Promise<string>}
  */
 async function getUserRbacRole(adminDb, uid) {
-    // V5: Try users/{uid}.rbacRole first
     const userDoc = await adminDb.collection("users").doc(uid).get();
-    if (userDoc.exists) {
-        const rbacRole = userDoc.data().rbacRole;
-        if (rbacRole) return rbacRole;
-        // Fallback: some users migrated before rbacRole was added
-        const legacyRole = userDoc.data().role;
-        if (legacyRole) return legacyRole;
+    if (userDoc.exists && userDoc.data().rbacRole) {
+        return userDoc.data().rbacRole;
     }
-
-    // Migration fallback: read from users_roles (legacy)
-    const roleDoc = await adminDb.collection("users_roles").doc(uid).get();
-    if (roleDoc.exists) {
-        return roleDoc.data().role || "viewer";
-    }
-
-    return "viewer"; // Default for unknown users
+    return "viewer";
 }
 
 /**
- * Require that the caller is authenticated.
- * Throws HttpsError if not.
- *
- * @param {Object} request - Cloud Function request object
- */
-function requireAuth(request) {
-    if (!request.auth) {
-        throw new HttpsError("unauthenticated", "User must be authenticated.");
-    }
-}
-
-/**
- * Require that the caller has admin role.
- * Checks users.rbacRole (V5) with fallback to users_roles.role.
- *
+ * Require admin role. Throws HttpsError if not admin.
+ * 
  * @param {FirebaseFirestore.Firestore} adminDb
- * @param {Object} request - Cloud Function request object
- * @returns {Promise<string>} The user's UID (for convenience)
+ * @param {Object} request - Cloud Function request with request.auth
+ * @throws {HttpsError}
  */
 async function requireAdmin(adminDb, request) {
-    requireAuth(request);
+    if (!request.auth) {
+        throw new HttpsError("unauthenticated", "Authentication required.");
+    }
     const role = await getUserRbacRole(adminDb, request.auth.uid);
     if (role !== "admin") {
         throw new HttpsError("permission-denied", "Admin access required.");
     }
-    return request.auth.uid;
 }
 
 /**
- * Require that the caller has editor or admin role.
- *
+ * Require editor or admin role.
+ * 
  * @param {FirebaseFirestore.Firestore} adminDb
- * @param {Object} request - Cloud Function request object
- * @returns {Promise<string>} The user's UID (for convenience)
+ * @param {Object} request
+ * @throws {HttpsError}
  */
 async function requireEditor(adminDb, request) {
-    requireAuth(request);
+    if (!request.auth) {
+        throw new HttpsError("unauthenticated", "Authentication required.");
+    }
     const role = await getUserRbacRole(adminDb, request.auth.uid);
-    if (role !== "admin" && role !== "editor") {
+    if (!["admin", "editor"].includes(role)) {
         throw new HttpsError("permission-denied", "Editor access required.");
     }
-    return request.auth.uid;
 }
 
-module.exports = {
-    getUserRbacRole,
-    requireAuth,
-    requireAdmin,
-    requireEditor,
-};
+module.exports = { getUserRbacRole, requireAdmin, requireEditor };

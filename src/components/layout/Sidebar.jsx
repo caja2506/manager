@@ -38,7 +38,7 @@ const SECTIONS = [
     },
     {
         key: 'engineering',
-        label: 'Ingeniería',
+        label: 'Gestión',
         icon: Briefcase,
         items: [
             { to: '/projects', label: 'Proyectos', icon: Briefcase, countKey: 'engProjects' },
@@ -166,23 +166,23 @@ export default function Sidebar() {
     return (
         <>
             {/* Spacer to maintain layout */}
-            <div className="hidden md:block w-[60px] bg-slate-950 shrink-0 z-40" data-sidebar />
+            <div className="hidden md:block w-[72px] bg-slate-950 shrink-0 z-40" data-sidebar />
 
             {/* ═══ TWO-COLUMN SIDEBAR ═══ */}
-            <div ref={sidebarRef} className="hidden md:flex fixed left-0 top-0 h-full z-[100]" data-sidebar>
+            <div ref={sidebarRef} className="hidden md:flex fixed left-0 top-0 h-full z-100" data-sidebar>
 
                 {/* ─── COLUMN 1: Icon Strip (always visible) ─── */}
-                <div className="w-[60px] h-full bg-slate-950 border-r border-slate-800/50 flex flex-col items-center py-3 flex-shrink-0">
+                <div className="w-[72px] h-full bg-slate-950 border-r border-slate-800/50 flex flex-col items-center py-3 shrink-0">
 
                     {/* Logo */}
                     <div className="mb-4 p-0.5">
-                        <AnalyzeOpsLogo size={34} />
+                        <AnalyzeOpsLogo size={34} animate />
                     </div>
 
                     <div className="w-8 h-px bg-slate-800 mb-3" />
 
                     {/* Section Icons */}
-                    <nav className="flex-1 flex flex-col items-center gap-1 w-full px-2 overflow-y-auto scrollbar-none">
+                    <nav className="flex-1 flex flex-col items-center gap-0.5 w-full px-1 overflow-y-auto scrollbar-none">
                         {SECTIONS.map(section => {
                             const Icon = section.icon;
                             const isActive = activeSection === section.key;
@@ -191,28 +191,22 @@ export default function Sidebar() {
                                 <button
                                     key={section.key}
                                     onClick={() => handleIconClick(section)}
-                                    title={section.label}
                                     className={`
-                                        group/icon relative w-10 h-10 rounded-xl flex items-center justify-center
+                                        group/icon relative w-full py-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5
                                         transition-all duration-200 ease-out
                                         ${isActive
-                                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/25'
+                                            ? 'bg-indigo-600/15 text-indigo-400'
                                             : isPanelOpen
                                                 ? 'bg-slate-800 text-white'
                                                 : 'text-slate-500 hover:text-slate-200 hover:bg-slate-800/60'
                                         }
                                     `}
                                 >
+                                    {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-indigo-500" />}
                                     <Icon className="w-[18px] h-[18px]" />
-                                    {/* Tooltip */}
-                                    {!openPanel && (
-                                        <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-slate-800 text-white text-xs font-semibold rounded-lg
-                                            opacity-0 group-hover/icon:opacity-100 pointer-events-none transition-opacity duration-150 whitespace-nowrap
-                                            shadow-lg shadow-black/30 border border-slate-700/50 z-50">
-                                            {section.label}
-                                            <div className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-r-[5px] border-r-slate-800" />
-                                        </div>
-                                    )}
+                                    <span className={`text-[9px] font-semibold leading-tight truncate max-w-[62px] text-center ${
+                                        isActive ? 'text-indigo-400' : 'text-slate-500 group-hover/icon:text-slate-300'
+                                    }`}>{section.label}</span>
                                 </button>
                             );
                         })}
@@ -220,30 +214,25 @@ export default function Sidebar() {
                         {/* Admin icon */}
                         {isAdmin && (
                             <>
-                                <div className="w-6 h-px bg-slate-800 my-1" />
+                                <div className="w-10 h-px bg-slate-800 my-1" />
                                 <button
                                     onClick={() => handleIconClick(ADMIN_SECTION)}
-                                    title="Admin"
                                     className={`
-                                        group/icon relative w-10 h-10 rounded-xl flex items-center justify-center
+                                        group/icon relative w-full py-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5
                                         transition-all duration-200 ease-out
                                         ${activeSection === 'admin'
-                                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/25'
+                                            ? 'bg-indigo-600/15 text-indigo-400'
                                             : openPanel === 'admin'
                                                 ? 'bg-slate-800 text-white'
                                                 : 'text-slate-500 hover:text-slate-200 hover:bg-slate-800/60'
                                         }
                                     `}
                                 >
+                                    {activeSection === 'admin' && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-indigo-500" />}
                                     <Settings className="w-[18px] h-[18px]" />
-                                    {!openPanel && (
-                                        <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-slate-800 text-white text-xs font-semibold rounded-lg
-                                            opacity-0 group-hover/icon:opacity-100 pointer-events-none transition-opacity duration-150 whitespace-nowrap
-                                            shadow-lg shadow-black/30 border border-slate-700/50 z-50">
-                                            Admin
-                                            <div className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-r-[5px] border-r-slate-800" />
-                                        </div>
-                                    )}
+                                    <span className={`text-[9px] font-semibold leading-tight ${
+                                        activeSection === 'admin' ? 'text-indigo-400' : 'text-slate-500 group-hover/icon:text-slate-300'
+                                    }`}>Admin</span>
                                 </button>
                             </>
                         )}
@@ -251,13 +240,13 @@ export default function Sidebar() {
 
                     <div className="w-8 h-px bg-slate-800 my-2" />
 
-                    <div className="flex flex-col items-center gap-2 pb-1">
+                    <div className="flex flex-col items-center gap-1 pb-1 w-full px-1">
                         <button
                             onClick={toggleTheme}
-                            title={isDark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
-                            className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:text-amber-400 hover:bg-amber-950/30 transition-all duration-200"
+                            className="group/icon w-full py-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 text-slate-500 hover:text-amber-400 hover:bg-amber-950/30 transition-all duration-200"
                         >
                             {isDark ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
+                            <span className="text-[9px] font-semibold leading-tight text-slate-500 group-hover/icon:text-amber-400">{isDark ? 'Claro' : 'Oscuro'}</span>
                         </button>
                     </div>
                 </div>

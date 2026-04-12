@@ -4,6 +4,7 @@
  */
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { requireAdmin } = require("../middleware/authGuard");
 
 const MODEL_NAME = "gemini-2.5-flash";
 
@@ -11,7 +12,7 @@ function createAnalyticsExports(adminDb, secrets) {
     const { geminiApiKey } = secrets;
 
     const scheduledAudit = onSchedule(
-        { schedule: "0 6 * * *", timeZone: "America/Mexico_City", timeoutSeconds: 120 },
+        { schedule: "0 6 * * *", timeZone: "America/Costa_Rica", timeoutSeconds: 120 },
         async () => {
             console.log("Starting scheduled daily audit...");
             try {
@@ -91,7 +92,7 @@ function createAnalyticsExports(adminDb, secrets) {
     );
 
     const weeklyBriefGenerator = onSchedule(
-        { schedule: "0 7 * * 1", timeZone: "America/Mexico_City", timeoutSeconds: 120, secrets: [geminiApiKey] },
+        { schedule: "0 7 * * 1", timeZone: "America/Costa_Rica", timeoutSeconds: 120, secrets: [geminiApiKey] },
         async () => {
             console.log("Starting weekly brief generation...");
             try {
@@ -133,7 +134,7 @@ function createAnalyticsExports(adminDb, secrets) {
     const { runAnalyticsRefresh, getAnalyticsDashboardData } = require("../handlers/analyticsRefreshHandler");
 
     const scheduledAnalyticsRefresh = onSchedule(
-        { schedule: "30 6 * * *", timeZone: "America/Mexico_City", timeoutSeconds: 120 },
+        { schedule: "30 6 * * *", timeZone: "America/Costa_Rica", timeoutSeconds: 120 },
         async () => {
             console.log("[scheduledAnalyticsRefresh] Starting daily analytics refresh...");
             try {
@@ -149,8 +150,7 @@ function createAnalyticsExports(adminDb, secrets) {
         { timeoutSeconds: 120 },
         async (request) => {
             if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
-            const roleDoc = await adminDb.collection("users_roles").doc(request.auth.uid).get();
-            if (!roleDoc.exists || roleDoc.data().role !== "admin") throw new HttpsError("permission-denied", "Admin access required.");
+            await requireAdmin(adminDb, request);
             const { periodType = "daily", startDate, endDate } = request.data || {};
             console.log(`[refreshAnalyticsManual] Admin ${request.auth.uid} requested ${periodType} refresh`);
             const result = await runAnalyticsRefresh(adminDb, { periodType, startDate, endDate });

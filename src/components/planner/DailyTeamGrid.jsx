@@ -206,7 +206,7 @@ export default function DailyTeamGrid({
                 <div className="inline-flex flex-col" style={{ minWidth: '100%' }}>
 
                     {/* Sticky header row */}
-                    <div className="flex shrink-0 border-b border-slate-700 bg-slate-900 z-20 sticky top-0" style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                    <div className="flex shrink-0 border-b border-slate-700 bg-slate-900 z-30 sticky top-0" style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
                         <div className="w-16 shrink-0 border-r border-slate-800 bg-slate-900" />
                         <div className="flex flex-1 min-w-0">
                             {memberLayouts.map(({ member, dynMinWidth }) => {

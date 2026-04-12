@@ -104,3 +104,21 @@ export async function fetchComments(taskId) {
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
+
+/**
+ * Fetch all comments from yesterday across all tasks (collectionGroup).
+ * @param {string} yesterdayStr — YYYY-MM-DD
+ * @returns {Array} [{ id, taskId, text, userName, createdAt }]
+ */
+export async function fetchYesterdayComments(yesterdayStr) {
+    const { collectionGroup: cg, where } = await import('firebase/firestore');
+    const start = `${yesterdayStr}T00:00:00`;
+    const end = `${yesterdayStr}T23:59:59`;
+    const q = query(
+        cg(db, 'comments'),
+        where('createdAt', '>=', start),
+        where('createdAt', '<=', end)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, taskId: d.data().taskId, ...d.data() }));
+}

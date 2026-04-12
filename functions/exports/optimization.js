@@ -3,6 +3,7 @@
  * [Phase M.5] Optimization scan, simulations, dashboard.
  */
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { requireAdmin } = require("../middleware/authGuard");
 
 function createOptimizationExports(adminDb) {
     const { runOptimizationScan: doScan, getOptimizationDashboardData, handleSimulation } = require("../handlers/optimizationHandler");
@@ -11,8 +12,7 @@ function createOptimizationExports(adminDb) {
         { timeoutSeconds: 120 },
         async (request) => {
             if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
-            const roleDoc = await adminDb.collection("users_roles").doc(request.auth.uid).get();
-            if (!roleDoc.exists || roleDoc.data().role !== "admin") throw new HttpsError("permission-denied", "Admin access required.");
+            await requireAdmin(adminDb, request);
             const { periodType = "daily" } = request.data || {};
             console.log(`[runOptimizationScan] Admin ${request.auth.uid} requested scan`);
             const result = await doScan(adminDb, { periodType });
@@ -24,8 +24,7 @@ function createOptimizationExports(adminDb) {
         { timeoutSeconds: 30 },
         async (request) => {
             if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
-            const roleDoc = await adminDb.collection("users_roles").doc(request.auth.uid).get();
-            if (!roleDoc.exists || roleDoc.data().role !== "admin") throw new HttpsError("permission-denied", "Admin access required.");
+            await requireAdmin(adminDb, request);
             const { type, params } = request.data || {};
             if (!type) throw new HttpsError("invalid-argument", "Simulation type is required.");
             const result = await handleSimulation(adminDb, { type, params }, request.auth.uid);

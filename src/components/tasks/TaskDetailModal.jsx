@@ -6,10 +6,11 @@ import {
 import { createTask, updateTask, updateTaskStatus, deleteTask } from '../../services/taskService';
 import { handleTaskStatusTimerSync, canManageOthersTimers, addSimpleManualTimeLog } from '../../services/timeService';
 import { resolveAreaSync } from '../../services/mappingService';
-import { canAutoScheduleFor } from '../../services/autoPlannerService';
+import { canAutoScheduleFor, autoScheduleTask, determineStrategy } from '../../services/autoPlannerService';
 import { plannerService } from '../../services/plannerService';
 import { onProjectStations } from '../../services/stationService';
 import { logActivity, ACTIVITY_TYPES } from '../../services/activityLogService';
+import { getActiveAssignments } from '../../services/resourceAssignmentService';
 import { useRole } from '../../contexts/RoleContext';
 import { useAppData } from '../../contexts/AppDataContext';
 import { useEngineeringData } from '../../hooks/useEngineeringData';
@@ -37,7 +38,7 @@ export default function TaskDetailModal({
     const {
         setIsDelayReportOpen, setDelayReportTarget, setListManager,
     } = useAppData();
-    const { role, teamRole, canEditDates } = useRole();
+    const { role, teamRole, canEditDates, isAdmin } = useRole();
     const { timeLogs, engTasks, engProjects, delays, workAreaTypes } = useEngineeringData();
     const isNew = !task;
     
@@ -72,6 +73,7 @@ export default function TaskDetailModal({
     const [deleteError, setDeleteError] = useState(null);
     const [dependencies, setDependencies] = useState([]);
     const [plannerItems, setPlannerItems] = useState([]);
+    const [userPlanItems, setUserPlanItems] = useState([]); // All plan items for the assignee
     // V5: Milestones and work areas for current project
     const [projectMilestones, setProjectMilestones] = useState([]);
     const [milestoneWorkAreas, setMilestoneWorkAreas] = useState([]);
@@ -80,6 +82,15 @@ export default function TaskDetailModal({
     // Manual time tracking state
     const [isSavingManualTime, setIsSavingManualTime] = useState(false);
     const [autoPlannerOpen, setAutoPlannerOpen] = useState(false);
+    const [pendingNewTask, setPendingNewTask] = useState(null); // Task created but pending planner confirmation
+    const [resourceAssignments, setResourceAssignments] = useState([]); // engineer→technician assignments
+
+    // Load resource assignments for permission checks
+    useEffect(() => {
+        getActiveAssignments()
+            .then(setResourceAssignments)
+            .catch(err => console.warn('[TaskDetailModal] Failed to load assignments:', err));
+    }, []);
 
     useEffect(() => {
         const toDate = (iso) => iso ? iso.substring(0, 10) : '';
@@ -192,6 +203,20 @@ export default function TaskDetailModal({
         return () => { cancelled = true; };
     }, [task?.id]);
 
+    // Fetch ALL plan items for the assignee (for AvailabilityCalendar)
+    useEffect(() => {
+        const uid = form.assignedTo;
+        if (!uid) {
+            setUserPlanItems([]);
+            return;
+        }
+        let cancelled = false;
+        plannerService.getPlanItemsByUser(uid)
+            .then(items => { if (!cancelled) setUserPlanItems(items); })
+            .catch(err => console.warn('TaskDetailModal: error fetching user plan items:', err));
+        return () => { cancelled = true; };
+    }, [form.assignedTo]);
+
     if (!isOpen) return null;
 
     // ── Handlers (business logic preserved) ──
@@ -256,9 +281,39 @@ export default function TaskDetailModal({
             };
 
             if (isNew) {
-                await createTask(data, userId);
+                const newTaskId = await createTask(data, userId);
+
+                // If task has planning data, open AutoPlannerModal instead of closing
+                if (data.plannedStartDate && data.estimatedHours > 0 && data.assignedTo) {
+                    const createdTask = { ...data, id: newTaskId };
+                    setPendingNewTask(createdTask);
+                    // Fetch user's existing plan items for accurate scheduling
+                    const userItems = await plannerService.getPlanItemsByUser(data.assignedTo);
+                    setPlannerItems(userItems);
+                    setAutoPlannerOpen(true);
+                    setIsSaving(false);
+                    return; // Don't close — wait for planner modal
+                }
             } else {
                 await updateTask(task.id, data);
+
+                // ── Silent auto-plan on update if no blocks exist yet ──
+                const hasBlocks = plannerItems.length > 0;
+                if (!hasBlocks && data.plannedStartDate && data.estimatedHours > 0 && data.assignedTo) {
+                    try {
+                        const updatedTask = { ...data, id: task.id };
+                        const strategy = determineStrategy(updatedTask);
+                        if (strategy.strategy !== 'not_plannable') {
+                            const allItems = await plannerService.getPlanItemsByUser(data.assignedTo);
+                            const result = autoScheduleTask(updatedTask, allItems, { mode: 'front-loaded', createdBy: userId });
+                            for (const block of result.blocks) {
+                                await plannerService.createPlanItem(block);
+                            }
+                        }
+                    } catch (planErr) {
+                        console.warn('[TaskDetailModal] Silent auto-plan failed:', planErr);
+                    }
+                }
 
                 // ── Detect and log field changes ──
                 const loggedInUserName = teamMembers?.find(m => m.uid === userId)?.displayName || null;
@@ -479,29 +534,46 @@ export default function TaskDetailModal({
                 {/* Body — Two Columns */}
 
                 {/* ── Auto-Planner Button ── */}
-                {!isNew && task?.assignedTo && canAutoScheduleFor(teamRole, userId, task.assignedTo) && (
-                    (() => {
-                        const hasData = form.plannedStartDate || form.estimatedHours;
-                        const totalPlanned = plannerItems.reduce((s, pi) => s + (pi.plannedHours || 0), 0);
-                        const isFullyPlanned = form.estimatedHours && totalPlanned >= form.estimatedHours;
-                        return hasData && !isFullyPlanned ? (
-                            <div className="px-6 pb-2">
-                                <button
-                                    onClick={() => setAutoPlannerOpen(true)}
-                                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 hover:border-indigo-500/40 text-indigo-400 text-sm font-bold transition-all active:scale-[0.98]"
-                                >
-                                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                    </svg>
-                                    🗓️ Auto-planificar
-                                    {form.estimatedHours > 0 && (
-                                        <span className="text-[10px] ml-1 opacity-70">({form.estimatedHours}h est. — {totalPlanned.toFixed(1)}h plan.)</span>
-                                    )}
-                                </button>
-                            </div>
-                        ) : null;
-                    })()
-                )}
+                {(form.assignedTo || task?.assignedTo) && (isAdmin || isNew || canAutoScheduleFor(teamRole, userId, form.assignedTo || task?.assignedTo, resourceAssignments)) && (() => {
+                    const hasData = form.plannedStartDate || form.estimatedHours;
+                    const totalPlanned = plannerItems.reduce((s, pi) => s + (pi.plannedHours || 0), 0);
+                    const isFullyPlanned = !isNew && form.estimatedHours && totalPlanned >= form.estimatedHours;
+                    const willAutoOnSave = isNew && form.plannedStartDate && form.estimatedHours;
+                    return (
+                        <div className="px-6 pb-2">
+                            <button
+                                type="button"
+                                onClick={() => !isNew && hasData && !isFullyPlanned ? setAutoPlannerOpen(true) : null}
+                                disabled={!hasData || isFullyPlanned}
+                                className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-[0.98] ${
+                                    !hasData
+                                        ? 'bg-slate-800/50 border border-slate-700/50 text-slate-500 cursor-not-allowed'
+                                        : willAutoOnSave
+                                            ? 'bg-teal-500/10 border border-teal-500/20 text-teal-400 cursor-default'
+                                            : isFullyPlanned
+                                                ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 cursor-default'
+                                                : 'bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 hover:border-indigo-500/40 text-indigo-400'
+                                }`}
+                            >
+                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                                {!hasData
+                                    ? '⚠️ Agrega fecha inicio u horas estimadas para planificar'
+                                    : willAutoOnSave
+                                        ? `🤖 Se auto-planificará al crear (${form.estimatedHours}h)`
+                                        : isFullyPlanned
+                                            ? `✅ Completamente planificada (${totalPlanned.toFixed(1)}h)`
+                                            : <>🗓️ Auto-planificar
+                                                {form.estimatedHours > 0 && (
+                                                    <span className="text-[10px] ml-1 opacity-70">({form.estimatedHours}h est. — {totalPlanned.toFixed(1)}h plan.)</span>
+                                                )}
+                                            </>
+                                }
+                            </button>
+                        </div>
+                    );
+                })()}
                 <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
 
                     {/* Left: Content & Execution */}
@@ -532,6 +604,7 @@ export default function TaskDetailModal({
                         delays={delays}
                         dependencies={dependencies}
                         plannerItems={plannerItems}
+                        userPlanItems={userPlanItems}
                         projectMilestones={projectMilestones}
                         milestoneWorkAreas={milestoneWorkAreas}
                         onStatusChange={handleStatusChange}
@@ -545,12 +618,13 @@ export default function TaskDetailModal({
 
                 {/* Footer */}
                 <TaskFooter
-                    isNew={isNew}
+                    isNew={isNew && !pendingNewTask}
                     isSaving={isSaving}
                     canSave={!!form.title.trim()}
-                    canEdit={canEdit}
+                    canEdit={effectiveCanEdit}
                     onSave={handleSave}
-                    onClose={onClose}
+                    onClose={pendingNewTask ? onClose : onClose}
+                    willAutoPlan={isNew && !!form.plannedStartDate && !!form.estimatedHours && !!form.assignedTo}
                 />
 
                 {/* Custom Delete Confirmation Overlay */}
@@ -606,11 +680,17 @@ export default function TaskDetailModal({
             </div>
 
             {/* ── Auto-Planner Modal ── */}
-            {!isNew && task && (
+            {((!isNew && task) || pendingNewTask) && (
                 <AutoPlannerModal
                     isOpen={autoPlannerOpen}
-                    onClose={() => setAutoPlannerOpen(false)}
-                    tasks={[{ ...task, ...form, id: task.id }]}
+                    onClose={() => {
+                        setAutoPlannerOpen(false);
+                        if (pendingNewTask) {
+                            setPendingNewTask(null);
+                            onClose(); // close entire modal after planner is dismissed
+                        }
+                    }}
+                    tasks={[pendingNewTask || { ...task, ...form, id: task?.id }]}
                     existingPlanItems={plannerItems}
                     options={{
                         createdBy: userId,
@@ -626,9 +706,14 @@ export default function TaskDetailModal({
                             }
                         }
                         // Refresh planner items
-                        if (task.id) {
-                            const updated = await fetchTaskPlannerItems(task.id);
+                        const targetId = pendingNewTask?.id || task?.id;
+                        if (targetId) {
+                            const updated = await fetchTaskPlannerItems(targetId);
                             setPlannerItems(updated);
+                        }
+                        if (pendingNewTask) {
+                            setPendingNewTask(null);
+                            onClose(); // close entire modal after confirming blocks
                         }
                     }}
                 />

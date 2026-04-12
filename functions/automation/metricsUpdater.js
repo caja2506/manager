@@ -19,7 +19,7 @@ function getMetricsDocId(date, channel = AUTOMATION_CHANNELS.TELEGRAM) {
  * Get today's date string in YYYY-MM-DD format (Mexico City timezone).
  */
 function getTodayDate() {
-    return new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+    return new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
 }
 
 /**

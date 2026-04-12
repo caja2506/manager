@@ -11,7 +11,9 @@ import LoginPage from './components/auth/LoginPage';
 // --- Layout & Error Handling ---
 import AppLayout from './components/layout/AppLayout';
 import ReportsLayout from './components/layout/ReportsLayout';
+import MainLayout from './components/layout/MainLayout';
 import ErrorBoundary from './components/ErrorBoundary';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 
 // --- Pages ---
 import Dashboard from './pages/Dashboard';
@@ -170,11 +172,13 @@ export default function App() {
     <ErrorBoundary module="App">
       <Routes>
         <Route element={<AppLayout />}>
-          {/* Main */}
-          <Route path="/" element={<ErrorBoundary module="Dashboard"><Dashboard /></ErrorBoundary>} />
-          <Route path="/my-work" element={<ErrorBoundary module="Mi Trabajo"><MyWork /></ErrorBoundary>} />
-          <Route path="/overview" element={<ErrorBoundary module="Cómo Funciona"><PlatformOverview /></ErrorBoundary>} />
-          <Route path="/daily-briefing" element={<ErrorBoundary module="Daily Briefing"><DailyBriefing /></ErrorBoundary>} />
+          {/* Main — grouped under MainLayout with shared tab banner */}
+          <Route element={<MainLayout />}>
+            <Route path="/" element={<ErrorBoundary module="Dashboard"><Dashboard /></ErrorBoundary>} />
+            <Route path="/my-work" element={<ErrorBoundary module="Mi Trabajo"><MyWork /></ErrorBoundary>} />
+            <Route path="/overview" element={<ErrorBoundary module="Cómo Funciona"><PlatformOverview /></ErrorBoundary>} />
+            <Route path="/daily-briefing" element={<ErrorBoundary module="Daily Briefing"><DailyBriefing /></ErrorBoundary>} />
+          </Route>
 
           {/* AutoBOM */}
           <Route path="/bom/projects" element={<ErrorBoundary module="BOM Proyectos"><BomProjects /></ErrorBoundary>} />
@@ -219,10 +223,12 @@ export default function App() {
           <Route path="/bom/lists" element={<ErrorBoundary module="Listas BOM"><BomListsPage /></ErrorBoundary>} />
           <Route path="/engineering/lists" element={<ErrorBoundary module="Clasificadores"><EngineeringListsPage /></ErrorBoundary>} />
 
-          {/* Admin */}
-          <Route path="/automation" element={<ErrorBoundary module="Automatización"><AutomationControlCenter /></ErrorBoundary>} />
-          <Route path="/settings" element={<ErrorBoundary module="Configuración"><SettingsPage /></ErrorBoundary>} />
-          <Route path="/system/data-flow" element={<ErrorBoundary module="Arquitectura de Datos"><DataFlowPage /></ErrorBoundary>} />
+          {/* Admin — Protected routes (require admin role) */}
+          <Route element={<ProtectedRoute requiredRole="admin" />}>
+            <Route path="/automation" element={<ErrorBoundary module="Automatización"><AutomationControlCenter /></ErrorBoundary>} />
+            <Route path="/settings" element={<ErrorBoundary module="Configuración"><SettingsPage /></ErrorBoundary>} />
+            <Route path="/system/data-flow" element={<ErrorBoundary module="Arquitectura de Datos"><DataFlowPage /></ErrorBoundary>} />
+          </Route>
 
           {/* Catch-all redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />

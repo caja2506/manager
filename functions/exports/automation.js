@@ -4,6 +4,7 @@
  */
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { requireAdmin } = require("../middleware/authGuard");
 
 function createAutomationExports(adminDb, secrets) {
     const { telegramBotToken, geminiApiKey, resendApiKey } = secrets;
@@ -38,14 +39,30 @@ function createAutomationExports(adminDb, secrets) {
                     // Skip routines managed by daySchedule settings
                     if (DAY_SCHEDULE_ROUTINES.has(key)) continue;
 
-                    if (routine.scheduleType !== "daily") continue;
-                    if (!routine.enabled) continue;
-                    if (!routine.scheduleConfig?.cron) continue;
+                    if (routine.scheduleType !== "daily") {
+                        console.log(`[scheduler] Skip "${key}": scheduleType="${routine.scheduleType}" (not daily)`);
+                        continue;
+                    }
+                    if (!routine.enabled) {
+                        console.log(`[scheduler] Skip "${key}": disabled`);
+                        continue;
+                    }
+                    if (!routine.scheduleConfig?.cron) {
+                        console.log(`[scheduler] Skip "${key}": no cron in scheduleConfig`, JSON.stringify(routine.scheduleConfig || {}));
+                        continue;
+                    }
 
                     const cronParts = routine.scheduleConfig.cron.split(" ");
                     const cronMinute = parseInt(cronParts[0]);
                     const cronHour = parseInt(cronParts[1]);
                     const cronDays = cronParts[4] || "1-5";
+
+                    // Use the routine's own timezone (if configured) instead of global default
+                    const routineTz = routine.scheduleConfig.timezone || tz;
+                    const nowInRoutineTz = new Date(now.toLocaleString("en-US", { timeZone: routineTz }));
+                    const routineHour = nowInRoutineTz.getHours();
+                    const routineMinute = nowInRoutineTz.getMinutes();
+                    const routineDay = nowInRoutineTz.getDay();
 
                     const activeDays = new Set();
                     cronDays.split(",").forEach(segment => {
@@ -56,14 +73,18 @@ function createAutomationExports(adminDb, secrets) {
                             activeDays.add(parseInt(segment));
                         }
                     });
-                    if (!activeDays.has(currentDay)) continue;
+                    if (!activeDays.has(routineDay)) {
+                        console.log(`[scheduler] Skip "${key}": day=${routineDay} not in activeDays=[${[...activeDays]}]`);
+                        continue;
+                    }
 
                     const cronTotalMinutes = cronHour * 60 + cronMinute;
-                    const currentTotalMinutes = currentHour * 60 + currentMinute;
+                    const currentTotalMinutes = routineHour * 60 + routineMinute;
                     const diff = currentTotalMinutes - cronTotalMinutes;
+                    console.log(`[scheduler] "${key}" cron=${cronHour}:${String(cronMinute).padStart(2,'0')} tz=${routineTz} now=${routineHour}:${String(routineMinute).padStart(2,'0')} diff=${diff}`);
                     if (diff < 0 || diff >= 15) continue;
 
-                    console.log(`[scheduler] Routine "${key}" matches schedule (${cronHour}:${String(cronMinute).padStart(2, '0')}). Executing...`);
+                    console.log(`[scheduler] Routine "${key}" matches schedule (${cronHour}:${String(cronMinute).padStart(2, '0')} tz=${routineTz}, now=${routineHour}:${String(routineMinute).padStart(2, '0')}). Executing...`);
                     try {
                         const options = {};
                         if (key === "morning_digest_all") options.apiKey = geminiApiKey.value();
@@ -198,8 +219,7 @@ function createAutomationExports(adminDb, secrets) {
         { secrets: [telegramBotToken], timeoutSeconds: 30 },
         async (request) => {
             if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
-            const roleDoc = await adminDb.collection("users_roles").doc(request.auth.uid).get();
-            if (!roleDoc.exists || roleDoc.data().role !== "admin") throw new HttpsError("permission-denied", "Admin access required.");
+            await requireAdmin(adminDb, request);
             const { userId, message } = request.data;
             if (!userId) throw new HttpsError("invalid-argument", "userId is required.");
             try {

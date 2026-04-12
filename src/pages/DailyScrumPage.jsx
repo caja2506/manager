@@ -12,13 +12,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     Users, AlertTriangle, CheckCircle2, Clock, Shield,
-    Repeat2, ChevronDown, ChevronUp, X, ArrowRightLeft,
-    ListTodo, CalendarCheck, UserCheck, RefreshCw, Activity,
-    Briefcase, Eye
+    Repeat2, X, ArrowRightLeft,
+    ListTodo, CalendarCheck, UserCheck, RefreshCw, Activity
 } from 'lucide-react';
 import { useEngineeringData } from '../hooks/useEngineeringData';
 import { useAuth } from '../contexts/AuthContext';
-import PageHeader from '../components/layout/PageHeader';
+import TaskModuleBanner from '../components/layout/TaskModuleBanner';
 import {
     getActiveAssignments,
     reassignTechnician,
@@ -30,6 +29,7 @@ import {
     PERSON_STATUS,
 } from '../core/dailyScrum/dailyScrumEngine';
 import { getActiveTeamMembers } from '../utils/teamFilters';
+import { fetchYesterdayComments } from '../services/commentService';
 
 // ─── Role config (match Team page) ───
 const ROLE_CONFIG = {
@@ -334,7 +334,7 @@ function PersonCard({ person, teamMembers, onReassign }) {
 
 // ─── Main Page ───
 export default function DailyScrumPage() {
-    const { engTasks, teamMembers, timeLogs, delays } = useEngineeringData();
+    const { engTasks, engSubtasks, engProjects, teamMembers, timeLogs, delays } = useEngineeringData();
     const { user } = useAuth();
     const userId = user?.uid;
 
@@ -343,6 +343,7 @@ export default function DailyScrumPage() {
     const [reassigning, setReassigning] = useState(null);
     const [refreshKey, setRefreshKey] = useState(0);
     const [statusFilter, setStatusFilter] = useState(null);
+    const [ydComments, setYdComments] = useState([]);
 
     // Load assignments
     useEffect(() => {
@@ -360,6 +361,18 @@ export default function DailyScrumPage() {
         return () => { cancelled = true; };
     }, [refreshKey]);
 
+    // Load yesterday comments
+    useEffect(() => {
+        const yd = new Date();
+        yd.setDate(yd.getDate() - 1);
+        if (yd.getDay() === 0) yd.setDate(yd.getDate() - 2);
+        if (yd.getDay() === 6) yd.setDate(yd.getDate() - 1);
+        const yStr = `${yd.getFullYear()}-${String(yd.getMonth()+1).padStart(2,'0')}-${String(yd.getDate()).padStart(2,'0')}`;
+        fetchYesterdayComments(yStr).then(setYdComments).catch(err => {
+            console.warn('[DailyScrum] Error loading yesterday comments:', err);
+        });
+    }, []);
+
     // Build scrum data
     const scrumData = useMemo(() => {
         if (loading) return [];
@@ -368,6 +381,13 @@ export default function DailyScrumPage() {
     }, [teamMembers, engTasks, timeLogs, delays, assignments, loading]);
 
     const summary = useMemo(() => buildSummary(scrumData), [scrumData]);
+
+    // Project name map
+    const projectMap = useMemo(() => {
+        const map = {};
+        engProjects.forEach(p => { map[p.id] = p.name || p.title || '?'; });
+        return map;
+    }, [engProjects]);
 
     // Engineers for reassignment
     const engineers = useMemo(() =>
@@ -385,102 +405,275 @@ export default function DailyScrumPage() {
         }
     }, [userId]);
 
-    const today = new Date();
-    const dateStr = today.toLocaleDateString('es', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+
 
     return (
-        <div className="space-y-6">
-            {/* Back Button */}
-            <PageHeader title="" showBack={true} />
+        <div className="-m-4 md:-m-8 flex flex-col bg-slate-950 text-white" style={{ minHeight: '100vh' }}>
+            <TaskModuleBanner />
 
-            {/* ─── Header ─── */}
-            <div className="flex items-center justify-between flex-wrap gap-3">
-                <div>
-                    <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-                            <Eye className="w-5 h-5 text-white" />
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-4">
+
+                {/* Summary row */}
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <SummaryCard icon={Users} label="Total" value={summary.total} color="indigo"
+                        active={statusFilter === null}
+                        onClick={() => setStatusFilter(null)} />
+                    <SummaryCard icon={CheckCircle2} label="OK" value={summary.ok} color="emerald"
+                        active={statusFilter === 'ok'}
+                        onClick={() => setStatusFilter(f => f === 'ok' ? null : 'ok')} />
+                    <SummaryCard icon={Activity} label="Sin tareas" value={summary.sin_tareas} color="amber"
+                        alert={summary.sin_tareas > 0}
+                        active={statusFilter === 'sin_tareas'}
+                        onClick={() => setStatusFilter(f => f === 'sin_tareas' ? null : 'sin_tareas')} />
+                    <SummaryCard icon={AlertTriangle} label="Sin reporte" value={summary.sin_reporte} color="rose"
+                        alert={summary.sin_reporte > 0}
+                        active={statusFilter === 'sin_reporte'}
+                        onClick={() => setStatusFilter(f => f === 'sin_reporte' ? null : 'sin_reporte')} />
+                    <SummaryCard icon={Shield} label="Bloqueados" value={summary.bloqueado} color="rose"
+                        alert={summary.bloqueado > 0}
+                        active={statusFilter === 'bloqueado'}
+                        onClick={() => setStatusFilter(f => f === 'bloqueado' ? null : 'bloqueado')} />
+                </div>
+
+                {/* Filter indicator */}
+                {statusFilter && (
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-500">Filtrando por:</span>
+                        <button onClick={() => setStatusFilter(null)}
+                            className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-bold hover:bg-indigo-500/20 transition-colors">
+                            {statusFilter === 'ok' ? '✅ OK' : statusFilter === 'sin_tareas' ? '⚡ Sin tareas' : statusFilter === 'sin_reporte' ? '⚠️ Sin reporte' : '🛡️ Bloqueados'}
+                            <X className="w-3 h-3" />
+                        </button>
+                    </div>
+                )}
+
+                {/* Loading */}
+                {loading && (
+                    <div className="text-center py-16 text-slate-500 text-sm font-medium">Cargando equipo...</div>
+                )}
+
+                {/* TABLE */}
+                {!loading && scrumData.length > 0 && (
+                    <div className="rounded-xl border border-slate-800/60 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="bg-slate-900/80 border-b border-slate-800/50">
+                                        <th className="px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Miembro</th>
+                                        <th className="px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado</th>
+                                        <th className="px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Ayer (h)</th>
+                                        <th className="px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tareas de Ayer</th>
+                                        <th className="px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">% Avance</th>
+                                        <th className="px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tareas Hoy</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800/40">
+                                    {scrumData
+                                        .filter(person => !statusFilter || person.status === statusFilter)
+                                        .sort((a, b) => {
+                                            const order = { ok: 0, bloqueado: 1, sin_tareas: 2, sin_reporte: 3 };
+                                            return (order[a.status] ?? 9) - (order[b.status] ?? 9);
+                                        })
+                                        .map(person => {
+                                            const cfg = person.statusConfig;
+                                            const nameParts = (person.displayName || '?').split(' ');
+                                            const shortName = nameParts.length > 1
+                                                ? `${nameParts[0]} ${nameParts[1][0]}.`
+                                                : nameParts[0];
+                                            // % avance: avg percentComplete of person's tasks
+                                            const personTasks = engTasks.filter(t => t.assignedTo === person.uid && t.status !== 'completed');
+                                            const avgPct = personTasks.length > 0
+                                                ? Math.round(personTasks.reduce((s, t) => s + (t.percentComplete || 0), 0) / personTasks.length)
+                                                : 0;
+
+                                            return (
+                                                <tr key={person.uid} className="hover:bg-slate-800/40 transition-colors">
+                                                    <td className="px-4 py-3">
+                                                        <span className="text-xs font-bold text-white">{shortName}</span>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <span className="px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wide inline-flex items-center gap-1"
+                                                            style={{ background: cfg.bgColor, border: `1px solid ${cfg.borderColor}`, color: cfg.color }}>
+                                                            {cfg.emoji} {cfg.label}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        {person.yesterdayEvidence.hasEvidence ? (
+                                                            <span className="text-xs font-bold text-emerald-400">{person.yesterdayEvidence.totalHours.toFixed(1)}h</span>
+                                                        ) : (
+                                                            <span className="text-[10px] font-bold text-red-400">{"\u26A0"} 0h</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-2">
+                                                        {(() => {
+                                                            // Calculate yesterday (skip weekends)
+                                                            const yd = new Date();
+                                                            yd.setDate(yd.getDate() - 1);
+                                                            if (yd.getDay() === 0) yd.setDate(yd.getDate() - 2);
+                                                            if (yd.getDay() === 6) yd.setDate(yd.getDate() - 1);
+                                                            const yStr = `${yd.getFullYear()}-${String(yd.getMonth()+1).padStart(2,'0')}-${String(yd.getDate()).padStart(2,'0')}`;
+
+                                                            // Get all person's tasks and find subtasks completed yesterday
+                                                            const pTaskIds = new Set(engTasks.filter(t => t.assignedTo === person.uid).map(t => t.id));
+                                                            const allSubs = engSubtasks.filter(s => pTaskIds.has(s.taskId));
+                                                            const completedYesterday = allSubs.filter(s => {
+                                                                if (!s.completed) return false;
+                                                                const cAt = s.completedAt;
+                                                                if (!cAt) return false;
+                                                                const d = typeof cAt === 'string' ? new Date(cAt) : (cAt.toDate ? cAt.toDate() : new Date(cAt));
+                                                                if (isNaN(d.getTime())) return false;
+                                                                return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` === yStr;
+                                                            });
+
+                                                            // Group by parent task
+                                                            const taskMap = {};
+                                                            completedYesterday.forEach(sub => {
+                                                                if (!taskMap[sub.taskId]) taskMap[sub.taskId] = [];
+                                                                taskMap[sub.taskId].push(sub);
+                                                            });
+                                                            const taskEntries = Object.entries(taskMap);
+
+                                                            // Filter yesterday comments for this person's tasks
+                                                            const personYdComments = ydComments.filter(c => pTaskIds.has(c.taskId));
+
+                                                            if (taskEntries.length === 0 && personYdComments.length === 0) {
+                                                                return <span className="text-[10px] text-slate-600">{"\u2014"}</span>;
+                                                            }
+
+                                                            return (
+                                                                <div className="space-y-2">
+                                                                    {taskEntries.map(([taskId, subs]) => {
+                                                                        const parentTask = engTasks.find(t => t.id === taskId);
+                                                                        return (
+                                                                            <div key={taskId} className="border-l-2 border-emerald-500/40 pl-2">
+                                                                                <div className="flex items-center gap-1.5">
+                                                                                    <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-emerald-400" />
+                                                                                    <span className="text-[11px] font-bold text-slate-300 truncate max-w-[180px]">{parentTask?.title || '?'}</span>
+                                                                                    <span className="text-[9px] font-bold px-1 py-0.5 rounded shrink-0 bg-emerald-500/15 text-emerald-400">
+                                                                                        {subs.length}
+                                                                                    </span>
+                                                                                </div>
+                                                                                {parentTask?.projectId && projectMap[parentTask.projectId] && (
+                                                                                    <span className="text-[8px] text-indigo-400/70 font-semibold ml-3">{"\uD83D\uDCC1"} {projectMap[parentTask.projectId]}</span>
+                                                                                )}
+                                                                                <div className="ml-3 mt-0.5 space-y-0.5">
+                                                                                    {subs.slice(0, 5).map(sub => (
+                                                                                        <div key={sub.id} className="flex items-center gap-1 text-[10px]">
+                                                                                            <span className="text-emerald-400 shrink-0">{"\u2713"}</span>
+                                                                                            <span className="text-emerald-300/70">{sub.title}</span>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                    {subs.length > 5 && (
+                                                                                        <span className="text-[9px] text-slate-600">+{subs.length - 5} m{"\u00E1"}s</span>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                    {/* Yesterday comments */}
+                                                                    {personYdComments.length > 0 && (
+                                                                        <div className="mt-1 space-y-0.5">
+                                                                            {personYdComments.slice(0, 5).map(c => (
+                                                                                <div key={c.id} className="flex items-start gap-1 text-[10px]">
+                                                                                    <span className="text-indigo-400 shrink-0">{"\uD83D\uDCAC"}</span>
+                                                                                    <span className="text-indigo-300/80"><strong>{c.userName || '?'}:</strong> {(c.text || '').slice(0, 80)}</span>
+                                                                                </div>
+                                                                            ))}
+                                                                            {personYdComments.length > 5 && (
+                                                                                <span className="text-[9px] text-slate-600">+{personYdComments.length - 5} m{"\u00E1"}s</span>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })()}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <span className={`text-xs font-bold ${avgPct >= 60 ? 'text-emerald-400' : avgPct >= 30 ? 'text-amber-400' : 'text-slate-500'}`}>
+                                                            {avgPct}%
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-2">
+                                                        {person.todayTasks.length > 0 ? (
+                                                            <div className="space-y-2">
+                                                                {person.todayTasks.map(task => {
+                                                                    const taskSubs = engSubtasks.filter(s => s.taskId === task.id);
+                                                                    const pendingSubs = taskSubs.filter(s => !s.completed);
+                                                                    const doneCount = taskSubs.filter(s => s.completed).length;
+                                                                    const totalCount = taskSubs.length;
+                                                                    const taskPct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : (task.percentComplete || 0);
+                                                                    const taskBlockers = person.blockers.filter(bl => bl.taskId === task.id);
+                                                                    return (
+                                                                        <div key={task.id} className={`border-l-2 ${taskBlockers.length > 0 ? 'border-red-500/60' : 'border-indigo-500/40'} pl-2`}>
+                                                                            {/* Task header */}
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${taskBlockers.length > 0 ? 'bg-red-400' : taskPct === 100 ? 'bg-emerald-400' : taskPct > 0 ? 'bg-indigo-400' : 'bg-slate-600'}`} />
+                                                                                <span className="text-[11px] font-bold text-slate-200 truncate max-w-[180px]">{task.title}</span>
+                                                                                <span className={`text-[9px] font-bold px-1 py-0.5 rounded shrink-0 ${taskPct === 100 ? 'bg-emerald-500/15 text-emerald-400' : taskPct > 0 ? 'bg-indigo-500/15 text-indigo-400' : 'bg-slate-700/50 text-slate-500'}`}>
+                                                                                    {taskPct}%
+                                                                                </span>
+                                                                            </div>
+                                                                            {task.projectId && projectMap[task.projectId] && (
+                                                                                <span className="text-[8px] text-indigo-400/70 font-semibold ml-3">{"\uD83D\uDCC1"} {projectMap[task.projectId]}</span>
+                                                                            )}
+                                                                            {/* Blockers for this task */}
+                                                                            {taskBlockers.length > 0 && (
+                                                                                <div className="ml-3 mt-0.5 space-y-0.5">
+                                                                                    {taskBlockers.map((bl, i) => (
+                                                                                        <div key={bl.id || i} className="flex items-center gap-1 text-[10px]">
+                                                                                            <span className="text-red-400 shrink-0">{"\u26D4"}</span>
+                                                                                            <span className="text-red-300 font-bold">{bl.causeName || bl.cause || 'Bloqueo'}</span>
+                                                                                            {(bl.notes || bl.comment) && (
+                                                                                                <span className="text-slate-500 truncate max-w-[120px]">— {bl.notes || bl.comment}</span>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            )}
+                                                                            {/* Only pending subtasks */}
+                                                                            {pendingSubs.length > 0 && (
+                                                                                <div className="ml-3 mt-0.5 space-y-0.5">
+                                                                                    {pendingSubs.sort((a, b) => (a.order ?? 999) - (b.order ?? 999)).slice(0, 5).map(sub => (
+                                                                                        <div key={sub.id} className="flex items-center gap-1 text-[10px]">
+                                                                                            <span className="text-slate-600 shrink-0">{"\u25CB"}</span>
+                                                                                            <span className="text-slate-400">{sub.title}</span>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                    {pendingSubs.length > 5 && (
+                                                                                        <span className="text-[9px] text-slate-600">+{pendingSubs.length - 5} m{"\u00E1"}s</span>
+                                                                                    )}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-[10px] text-amber-400 font-medium">{"\uD83D\uDFE1"} Sin tareas</span>
+                                                        )}
+                                                    </td>
+
+                                                </tr>
+                                            );
+                                        })}
+                                </tbody>
+                            </table>
                         </div>
-                        Equipo Hoy <span className="text-base font-medium text-slate-500">(Daily Scrum Digital Dashboard)</span>
-                    </h1>
-                    <p className="text-sm text-slate-400 mt-1 capitalize">{dateStr}</p>
-                </div>
-                <button
-                    onClick={() => setRefreshKey(k => k + 1)}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800/60 border border-slate-700/50 text-sm text-slate-400 hover:text-white hover:border-slate-600 transition-all font-medium"
-                >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    Actualizar
-                </button>
+                    </div>
+                )}
+
+                {!loading && scrumData.length === 0 && (
+                    <div className="text-center py-16 text-slate-500">
+                        <Users className="w-12 h-12 mx-auto mb-3 opacity-40" />
+                        <p className="font-bold">No hay miembros del equipo</p>
+                        <p className="text-sm mt-1">Agrega miembros desde la administración de usuarios.</p>
+                    </div>
+                )}
             </div>
 
-            {/* ─── Summary Cards ─── */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                <SummaryCard icon={Users} label="Total" value={summary.total} color="indigo"
-                    active={statusFilter === null}
-                    onClick={() => setStatusFilter(null)} />
-                <SummaryCard icon={CheckCircle2} label="OK" value={summary.ok} color="emerald"
-                    active={statusFilter === 'ok'}
-                    onClick={() => setStatusFilter(f => f === 'ok' ? null : 'ok')} />
-                <SummaryCard icon={Activity} label="Sin tareas" value={summary.sin_tareas} color="amber"
-                    alert={summary.sin_tareas > 0}
-                    active={statusFilter === 'sin_tareas'}
-                    onClick={() => setStatusFilter(f => f === 'sin_tareas' ? null : 'sin_tareas')} />
-                <SummaryCard icon={AlertTriangle} label="Sin reporte" value={summary.sin_reporte} color="rose"
-                    alert={summary.sin_reporte > 0}
-                    active={statusFilter === 'sin_reporte'}
-                    onClick={() => setStatusFilter(f => f === 'sin_reporte' ? null : 'sin_reporte')} />
-                <SummaryCard icon={Shield} label="Bloqueados" value={summary.bloqueado} color="rose"
-                    alert={summary.bloqueado > 0}
-                    active={statusFilter === 'bloqueado'}
-                    onClick={() => setStatusFilter(f => f === 'bloqueado' ? null : 'bloqueado')} />
-            </div>
-
-            {/* Active filter indicator */}
-            {statusFilter && (
-                <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-500">Filtrando por:</span>
-                    <button
-                        onClick={() => setStatusFilter(null)}
-                        className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-bold hover:bg-indigo-500/20 transition-colors"
-                    >
-                        {statusFilter === 'ok' ? '✅ OK' : statusFilter === 'sin_tareas' ? '⚡ Sin tareas' : statusFilter === 'sin_reporte' ? '⚠️ Sin reporte' : '🛡️ Bloqueados'}
-                        <X className="w-3 h-3" />
-                    </button>
-                </div>
-            )}
-
-            {/* ─── Loading ─── */}
-            {loading && (
-                <div className="text-center py-16 text-slate-500 text-sm font-medium">
-                    Cargando equipo...
-                </div>
-            )}
-
-            {/* ─── Person Cards Grid ─── */}
-            {!loading && (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                    {scrumData
-                        .filter(person => !statusFilter || person.status === statusFilter)
-                        .map(person => (
-                        <PersonCard
-                            key={person.uid}
-                            person={person}
-                            teamMembers={teamMembers}
-                            onReassign={setReassigning}
-                        />
-                    ))}
-                </div>
-            )}
-
-            {!loading && scrumData.length === 0 && (
-                <div className="text-center py-16 text-slate-500">
-                    <Users className="w-12 h-12 mx-auto mb-3 opacity-40" />
-                    <p className="font-bold">No hay miembros del equipo</p>
-                    <p className="text-sm mt-1">Agrega miembros desde la administración de usuarios.</p>
-                </div>
-            )}
-
-            {/* ─── Reassignment Modal ─── */}
+            {/* Reassignment Modal */}
             {reassigning && (
                 <ReassignModal
                     person={reassigning}
@@ -492,3 +685,5 @@ export default function DailyScrumPage() {
         </div>
     );
 }
+
+

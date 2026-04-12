@@ -130,7 +130,7 @@ export default function TaskCard({ task, project, teamMembers, subtasks = [], on
 
     // ── Card class ──
     let cardCls = 'rounded-xl border p-3.5 transition-all duration-200 group cursor-grab active:cursor-grabbing relative';
-    cardCls += ' bg-slate-900/80 backdrop-blur-md border-slate-700/50 shadow-lg shadow-black/10';
+    cardCls += ' bg-slate-900/80 backdrop-blur-md border-slate-700/50 shadow-lg shadow-black/10 cursor-pointer';
     cardCls += ' hover:shadow-xl hover:shadow-black/20 hover:-translate-y-0.5 hover:border-slate-600/60';
 
     if (isDragging) cardCls += ' shadow-2xl ring-2 ring-indigo-400 scale-[1.03] z-50';
@@ -149,7 +149,7 @@ export default function TaskCard({ task, project, teamMembers, subtasks = [], on
     };
 
     return (
-        <div ref={setNodeRef} style={style} className={cardCls}>
+        <div ref={setNodeRef} style={style} className={cardCls} onClick={onClick}>
 
             {/* ── Row 1: Drag + Priority + Project ── */}
             <div className="flex items-center justify-between mb-2.5">
@@ -198,8 +198,7 @@ export default function TaskCard({ task, project, teamMembers, subtasks = [], on
 
             {/* ── Title ── */}
             <h4
-                className="font-bold text-sm text-slate-100 leading-snug mb-2.5 line-clamp-2 group-hover:text-indigo-300 transition-colors cursor-pointer"
-                onClick={onClick}
+                className="font-bold text-sm text-slate-100 leading-snug mb-2.5 line-clamp-2 group-hover:text-indigo-300 transition-colors"
             >
                 {task.title}
             </h4>

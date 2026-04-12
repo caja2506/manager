@@ -1,13 +1,14 @@
-import React, { useMemo, useState } from 'react';
-import { X, Zap, Calendar, Clock, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Info } from 'lucide-react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { X, Zap, Calendar, Clock, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Info, Users, User, Pencil } from 'lucide-react';
 import { autoScheduleTask, autoScheduleAll } from '../../services/autoPlannerService';
+import AvailabilityCalendar from './AvailabilityCalendar';
 
 /**
  * AutoPlannerModal
  * ================
  * Preview and confirmation modal for auto-scheduling tasks.
  * Shows distribution preview, strategy messages, warnings,
- * and mode selection before committing to Firestore.
+ * person filter, and mode selection before committing to Firestore.
  *
  * Props:
  *   isOpen          — boolean
@@ -23,21 +24,54 @@ export default function AutoPlannerModal({
     tasks = [],
     existingPlanItems = [],
     onConfirm,
+    onEditTask,
     options = {},
 }) {
     const [mode, setMode] = useState('front-loaded');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [expandedTask, setExpandedTask] = useState(null);
     const [includeOvertime, setIncludeOvertime] = useState(false);
+    const [selectedAssignees, setSelectedAssignees] = useState(new Set());
+    const [overrideEndDate, setOverrideEndDate] = useState('');
+
+    // ── Extract unique assignees from tasks ──
+    const assigneeOptions = useMemo(() => {
+        const members = options.teamMembers || [];
+        const uniqueIds = [...new Set(tasks.map(t => t.assignedTo).filter(Boolean))];
+        return uniqueIds.map(uid => {
+            const m = members.find(mm => mm.uid === uid);
+            return {
+                uid,
+                name: m?.displayName || m?.email || uid,
+                teamRole: m?.teamRole || '?',
+            };
+        }).sort((a, b) => a.name.localeCompare(b.name));
+    }, [tasks, options.teamMembers]);
+
+    // Auto-select all assignees when modal opens or tasks change
+    useEffect(() => {
+        if (isOpen && assigneeOptions.length > 0) {
+            setSelectedAssignees(new Set(assigneeOptions.map(a => a.uid)));
+        }
+    }, [isOpen, assigneeOptions]);
+
+    // ── Filter tasks by selected assignees + inject overrideEndDate ──
+    const filteredTasks = useMemo(() => {
+        if (selectedAssignees.size === 0) return [];
+        return tasks.filter(t => selectedAssignees.has(t.assignedTo)).map(t => ({
+            ...t,
+            plannedEndDate: t.plannedEndDate || overrideEndDate || null,
+        }));
+    }, [tasks, selectedAssignees, overrideEndDate]);
 
     // ── Compute schedule preview ──
     const preview = useMemo(() => {
-        if (!tasks.length) return null;
+        if (!filteredTasks.length) return null;
 
-        if (tasks.length === 1) {
-            const result = autoScheduleTask(tasks[0], existingPlanItems, { ...options, mode });
+        if (filteredTasks.length === 1) {
+            const result = autoScheduleTask(filteredTasks[0], existingPlanItems, { ...options, mode });
             return {
-                results: [{ task: tasks[0], ...result }],
+                results: [{ task: filteredTasks[0], ...result }],
                 globalWarnings: [],
                 totalBlocks: result.blocks.length,
                 totalHours: result.blocks.reduce((s, b) => s + b.plannedHours, 0),
@@ -46,7 +80,7 @@ export default function AutoPlannerModal({
             };
         }
 
-        const batch = autoScheduleAll(tasks, existingPlanItems, { ...options, mode });
+        const batch = autoScheduleAll(filteredTasks, existingPlanItems, { ...options, mode });
         return {
             ...batch,
             totalBlocks: batch.results.reduce((s, r) => s + r.blocks.length, 0),
@@ -56,7 +90,7 @@ export default function AutoPlannerModal({
             totalOvertimeHours: batch.results.reduce((s, r) =>
                 s + (r.overtime || []).reduce((bs, b) => bs + b.plannedHours, 0), 0),
         };
-    }, [tasks, existingPlanItems, options, mode]);
+    }, [filteredTasks, existingPlanItems, options, mode]);
 
     // ── Handlers ──
     const handleConfirm = async () => {
@@ -64,7 +98,6 @@ export default function AutoPlannerModal({
         setIsSubmitting(true);
         try {
             const allBlocks = preview.results.flatMap(r => r.blocks);
-            // Add overtime blocks if checkbox is checked
             if (includeOvertime) {
                 const overtimeBlocks = preview.results.flatMap(r => r.overtime || []);
                 allBlocks.push(...overtimeBlocks);
@@ -78,9 +111,35 @@ export default function AutoPlannerModal({
         }
     };
 
+    const toggleAssignee = (uid) => {
+        setSelectedAssignees(prev => {
+            const next = new Set(prev);
+            if (next.has(uid)) next.delete(uid);
+            else next.add(uid);
+            return next;
+        });
+    };
+
+    const selectAll = () => setSelectedAssignees(new Set(assigneeOptions.map(a => a.uid)));
+    const selectNone = () => setSelectedAssignees(new Set());
+
     if (!isOpen) return null;
 
-    const isSingle = tasks.length === 1;
+    const isSingle = tasks.length === 1 && assigneeOptions.length <= 1;
+    const roleColors = {
+        engineer: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+        technician: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
+        team_lead: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+        manager: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
+        '?': 'bg-slate-500/15 text-slate-400 border-slate-500/30',
+    };
+    const roleLabels = {
+        engineer: 'Ing',
+        technician: 'Téc',
+        team_lead: 'TL',
+        manager: 'Mgr',
+        '?': '?',
+    };
 
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in">
@@ -93,10 +152,10 @@ export default function AutoPlannerModal({
                     </div>
                     <div className="flex-1 min-w-0">
                         <h2 className="text-lg font-black text-white">
-                            {isSingle ? 'Auto-Planificar Tarea' : `Auto-Planificar ${tasks.length} Tareas`}
+                            {isSingle ? 'Auto-Planificar Tarea' : `Auto-Planificar ${filteredTasks.length} Tareas`}
                         </h2>
-                        {isSingle && (
-                            <p className="text-sm text-slate-400 truncate">{tasks[0]?.title}</p>
+                        {isSingle && filteredTasks[0] && (
+                            <p className="text-sm text-slate-400 truncate">{filteredTasks[0]?.title}</p>
                         )}
                     </div>
                     <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-800 text-slate-400 transition-colors">
@@ -104,33 +163,146 @@ export default function AutoPlannerModal({
                     </button>
                 </div>
 
-                {/* ── Mode selector ── */}
-                <div className="px-6 py-3 border-b border-slate-800/50 flex items-center gap-4">
-                    <span className="text-xs font-bold text-slate-500 uppercase">Modo:</span>
-                    <button
-                        onClick={() => setMode('front-loaded')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                            mode === 'front-loaded'
-                                ? 'bg-indigo-500/20 text-indigo-300 ring-1 ring-indigo-500/50'
-                                : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                        }`}
-                    >
-                        ⚡ Carga Temprana
-                    </button>
-                    <button
-                        onClick={() => setMode('uniform')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                            mode === 'uniform'
-                                ? 'bg-indigo-500/20 text-indigo-300 ring-1 ring-indigo-500/50'
-                                : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                        }`}
-                    >
-                        📊 Uniforme
-                    </button>
+                {/* ── Controls bar: Mode + Person filter ── */}
+                <div className="px-6 py-3 border-b border-slate-800/50 space-y-3">
+
+                    {/* Date range display */}
+                    {isSingle && filteredTasks[0] && (
+                        <div className="flex items-center gap-3 text-xs">
+                            <span className="font-bold text-slate-500 uppercase w-12">Rango:</span>
+                            <div className="flex items-center gap-2">
+                                <span className="px-2 py-1 rounded-md bg-slate-800 text-slate-300 font-mono">
+                                    📅 {filteredTasks[0].plannedStartDate || '—'}
+                                </span>
+                                <span className="text-slate-600">→</span>
+                                {tasks[0]?.plannedEndDate ? (
+                                    <span className="px-2 py-1 rounded-md bg-slate-800 text-slate-300 font-mono">
+                                        📅 {tasks[0].plannedEndDate}
+                                    </span>
+                                ) : (
+                                    <AvailabilityCalendar
+                                        value={overrideEndDate}
+                                        onChange={(date) => setOverrideEndDate(date)}
+                                        planItems={existingPlanItems}
+                                        assignedTo={filteredTasks[0].assignedTo}
+                                        minDate={filteredTasks[0].plannedStartDate ? new Date(filteredTasks[0].plannedStartDate + 'T00:00:00') : undefined}
+                                    />
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Mode selector */}
+                    {(() => {
+                        const hasEndDate = filteredTasks.every(t => !!t.plannedEndDate);
+                        return (
+                            <div className="flex items-center gap-4">
+                                <span className="text-xs font-bold text-slate-500 uppercase w-12">Modo:</span>
+                                <button
+                                    onClick={() => setMode('front-loaded')}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                        mode === 'front-loaded'
+                                            ? 'bg-indigo-500/20 text-indigo-300 ring-1 ring-indigo-500/50'
+                                            : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                                    }`}
+                                >
+                                    ⚡ Carga Temprana
+                                </button>
+                                <div className="relative group">
+                                    <button
+                                        onClick={() => hasEndDate ? setMode('uniform') : null}
+                                        disabled={!hasEndDate}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                            !hasEndDate
+                                                ? 'bg-slate-800/50 text-slate-600 cursor-not-allowed'
+                                                : mode === 'uniform'
+                                                    ? 'bg-indigo-500/20 text-indigo-300 ring-1 ring-indigo-500/50'
+                                                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                                        }`}
+                                    >
+                                        📊 Uniforme
+                                    </button>
+                                    {!hasEndDate && (
+                                        <div className="absolute left-0 top-full mt-1 px-2 py-1 bg-slate-800 border border-slate-700 rounded-md text-[10px] text-amber-400 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                            Requiere fecha de fin para distribuir uniformemente
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })()}
+
+                    {/* Person filter — only show if multiple assignees */}
+                    {assigneeOptions.length > 1 && (
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-3">
+                                <span className="text-xs font-bold text-slate-500 uppercase w-12 flex items-center gap-1">
+                                    <Users className="w-3 h-3" /> Para:
+                                </span>
+                                <div className="flex items-center gap-1.5 flex-1 flex-wrap">
+                                    {assigneeOptions.map(a => {
+                                        const isSelected = selectedAssignees.has(a.uid);
+                                        const taskCount = tasks.filter(t => t.assignedTo === a.uid).length;
+                                        return (
+                                            <button
+                                                key={a.uid}
+                                                onClick={() => toggleAssignee(a.uid)}
+                                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                                                    isSelected
+                                                        ? `${roleColors[a.teamRole] || roleColors['?']} ring-1 ring-current/30`
+                                                        : 'bg-slate-800/50 text-slate-500 border-slate-700/50 hover:bg-slate-800'
+                                                }`}
+                                                title={`${a.name} (${a.teamRole}) — ${taskCount} tareas`}
+                                            >
+                                                <span className={`text-[9px] font-black uppercase px-1 py-0.5 rounded ${
+                                                    isSelected
+                                                        ? roleColors[a.teamRole] || roleColors['?']
+                                                        : 'bg-slate-700/50 text-slate-500'
+                                                }`}>
+                                                    {roleLabels[a.teamRole] || '?'}
+                                                </span>
+                                                <span className="truncate max-w-[100px]">{a.name.split(' ')[0]}</span>
+                                                <span className={`text-[9px] ${isSelected ? 'opacity-70' : 'opacity-40'}`}>
+                                                    {taskCount}
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                {/* Select all / none */}
+                                <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                        onClick={selectAll}
+                                        className="text-[9px] font-bold text-indigo-400 hover:text-indigo-300 uppercase px-1.5 py-1 rounded hover:bg-indigo-500/10 transition-colors"
+                                        title="Seleccionar todos"
+                                    >
+                                        Todos
+                                    </button>
+                                    <span className="text-slate-700">|</span>
+                                    <button
+                                        onClick={selectNone}
+                                        className="text-[9px] font-bold text-slate-500 hover:text-slate-400 uppercase px-1.5 py-1 rounded hover:bg-slate-500/10 transition-colors"
+                                        title="Deseleccionar todos"
+                                    >
+                                        Ninguno
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* ── Content ── */}
                 <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+
+                    {/* Empty state */}
+                    {selectedAssignees.size === 0 && (
+                        <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                            <Users className="w-10 h-10 mb-3 opacity-40" />
+                            <p className="text-sm font-bold">Selecciona al menos una persona</p>
+                            <p className="text-xs mt-1 opacity-70">Usa los filtros arriba para elegir a quién planificar</p>
+                        </div>
+                    )}
 
                     {/* Summary bar */}
                     {preview && (
@@ -146,7 +318,13 @@ export default function AutoPlannerModal({
                             <div className="flex items-center gap-2">
                                 <CheckCircle2 className="w-4 h-4 text-amber-400" />
                                 <span className="text-sm font-bold text-white">
-                                    {preview.results.filter(r => r.blocks.length > 0).length} de {tasks.length} tareas
+                                    {preview.results.filter(r => r.blocks.length > 0).length} de {filteredTasks.length} tareas
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <User className="w-4 h-4 text-cyan-400" />
+                                <span className="text-sm font-bold text-white">
+                                    {selectedAssignees.size} persona{selectedAssignees.size !== 1 ? 's' : ''}
                                 </span>
                             </div>
                         </div>
@@ -176,8 +354,26 @@ export default function AutoPlannerModal({
                                     <p className="text-sm font-bold text-white truncate">{result.task.title}</p>
                                     <p className="text-[10px] text-slate-500 font-medium">
                                         {result.task.priority} · {result.blocks.length} bloques · {result.blocks.reduce((s, b) => s + b.plannedHours, 0).toFixed(1)}h
+                                        {/* Show assignee name */}
+                                        {assigneeOptions.length > 1 && (() => {
+                                            const a = assigneeOptions.find(ao => ao.uid === result.task.assignedTo);
+                                            return a ? ` · ${a.name.split(' ')[0]}` : '';
+                                        })()}
                                     </p>
                                 </div>
+                                {/* Edit task button */}
+                                {onEditTask && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onEditTask(result.task);
+                                        }}
+                                        className="p-1.5 rounded-lg hover:bg-indigo-500/20 text-slate-500 hover:text-indigo-400 transition-colors shrink-0"
+                                        title="Editar tarea"
+                                    >
+                                        <Pencil className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
                                 {(isSingle || expandedTask === idx)
                                     ? <ChevronUp className="w-4 h-4 text-slate-500" />
                                     : <ChevronDown className="w-4 h-4 text-slate-500" />
@@ -192,7 +388,8 @@ export default function AutoPlannerModal({
                                     {result.warnings?.map((w, wi) => (
                                         <div key={wi} className={`flex items-start gap-2 text-[11px] font-medium ${
                                             w.startsWith('⚠') ? 'text-amber-400' :
-                                            w.startsWith('✅') ? 'text-emerald-400' : 'text-slate-400'
+                                            w.startsWith('✅') ? 'text-emerald-400' :
+                                            w.startsWith('⏱') ? 'text-orange-400' : 'text-slate-400'
                                         }`}>
                                             <Info className="w-3 h-3 shrink-0 mt-0.5" />
                                             <span>{w}</span>

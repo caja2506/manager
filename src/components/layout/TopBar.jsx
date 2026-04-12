@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import {
     Search, Bell, AlertTriangle, LogOut, Settings,
-    User as UserIcon, Folder, Command, Briefcase, UserCircle, ListTodo
+    User as UserIcon, Folder, Command, Briefcase, UserCircle, ListTodo,
+    LayoutGrid, BarChart3, Calendar, Table2, KanbanSquare, Clock, Shield,
+    Wrench, BookOpen, Users, Gauge, FileText, Zap, ArrowLeft
 } from 'lucide-react';
 
 // Contexts
@@ -14,8 +16,37 @@ import TaskDetailModal from '../tasks/TaskDetailModal';
 
 import { useRole } from '../../contexts/RoleContext';
 
+// ── Route-based page context config ──
+const PAGE_CONTEXT = [
+    { match: '/main-table',    title: 'Main Table',          icon: Table2 },
+    { match: '/tasks',         title: 'Kanban',              icon: KanbanSquare },
+    { match: '/planner',       title: 'Weekly Planner',      icon: Calendar },
+    { match: '/daily-board',   title: 'Daily Board',         icon: Clock },
+    { match: '/gantt',         title: 'Gantt',               icon: BarChart3 },
+    { match: '/projects',      title: 'Proyectos',           icon: Folder },
+    { match: '/my-work',       title: 'Mi Trabajo',          icon: UserIcon },
+    { match: '/control-tower', title: 'Control Tower',       icon: Gauge },
+    { match: '/analytics',     title: 'Analítica',           icon: BarChart3 },
+    { match: '/settings',      title: 'Configuración',       icon: Settings },
+    { match: '/automation',    title: 'Automatización',      icon: Zap },
+    { match: '/team',          title: 'Equipo',              icon: Users },
+    { match: '/notifications', title: 'Notificaciones',      icon: Bell },
+    { match: '/audit',         title: 'Auditoría',           icon: Shield },
+    { match: '/reports',       title: 'Reportes',            icon: FileText },
+    { match: '/work-logs',     title: 'Bitácora',            icon: BookOpen },
+    { match: '/daily-scrum',   title: 'Equipo Hoy',          icon: Users },
+    { match: '/daily-briefing',title: 'Daily Briefing',      icon: FileText },
+    { match: '/catalog',       title: 'Catálogo',            icon: LayoutGrid },
+    { match: '/bom',           title: 'BOM',                 icon: Wrench },
+    { match: '/',              title: 'Dashboard',           icon: LayoutGrid, exact: true },
+];
+
+// Task management routes that show task stats
+const TASK_ROUTES = ['/main-table', '/tasks', '/planner', '/daily-board', '/gantt', '/projects'];
+
 export default function TopBar() {
     const navigate = useNavigate();
+    const location = useLocation();
     const { user, signOut } = useAuth();
     const { canEdit, canDelete } = useRole();
 
@@ -57,6 +88,18 @@ export default function TopBar() {
         if (!user?.uid || !engTasks) return 0;
         return engTasks.filter(t => t.assignedTo === user.uid && !['completed', 'cancelled'].includes(t.status)).length;
     }, [user, engTasks]);
+
+    // --- Dynamic Page Context ---
+    const pageContext = useMemo(() => {
+        const path = location.pathname;
+        const ctx = PAGE_CONTEXT.find(p => p.exact ? path === p.match : path.startsWith(p.match));
+        if (!ctx) return null;
+
+        const isTaskRoute = TASK_ROUTES.some(r => path.startsWith(r));
+        const activeTasks = isTaskRoute ? engTasks.filter(t => !['completed', 'cancelled'].includes(t.status)) : [];
+
+        return { ...ctx, activeTasks: activeTasks.length, projectCount: isTaskRoute ? engProjects.length : 0, isTaskRoute };
+    }, [location.pathname, engTasks, engProjects]);
 
     // --- Global Search Logic ---
     const searchResults = useMemo(() => {
@@ -152,9 +195,44 @@ export default function TopBar() {
     };
 
     return (
-        <div className="flex-shrink-0 h-16 bg-white/5 dark:bg-slate-900/40 backdrop-blur-xl border-b border-white/10 dark:border-slate-800/50 flex items-center justify-between px-4 md:px-6 sticky top-0 z-[100]">
-            
-            {/* LEFT: Omnibar Search */}
+        <div className="flex-shrink-0 h-12 bg-white/5 dark:bg-slate-900/40 backdrop-blur-xl border-b border-white/10 dark:border-slate-800/50 flex items-center justify-between px-4 md:px-6 sticky top-0 z-[100]">
+
+            {/* LEFT: Page Context + Search */}
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+
+                {/* Dynamic Page Context */}
+                {pageContext && (() => {
+                    const Icon = pageContext.icon;
+                    return (
+                        <div className="flex items-center gap-2 shrink-0">
+                            <button
+                                onClick={() => navigate(-1)}
+                                className="w-7 h-7 rounded-lg bg-slate-200 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700/50 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-300 dark:hover:bg-slate-700 transition-all shrink-0"
+                                title="Volver"
+                            >
+                                <ArrowLeft className="w-3.5 h-3.5" />
+                            </button>
+                            <div className="w-7 h-7 rounded-lg bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center">
+                                <Icon className="w-3.5 h-3.5 text-indigo-400" />
+                            </div>
+                            <div className="hidden sm:block">
+                                <h1 className="font-black text-sm text-slate-800 dark:text-white tracking-tight leading-none">
+                                    {pageContext.title}
+                                </h1>
+                                {pageContext.isTaskRoute && (
+                                    <p className="text-[9px] text-slate-400 dark:text-slate-500 font-medium flex items-center gap-1">
+                                        <span className="w-1 h-1 rounded-full bg-emerald-500 inline-block" />
+                                        {pageContext.activeTasks} activa{pageContext.activeTasks !== 1 ? 's' : ''}
+                                        {pageContext.projectCount > 0 && <> · {pageContext.projectCount} proy.</>}
+                                    </p>
+                                )}
+                            </div>
+                            <div className="w-px h-5 bg-slate-300 dark:bg-slate-700/50 ml-1 hidden md:block" />
+                        </div>
+                    );
+                })()}
+
+            {/* Omnibar Search */}
             <div className="flex-1 max-w-xl relative" ref={searchContainerRef}>
                 <div 
                     className={`relative flex items-center w-full h-10 bg-black/5 dark:bg-black/20 rounded-full border transition-all ${
@@ -243,6 +321,7 @@ export default function TopBar() {
                     </div>
                 )}
             </div>
+            </div>{/* end LEFT */}
 
             {/* RIGHT: Tools & Profile */}
             <div className="flex items-center gap-2 md:gap-4 ml-4">
@@ -261,12 +340,19 @@ export default function TopBar() {
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors font-bold text-xs relative"
                     >
                         <ListTodo className="w-4 h-4" />
-                        <span>Tablero</span>
+                        <span>Tareas</span>
                         {myTasksCount > 0 && (
                             <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-black bg-indigo-500 text-white">
                                 {myTasksCount}
                             </span>
                         )}
+                    </Link>
+                    <Link
+                        to="/work-logs"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors font-bold text-xs"
+                    >
+                        <Clock className="w-4 h-4" />
+                        <span>Horas</span>
                     </Link>
                 </div>
 

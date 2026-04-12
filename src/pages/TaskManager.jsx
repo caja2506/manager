@@ -22,7 +22,7 @@ import {
 } from '../models/schemas';
 import { getAvailableTransitions } from '../core/workflow/workflowModel';
 import {
-    Plus, Search, Menu, Filter, X
+    Plus, Search
 } from 'lucide-react';
 
 // ============================================================
@@ -105,7 +105,6 @@ export default function TaskManager() {
 
     // Drag state
     const [activeId, setActiveId] = useState(null);
-    const [showFilters, setShowFilters] = useState(false);
     const [movingTask, setMovingTask] = useState(null);
 
     const openNew = () => { setSelectedTask(null); setIsModalOpen(true); };
@@ -314,68 +313,37 @@ export default function TaskManager() {
             )}
 
             {/* ══════════════ SHARED BANNER ══════════════ */}
-            <TaskModuleBanner onNewTask={canEdit ? openNew : null} canEdit={canEdit}>
-                {/* Filter toggle in the tabs bar */}
-                <button
-                    onClick={() => setShowFilters(f => !f)}
-                    className={`relative px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 text-xs border transition-all active:scale-95 ${
-                        showFilters
-                            ? 'bg-indigo-600/15 text-indigo-400 border-indigo-500/40'
-                            : 'bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-600 hover:text-slate-300'
-                    }`}
-                >
-                    {showFilters ? <X className="w-3.5 h-3.5" /> : <Filter className="w-3.5 h-3.5" />}
-                    Filtros
-                    {(search || filterProject || filterAssignee || filterPriority) && (
-                        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-indigo-500 text-white text-[8px] font-bold flex items-center justify-center shadow">
-                            {[search, filterProject, filterAssignee, filterPriority].filter(Boolean).length}
-                        </span>
-                    )}
-                </button>
-            </TaskModuleBanner>
+            <TaskModuleBanner onNewTask={canEdit ? openNew : null} canEdit={canEdit} />
 
-            {/* ══════════════ FILTERS BAR (collapsible) ══════════════ */}
-            {showFilters && (
-                <div className="flex flex-wrap gap-3 items-center flex-shrink-0 animate-in fade-in slide-in-from-top-2 duration-200 px-6 py-3">
-                    {/* Search */}
-                    <div className="relative flex-1 min-w-[200px]">
-                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                        <input
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            placeholder="Buscar tareas..."
-                            className="pl-10 pr-4 py-2.5 w-full border border-slate-700/60 rounded-xl text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 bg-slate-900/60 backdrop-blur-sm placeholder:text-slate-600 transition-all"
-                        />
-                    </div>
-                    {/* Dropdowns */}
-                    <select
-                        value={filterProject}
-                        onChange={e => setFilterProject(e.target.value)}
-                        className="px-4 py-2.5 border border-slate-700/60 rounded-xl text-sm text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500/50 bg-slate-900/60 backdrop-blur-sm cursor-pointer hover:border-slate-600 transition-all"
-                    >
-                        <option value="">Todos los proyectos</option>
-                        {engProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                    <select
-                        value={filterAssignee}
-                        onChange={e => setFilterAssignee(e.target.value)}
-                        className="px-4 py-2.5 border border-slate-700/60 rounded-xl text-sm text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500/50 bg-slate-900/60 backdrop-blur-sm cursor-pointer hover:border-slate-600 transition-all"
-                    >
-                        <option value="">Todos los miembros</option>
-                        {teamMembers.map(u => <option key={u.uid} value={u.uid}>{u.displayName || u.email}</option>)}
-                    </select>
-                    <select
-                        value={filterPriority}
-                        onChange={e => setFilterPriority(e.target.value)}
-                        className="px-4 py-2.5 border border-slate-700/60 rounded-xl text-sm text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500/50 bg-slate-900/60 backdrop-blur-sm cursor-pointer hover:border-slate-600 transition-all"
-                    >
-                        <option value="">Todas las prioridades</option>
-                        {Object.entries(TASK_PRIORITY_CONFIG).map(([key, cfg]) => (
-                            <option key={key} value={key}>{cfg.label}</option>
-                        ))}
-                    </select>
+            {/* ══════════════ FILTERS BAR (always visible) ══════════════ */}
+            <div className="flex flex-wrap gap-2 items-center px-6 py-2 border-b border-slate-800/40">
+                <div className="relative flex-1 min-w-[160px] max-w-xs">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar..."
+                        className="pl-8 pr-3 py-1.5 w-full border border-slate-700/60 rounded-lg text-xs text-white outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 placeholder:text-slate-600" />
                 </div>
-            )}
+                <select value={filterProject} onChange={e => setFilterProject(e.target.value)}
+                    className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer">
+                    <option value="">Todos los proyectos</option>
+                    {engProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}
+                    className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer">
+                    <option value="">Todos los miembros</option>
+                    {teamMembers.map(u => <option key={u.uid} value={u.uid}>{u.displayName || u.email}</option>)}
+                </select>
+                <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}
+                    className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer">
+                    <option value="">Todas las prioridades</option>
+                    {Object.entries(TASK_PRIORITY_CONFIG).map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
+                </select>
+                {(search || filterProject || filterAssignee || filterPriority) && (
+                    <button onClick={() => { setSearch(''); setFilterProject(''); setFilterAssignee(''); setFilterPriority(''); }}
+                        className="text-[11px] text-rose-400 hover:text-rose-300 px-2 py-1 rounded hover:bg-rose-500/10 transition-colors">
+                        Limpiar
+                    </button>
+                )}
+            </div>
 
             {/* ══════════════ KANBAN BOARD ══════════════ */}
             <DndContext

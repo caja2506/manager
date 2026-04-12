@@ -16,7 +16,7 @@ export const TASK_STATUS_CONFIG = {
     [TASK_STATUS.BACKLOG]:     { label: 'Backlog',     color: '#64748b', icon: 'Inbox',      order: 0 },
     [TASK_STATUS.PENDING]:     { label: 'Pendiente',   color: '#ef4444', icon: 'Clock',      order: 1 },
     [TASK_STATUS.IN_PROGRESS]: { label: 'En Progreso', color: '#f59e0b', icon: 'Play',       order: 2 },
-    [TASK_STATUS.VALIDATION]:  { label: 'Validación',  color: '#8b5cf6', icon: 'CheckCircle', order: 3 },
+    [TASK_STATUS.VALIDATION]:  { label: 'Revisión',  color: '#8b5cf6', icon: 'CheckCircle', order: 3 },
     [TASK_STATUS.COMPLETED]:   { label: 'Completado',  color: '#22c55e', icon: 'CheckCheck', order: 4 },
     [TASK_STATUS.BLOCKED]:     { label: 'Bloqueado',   color: '#ef4444', icon: 'Ban',        order: 5 },
     [TASK_STATUS.CANCELLED]:   { label: 'Cancelado',   color: '#6b7280', icon: 'XCircle',    order: 6 },

@@ -1,26 +1,35 @@
 /**
  * userAdminService.js
  * ===================
- * [Phase M.2] Firestore operations for user admin panel.
- * Extracted from UserAdminPanel.jsx to remove direct Firestore access.
+ * [Phase V5] Firestore operations for user admin panel.
+ * 
+ * UNIFIED MODEL: users/{uid} is the single source of truth for RBAC.
+ * The `users_roles` collection is frozen (read-only, no new writes).
+ * 
+ * All RBAC mutations go to users/{uid}.rbacRole.
  */
 
 import {
-    collection, onSnapshot, doc, updateDoc, deleteDoc, setDoc
+    collection, onSnapshot, doc, setDoc, deleteDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { COLLECTIONS } from '../models/schemas';
 
 /**
- * Subscribe to RBAC users (users_roles collection).
+ * Subscribe to user profiles (unified RBAC + operational data).
+ * This replaces the old subscribeToRbacUsers which read from users_roles.
  * @param {function} onData - callback(users[])
  * @returns {function} unsubscribe
  */
 export function subscribeToRbacUsers(onData) {
-    return onSnapshot(collection(db, 'users_roles'), (snap) => {
+    return onSnapshot(collection(db, COLLECTIONS.USERS), (snap) => {
         onData(
             snap.docs
-                .map(d => ({ uid: d.id, ...d.data() }))
+                .map(d => ({
+                    uid: d.id,
+                    role: d.data().rbacRole || 'viewer', // map rbacRole → role for backward compat
+                    ...d.data(),
+                }))
                 .sort((a, b) => (a.displayName || a.email || '').localeCompare(b.displayName || b.email || ''))
         );
     });
@@ -41,72 +50,58 @@ export function subscribeToUserProfiles(onData) {
 
 /**
  * Update a user's RBAC role.
+ * Single write to users/{uid}.rbacRole — the only source of truth.
  * @param {string} uid
  * @param {string} newRole
  */
 export async function updateRbacRole(uid, newRole) {
-    // Write to legacy RBAC collection (used by Firestore security rules)
-    await updateDoc(doc(db, 'users_roles', uid), { role: newRole });
-
-    // Sync to users/{uid}.rbacRole (V5 primary source read by RoleContext)
-    // Without this, RoleContext reads the stale rbacRole from users/{uid}
-    // and never falls through to the updated users_roles value.
-    try {
-        await setDoc(
-            doc(db, COLLECTIONS.USERS, uid),
-            { rbacRole: newRole, updatedAt: new Date().toISOString() },
-            { merge: true }
-        );
-    } catch (err) {
-        console.warn('[userAdminService] Failed to sync rbacRole to users/ profile:', err);
-    }
+    await setDoc(
+        doc(db, COLLECTIONS.USERS, uid),
+        { rbacRole: newRole, updatedAt: new Date().toISOString() },
+        { merge: true }
+    );
 }
 
 /**
- * Update a user's display name (in both users and users_roles).
+ * Update a user's display name.
  * @param {string} uid
  * @param {string} displayName
  */
 export async function updateUserDisplayName(uid, displayName) {
-    const usersRef = doc(db, COLLECTIONS.USERS, uid);
-    await setDoc(usersRef, { displayName, updatedAt: new Date().toISOString() }, { merge: true });
-    await updateDoc(doc(db, 'users_roles', uid), { displayName });
+    await setDoc(
+        doc(db, COLLECTIONS.USERS, uid),
+        { displayName, updatedAt: new Date().toISOString() },
+        { merge: true }
+    );
 }
 
 /**
- * Remove a user from RBAC (users_roles collection).
+ * Remove a user from the system.
  * @param {string} uid
  */
 export async function removeRbacUser(uid) {
-    await deleteDoc(doc(db, 'users_roles', uid));
+    await deleteDoc(doc(db, COLLECTIONS.USERS, uid));
 }
 
 /**
- * Register an orphan user (exists in `users` but not in `users_roles`).
- * Creates the `users_roles/{uid}` document so the user appears in the admin panel.
+ * Register an orphan user (ensure they have rbacRole in users/{uid}).
  * @param {string} uid
- * @param {Object} profileData - { email, displayName } from the users collection
+ * @param {Object} profileData - { email, displayName }
  * @param {string} [role='viewer'] - initial RBAC role
  */
 export async function registerOrphanUser(uid, profileData, role = 'viewer') {
-    await setDoc(doc(db, 'users_roles', uid), {
-        role,
+    await setDoc(doc(db, COLLECTIONS.USERS, uid), {
+        rbacRole: role,
         email: profileData.email || '',
         displayName: profileData.displayName || '',
         createdAt: new Date().toISOString(),
-    });
+    }, { merge: true });
 }
 
 /**
  * Fully remove an orphan user from the system.
- * Deletes from both `users` and `users_roles` collections.
  * @param {string} uid
  */
 export async function removeOrphanUser(uid) {
-    // Delete from users collection (profile)
     await deleteDoc(doc(db, COLLECTIONS.USERS, uid));
-    // Also delete from users_roles if it exists (safety cleanup)
-    try {
-        await deleteDoc(doc(db, 'users_roles', uid));
-    } catch { /* may not exist */ }
 }

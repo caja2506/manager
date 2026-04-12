@@ -1,5 +1,5 @@
 import React from 'react';
-import { Save } from 'lucide-react';
+import { Save, Zap } from 'lucide-react';
 
 /**
  * TaskFooter — sticky bottom bar with Cancel + Save buttons.
@@ -7,10 +7,16 @@ import { Save } from 'lucide-react';
  * Save: gradient purple button spanning most of the width.
  */
 export default function TaskFooter({
-    isNew, isSaving, canSave, canEdit,
+    isNew, isSaving, canSave, canEdit, willAutoPlan,
     onSave, onClose,
 }) {
     if (!canEdit) return null;
+
+    const label = isSaving
+        ? 'Guardando...'
+        : isNew
+            ? (willAutoPlan ? 'Crear y Planificar' : 'Crear Tarea')
+            : 'Guardar Cambios';
 
     return (
         <div className="p-3 lg:p-4 border-t border-slate-800 flex gap-3 bg-slate-800/50 rounded-b-2xl flex-shrink-0">
@@ -27,11 +33,13 @@ export default function TaskFooter({
                 style={{
                     background: isSaving || !canSave
                         ? '#374151'
-                        : 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%)',
+                        : willAutoPlan
+                            ? 'linear-gradient(135deg, #06b6d4 0%, #6366f1 50%, #8b5cf6 100%)'
+                            : 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%)',
                 }}
             >
-                <Save className="w-4 h-4" />
-                {isSaving ? 'Guardando...' : isNew ? 'Crear Tarea' : 'Guardar Cambios'}
+                {willAutoPlan ? <Zap className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                {label}
             </button>
         </div>
     );

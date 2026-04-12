@@ -196,7 +196,7 @@ function RoutineRow({ routine, isExpanded, onToggleExpand, onToggleRoutine, onUp
 function RoutineDetailPanel({ routine, onUpdateSchedule }) {
     const isSchedulable = routine.scheduleType === 'daily';
     const currentCron = routine.scheduleConfig?.cron || '0 7 * * 1-5';
-    const currentTz = routine.scheduleConfig?.timezone || 'America/Mexico_City';
+    const currentTz = routine.scheduleConfig?.timezone || 'America/Costa_Rica';
 
     const { hour: initHour, minute: initMinute } = parseCronTime(currentCron);
     const initDays = parseCronDays(currentCron);
@@ -356,8 +356,8 @@ function RoutineDetailPanel({ routine, onUpdateSchedule }) {
             {routine.lastRunAt && (
                 <div className="pt-2 border-t border-slate-700/20">
                     <p className="text-[10px] text-slate-600">
-                        Última ejecución: {new Date(routine.lastRunAt).toLocaleString('es-MX', {
-                            dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Mexico_City'
+                        Última ejecución: {new Date(routine.lastRunAt).toLocaleString('es-CR', {
+                            dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Costa_Rica'
                         })}
                     </p>
                 </div>

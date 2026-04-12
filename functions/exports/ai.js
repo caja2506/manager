@@ -4,6 +4,7 @@
  * image search, insights generation, extraction, briefing, report reprocessing.
  */
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { requireAdmin } = require("../middleware/authGuard");
 
 const MODEL_NAME = "gemini-2.5-flash";
 
@@ -162,8 +163,7 @@ ${text}`;
         { secrets: [geminiApiKey], timeoutSeconds: 30 },
         async (request) => {
             if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
-            const roleDoc = await adminDb.collection("users_roles").doc(request.auth.uid).get();
-            if (!roleDoc.exists || roleDoc.data().role !== "admin") throw new HttpsError("permission-denied", "Admin access required.");
+            await requireAdmin(adminDb, request);
             const { text } = request.data;
             if (!text) throw new HttpsError("invalid-argument", "text is required.");
             const { extractFromText } = require("../ai/aiExtractionService");
@@ -176,8 +176,7 @@ ${text}`;
         { secrets: [geminiApiKey], timeoutSeconds: 30 },
         async (request) => {
             if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
-            const roleDoc = await adminDb.collection("users_roles").doc(request.auth.uid).get();
-            if (!roleDoc.exists || roleDoc.data().role !== "admin") throw new HttpsError("permission-denied", "Admin access required.");
+            await requireAdmin(adminDb, request);
             const { role, userName } = request.data;
             if (!role) throw new HttpsError("invalid-argument", "role is required.");
             const { generateBriefing } = require("../ai/aiBriefingService");
@@ -190,8 +189,7 @@ ${text}`;
         { secrets: [geminiApiKey], timeoutSeconds: 30 },
         async (request) => {
             if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
-            const roleDoc = await adminDb.collection("users_roles").doc(request.auth.uid).get();
-            if (!roleDoc.exists || roleDoc.data().role !== "admin") throw new HttpsError("permission-denied", "Admin access required.");
+            await requireAdmin(adminDb, request);
             const { reportId } = request.data;
             if (!reportId) throw new HttpsError("invalid-argument", "reportId is required.");
             const reportDoc = await adminDb.collection("telegramReports").doc(reportId).get();

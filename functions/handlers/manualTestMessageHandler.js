@@ -13,7 +13,7 @@ const templates = require("../telegram/telegramTemplates");
  */
 async function execute(adminDb, token, targets, context) {
     const { options = {} } = context;
-    const timestamp = new Date().toLocaleString("es-MX", { timeZone: "America/Mexico_City" });
+    const timestamp = new Date().toLocaleString("es-CR", { timeZone: "America/Costa_Rica" });
 
     const messageBuilder = (target) => {
         if (options.message) {

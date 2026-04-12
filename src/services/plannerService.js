@@ -146,5 +146,27 @@ export const plannerService = {
             console.error("[plannerService] Error fetching weekly plan items:", error);
             throw error;
         }
+    },
+
+    /**
+     * Get all plan items assigned to a specific user.
+     * Used by AvailabilityCalendar to calculate per-day availability.
+     *
+     * @param {string} userId
+     * @returns {Promise<Array>} raw plan items for this user
+     */
+    async getPlanItemsByUser(userId) {
+        try {
+            const itemsRef = collection(db, COLLECTIONS.WEEKLY_PLAN_ITEMS);
+            const q = query(itemsRef, where("assignedTo", "==", userId));
+            const snapshot = await getDocs(q);
+            return snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+        } catch (error) {
+            console.error("[plannerService] Error fetching user plan items:", error);
+            throw error;
+        }
     }
 };

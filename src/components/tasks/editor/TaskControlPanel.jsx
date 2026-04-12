@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import {
     Clock, BarChart2, AlertTriangle,
     ChevronDown, ChevronRight, Settings2, User,
-    Link2, ShieldAlert, CalendarRange, CalendarDays, Target, MapPin, X, Plus
+    Link2, ShieldAlert, CalendarRange, CalendarDays, Target, MapPin, X, Plus, CheckCircle
 } from 'lucide-react';
+import { resolveDelay } from '../../../services/delayService';
 import {
     TASK_STATUS, TASK_STATUS_CONFIG,
 } from '../../../models/schemas';
+import AvailabilityCalendar from '../../planner/AvailabilityCalendar';
 
 /**
  * TaskControlPanel — right column of the task editor.
@@ -51,6 +53,7 @@ export default function TaskControlPanel({
     form, setForm, isNew, task,
     canEdit, canEditDates, subtasks = [], teamMembers = [], taskTypes = [],
     timeLogs = [], allTasks = [], delays = [], dependencies = [], plannerItems = [],
+    userPlanItems = [],
     projectMilestones = [], milestoneWorkAreas = [],
     onStatusChange, onOpenDelayReport, onOpenListManager, onDeleteDependency,
     onAddManualTime, isSavingManualTime
@@ -323,17 +326,17 @@ export default function TaskControlPanel({
                             disabled={!canEditDates && !!form.dueDate}
                         />
                     </div>
-                    {/* Planned Start / End Dates */}
+                    {/* Planned Start / End Dates — Availability Calendar */}
                     <div className="grid grid-cols-2 gap-2 pt-1">
                         <div>
                             <span className="text-[9px] font-bold text-slate-500 flex items-center gap-1 mb-0.5">
                                 <CalendarDays className="w-2.5 h-2.5" /> Inicio plan
                             </span>
-                            <input
-                                type="date"
+                            <AvailabilityCalendar
                                 value={form.plannedStartDate}
-                                onChange={e => setForm({ ...form, plannedStartDate: e.target.value })}
-                                className="w-full px-2.5 py-1.5 border border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800 text-slate-200"
+                                onChange={v => setForm({ ...form, plannedStartDate: v })}
+                                planItems={userPlanItems}
+                                assignedTo={form.assignedTo}
                                 disabled={!canEditDates && !!form.plannedStartDate}
                             />
                         </div>
@@ -341,11 +344,12 @@ export default function TaskControlPanel({
                             <span className="text-[9px] font-bold text-slate-500 flex items-center gap-1 mb-0.5">
                                 <CalendarDays className="w-2.5 h-2.5" /> Fin plan
                             </span>
-                            <input
-                                type="date"
+                            <AvailabilityCalendar
                                 value={form.plannedEndDate}
-                                onChange={e => setForm({ ...form, plannedEndDate: e.target.value })}
-                                className="w-full px-2.5 py-1.5 border border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800 text-slate-200"
+                                onChange={v => setForm({ ...form, plannedEndDate: v })}
+                                planItems={userPlanItems}
+                                assignedTo={form.assignedTo}
+                                minDate={form.plannedStartDate ? new Date(form.plannedStartDate + 'T00:00:00') : undefined}
                                 disabled={!canEditDates && !!form.plannedEndDate}
                             />
                         </div>
@@ -440,11 +444,29 @@ export default function TaskControlPanel({
                         <div className="space-y-1.5">
                             {taskDelays.map(delay => (
                                 <div key={delay.id} className="px-2.5 py-2 bg-red-500/10 border border-red-500/20 rounded-lg">
-                                    <div className="flex items-center gap-1.5">
-                                        <ShieldAlert className="w-3 h-3 text-red-400 flex-shrink-0" />
-                                        <span className="text-[10px] font-bold text-red-300">
-                                            {delay.causeName || 'Causa desconocida'}
-                                        </span>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-1.5">
+                                            <ShieldAlert className="w-3 h-3 text-red-400 flex-shrink-0" />
+                                            <span className="text-[10px] font-bold text-red-300">
+                                                {delay.causeName || 'Causa desconocida'}
+                                            </span>
+                                        </div>
+                                        <button
+                                            onClick={async (e) => {
+                                                e.stopPropagation();
+                                                if (!window.confirm('¿Resolver este bloqueo?')) return;
+                                                try {
+                                                    await resolveDelay(delay.id, delay.projectId, delay.taskId || form?.id);
+                                                } catch (err) {
+                                                    console.error('Error resolviendo bloqueo:', err);
+                                                }
+                                            }}
+                                            className="flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500/15 hover:bg-emerald-500/30 border border-emerald-500/30 rounded text-[9px] font-bold text-emerald-400 transition-colors cursor-pointer"
+                                            title="Resolver bloqueo"
+                                        >
+                                            <CheckCircle className="w-3 h-3" />
+                                            Resolver
+                                        </button>
                                     </div>
                                     {delay.comment && (
                                         <p className="text-[10px] text-red-300/70 mt-1 ml-4.5 leading-tight">

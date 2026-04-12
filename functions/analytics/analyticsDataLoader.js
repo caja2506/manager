@@ -12,7 +12,7 @@ const paths = require("../automation/firestorePaths");
  * Get date string in YYYY-MM-DD for a Date object (Mexico City TZ).
  */
 function toDateStr(d) {
-    return d.toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+    return d.toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
 }
 
 /**

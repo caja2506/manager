@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthContext';
 import { ensureUserProfile } from '../services/userProfileService';
@@ -24,12 +24,11 @@ export function useRole() {
 export function RoleProvider({ children }) {
     const { user } = useAuth();
 
-    // --- RBAC state (from users_roles) ---
+    // --- RBAC state (from users/{uid}.rbacRole) ---
     const [role, setRole] = useState(null);
     const [roleLoading, setRoleLoading] = useState(true);
 
     // --- Operational profile state (from users/{uid}) ---
-    // Bootstrapped on login, null until loaded.
     const [userProfile, setUserProfile] = useState(null);
 
     // Check if the current user is a super admin by email
@@ -47,49 +46,34 @@ export function RoleProvider({ children }) {
 
         setRoleLoading(true);
 
-        // ── Role resolution: users_roles is authoritative (Firestore rules use it) ──
-        // Read users_roles FIRST, then users/{uid}.rbacRole as fallback.
-        // This guarantees the frontend permission checks match security rules.
+        // ── Unified: users/{uid} is the single source of truth ──
+        // rbacRole lives in the same document as the operational profile.
+        // Firestore security rules also read from users/{uid}.rbacRole.
         const userDocRef = doc(db, 'users', user.uid);
-        const legacyRoleRef = doc(db, 'users_roles', user.uid);
 
-        const unsubscribe = onSnapshot(legacyRoleRef, async (legacySnap) => {
+        const unsubscribe = onSnapshot(userDocRef, async (userSnap) => {
             let resolvedRole = null;
 
-            // 1. Primary source: users_roles/{uid}.role (used by Firestore security rules)
-            if (legacySnap.exists() && legacySnap.data().role) {
-                resolvedRole = legacySnap.data().role;
+            // 1. Primary (and only) source: users/{uid}.rbacRole
+            if (userSnap.exists() && userSnap.data().rbacRole) {
+                resolvedRole = userSnap.data().rbacRole;
             }
 
-            // 2. Fallback: users/{uid}.rbacRole (V5 profile)
-            if (!resolvedRole) {
-                try {
-                    const { getDoc: getDocFn } = await import('firebase/firestore');
-                    const userSnap = await getDocFn(userDocRef);
-                    if (userSnap.exists() && userSnap.data().rbacRole) {
-                        resolvedRole = userSnap.data().rbacRole;
-                    }
-                } catch (err) {
-                    console.warn('[RoleContext] V5 profile fallback failed:', err);
-                }
-            }
-
-            // 3. Default for new users — AND auto-create users_roles doc
+            // 2. Default for new users — auto-create users/{uid} doc
             if (!resolvedRole) {
                 resolvedRole = isSuperAdmin ? 'admin' : 'viewer';
 
-                // ── Auto-register: create users_roles/{uid} so the user
-                //    appears in Settings → Admin Panel for role assignment ──
+                // ── Auto-register: create users/{uid} with rbacRole ──
                 try {
-                    await setDoc(legacyRoleRef, {
-                        role: resolvedRole,
+                    await setDoc(userDocRef, {
+                        rbacRole: resolvedRole,
                         email: user.email || '',
                         displayName: user.displayName || '',
                         createdAt: new Date().toISOString(),
-                    });
-                    console.log(`[RoleContext] Auto-registered ${user.email} in users_roles with role=${resolvedRole}`);
+                    }, { merge: true });
+                    console.log(`[RoleContext] Auto-registered ${user.email} in users with rbacRole=${resolvedRole}`);
                 } catch (err) {
-                    console.warn('[RoleContext] Failed to auto-register in users_roles:', err);
+                    console.warn('[RoleContext] Failed to auto-register:', err);
                 }
             }
 
@@ -99,10 +83,9 @@ export function RoleProvider({ children }) {
                     `🔒 Super Admin auto-recovery: role was "${resolvedRole}", restoring to "admin" for ${user.email}`
                 );
                 resolvedRole = 'admin';
-                // Write to both sources for consistency
                 try {
-                    await updateDoc(legacyRoleRef, { role: 'admin' });
-                } catch { /* legacy doc may not exist */ }
+                    await setDoc(userDocRef, { rbacRole: 'admin' }, { merge: true });
+                } catch { /* safety */ }
             }
 
             setRole(resolvedRole);
@@ -126,7 +109,6 @@ export function RoleProvider({ children }) {
     const isViewer = role === 'viewer';
     const canEdit = role === 'admin' || role === 'editor';
     const canDelete = role === 'admin';
-    // Technicians can edit tasks but NOT modify dates that already have values
     const canEditDates = canEdit && (userProfile?.teamRole !== 'technician');
 
     const value = {
@@ -141,8 +123,7 @@ export function RoleProvider({ children }) {
         canDelete,
         isSuperAdmin: !!isSuperAdmin,
 
-        // --- Operational profile (new) ---
-        // userProfile: { uid, displayName, email, teamRole, weeklyCapacityHours, ... }
+        // --- Operational profile ---
         userProfile,
         teamRole: userProfile?.teamRole || null,
         weeklyCapacityHours: userProfile?.weeklyCapacityHours ?? 40,
@@ -150,4 +131,3 @@ export function RoleProvider({ children }) {
 
     return <RoleContext.Provider value={value}>{children}</RoleContext.Provider>;
 }
-

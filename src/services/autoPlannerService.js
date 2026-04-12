@@ -39,18 +39,20 @@ const PRIORITY_ORDER = ['critical', 'high', 'medium', 'low'];
  * @returns {boolean}
  */
 export function canAutoScheduleFor(currentTeamRole, currentUserId, targetUserId, supervisorAssignments = []) {
+    // Anyone can auto-plan their own tasks
+    if (currentUserId === targetUserId) return true;
+
     // Manager & Team Lead can plan for anyone
     if (['manager', 'team_lead'].includes(currentTeamRole)) return true;
 
     // Engineer can plan for their assigned technicians
     if (currentTeamRole === 'engineer') {
         return supervisorAssignments.some(a =>
-            (a.engineerId === currentUserId || a.supervisorId === currentUserId)
-            && (a.technicianId === targetUserId || a.userId === targetUserId)
+            a.engineerId === currentUserId && a.technicianId === targetUserId
         );
     }
 
-    // Technician: no access
+    // Technician: no access to others' tasks
     return false;
 }
 
@@ -70,10 +72,13 @@ export function determineStrategy(task) {
     const hours = task.estimatedHours || 0;
 
     const parseDate = (d) => d ? new Date(d + (d.includes('T') ? '' : 'T00:00:00')) : null;
-    const startDate = parseDate(task.plannedStartDate);
+    const rawStartDate = parseDate(task.plannedStartDate);
     const endDate = parseDate(task.plannedEndDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
+    // Never schedule in the past — clamp startDate to today
+    const startDate = rawStartDate && rawStartDate < today ? today : rawStartDate;
 
     if (hasStart && hasEnd && hasHours) {
         return {

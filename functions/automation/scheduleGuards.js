@@ -60,7 +60,7 @@ async function shouldRoutineRun(adminDb, routineKey) {
 
     // Check weekday (Mexico City timezone)
     const activeDays = tgConfig.weekdayRules?.activeDays || [1, 2, 3, 4, 5];
-    const tz = tgConfig.timezone || coreConfig.defaultTimezone || "America/Mexico_City";
+    const tz = tgConfig.timezone || coreConfig.defaultTimezone || "America/Costa_Rica";
     const nowInTz = new Date().toLocaleDateString("en-US", { timeZone: tz, weekday: "long" });
     const dayMap = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
     const currentDay = dayMap[nowInTz];

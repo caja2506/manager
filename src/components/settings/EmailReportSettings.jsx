@@ -4,7 +4,7 @@ import {
     Plus, X, CheckCircle, AlertCircle, Loader2, BarChart3,
     Shield, Target, FileText, Zap, CalendarDays
 } from 'lucide-react';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, collection } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -52,7 +52,7 @@ export default function EmailReportSettings() {
     const [emailError, setEmailError] = useState('');
     const [reportDate, setReportDate] = useState(() => {
         const d = new Date();
-        return d.toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+        return d.toLocaleDateString('en-CA', { timeZone: 'America/Costa_Rica' });
     });
 
     // Subscribe to Firestore
@@ -110,10 +110,31 @@ export default function EmailReportSettings() {
                 recipients,
                 scheduleTime,
                 sections,
-                timezone: 'America/Mexico_City',
+                timezone: 'America/Costa_Rica',
                 updatedAt: new Date().toISOString(),
                 updatedBy: user?.uid || null,
             }, { merge: true });
+
+            // ── Sync with automationRoutines so the scheduler picks up the change ──
+            const [hours, minutes] = scheduleTime.split(':').map(Number);
+            const cron = `${minutes} ${hours} * * 1-5`;
+            const { getDocs: gd, query: q, where: w, updateDoc: ud } = await import('firebase/firestore');
+            const routinesSnap = await gd(q(
+                collection(db, 'automationRoutines'),
+                w('key', '==', 'daily_performance_report')
+            ));
+            if (!routinesSnap.empty) {
+                const routineDoc = routinesSnap.docs[0];
+                await ud(doc(db, 'automationRoutines', routineDoc.id), {
+                    enabled,
+                    scheduleConfig: { cron, timezone: 'America/Costa_Rica' },
+                    updatedAt: new Date().toISOString(),
+                });
+                console.log(`[EmailReportSettings] Synced routine ${routineDoc.id}: enabled=${enabled}, cron=${cron}`);
+            } else {
+                console.warn('[EmailReportSettings] No automationRoutines doc found for daily_performance_report');
+            }
+
             setSaved(true);
             setTimeout(() => setSaved(false), 3000);
         } catch (e) {
@@ -209,7 +230,32 @@ export default function EmailReportSettings() {
                             </p>
                         </div>
                         <button
-                            onClick={() => setEnabled(!enabled)}
+                            onClick={async () => {
+                                const newVal = !enabled;
+                                setEnabled(newVal);
+                                try {
+                                    // Sync emailReportConfig
+                                    await setDoc(doc(db, 'settings', 'emailReportConfig'), {
+                                        enabled: newVal,
+                                        updatedAt: new Date().toISOString(),
+                                    }, { merge: true });
+                                    // Sync automationRoutines
+                                    const { getDocs: gd, query: q, where: w, updateDoc: ud } = await import('firebase/firestore');
+                                    const snap = await gd(q(
+                                        collection(db, 'automationRoutines'),
+                                        w('key', '==', 'daily_performance_report')
+                                    ));
+                                    if (!snap.empty) {
+                                        await ud(doc(db, 'automationRoutines', snap.docs[0].id), {
+                                            enabled: newVal,
+                                            updatedAt: new Date().toISOString(),
+                                        });
+                                    }
+                                    console.log(`[EmailReport] Toggle → ${newVal ? 'ON' : 'OFF'}`);
+                                } catch (e) {
+                                    console.error('Error toggling report:', e);
+                                }
+                            }}
                             className={`relative w-12 h-7 rounded-full transition-all ${
                                 enabled ? 'bg-indigo-500' : 'bg-slate-700'
                             }`}
@@ -278,7 +324,7 @@ export default function EmailReportSettings() {
                                 className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-40 w-32"
                             />
                             <span className="text-[10px] text-slate-500">
-                                Lunes a Viernes · America/Mexico_City
+                                Lunes a Viernes · America/Costa_Rica
                             </span>
                         </div>
                     </div>

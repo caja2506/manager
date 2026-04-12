@@ -26,7 +26,7 @@ const STATUS_GROUPS = [
     { status: TASK_STATUS.IN_PROGRESS, label: 'In Progress', color: '#f59e0b' },
     { status: TASK_STATUS.PENDING,     label: 'To Do',       color: '#ef4444' },
     { status: TASK_STATUS.BACKLOG,     label: 'Backlog',     color: '#64748b' },
-    { status: TASK_STATUS.VALIDATION,  label: 'Validación',  color: '#8b5cf6' },
+    { status: TASK_STATUS.VALIDATION,  label: 'Revisión',  color: '#8b5cf6' },
     { status: TASK_STATUS.COMPLETED,   label: 'Completado',  color: '#22c55e' },
     { status: TASK_STATUS.BLOCKED,     label: 'Bloqueado',   color: '#ef4444' },
     { status: TASK_STATUS.CANCELLED,   label: 'Cancelado',   color: '#6b7280' },

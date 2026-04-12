@@ -8,6 +8,7 @@ import { enrichPlanItemsWithTasks } from '../utils/plannerUtils';
 import { getEffectiveHours } from '../utils/breakTimeUtils';
 import { usePlannerTimerStatus } from '../hooks/usePlannerTimerSync';
 import { canAutoScheduleFor } from '../services/autoPlannerService';
+import { getActiveAssignments } from '../services/resourceAssignmentService';
 import PlannerSidebar from '../components/planner/PlannerSidebar';
 import PlannerGrid from '../components/planner/PlannerGrid';
 import WeeklyCapacitySummary from '../components/planner/WeeklyCapacitySummary';
@@ -67,6 +68,14 @@ export default function WeeklyPlanner() {
     const [sidebarOpen, setSidebarOpen] = useState(false); // mobile sidebar toggle
     const [autoPlannerOpen, setAutoPlannerOpen] = useState(false); // auto-planner modal
     const [autoPlannerTasks, setAutoPlannerTasks] = useState([]); // tasks to auto-plan
+    const [resourceAssignments, setResourceAssignments] = useState([]); // engineer→technician
+
+    // Load resource assignments (for engineer permission checks)
+    useEffect(() => {
+        getActiveAssignments()
+            .then(setResourceAssignments)
+            .catch(err => console.warn('[WeeklyPlanner] Failed to load assignments:', err));
+    }, []);
 
     // Fetch plan items for the visible week
     const fetchPlanItems = useCallback(async () => {
@@ -472,9 +481,20 @@ export default function WeeklyPlanner() {
                         onCancelPlacement={handleCancelPlacement}
                         showAutoSchedule={canEdit && (isAdmin || ['manager', 'team_lead', 'engineer'].includes(teamRole))}
                         onAutoScheduleAll={() => {
-                            const eligible = allUnscheduledTasks.filter(t =>
-                                isAdmin || canAutoScheduleFor(teamRole, user.uid, t.assignedTo)
-                            );
+                            let eligible;
+                            if (teamRole === 'manager' || teamRole === 'team_lead') {
+                                // Manager/TL: all tasks
+                                eligible = allUnscheduledTasks;
+                            } else if (teamRole === 'engineer' || isAdmin) {
+                                // Engineer: only self + assigned technicians
+                                const myTechIds = resourceAssignments
+                                    .filter(a => a.engineerId === user.uid)
+                                    .map(a => a.technicianId);
+                                const myTeam = new Set([user.uid, ...myTechIds]);
+                                eligible = allUnscheduledTasks.filter(t => myTeam.has(t.assignedTo));
+                            } else {
+                                eligible = [];
+                            }
                             setAutoPlannerTasks(eligible);
                             setAutoPlannerOpen(true);
                             setSidebarOpen(false);
@@ -553,6 +573,10 @@ export default function WeeklyPlanner() {
                             console.error('[AutoPlanner] Error creating block:', err);
                         }
                     }
+                }}
+                onEditTask={(task) => {
+                    setAutoPlannerOpen(false);
+                    setTaskModalTask(task);
                 }}
             />
         </div>
