@@ -14,6 +14,7 @@ import ReportsLayout from './components/layout/ReportsLayout';
 import MainLayout from './components/layout/MainLayout';
 import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import { EngineeringDataProvider } from './hooks/useEngineeringData';
 
 // --- Pages ---
 import Dashboard from './pages/Dashboard';
@@ -169,6 +170,7 @@ export default function App() {
 
   // --- Authenticated App ---
   return (
+    <EngineeringDataProvider>
     <ErrorBoundary module="App">
       <Routes>
         <Route element={<AppLayout />}>
@@ -235,5 +237,6 @@ export default function App() {
         </Route>
       </Routes>
     </ErrorBoundary>
+    </EngineeringDataProvider>
   );
 }

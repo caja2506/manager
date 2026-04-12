@@ -1,24 +1,27 @@
 /**
- * useEngineeringData — Domain hook for real-time engineering data.
- * ================================================================
- * [Phase M.3] Extracted from AppDataContext to establish clear ownership
- * over the 10 core Firestore subscriptions that power the engineering modules.
+ * useEngineeringData — Shared Context Provider for real-time engineering data.
+ * =============================================================================
+ * [Phase M.9] PERFORMANCE REMEDIATION
  *
- * This hook provides ALL real-time engineering data:
- *   - engProjects, engTasks, engSubtasks (core entities)
- *   - taskTypes, workAreaTypes, milestoneTypes (configuration)
- *   - teamMembers (operational profiles from 'users' collection)
- *   - timeLogs (time tracking records)
- *   - delayCauses, delays (delay management)
+ * BEFORE: Each call to useEngineeringData() created 10 independent onSnapshot
+ * listeners. With 35+ consumers (3 always-mounted layout components + pages +
+ * modals + derived hooks), this resulted in 50-90 redundant Firestore WebSocket
+ * connections for the same 10 collections.
  *
- * AppDataContext now delegates to this hook instead of managing subscriptions directly.
- * Consumers that only need engineering data can import this hook directly,
- * reducing their dependency on the global useAppData().
+ * AFTER: A single EngineeringDataProvider at the app root manages exactly 10
+ * listeners. All consumers read from React Context — zero additional listeners.
+ *
+ * API CONTRACT (unchanged):
+ *   const { engTasks, engProjects, teamMembers, ... } = useEngineeringData();
+ *
+ * COLLECTIONS SUBSCRIBED (10 total):
+ *   projects, tasks, subtasks, taskTypes, workAreaTypes,
+ *   milestoneTypes, users, timeLogs, delayCauses, delays
  *
  * @module hooks/useEngineeringData
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { COLLECTIONS } from '../models/schemas';
 import { db } from '../firebase';
@@ -26,10 +29,43 @@ import { db } from '../firebase';
 const safeLocaleCompare = (a, b, field) =>
     String(a[field] || '').localeCompare(String(b[field] || ''));
 
-// Total number of Firestore subscriptions managed by this hook
+// Total number of Firestore subscriptions managed by this provider
 const TOTAL_SUBSCRIPTIONS = 10;
 
+// ── Context ──
+const EngineeringDataContext = createContext(null);
+
+/**
+ * Hook to consume shared engineering data.
+ * Must be used within an <EngineeringDataProvider>.
+ *
+ * API is identical to the previous pure-hook version:
+ *   const { engTasks, engProjects, teamMembers, isReady } = useEngineeringData();
+ */
 export function useEngineeringData() {
+    const context = useContext(EngineeringDataContext);
+    if (!context) {
+        throw new Error(
+            'useEngineeringData() must be used within an <EngineeringDataProvider>. ' +
+            'Wrap your app with <EngineeringDataProvider> in App.jsx.'
+        );
+    }
+    return context;
+}
+
+/**
+ * EngineeringDataProvider — Singleton provider for all engineering data.
+ *
+ * Place this ONCE at the app root (inside auth guard, outside routes).
+ * Creates exactly 10 Firestore onSnapshot listeners that are shared by
+ * all consumers via React Context.
+ *
+ * Usage in App.jsx:
+ *   <EngineeringDataProvider>
+ *     <AppLayout />
+ *   </EngineeringDataProvider>
+ */
+export function EngineeringDataProvider({ children }) {
     const [engProjects, setEngProjects] = useState([]);
     const [engTasks, setEngTasks] = useState([]);
     const [engSubtasks, setEngSubtasks] = useState([]);
@@ -107,7 +143,7 @@ export function useEngineeringData() {
         };
     }, [markLoaded]);
 
-    return {
+    const value = {
         engProjects,
         engTasks,
         engSubtasks,
@@ -120,4 +156,10 @@ export function useEngineeringData() {
         delays,
         isReady,
     };
+
+    return (
+        <EngineeringDataContext.Provider value={value}>
+            {children}
+        </EngineeringDataContext.Provider>
+    );
 }
