@@ -221,17 +221,8 @@ async function updateTeamMember(adminDb, userId, fields) {
 
     await userRef.update(updates);
 
-    // Sync operationalRole → users_roles.teamRole for consistency
-    if (updates.operationalRole !== undefined) {
-        const rolesRef = adminDb.collection(paths.USERS_ROLES).doc(userId);
-        const rolesSnap = await rolesRef.get();
-        if (rolesSnap.exists) {
-            await rolesRef.update({
-                teamRole: updates.operationalRole,
-                updatedAt: updates.updatedAt,
-            });
-        }
-    }
+    // SECURITY: users_roles is FROZEN. Do NOT write to it.
+    // All operational role data lives in users/{uid} only.
 
     return { updated: true, userId, fields: Object.keys(updates) };
 }

@@ -60,18 +60,24 @@ export function RoleProvider({ children }) {
             }
 
             // 2. Default for new users — auto-create users/{uid} doc
+            //    SECURITY: Do NOT write rbacRole here. Only admins can set rbacRole.
+            //    New users get 'viewer' by default (resolved in-memory, not stored).
             if (!resolvedRole) {
                 resolvedRole = isSuperAdmin ? 'admin' : 'viewer';
 
-                // ── Auto-register: create users/{uid} with rbacRole ──
+                // ── Auto-register: create users/{uid} with NON-privileged fields only ──
                 try {
-                    await setDoc(userDocRef, {
-                        rbacRole: resolvedRole,
+                    const createPayload = {
                         email: user.email || '',
                         displayName: user.displayName || '',
                         createdAt: new Date().toISOString(),
-                    }, { merge: true });
-                    console.log(`[RoleContext] Auto-registered ${user.email} in users with rbacRole=${resolvedRole}`);
+                    };
+                    // Only super admins can self-assign admin role via frontend
+                    if (isSuperAdmin) {
+                        createPayload.rbacRole = 'admin';
+                    }
+                    await setDoc(userDocRef, createPayload, { merge: true });
+                    console.log(`[RoleContext] Auto-registered ${user.email} (rbacRole=${isSuperAdmin ? 'admin' : 'not set — viewer default'})`);
                 } catch (err) {
                     console.warn('[RoleContext] Failed to auto-register:', err);
                 }
@@ -92,7 +98,7 @@ export function RoleProvider({ children }) {
 
             // ── Bootstrap users/{uid} operational profile ──
             try {
-                const profile = await ensureUserProfile(user, resolvedRole);
+                const profile = await ensureUserProfile(user);
                 setUserProfile(profile);
             } catch (err) {
                 console.error('[RoleContext] Failed to bootstrap user profile:', err);

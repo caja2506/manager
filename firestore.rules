@@ -79,11 +79,7 @@ service cloud.firestore {
       allow update, delete: if isAuthenticated();
     }
 
-    // WeeklyPlanItems: authenticated users can fully manage their own planning blocks
-    // This is placed at global level to ensure it overrides any potential conflicts
-    match /weeklyPlanItems/{docId} {
-      allow read, write: if isAuthenticated();
-    }
+    // WeeklyPlanItems: global-level rule removed — use collection-specific rule below
 
     // ============================================================
     // EXISTING COLLECTIONS (preserved — no changes)
@@ -136,11 +132,17 @@ service cloud.firestore {
     // ============================================================
 
     // --- users (extended profiles) ---
-    // Users can create/update their own profile
-    // Admins can update any profile (e.g., assign teamRole)
+    // HARDENED: Users can update their OWN profile EXCEPT privilege fields.
+    // rbacRole, teamRole, and active can ONLY be set by admins.
+    // This prevents self-escalation (a viewer promoting themselves to admin).
     match /users/{userId} {
-      allow create: if isAuthenticated() && request.auth.uid == userId;
-      allow update: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && request.auth.uid == userId
+        && (!request.resource.data.keys().hasAny(['rbacRole'])
+            || request.resource.data.rbacRole == 'viewer');
+      allow update: if isAdmin()
+        || (isOwner(userId)
+            && !request.resource.data.diff(resource.data).affectedKeys()
+                .hasAny(['rbacRole', 'teamRole', 'active']));
       allow delete: if isAdmin();
     }
 
@@ -263,9 +265,12 @@ service cloud.firestore {
       allow create: if isAdmin();
     }
     // --- weeklyPlanItems ---
-    // Any authenticated user can plan work (same pattern as tasks)
+    // HARDENED: Users can only manage their OWN planning blocks.
+    // userId field must match the authenticated user.
     match /weeklyPlanItems/{docId} {
-      allow create, update, delete: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated()
+        && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
     // --- scheduledTimerEvents ---
@@ -277,9 +282,10 @@ service cloud.firestore {
     }
 
     // --- taskDependencies ---
-    // Any authenticated user can create/manage task dependencies (Gantt linking)
+    // HARDENED: Only editors+ can manage task dependencies (Gantt linking).
     match /taskDependencies/{docId} {
-      allow create, update, delete: if isAuthenticated();
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
     }
 
     // ============================================================
@@ -302,7 +308,9 @@ service cloud.firestore {
     // Official schema: eventType, entityType, entityId, userId,
     //                  timestamp, source, correlationId, details
     match /auditEvents/{docId} {
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && request.resource.data.keys().hasAll(['eventType', 'timestamp', 'userId'])
+        && request.resource.data.userId == request.auth.uid;
       // NO update or delete — immutable trail
     }
 

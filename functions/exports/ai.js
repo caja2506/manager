@@ -14,6 +14,8 @@ function createAiExports(adminDb, secrets) {
     const testGeminiConnection = onCall(
         { secrets: [geminiApiKey] },
         async (request) => {
+            if (!request.auth) throw new HttpsError("unauthenticated", "Authentication required.");
+            await requireAdmin(adminDb, request);
             const apiKey = geminiApiKey.value();
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
             try {

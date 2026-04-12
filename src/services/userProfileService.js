@@ -36,41 +36,35 @@ const VALID_TEAM_ROLES = Object.values(TEAM_ROLES);
  * Guarantees that `users/{uid}` exists in Firestore.
  * Called by RoleContext on every login / auth state change.
  * 
+ * SECURITY: This function does NOT write rbacRole.
+ * rbacRole can ONLY be set by an admin (via Cloud Function or admin panel).
+ * 
  * Behavior:
- *   - If doc exists → returns existing data (no overwrites)
- *   - If doc missing → creates from Firebase Auth + users_roles data
+ *   - If doc exists → syncs displayName only (no privilege fields)
+ *   - If doc missing → creates from Firebase Auth data (no rbacRole)
  * 
  * @param {Object} authUser — Firebase Auth user object (uid, email, displayName, photoURL)
- * @param {string} rbacRole — current RBAC role from users_roles (admin/editor/viewer)
  * @returns {Object} — the user profile document data
  */
-export async function ensureUserProfile(authUser, rbacRole) {
+export async function ensureUserProfile(authUser) {
     if (!authUser?.uid) return null;
 
     const profileRef = doc(db, COLLECTIONS.USERS, authUser.uid);
     const profileSnap = await getDoc(profileRef);
 
-    // Also read users_roles to get the canonical displayName
-    const rbacRef = doc(db, 'users_roles', authUser.uid);
-    const rbacSnap = await getDoc(rbacRef);
-    const rbacName = rbacSnap.exists() ? (rbacSnap.data().displayName || '') : '';
-
-    // Determine best available name: users_roles > authUser > existing profile
-    const bestName = rbacName || authUser.displayName || '';
+    // Determine best available name from Auth
+    const bestName = authUser.displayName || '';
 
     if (profileSnap.exists()) {
         const existing = profileSnap.data();
         const updates = {};
 
-        // V5 (O6): Sync rbacRole into users/{uid} — makes users the SoT
-        if (rbacRole && rbacRole !== (existing.rbacRole || '')) {
-            updates.rbacRole = rbacRole;
-        }
-
-        // Sync displayName if users_roles has a better name
+        // Sync displayName if Auth has a better name (non-privileged field only)
         if (bestName && bestName !== (existing.displayName || '')) {
             updates.displayName = bestName;
         }
+
+        // SECURITY: Do NOT sync rbacRole here. Only admins can modify rbacRole.
 
         // Only write if there are actual changes
         if (Object.keys(updates).length > 0) {
@@ -82,12 +76,12 @@ export async function ensureUserProfile(authUser, rbacRole) {
         return { uid: authUser.uid, ...existing };
     }
 
-    // Profile missing — bootstrap from auth + RBAC data
+    // Profile missing — bootstrap from auth data (NO rbacRole — admin assigns it)
     const newProfile = {
         displayName: bestName,
         email: authUser.email || '',
         photoURL: authUser.photoURL || '',
-        rbacRole: rbacRole || 'viewer',  // V5 (O7): Write rbacRole on creation
+        // SECURITY: rbacRole is NOT set here. Defaults to 'viewer' in rules/context.
         teamRole: null,             // Admin sets this manually
         department: 'Engineering',
         weeklyCapacityHours: 40,    // Default: standard 40h week
@@ -99,7 +93,7 @@ export async function ensureUserProfile(authUser, rbacRole) {
     };
 
     await setDoc(profileRef, newProfile);
-    console.log(`[userProfileService] Created profile for ${authUser.email} with rbacRole=${rbacRole}`);
+    console.log(`[userProfileService] Created profile for ${authUser.email} (rbacRole not set — viewer default)`);
 
     return { uid: authUser.uid, ...newProfile };
 }
