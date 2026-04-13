@@ -1,26 +1,14 @@
 /**
  * Tasks Domain Exports — functions/exports/tasks.js
  * [Phase M.5] Task workflow enforcement and project risk recalculation.
+ *
+ * ★ Workflow contract derived from shared/taskWorkflow.js (Single Source of Truth)
  */
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
-
-const VALID_TRANSITIONS = {
-    backlog: ["pending", "in_progress", "cancelled"],
-    pending: ["in_progress", "backlog", "blocked", "cancelled"],
-    in_progress: ["validation", "pending", "blocked", "cancelled"],
-    blocked: ["in_progress", "pending", "cancelled"],
-    validation: ["completed", "in_progress", "blocked"],
-    completed: ["in_progress"],
-    cancelled: ["backlog"],
-};
-
-const REQUIRED_FIELDS = {
-    pending: [{ field: "assignedTo", label: "Responsable asignado" }, { field: "projectId", label: "Proyecto asignado" }],
-    in_progress: [{ field: "assignedTo", label: "Responsable asignado" }],
-    blocked: [{ field: "blockedReason", label: "Razón de bloqueo" }],
-    validation: [{ field: "assignedTo", label: "Responsable asignado" }],
-    completed: [{ field: "assignedTo", label: "Responsable asignado" }],
-};
+const {
+    TRANSITIONS: VALID_TRANSITIONS,
+    REQUIRED_FIELDS: REQUIRED_FIELDS_MAP,
+} = require("../../shared/taskWorkflow.cjs");
 
 async function recalculateProjectRisk(adminDb, projectId) {
     const tasksSnap = await adminDb.collection("tasks").where("projectId", "==", projectId).get();
@@ -60,17 +48,18 @@ function createTasksExports(adminDb) {
             const task = { id: taskSnap.id, ...taskSnap.data() };
             const currentStatus = task.status;
 
+            // ★ Transition validation from shared contract
             const allowedTargets = VALID_TRANSITIONS[currentStatus];
             if (!allowedTargets || !allowedTargets.includes(newStatus)) {
                 throw new HttpsError("failed-precondition", `Transition "${currentStatus}" → "${newStatus}" is not allowed. Valid targets: ${(allowedTargets || []).join(", ") || "none"}`);
             }
 
+            // ★ Required fields validation using canonical check() functions
             const warnings = [];
-            const requiredFields = REQUIRED_FIELDS[newStatus] || [];
+            const requiredFields = REQUIRED_FIELDS_MAP[newStatus] || [];
             const missingFields = [];
             for (const req of requiredFields) {
-                const value = task[req.field];
-                if (!value || (typeof value === "string" && !value.trim())) missingFields.push(req.label);
+                if (!req.check(task)) missingFields.push(req.label);
             }
             if (missingFields.length > 0 && !force) throw new HttpsError("failed-precondition", `Missing required fields: ${missingFields.join(", ")}`);
             if (missingFields.length > 0 && force) warnings.push(`Forced with missing: ${missingFields.join(", ")}`);

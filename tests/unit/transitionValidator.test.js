@@ -49,17 +49,26 @@ describe('transitionValidator', () => {
     });
 
     describe('validateTransition — required fields', () => {
-        it('fails pending → blocked without blockedReason', () => {
+        it('warns pending → blocked without blockedReason', () => {
             const task = makeTask({ status: 'pending', blockedReason: '' });
             const result = validateTransition(task, 'blocked');
-            expect(result.valid).toBe(false);
-            expect(result.errors.some(e => e.code === 'MISSING_REQUIRED_FIELD')).toBe(true);
+            // Required fields are warnings (overridable), not errors
+            expect(result.valid).toBe(true);
+            expect(result.warnings.some(w => w.code === 'MISSING_REQUIRED_FIELD')).toBe(true);
         });
 
-        it('passes pending → blocked with blockedReason', () => {
+        it('passes pending → blocked with blockedReason (no warnings)', () => {
             const task = makeTask({ status: 'pending', blockedReason: 'Waiting for parts' });
             const result = validateTransition(task, 'blocked');
             expect(result.valid).toBe(true);
+            expect(result.warnings.some(w => w.code === 'MISSING_REQUIRED_FIELD')).toBe(false);
+        });
+
+        it('warns when moving to in_progress without estimatedHours', () => {
+            const task = makeTask({ status: 'pending', estimatedHours: 0 });
+            const result = validateTransition(task, 'in_progress');
+            expect(result.valid).toBe(true);
+            expect(result.warnings.some(w => w.field === 'estimatedHours')).toBe(true);
         });
     });
 
