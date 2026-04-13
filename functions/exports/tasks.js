@@ -8,7 +8,7 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const {
     TRANSITIONS: VALID_TRANSITIONS,
     REQUIRED_FIELDS: REQUIRED_FIELDS_MAP,
-} = require("../../shared/taskWorkflow.cjs");
+} = require("../shared/taskWorkflow.cjs");
 
 async function recalculateProjectRisk(adminDb, projectId) {
     const tasksSnap = await adminDb.collection("tasks").where("projectId", "==", projectId).get();
