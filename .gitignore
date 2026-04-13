@@ -41,3 +41,15 @@ vite_log.txt
 
 # IDE specific
 .idx/
+
+# ── Security: environment files and secrets ──
+.env
+.env.*
+.env.local
+.env.production
+*.secret
+*.secrets
+
+# ── Security: user bootstrap data (contains passwords) ──
+users.json
+functions/scripts/users.json
