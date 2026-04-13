@@ -10,6 +10,7 @@
 
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
+import { DEFAULT_TIMEZONE } from './timezoneConfig';
 
 const DEFAULTS_BREAKS = [
     { id: 'desayuno', start: 8,    end: 8.5  },   // 30 min
@@ -17,7 +18,7 @@ const DEFAULTS_BREAKS = [
     { id: 'cafe',     start: 15.5, end: 16   },   // 30 min
 ];
 
-const TZ = 'America/Costa_Rica';
+const TZ = DEFAULT_TIMEZONE;
 
 // ── Live cache from Firestore ──
 let _cachedBands = DEFAULTS_BREAKS;

@@ -5,6 +5,7 @@ import {
     Shield, Target, FileText, Zap, CalendarDays
 } from 'lucide-react';
 import { doc, onSnapshot, setDoc, collection } from 'firebase/firestore';
+import { DEFAULT_TIMEZONE } from '../../utils/timezoneConfig';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -52,7 +53,7 @@ export default function EmailReportSettings() {
     const [emailError, setEmailError] = useState('');
     const [reportDate, setReportDate] = useState(() => {
         const d = new Date();
-        return d.toLocaleDateString('en-CA', { timeZone: 'America/Costa_Rica' });
+        return d.toLocaleDateString('en-CA', { timeZone: DEFAULT_TIMEZONE });
     });
 
     // Subscribe to Firestore
@@ -110,7 +111,7 @@ export default function EmailReportSettings() {
                 recipients,
                 scheduleTime,
                 sections,
-                timezone: 'America/Costa_Rica',
+                timezone: DEFAULT_TIMEZONE,
                 updatedAt: new Date().toISOString(),
                 updatedBy: user?.uid || null,
             }, { merge: true });
@@ -127,7 +128,7 @@ export default function EmailReportSettings() {
                 const routineDoc = routinesSnap.docs[0];
                 await ud(doc(db, 'automationRoutines', routineDoc.id), {
                     enabled,
-                    scheduleConfig: { cron, timezone: 'America/Costa_Rica' },
+                    scheduleConfig: { cron, timezone: DEFAULT_TIMEZONE },
                     updatedAt: new Date().toISOString(),
                 });
                 console.log(`[EmailReportSettings] Synced routine ${routineDoc.id}: enabled=${enabled}, cron=${cron}`);

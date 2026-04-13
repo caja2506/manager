@@ -3,6 +3,7 @@ import { Clock, Sunset, Sunrise, Save, Coffee, Plus, Trash2 } from 'lucide-react
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
+import { DEFAULT_TIMEZONE } from '../../utils/timezoneConfig';
 
 const DEFAULTS_BREAKS = [
     { id: 'desayuno', label: 'Desayuno', start: '08:00', end: '08:30' },
@@ -49,7 +50,7 @@ export default function DayScheduleSettings() {
             await setDoc(doc(db, 'settings', 'daySchedule'), {
                 closeTime,
                 openTime,
-                timezone: 'America/Costa_Rica',
+                timezone: DEFAULT_TIMEZONE,
                 enabled,
                 breakBands,
                 updatedAt: new Date().toISOString(),

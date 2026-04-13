@@ -18,6 +18,7 @@ import {
     ROUTINE_KEYS,
 } from './constants.js';
 import { createAutomationRoutineDocument } from './schemas.js';
+import { DEFAULT_TIMEZONE } from '../utils/timezoneConfig';
 
 /**
  * Default routine definitions.
@@ -33,7 +34,7 @@ export const DEFAULT_ROUTINES = [
         provider: AUTOMATION_PROVIDERS.TELEGRAM_BOT,
         enabled: false,
         scheduleType: SCHEDULE_TYPE.DAILY,
-        scheduleConfig: { cron: '0 7 * * 1-5', timezone: 'America/Costa_Rica' },
+        scheduleConfig: { cron: '0 7 * * 1-5', timezone: DEFAULT_TIMEZONE },
         delayMinutes: 0,
         gracePeriodMinutes: 0,
         personalityMode: PERSONALITY_MODES.PROFESSIONAL,
@@ -54,7 +55,7 @@ export const DEFAULT_ROUTINES = [
         provider: AUTOMATION_PROVIDERS.TELEGRAM_BOT,
         enabled: false,
         scheduleType: SCHEDULE_TYPE.DAILY,
-        scheduleConfig: { cron: '0 16 * * 1-5', timezone: 'America/Costa_Rica' },
+        scheduleConfig: { cron: '0 16 * * 1-5', timezone: DEFAULT_TIMEZONE },
         delayMinutes: 0,
         gracePeriodMinutes: 30,
         personalityMode: PERSONALITY_MODES.FRIENDLY,
@@ -109,7 +110,7 @@ export const DEFAULT_ROUTINES = [
         provider: AUTOMATION_PROVIDERS.TELEGRAM_BOT,
         enabled: false,
         scheduleType: SCHEDULE_TYPE.DAILY,
-        scheduleConfig: { cron: '0 17 * * 1-5', timezone: 'America/Costa_Rica' },
+        scheduleConfig: { cron: '0 17 * * 1-5', timezone: DEFAULT_TIMEZONE },
         delayMinutes: 0,
         gracePeriodMinutes: 0,
         personalityMode: PERSONALITY_MODES.PROFESSIONAL,
@@ -125,7 +126,7 @@ export const DEFAULT_ROUTINES = [
         provider: AUTOMATION_PROVIDERS.TELEGRAM_BOT,
         enabled: false,
         scheduleType: SCHEDULE_TYPE.DAILY,
-        scheduleConfig: { cron: '30 7 * * 1-5', timezone: 'America/Costa_Rica' },
+        scheduleConfig: { cron: '30 7 * * 1-5', timezone: DEFAULT_TIMEZONE },
         delayMinutes: 0,
         gracePeriodMinutes: 0,
         personalityMode: PERSONALITY_MODES.PROFESSIONAL,
@@ -160,7 +161,7 @@ export const DEFAULT_ROUTINES = [
         provider: AUTOMATION_PROVIDERS.TELEGRAM_BOT,
         enabled: true,
         scheduleType: SCHEDULE_TYPE.DAILY,
-        scheduleConfig: { cron: '0 18 * * 1-5', timezone: 'America/Costa_Rica' },
+        scheduleConfig: { cron: '0 18 * * 1-5', timezone: DEFAULT_TIMEZONE },
         delayMinutes: 0,
         gracePeriodMinutes: 0,
         personalityMode: PERSONALITY_MODES.PROFESSIONAL,
@@ -181,7 +182,7 @@ export const DEFAULT_ROUTINES = [
         provider: AUTOMATION_PROVIDERS.TELEGRAM_BOT,
         enabled: true,
         scheduleType: SCHEDULE_TYPE.DAILY,
-        scheduleConfig: { cron: '0 8 * * 1-5', timezone: 'America/Costa_Rica' },
+        scheduleConfig: { cron: '0 8 * * 1-5', timezone: DEFAULT_TIMEZONE },
         delayMinutes: 0,
         gracePeriodMinutes: 0,
         personalityMode: PERSONALITY_MODES.PROFESSIONAL,
@@ -202,7 +203,7 @@ export const DEFAULT_ROUTINES = [
         provider: 'resend',
         enabled: false,
         scheduleType: SCHEDULE_TYPE.DAILY,
-        scheduleConfig: { cron: '15 18 * * 1-5', timezone: 'America/Costa_Rica' },
+        scheduleConfig: { cron: '15 18 * * 1-5', timezone: DEFAULT_TIMEZONE },
         delayMinutes: 0,
         gracePeriodMinutes: 0,
         personalityMode: PERSONALITY_MODES.PROFESSIONAL,

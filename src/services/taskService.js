@@ -200,7 +200,7 @@ export async function deleteTask(taskId) {
     // Cascade: delete planner items (weeklyPlanItems)
     try {
         const planSnap = await getDocs(
-            query(collection(db, 'weeklyPlanItems'), where('taskId', '==', taskId))
+            query(collection(db, COLLECTIONS.WEEKLY_PLAN_ITEMS), where('taskId', '==', taskId))
         );
         planSnap.docs.forEach(p => batch.delete(p.ref));
         if (!planSnap.empty) {

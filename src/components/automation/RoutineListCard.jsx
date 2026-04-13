@@ -4,6 +4,7 @@ import {
     Save, Calendar, Users as UsersIcon, Zap, AlertTriangle
 } from 'lucide-react';
 import { RUN_STATUS_CONFIG, RUN_STATUS } from '../../automation/constants.js';
+import { DEFAULT_TIMEZONE } from '../../utils/timezoneConfig';
 
 /** Friendly cron-to-time parser for simple daily schedules */
 function parseCronTime(cron) {
@@ -196,7 +197,7 @@ function RoutineRow({ routine, isExpanded, onToggleExpand, onToggleRoutine, onUp
 function RoutineDetailPanel({ routine, onUpdateSchedule }) {
     const isSchedulable = routine.scheduleType === 'daily';
     const currentCron = routine.scheduleConfig?.cron || '0 7 * * 1-5';
-    const currentTz = routine.scheduleConfig?.timezone || 'America/Costa_Rica';
+    const currentTz = routine.scheduleConfig?.timezone || DEFAULT_TIMEZONE;
 
     const { hour: initHour, minute: initMinute } = parseCronTime(currentCron);
     const initDays = parseCronDays(currentCron);
@@ -357,7 +358,7 @@ function RoutineDetailPanel({ routine, onUpdateSchedule }) {
                 <div className="pt-2 border-t border-slate-700/20">
                     <p className="text-[10px] text-slate-600">
                         Última ejecución: {new Date(routine.lastRunAt).toLocaleString('es-CR', {
-                            dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Costa_Rica'
+                            dateStyle: 'short', timeStyle: 'short', timeZone: DEFAULT_TIMEZONE
                         })}
                     </p>
                 </div>

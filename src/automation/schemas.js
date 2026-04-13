@@ -22,6 +22,7 @@ import {
     TRIGGER_TYPE,
     PERSONALITY_MODES,
 } from './constants.js';
+import { DEFAULT_TIMEZONE } from '../utils/timezoneConfig';
 
 // ============================================================
 // SYSTEM SETTINGS — automationCore
@@ -41,7 +42,7 @@ export function createAutomationCoreConfig(overrides = {}) {
         dryRun: true,                          // Safe default: dry-run ON
         metricsEnabled: true,
         opsConsoleEnabled: true,
-        defaultTimezone: 'America/Costa_Rica',
+        defaultTimezone: DEFAULT_TIMEZONE,
         allowedChannels: [AUTOMATION_CHANNELS.TELEGRAM],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -67,7 +68,7 @@ export function createTelegramOpsConfig(overrides = {}) {
         techCheckTime: '16:00',                // HH:mm format
         gracePeriodMinutes: 30,
         alertGroupId: null,                    // Telegram group chat ID
-        timezone: 'America/Costa_Rica',
+        timezone: DEFAULT_TIMEZONE,
         escalationEnabled: true,
         multimodalEnabled: false,              // Audio processing OFF by default
         debugMode: false,
