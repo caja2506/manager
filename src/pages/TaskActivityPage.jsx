@@ -139,7 +139,7 @@ function MultiSelect({ icon: Icon, options, selected, onChange, allLabel = 'Todo
 
 export default function TaskActivityPage() {
     const { engProjects, engTasks, engSubtasks, teamMembers, timeLogs, taskTypes } = useEngineeringData();
-    const { canEdit, canDelete } = useRole();
+    const { canEdit, canDelete, isAdmin } = useRole();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const urlTaskId = searchParams.get('taskId');
@@ -1830,7 +1830,7 @@ export default function TaskActivityPage() {
                                                             </>
                                                         )}
                                                     </div>
-                                                    {!isEditing && canEdit && (
+                                                    {!isEditing && isAdmin && (
                                                         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                                                             <button onClick={() => startEditing(log)}
                                                                 className="p-1 text-slate-500 hover:text-indigo-400 transition-colors" title="Editar">

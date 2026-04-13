@@ -63,79 +63,28 @@ service cloud.firestore {
     }
 
     // ============================================================
-    // GLOBAL READ RULE
-    // Authenticated users can read all collections
+    // NOTE: Global read rule REMOVED.
+    // Each collection now defines its own read permissions.
     // ============================================================
 
-    match /{collection}/{document=**} {
-      allow read: if isAuthenticated();
-    }
-
-    // ActivityLog: collectionGroup queries need explicit path matching
-    // This enables the cross-task activity timeline page
-    match /{path=**}/activityLog/{logId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated();
-    }
-
-    // WeeklyPlanItems: global-level rule removed — use collection-specific rule below
-
     // ============================================================
-    // EXISTING COLLECTIONS (preserved — no changes)
+    // COLLECTIONS WITH PER-COLLECTION READ/WRITE RULES
     // ============================================================
 
     // --- users_roles --- [FROZEN]
     // Legacy RBAC collection. Read-only for backward compatibility.
     // All RBAC writes now go to users/{uid}.rbacRole
     match /users_roles/{userId} {
-      // Read allowed for any authenticated user (backward compat)
+      allow read: if isAuthenticated();
       // All write operations disabled — collection is frozen
     }
-
-    // --- proyectos_bom ---
-    match /proyectos_bom/{docId} {
-      allow create, update: if isEditor();
-      allow delete: if isAdmin();
-    }
-
-    // --- catalogo_maestro ---
-    match /catalogo_maestro/{docId} {
-      allow create, update: if isEditor();
-      allow delete: if isAdmin();
-    }
-
-    // --- items_bom ---
-    match /items_bom/{docId} {
-      allow create, update: if isEditor();
-      allow delete: if isAdmin();
-    }
-
-    // --- marcas, categorias, proveedores ---
-    match /marcas/{docId} {
-      allow create, update: if isEditor();
-      allow delete: if isAdmin();
-    }
-
-    match /categorias/{docId} {
-      allow create, update: if isEditor();
-      allow delete: if isAdmin();
-    }
-
-    match /proveedores/{docId} {
-      allow create, update: if isEditor();
-      allow delete: if isAdmin();
-    }
-
-    // ============================================================
-    // NEW COLLECTIONS — Engineering Management Platform
-    // ============================================================
 
     // --- users (extended profiles) ---
     // HARDENED: Users can update their OWN profile EXCEPT privilege fields.
     // rbacRole, teamRole, and active can ONLY be set by admins.
     // This prevents self-escalation (a viewer promoting themselves to admin).
     match /users/{userId} {
+      allow read: if isAuthenticated();
       allow create: if isAuthenticated() && request.auth.uid == userId
         && (!request.resource.data.keys().hasAny(['rbacRole'])
             || request.resource.data.rbacRole == 'viewer');
@@ -146,39 +95,90 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // --- proyectos_bom ---
+    match /proyectos_bom/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    // --- catalogo_maestro ---
+    match /catalogo_maestro/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    // --- items_bom ---
+    match /items_bom/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    // --- marcas, categorias, proveedores ---
+    match /marcas/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    match /categorias/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    match /proveedores/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    // ============================================================
+    // ENGINEERING MANAGEMENT COLLECTIONS
+    // ============================================================
+
     // --- projects (engineering projects) ---
-    // Editors+ can create/update projects
-    // Only admins can delete projects
     match /projects/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isEditor();
       allow delete: if isAdmin();
 
       // --- stations (sub-collection) ---
-      // Production line stations managed by editors+
       match /stations/{stationId} {
+        allow read: if isAuthenticated();
         allow create, update: if isEditor();
         allow delete: if isAdmin();
       }
     }
 
     // --- tasks ---
-    // HARDENED: Workflow-controlled fields can ONLY be set by the
-    // transitionTaskStatus Cloud Function (Admin SDK bypasses rules).
-    // Clients can update non-workflow fields (title, description, etc.)
-    // but CANNOT directly change status, completedDate, or reopen fields.
+    // HARDENED V2:
+    //   - READ: all authenticated (team needs visibility)
+    //   - CREATE: editors+ only
+    //   - UPDATE: editors+ can update non-workflow fields.
+    //     Workflow fields (status, completedDate, etc.) are BLOCKED —
+    //     only transitionTaskStatus Cloud Function (Admin SDK) can change them.
+    //   - DELETE: admin only
     match /tasks/{docId} {
+      allow read: if isAuthenticated();
       allow create: if isEditor();
-      allow update: if isAuthenticated()
+      allow update: if isEditor()
         && !request.resource.data.diff(resource.data).affectedKeys()
             .hasAny(['status', 'completedDate', 'completedAt', 'reopenedAt', 'reopenedBy', 'updatedBy']);
       allow delete: if isAdmin();
 
       // --- activityLog (sub-collection) ---
-      // Timeline events for task activity tracking
+      // HARDENED: APPEND-ONLY from client.
+      //   - CREATE: authenticated users (logs task events)
+      //   - READ: authenticated users
+      //   - UPDATE/DELETE: admin only (corrective maintenance)
+      // Normal users should NOT edit or delete activity history.
       match /activityLog/{logId} {
         allow read: if isAuthenticated();
         allow create: if isAuthenticated();
-        allow update, delete: if isAuthenticated();
+        allow update, delete: if isAdmin();
       }
 
       // --- comments (sub-collection) ---
@@ -192,18 +192,32 @@ service cloud.firestore {
       }
     }
 
+    // --- activityLog collectionGroup ---
+    // For cross-task activity timeline queries.
+    // HARDENED: read-only + append-only from client. Admin for updates/deletes.
+    match /{path=**}/activityLog/{logId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
     // --- subtasks ---
-    // Follow same rules as tasks
+    // HARDENED V2:
+    //   - CREATE: editors+ only (aligned with task creation)
+    //   - UPDATE: editors+ only
+    //   - DELETE: admin only
     match /subtasks/{docId} {
-      allow create, update: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow create, update: if isEditor();
       allow delete: if isAdmin();
     }
 
     // --- timeLogs ---
-    // Any authenticated user can create their own time logs
-    // Users can update their own logs; admins can update any
-    // Only admins can delete
+    // Source of truth for hours.
+    // Users can create their own time logs.
+    // Users can update/delete their own logs; admins can update/delete any.
     match /timeLogs/{docId} {
+      allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if isAuthenticated()
         && (resource.data.userId == request.auth.uid || isAdmin());
@@ -211,17 +225,17 @@ service cloud.firestore {
     }
 
     // --- delayCauses (configurable list) ---
-    // Only admins can manage delay causes
     match /delayCauses/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     // --- delays ---
-    // Any authenticated user can report a delay
-    // Creator or admin can update
-    // Only admins can delete
+    // Authenticated users can report a delay.
+    // Creator or admin can update. Admin only deletes.
     match /delays/{docId} {
+      allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if isAuthenticated()
         && (resource.data.createdBy == request.auth.uid || isAdmin());
@@ -229,54 +243,59 @@ service cloud.firestore {
     }
 
     // --- risks ---
-    // System-managed (written by Cloud Functions or admin)
-    // Read by all authenticated (global read rule)
+    // System-managed (Cloud Functions or admin)
     match /risks/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     // --- dailyReports ---
-    // System-generated, read-only for users
-    // Admins can manage
     match /dailyReports/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     // --- taskTypes ---
-    // Admin-managed configuration
     match /taskTypes/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     // --- settings ---
-    // Admin-only management
     match /settings/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     // --- auditLogs ---
-    // Immutable: only system/admin can create
-    // No updates or deletes allowed
+    // Immutable: only system/admin can create. No updates or deletes.
     match /auditLogs/{docId} {
+      allow read: if isAdmin();
       allow create: if isAdmin();
     }
+
     // --- weeklyPlanItems ---
-    // HARDENED: Users can only manage their OWN planning blocks.
-    // userId field must match the authenticated user.
+    // HARDENED V2:
+    //   - READ: all authenticated (managers need team visibility)
+    //   - CREATE: authenticated, but createdBy MUST match the user
+    //   - UPDATE/DELETE: only the item creator (createdBy) or admin
+    // Field: `assignedTo` is the task assignee; `createdBy` is the planner owner.
     match /weeklyPlanItems/{docId} {
-      allow create: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && request.resource.data.createdBy == request.auth.uid;
       allow update, delete: if isAuthenticated()
-        && (resource.data.userId == request.auth.uid || isAdmin());
+        && (resource.data.createdBy == request.auth.uid || isAdmin());
     }
 
     // --- scheduledTimerEvents ---
-    // Written by Firestore triggers (onPlanItemChanged) via Admin SDK.
-    // Processed by scheduledTimerEventHandler. Admin can inspect from UI.
+    // Written by Firestore triggers (Admin SDK). Admin only from client.
     match /scheduledTimerEvents/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
@@ -284,6 +303,7 @@ service cloud.firestore {
     // --- taskDependencies ---
     // HARDENED: Only editors+ can manage task dependencies (Gantt linking).
     match /taskDependencies/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isEditor();
       allow delete: if isAdmin();
     }
@@ -293,21 +313,17 @@ service cloud.firestore {
     // ============================================================
 
     // --- auditFindings ---
-    // System-generated by Rule Engine / Cloud Functions / Client Audit
-    // Append-only for authenticated users; admin can update/resolve
-    // (Cloud Functions use Admin SDK which bypasses rules)
     match /auditFindings/{docId} {
+      allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     // --- auditEvents ---
-    // IMMUTABLE audit trail — append-only, no updates, no deletes.
-    // Written by Cloud Functions (Admin SDK) and client audit runs.
-    // Official schema: eventType, entityType, entityId, userId,
-    //                  timestamp, source, correlationId, details
+    // IMMUTABLE audit trail — append-only.
     match /auditEvents/{docId} {
+      allow read: if isAuthenticated();
       allow create: if isAuthenticated()
         && request.resource.data.keys().hasAll(['eventType', 'timestamp', 'userId'])
         && request.resource.data.userId == request.auth.uid;
@@ -315,32 +331,28 @@ service cloud.firestore {
     }
 
     // --- analyticsSnapshots ---
-    // System-generated periodic snapshots
-    // Read-only for frontend; written by Cloud Functions
     match /analyticsSnapshots/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     // --- aiInsights ---
-    // Gemini-generated insights
-    // Read-only for frontend; written by Cloud Functions
     match /aiInsights/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     // --- managementBriefs ---
-    // Weekly management summaries generated by Gemini
-    // Read-only for frontend; written by Cloud Functions
     match /managementBriefs/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     // --- notifications ---
-    // User-scoped notifications. Users can read/update their own (mark as read).
-    // Created by Cloud Functions or admin. Delete restricted to admin.
+    // User-scoped. Users can read/mark-as-read their own only.
     match /notifications/{docId} {
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow update: if isAuthenticated() && resource.data.userId == request.auth.uid
@@ -350,249 +362,217 @@ service cloud.firestore {
     }
 
     // ============================================================
-    // AUTOMATION OPERATIONS & ACCOUNTABILITY FOUNDATION
+    // AUTOMATION OPERATIONS & ACCOUNTABILITY
     // ============================================================
     //
     // All automation collections are admin-only from the client.
-    // Cloud Functions (Phase 2) use Admin SDK which bypasses rules.
-    // Global read rule above grants authenticated read access.
+    // Cloud Functions (Admin SDK) bypass these rules.
     //
 
-    // --- automationRoutines ---
-    // Admin controls routine definitions (enable/disable, config)
     match /automationRoutines/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // --- automationRuns ---
-    // Written by Cloud Functions; admin can manage from UI
     match /automationRuns/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // --- automationMetricsDaily ---
-    // Written by Cloud Functions; admin can view/manage
     match /automationMetricsDaily/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // --- operationIncidents ---
-    // Authenticated users can create incidents (report blockers)
-    // Admin resolves/manages incidents
     match /operationIncidents/{docId} {
+      allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // --- telegramSessions ---
-    // Backend-managed only; admin can inspect from UI
     match /telegramSessions/{docId} {
+      allow read: if isAdmin();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // --- telegramReports ---
-    // Backend-managed only
     match /telegramReports/{docId} {
+      allow read: if isAdmin();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // --- telegramEscalations ---
-    // Backend-managed only
     match /telegramEscalations/{docId} {
+      allow read: if isAdmin();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // --- telegramBotLogs ---
-    // APPEND-ONLY operational log — no updates, no deletes
     match /telegramBotLogs/{docId} {
+      allow read: if isAdmin();
       allow create: if isAdmin();
-      // NO update or delete — append-only traceability
+      // NO update or delete — append-only
     }
 
-    // --- telegramDeliveries ---
-    // Backend-managed only
     match /telegramDeliveries/{docId} {
+      allow read: if isAdmin();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     // ============================================================
-    // PHASE 4: ANALYTICS ENGINE COLLECTIONS
+    // ANALYTICS ENGINE
     // ============================================================
-    //
-    // All analytics collections are written by Cloud Functions
-    // (Admin SDK). Clients can read (via global rule above).
-    // Admin can manage from UI.
-    //
 
-    // --- operationalKpiSnapshots ---
     match /operationalKpiSnapshots/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // --- userOperationalScores ---
     match /userOperationalScores/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // --- routineOperationalScores ---
     match /routineOperationalScores/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // --- teamOperationalSummaries ---
     match /teamOperationalSummaries/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // --- operationalRiskFlags ---
     match /operationalRiskFlags/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // --- operationalRecommendations ---
     match /operationalRecommendations/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // --- analyticsRefreshLogs ---
     match /analyticsRefreshLogs/{docId} {
+      allow read: if isAdmin();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // --- aiExecutions ---
-    // Written by Cloud Functions; admin can inspect
     match /aiExecutions/{docId} {
+      allow read: if isAdmin();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     // ============================================================
-    // PHASE 5: OPTIMIZATION ENGINE COLLECTIONS
+    // OPTIMIZATION ENGINE
     // ============================================================
-    //
-    // All optimization collections are written by Cloud Functions
-    // (Admin SDK). Clients can read (via global rule above).
-    // Admin can manage from UI.
-    //
 
-    // --- optimizationOpportunities ---
     match /optimizationOpportunities/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // --- optimizationSimulations ---
     match /optimizationSimulations/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // --- operationalPlans ---
     match /operationalPlans/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // --- appliedRecommendations ---
     match /appliedRecommendations/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // --- optimizationHistory ---
-    // APPEND-ONLY audit trail — no updates, no deletes for traceability
     match /optimizationHistory/{docId} {
+      allow read: if isAdmin();
       allow create: if isAdmin();
-      // NO update or delete — append-only traceability
+      // NO update or delete — append-only
     }
 
     // ============================================================
     // TELEGRAM LINK CODES
     // ============================================================
 
-    // --- telegramLinkCodes ---
     match /telegramLinkCodes/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     // ============================================================
-    // V5 FOUNDATION COLLECTIONS
+    // V5 FOUNDATION
     // ============================================================
 
-    // --- milestones ---
-    // Editors+ can create/update/delete milestones within projects
     match /milestones/{docId} {
+      allow read: if isAuthenticated();
       allow create, update, delete: if isEditor();
     }
 
-    // --- workAreas ---
-    // Editors+ can manage work areas within milestones
-    // Only admins can delete
     match /workAreas/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isEditor();
       allow delete: if isAdmin();
     }
 
-    // --- workAreaTypes ---
-    // Global catalog of work area names (Eléctrica, Mecánica, etc.)
-    // Editors+ can manage, admins can delete
     match /workAreaTypes/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isEditor();
       allow delete: if isAdmin();
     }
 
-    // --- milestoneTypes ---
-    // Global catalog of milestone types (Setup, Commissioning, etc.)
-    // Editors+ can manage, admins can delete
     match /milestoneTypes/{docId} {
+      allow read: if isAuthenticated();
       allow create, update: if isEditor();
       allow delete: if isAdmin();
     }
 
     // --- auditTrail ---
-    // IMMUTABLE, APPEND-ONLY — no updates, no deletes, EVER
-    // Written by Cloud Functions (Admin SDK) and client audit actions
+    // IMMUTABLE, APPEND-ONLY
     match /auditTrail/{docId} {
+      allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       // NO update or delete — immutable trail
     }
 
     // --- aiGovernance ---
-    // Admin-only: defines AI capability matrix
     match /aiGovernance/{docId} {
+      allow read: if isAdmin();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     // --- scoreSnapshots ---
-    // Append-only score history for trend analysis
-    // Written by system/client on score computation events
+    // Append-only score history
     match /scoreSnapshots/{docId} {
-      allow create: if isAuthenticated();
       allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
       // NO update or delete — immutable history
     }
 
     // --- resourceAssignments ---
-    // Engineer→Technician assignments managed by admin/editors
-    // Any authenticated user can read (global rule)
     match /resourceAssignments/{docId} {
+      allow read: if isAuthenticated();
       allow create: if isEditor();
       allow update: if isEditor();
       allow delete: if isAdmin();
