@@ -48,7 +48,7 @@ export default function TaskDetailModal({
         setIsDelayReportOpen, setDelayReportTarget, setListManager,
     } = useAppData();
     const { role, teamRole, canEditDates, isAdmin } = useRole();
-    const { timeLogs, engTasks, engProjects, delays, workAreaTypes, delayCauses } = useEngineeringData();
+    const { timeLogs, engTasks, engProjects, delays, workAreaTypes, delayCauses, refetch } = useEngineeringData();
     const navigate = useNavigate();
     const isNew = !task;
     
@@ -375,6 +375,7 @@ export default function TaskDetailModal({
                 }
             } else {
                 await updateTask(task.id, data);
+                await refetch?.('tasks');
 
                 // ── Silent auto-plan on update if no blocks exist yet ──
                 const hasBlocks = plannerItems.length > 0;
@@ -439,6 +440,7 @@ export default function TaskDetailModal({
                     });
                 }
             }
+            if (refetch) await refetch('tasks');
             onClose();
         } catch (err) {
             console.error('Error saving task:', err);

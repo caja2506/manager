@@ -545,6 +545,7 @@ function StationCell({ task, canEdit, onSave }) {
 // ============================================================
 
 function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDates, onOpenModal, groupColor, isLast, savedField, onSaved, taskTypes, workAreaTypes, isSelected, onToggleSelect }) {
+    const { refetch } = useEngineeringData();
     const [popover, setPopover] = useState(null); // 'health' | 'score' | null
     const healthRef = useRef(null);
     const scoreRef = useRef(null);
@@ -568,10 +569,11 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                 });
             }
             onSaved(`${task.id}-${field}`);
+            refetch?.('tasks');
         } catch (err) {
             console.error(`Failed to save ${field}:`, err);
         }
-    }, [task.id, task.assignedTo, task.assignedBy, teamMembers, onSaved]);
+    }, [task.id, task.assignedTo, task.assignedBy, teamMembers, onSaved, refetch]);
 
     const project = engProjects.find(p => p.id === task.projectId);
     const isSaved = (field) => savedField === `${task.id}-${field}`;
@@ -1470,7 +1472,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
 export default function MainTable() {
     const { user } = useAuth();
     const { canEdit, canEditDates, canDelete } = useRole();
-    const { engProjects, engTasks, engSubtasks, teamMembers, taskTypes, workAreaTypes, delayCauses } = useEngineeringData();
+    const { engProjects, engTasks, engSubtasks, teamMembers, taskTypes, workAreaTypes, delayCauses, refetch } = useEngineeringData();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
@@ -1679,8 +1681,9 @@ export default function MainTable() {
         for (const u of updates) {
             await updateTask(u.id, { title: u.title, description: u.description });
         }
+        refetch?.('tasks');
         setSelectedTaskIds(new Set());
-    }, []);
+    }, [refetch]);
 
     return (
         <div className="-m-4 md:-m-8 flex flex-col" style={{ background: 'var(--bg-app)', color: 'var(--text-primary)', minHeight: '100vh' }}>

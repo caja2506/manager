@@ -5,13 +5,8 @@
  */
 
 import { USE_SUPABASE } from '../services/_backend';
+import * as SupabaseImpl from './useEngineeringData.supabase.jsx';
+import * as FirebaseImpl from './useEngineeringData.firebase.jsx';
 
-let exports;
-if (USE_SUPABASE) {
-    exports = await import('./useEngineeringData.supabase.jsx');
-} else {
-    exports = await import('./useEngineeringData.firebase.jsx');
-}
-
-export const useEngineeringData = exports.useEngineeringData;
-export const EngineeringDataProvider = exports.EngineeringDataProvider;
+export const useEngineeringData = USE_SUPABASE ? SupabaseImpl.useEngineeringData : FirebaseImpl.useEngineeringData;
+export const EngineeringDataProvider = USE_SUPABASE ? SupabaseImpl.EngineeringDataProvider : FirebaseImpl.EngineeringDataProvider;

@@ -59,6 +59,29 @@ export function EngineeringDataProvider({ children }) {
         }
     }, []);
 
+    // ── Refetch: on-demand data refresh for specific tables ──
+    // Components call refetch('tasks') after mutations to guarantee instant UI update.
+    const refetchTable = useCallback(async (tableName) => {
+        const config = {
+            projects:       { query: 'projects',        setter: setEngProjects,   mapper: mapProject,     sort: (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0) },
+            tasks:          { query: 'tasks',            setter: setEngTasks,      mapper: mapTask },
+            subtasks:       { query: 'subtasks',         setter: setEngSubtasks,   mapper: mapSubtask },
+            task_types:     { query: 'task_types',       setter: setTaskTypes,     mapper: mapTaskType,    sort: (a, b) => safeLocaleCompare(a, b, 'name') },
+            work_area_types:{ query: 'work_area_types',  setter: setWorkAreaTypes, mapper: r => ({ ...r }),sort: (a, b) => safeLocaleCompare(a, b, 'name') },
+            milestone_types:{ query: 'milestone_types',  setter: setMilestoneTypes,mapper: r => ({ ...r }),sort: (a, b) => safeLocaleCompare(a, b, 'name') },
+            users:          { query: 'users',            setter: setTeamMembers,   mapper: mapUser },
+            time_logs:      { query: 'time_logs',        setter: setTimeLogs,      mapper: mapTimeLog,     sort: (a, b) => new Date(b.startTime || 0) - new Date(a.startTime || 0) },
+            delay_causes:   { query: 'delay_causes',     setter: setDelayCauses,   mapper: mapDelayCause,  sort: (a, b) => (a.order || 0) - (b.order || 0) },
+            delays:         { query: 'delays',           setter: setDelays,        mapper: mapDelay,       sort: (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0) },
+        };
+        const c = config[tableName];
+        if (!c) { console.warn(`[refetch] Unknown table: ${tableName}`); return; }
+        const { data, error } = await supabase.from(c.query).select('*');
+        if (error) { console.error(`[refetch] ${tableName}:`, error.message); return; }
+        const mapped = (data || []).map(c.mapper);
+        c.setter(c.sort ? mapped.sort(c.sort) : mapped);
+    }, []);
+
     useEffect(() => {
         // ── Initial data fetch ──
         // Supabase Realtime only pushes CHANGES. We need to fetch initial state first.
@@ -123,24 +146,27 @@ export function EngineeringDataProvider({ children }) {
             }
         }
 
-        const tables = [
-            { table: 'projects', setter: setEngProjects, mapper: mapProject },
-            { table: 'tasks', setter: setEngTasks, mapper: mapTask },
-            { table: 'subtasks', setter: setEngSubtasks, mapper: mapSubtask },
-            { table: 'task_types', setter: setTaskTypes, mapper: mapTaskType },
-            { table: 'users', setter: setTeamMembers, mapper: mapUser },
-            { table: 'time_logs', setter: setTimeLogs, mapper: mapTimeLog },
-            { table: 'delay_causes', setter: setDelayCauses, mapper: mapDelayCause },
-            { table: 'delays', setter: setDelays, mapper: mapDelay },
-        ];
+        const tableConfig = {
+            'projects': { setter: setEngProjects, mapper: mapProject },
+            'tasks': { setter: setEngTasks, mapper: mapTask },
+            'subtasks': { setter: setEngSubtasks, mapper: mapSubtask },
+            'task_types': { setter: setTaskTypes, mapper: mapTaskType },
+            'users': { setter: setTeamMembers, mapper: mapUser },
+            'time_logs': { setter: setTimeLogs, mapper: mapTimeLog },
+            'delay_causes': { setter: setDelayCauses, mapper: mapDelayCause },
+            'delays': { setter: setDelays, mapper: mapDelay },
+        };
 
-        for (const { table, setter, mapper } of tables) {
-            channel.on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table },
-                (payload) => applyEvent(setter, mapper, payload)
-            );
-        }
+        channel.on(
+            'postgres_changes',
+            { event: '*', schema: 'public' },
+            (payload) => {
+                const config = tableConfig[payload.table];
+                if (config) {
+                    applyEvent(config.setter, config.mapper, payload);
+                }
+            }
+        );
 
         channel.subscribe((status) => {
             if (status === 'SUBSCRIBED') {
@@ -158,6 +184,7 @@ export function EngineeringDataProvider({ children }) {
         taskTypes, workAreaTypes, milestoneTypes,
         teamMembers, timeLogs, delayCauses, delays,
         isReady,
+        refetch: refetchTable,
     };
 
     return (
