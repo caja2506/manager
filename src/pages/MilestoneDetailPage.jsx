@@ -664,8 +664,8 @@ export default function MilestoneDetailPage() {
                 />
                 <NavButton
                     icon={<BrainCircuit size={14} />}
-                    label="AI Monitoring"
-                    onClick={() => navigate(`/milestones/${milestoneId}/ai-monitoring`)}
+                    label="Analítica Predictiva"
+                    onClick={() => navigate(`/milestones/${milestoneId}/predictive-analytics`)}
                 />
             </div>
         </div>

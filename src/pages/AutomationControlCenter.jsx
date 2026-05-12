@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import PageHeader from '../components/layout/PageHeader';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, ShieldAlert } from 'lucide-react';
 import {
@@ -7,7 +6,7 @@ import {
     query, orderBy, limit, getDocs
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { db, functions } from '../firebase.js';
+import { db, functions } from '../firebase';
 import { useRole } from '../contexts/RoleContext.jsx';
 
 // --- Automation imports ---
@@ -367,8 +366,8 @@ export default function AutomationControlCenter() {
     }
 
     return (
-        <div className="p-6 max-w-7xl mx-auto">
-            <PageHeader title="" showBack={true} />
+        <div className="p-4 md:p-6 w-full h-full flex flex-col">
+            
             <AutomationControlShell
                 coreConfig={coreConfig}
                 telegramConfig={telegramConfig}

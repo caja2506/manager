@@ -2,13 +2,17 @@ import React, { useState } from 'react';
 import {
     Clock, BarChart2, AlertTriangle,
     ChevronDown, ChevronRight, Settings2, User,
-    Link2, ShieldAlert, CalendarRange, CalendarDays, Target, MapPin, X, Plus, CheckCircle
+    Link2, ShieldAlert, CalendarRange, CalendarDays, Target, MapPin, X, Plus, CheckCircle,
+    FolderOpen, Clipboard, ClipboardCheck, Paperclip,
+    XSquare, CheckSquare, MinusSquare, MessageSquare, Square, Eye
 } from 'lucide-react';
+import FileAttachments from '../attachments/FileAttachments';
 import { resolveDelay } from '../../../services/delayService';
 import {
     TASK_STATUS, TASK_STATUS_CONFIG,
 } from '../../../models/schemas';
 import AvailabilityCalendar from '../../planner/AvailabilityCalendar';
+import TaskHealthScore from './TaskHealthScore';
 
 /**
  * TaskControlPanel — right column of the task editor.
@@ -18,19 +22,22 @@ import AvailabilityCalendar from '../../planner/AvailabilityCalendar';
  *  - Progress (auto from subtasks or manual)
  *  - Details (task type, assigned by)
  *  - Dependencies and blockers (if any)
+ * 
+ * MOBILE: Single scrollable column — Control → Main → Extras
+ * DESKTOP: 3-column layout (1/4, 1/2, 1/4)
  */
 
 /** Collapsible section wrapper */
-function Section({ title, icon: Icon, defaultOpen = true, children, badge }) {
+function Section({ title, icon: Icon, defaultOpen = true, children, badge, noBorder = false }) {
     const [open, setOpen] = useState(defaultOpen);
     return (
-        <div className="border-t border-slate-700/60 pt-3">
+        <div className={`${noBorder ? 'pt-1' : 'border-t border-slate-700/60 pt-3'}`}>
             <button
                 type="button"
                 onClick={() => setOpen(!open)}
                 className="flex items-center justify-between w-full mb-2 group"
             >
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                <span className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-1.5">
                     {Icon && <Icon className="w-3 h-3" />}
                     {title}
                     {badge !== undefined && badge !== null && (
@@ -40,8 +47,8 @@ function Section({ title, icon: Icon, defaultOpen = true, children, badge }) {
                     )}
                 </span>
                 {open
-                    ? <ChevronDown className="w-3 h-3 text-slate-500 group-hover:text-slate-300" />
-                    : <ChevronRight className="w-3 h-3 text-slate-500 group-hover:text-slate-300" />
+                    ? <ChevronDown className="w-3 h-3 text-white group-hover:text-slate-300" />
+                    : <ChevronRight className="w-3 h-3 text-white group-hover:text-slate-300" />
                 }
             </button>
             {open && <div className="space-y-2 animate-in fade-in duration-150">{children}</div>}
@@ -56,8 +63,12 @@ export default function TaskControlPanel({
     userPlanItems = [],
     projectMilestones = [], milestoneWorkAreas = [],
     onStatusChange, onOpenDelayReport, onOpenListManager, onDeleteDependency,
-    onAddManualTime, isSavingManualTime
+    onAddManualTime, isSavingManualTime,
+    onOpenPRRequest, onOpenPRExecution, onOpenPRFeedback, onWaivePR,
+    activePeerReview, currentUserId, children
 }) {
+    // Clipboard state for network path copy
+    const [pathCopied, setPathCopied] = useState(false);
     // ── Subtask-based auto progress ──
     const totalSubtasks = subtasks.length;
     const completedSubtasks = subtasks.filter(s => s.completed).length;
@@ -114,396 +125,542 @@ export default function TaskControlPanel({
         }
     };
 
-    return (
-        <div className="w-full lg:w-1/2 flex flex-col bg-slate-850 lg:bg-transparent overflow-y-auto relative">
-            <div className="p-4 lg:p-5 space-y-3">
+    // ═══════════════════════════════════════════
+    // SHARED CONTENT SECTIONS
+    // ═══════════════════════════════════════════
 
-                {/* ─── QUICK ACTIONS ─── */}
-                {!isNew && (
-                    <div className="space-y-2">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-                            Acciones Rápidas
-                        </span>
-                        <div className="flex gap-2">
-                            {[TASK_STATUS.BLOCKED, TASK_STATUS.CANCELLED].map(s => {
-                                const cfg = TASK_STATUS_CONFIG[s];
-                                const isActive = form.status === s;
-
-                                return (
-                                    <button
-                                        key={s}
-                                        onClick={() => {
-                                            if (!canEdit) return;
-                                            if (s === TASK_STATUS.BLOCKED) {
-                                                onOpenDelayReport();
-                                            } else {
-                                                onStatusChange(s);
-                                            }
-                                        }}
-                                        disabled={!canEdit}
-                                        className={`flex-1 px-3 py-2 rounded-xl text-[11px] font-black tracking-wide uppercase transition-all border ${isActive
-                                            ? s === TASK_STATUS.BLOCKED
-                                                ? 'bg-red-500 text-white shadow-md border-transparent'
-                                                : 'bg-gray-500 text-white shadow-md border-transparent'
-                                            : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-slate-300 hover:border-slate-600'
-                                            }`}
-                                    >
-                                        {cfg.label}
-                                    </button>
-                                );
-                            })}
-                        </div>
-
-                        {/* Blocked reason */}
-                        {form.status === 'blocked' && (
-                            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-2.5 animate-in fade-in duration-200 mt-1">
-                                <span className="text-[9px] font-black text-red-400 uppercase tracking-widest flex items-center gap-1 mb-1.5">
-                                    <AlertTriangle className="w-3 h-3" /> Motivo bloqueo
-                                </span>
-                                <textarea
-                                    value={form.blockedReason}
-                                    onChange={e => setForm({ ...form, blockedReason: e.target.value })}
-                                    placeholder="Razón del bloqueo..."
-                                    className="w-full px-2 py-1.5 border border-red-500/30 rounded-lg text-[11px] bg-slate-800 outline-none focus:ring-1 focus:ring-red-400 text-red-300 placeholder-red-400/40 resize-none"
-                                    rows={2}
-                                    disabled={!canEdit}
-                                />
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* ─── V5: MILESTONE / AREA ─── */}
-                <Section title="Milestone / Área" icon={Target} defaultOpen={true}>
-                    {/* Milestone selector */}
-                    <div>
-                        <span className="text-[9px] font-bold text-slate-500 flex items-center gap-1 mb-0.5">
-                            <Target className="w-2.5 h-2.5" /> Milestone
-                        </span>
-                        <select
-                            value={form.milestoneId}
-                            onChange={e => setForm({ ...form, milestoneId: e.target.value })}
-                            className="w-full px-2.5 py-1.5 border border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800 text-slate-200"
-                            disabled={!canEdit || !form.projectId}
+    const QuickActionsContent = !isNew && (
+        <div className="space-y-2">
+            <span className="text-[10px] font-black text-white uppercase tracking-widest block">
+                Acciones Rápidas
+            </span>
+            <div className="flex gap-2">
+                {[TASK_STATUS.BLOCKED, TASK_STATUS.CANCELLED].map(s => {
+                    const cfg = TASK_STATUS_CONFIG[s];
+                    const isActive = form.status === s;
+                    return (
+                        <button
+                            key={s}
+                            onClick={() => {
+                                if (!canEdit) return;
+                                if (s === TASK_STATUS.BLOCKED) {
+                                    onOpenDelayReport();
+                                } else {
+                                    onStatusChange(s);
+                                }
+                            }}
+                            disabled={!canEdit}
+                            className={`flex-1 h-[38px] px-3 py-2 rounded-xl text-[11px] font-black tracking-wide uppercase transition-all border ${isActive
+                                ? s === TASK_STATUS.BLOCKED
+                                    ? 'bg-red-500 text-white shadow-md border-transparent'
+                                    : 'bg-gray-500 text-white shadow-md border-transparent'
+                                : 'bg-slate-800 text-white border-slate-700 hover:bg-slate-700 hover:text-slate-300 hover:border-slate-600'
+                                }`}
                         >
-                            <option value="">Sin milestone</option>
-                            {projectMilestones.map(ms => (
-                                <option key={ms.id} value={ms.id}>{ms.name || ms.title || ms.id}</option>
-                            ))}
-                        </select>
-                        {!form.projectId && (
-                            <p className="text-[9px] text-amber-400/70 mt-0.5 italic">Selecciona un proyecto primero</p>
+                            {cfg.label}
+                        </button>
+                    );
+                })}
+            </div>
+            {form.status === 'blocked' && (
+                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-2.5 animate-in fade-in duration-200 mt-1">
+                    <span className="text-[9px] font-black text-red-400 uppercase tracking-widest flex items-center gap-1 mb-1.5">
+                        <AlertTriangle className="w-3 h-3" /> Motivo bloqueo
+                    </span>
+                    <textarea
+                        value={form.blockedReason}
+                        onChange={e => setForm({ ...form, blockedReason: e.target.value })}
+                        placeholder="Razón del bloqueo..."
+                        className="w-full px-2 py-1.5 border border-red-500/30 rounded-lg text-[11px] bg-slate-800 outline-none focus:ring-1 focus:ring-red-400 text-red-300 placeholder-red-400/40 resize-none"
+                        rows={2}
+                        disabled={!canEdit}
+                    />
+                </div>
+            )}
+        </div>
+    );
+
+    const TimeContent = (
+        <Section title="Tiempo" icon={Clock} defaultOpen={true}>
+            <div className="grid grid-cols-2 gap-2">
+                <div>
+                    <span className="text-[9px] font-bold text-white block mb-0.5">Horas est.</span>
+                    <input
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={form.estimatedHours}
+                        onChange={e => setForm({ ...form, estimatedHours: e.target.value })}
+                        placeholder="0"
+                        className="w-full px-2.5 py-1.5 border border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800 text-slate-200"
+                        disabled={!canEdit}
+                    />
+                </div>
+                <div>
+                    <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-[9px] font-bold text-white">Horas reales</span>
+                        {canEdit && !isNew && (
+                            <button 
+                                type="button"
+                                onClick={() => setShowManualTime(!showManualTime)}
+                                className="text-[9px] text-indigo-400 hover:text-indigo-300 flex items-center gap-0.5 font-bold"
+                                title="Agregar horas manuales"
+                            >
+                                <Plus className="w-3 h-3" /> Manual
+                            </button>
                         )}
                     </div>
-
-                    {/* Area — read-only auto-resolved */}
-                    {form.milestoneId && (
-                        <div>
-                            <span className="text-[9px] font-bold text-slate-500 flex items-center gap-1 mb-0.5">
-                                <MapPin className="w-2.5 h-2.5" /> Área (auto-asignada)
+                    <div className="px-2.5 py-1.5 border border-slate-700/50 rounded-lg text-xs bg-slate-800/50 text-slate-300 font-bold">
+                        {actualHours.toFixed(1)}h
+                        {form.estimatedHours > 0 && (
+                            <span className={`ml-1 text-[9px] ${actualHours > Number(form.estimatedHours) ? 'text-red-400' : 'text-emerald-400'}`}>
+                                ({Math.round((actualHours / Number(form.estimatedHours)) * 100)}%)
                             </span>
-                            {(() => {
-                                // Find resolved area from milestoneWorkAreas by taskTypeId
-                                const resolvedArea = milestoneWorkAreas.find(area => {
-                                    const types = [...(area.taskTypeIds || []), ...(area.taskFilter?.typeMatch || [])];
-                                    return types.includes(form.taskTypeId);
-                                });
-                                return resolvedArea ? (
-                                    <div className="px-2.5 py-1.5 border border-teal-500/30 rounded-lg text-xs bg-teal-500/10 text-teal-300 font-bold flex items-center gap-1.5">
-                                        <div className="w-2 h-2 rounded-full bg-teal-400 flex-shrink-0" />
-                                        {resolvedArea.name}
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {showManualTime && !isNew && canEdit && (
+                <div className="mt-2 p-2 relative bg-slate-800/80 border border-slate-700 rounded-lg animate-in fade-in slide-in-from-top-2">
+                    <button
+                        type="button" 
+                        onClick={() => setShowManualTime(false)}
+                        className="absolute right-1 top-1 p-1 text-white hover:text-slate-300"
+                    >
+                        <X className="w-3 h-3"/>
+                    </button>
+                    <span className="text-[10px] font-bold text-indigo-400 block mb-2">Agregar Registro Manual</span>
+                    <div className="grid grid-cols-2 gap-2 mb-2">
+                        <div>
+                            <label className="text-[9px] text-white block mb-0.5">Horas</label>
+                            <input 
+                                type="number" min="0.1" step="0.1"
+                                value={manualHours} 
+                                onChange={e => setManualHours(e.target.value)}
+                                placeholder="Ej: 1.5"
+                                className="w-full px-2 py-1 text-xs bg-slate-900 border border-slate-700 rounded outline-none text-white focus:border-indigo-500 transition-colors"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-[9px] text-white block mb-0.5">Fecha</label>
+                            <input 
+                                type="date" 
+                                value={manualDate} 
+                                onChange={e => setManualDate(e.target.value)}
+                                className="w-full px-2 py-1 text-xs bg-slate-900 border border-slate-700 rounded outline-none text-white focus:border-indigo-500 transition-colors"
+                            />
+                        </div>
+                    </div>
+                    <div className="mb-2">
+                        <label className="text-[9px] text-white block mb-0.5">Notas (Opcional)</label>
+                        <input 
+                            type="text" 
+                            value={manualNotes} 
+                            onChange={e => setManualNotes(e.target.value)}
+                            placeholder="Motivo del registro..."
+                            className="w-full px-2 py-1 text-xs bg-slate-900 border border-slate-700 rounded outline-none text-white focus:border-indigo-500 transition-colors"
+                        />
+                    </div>
+                    <button
+                        type="button"
+                        onClick={handleSubmitManualTime}
+                        disabled={!manualHours || isSavingManualTime}
+                        className="w-full text-[10px] font-bold bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded py-1.5 transition-colors"
+                    >
+                        {isSavingManualTime ? 'Guardando...' : 'Guardar Horas'}
+                    </button>
+                </div>
+            )}
+
+            <div className="mt-2">
+                <span className="text-[9px] font-bold text-white block mb-0.5">Fecha límite</span>
+                <input
+                    type="date"
+                    value={form.dueDate}
+                    onChange={e => setForm({ ...form, dueDate: e.target.value })}
+                    className="w-full px-2.5 py-1.5 border border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800 text-slate-200"
+                    disabled={!canEditDates && !!form.dueDate}
+                />
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+                <div>
+                    <span className="text-[9px] font-bold text-white flex items-center gap-1 mb-0.5">
+                        <CalendarDays className="w-2.5 h-2.5" /> Inicio plan
+                    </span>
+                    <AvailabilityCalendar
+                        value={form.plannedStartDate}
+                        onChange={v => setForm({ ...form, plannedStartDate: v })}
+                        planItems={userPlanItems}
+                        assignedTo={form.assignedTo}
+                        disabled={!canEditDates && !!form.plannedStartDate}
+                    />
+                </div>
+                <div>
+                    <span className="text-[9px] font-bold text-white flex items-center gap-1 mb-0.5">
+                        <CalendarDays className="w-2.5 h-2.5" /> Fin plan
+                    </span>
+                    <AvailabilityCalendar
+                        value={form.plannedEndDate}
+                        onChange={v => setForm({ ...form, plannedEndDate: v })}
+                        planItems={userPlanItems}
+                        assignedTo={form.assignedTo}
+                        minDate={form.plannedStartDate ? new Date(form.plannedStartDate + 'T00:00:00') : undefined}
+                        disabled={!canEditDates && !!form.plannedEndDate}
+                    />
+                </div>
+            </div>
+        </Section>
+    );
+
+    const PlannerContent = !isNew && taskPlannerItems.length > 0 && (
+        <Section title="Planificación" icon={CalendarRange} defaultOpen={false} badge={`${taskPlannerItems.length} slots`}>
+            <div className="space-y-1">
+                {taskPlannerItems.map((item, i) => (
+                    <div key={item.id || i} className="flex items-center justify-between px-2 py-1.5 bg-slate-800/60 rounded-lg text-[10px]">
+                        <span className="text-slate-300 font-medium">{item.date || 'Sin fecha'}</span>
+                        <span className="text-indigo-400 font-bold">{item.plannedHours || 0}h</span>
+                    </div>
+                ))}
+                <div className="flex items-center justify-between px-2 py-1 border-t border-slate-700/50 mt-1">
+                    <span className="text-[9px] font-bold text-white">Total planificado</span>
+                    <span className="text-[10px] font-black text-indigo-400">{totalPlannedHours.toFixed(1)}h</span>
+                </div>
+            </div>
+        </Section>
+    );
+
+    const DependenciesContent = !isNew && (predecessors.length > 0 || successors.length > 0) && (
+        <Section title="Dependencias" icon={Link2} defaultOpen={false} badge={predecessors.length + successors.length}>
+            {predecessors.length > 0 && (
+                <div className="space-y-1">
+                    <span className="text-[9px] font-bold text-white">Depende de:</span>
+                    {predecessors.map(dep => (
+                        <div key={dep.id} className="flex items-center gap-2 px-2 py-1.5 bg-slate-800/60 rounded-lg group/dep">
+                            <Link2 className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                            <span className="text-[10px] text-slate-300 truncate flex-1">{getTaskTitle(dep.predecessorTaskId)}</span>
+                            <span className="text-[8px] font-bold text-white bg-slate-700 px-1 py-0.5 rounded">{dep.type || 'FS'}</span>
+                            {onDeleteDependency && (
+                                <button type="button" onClick={() => onDeleteDependency(dep.id)}
+                                    className="opacity-0 group-hover/dep:opacity-100 w-5 h-5 flex items-center justify-center rounded-md bg-red-500/20 hover:bg-red-500/40 text-red-400 transition-all"
+                                    title="Eliminar dependencia">
+                                    <X className="w-3 h-3" />
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+            {successors.length > 0 && (
+                <div className="space-y-1 mt-1">
+                    <span className="text-[9px] font-bold text-white">Bloquea a:</span>
+                    {successors.map(dep => (
+                        <div key={dep.id} className="flex items-center gap-2 px-2 py-1.5 bg-slate-800/60 rounded-lg group/dep">
+                            <Link2 className="w-3 h-3 text-red-400 flex-shrink-0" />
+                            <span className="text-[10px] text-slate-300 truncate flex-1">{getTaskTitle(dep.successorTaskId)}</span>
+                            <span className="text-[8px] font-bold text-white bg-slate-700 px-1 py-0.5 rounded">{dep.type || 'FS'}</span>
+                            {onDeleteDependency && (
+                                <button type="button" onClick={() => onDeleteDependency(dep.id)}
+                                    className="opacity-0 group-hover/dep:opacity-100 w-5 h-5 flex items-center justify-center rounded-md bg-red-500/20 hover:bg-red-500/40 text-red-400 transition-all"
+                                    title="Eliminar dependencia">
+                                    <X className="w-3 h-3" />
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </Section>
+    );
+
+    const BlockersContent = !isNew && taskDelays.length > 0 && (
+        <Section title="Bloqueos Activos" icon={ShieldAlert} defaultOpen={true} badge={taskDelays.length}>
+            <div className="space-y-1.5">
+                {taskDelays.map(delay => (
+                    <div key={delay.id} className="px-2.5 py-2 bg-red-500/10 border border-red-500/20 rounded-lg">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                                <ShieldAlert className="w-3 h-3 text-red-400 flex-shrink-0" />
+                                <span className="text-[10px] font-bold text-red-300">{delay.causeName || 'Causa desconocida'}</span>
+                            </div>
+                            <button
+                                onClick={async (e) => {
+                                    e.stopPropagation();
+                                    if (!window.confirm('¿Resolver este bloqueo?')) return;
+                                    try { await resolveDelay(delay.id, delay.projectId, delay.taskId || form?.id); }
+                                    catch (err) { console.error('Error resolviendo bloqueo:', err); }
+                                }}
+                                className="flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500/15 hover:bg-emerald-500/30 border border-emerald-500/30 rounded text-[9px] font-bold text-emerald-400 transition-colors cursor-pointer"
+                                title="Resolver bloqueo">
+                                <CheckCircle className="w-3 h-3" /> Resolver
+                            </button>
+                        </div>
+                        {delay.comment && <p className="text-[10px] text-red-300/70 mt-1 ml-4.5 leading-tight">{delay.comment}</p>}
+                        <span className="text-[8px] text-red-400/50 mt-1 block ml-4.5">
+                            {delay.createdAt ? new Date(delay.createdAt).toLocaleDateString() : ''}
+                        </span>
+                    </div>
+                ))}
+            </div>
+        </Section>
+    );
+
+    const DetailsContent = (
+        <Section title="Detalles" icon={Settings2} defaultOpen={false}>
+            <div>
+                <span className="text-[9px] font-bold text-white flex items-center gap-1 mb-0.5">
+                    <User className="w-2.5 h-2.5" /> Asignado por
+                </span>
+                <select
+                    value={form.assignedBy}
+                    onChange={e => setForm({ ...form, assignedBy: e.target.value })}
+                    className="w-full px-2.5 py-1.5 border border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800 text-slate-200"
+                    disabled={!canEdit}
+                >
+                    <option value="">Desconocido</option>
+                    {teamMembers.map(u => (
+                        <option key={u.uid} value={u.uid}>{u.displayName || u.email}</option>
+                    ))}
+                </select>
+            </div>
+        </Section>
+    );
+
+    const PeerReviewContent = !isNew && (() => {
+        const taskTypeObj = taskTypes.find(t => t.id === form.taskTypeId || t.name === form.taskTypeId);
+        const typeRequiresPR = taskTypeObj?.peerReviewRequired === true;
+        const prRequired = form.peerReviewRequired || typeRequiresPR;
+        const prStatus = form.peerReviewStatus;
+        const statusLabels = {
+            'not_required': 'Pendiente', 'requested': 'Solicitada', 'in_review': 'En Revisión',
+            'approved': '✅ Aprobada', 'changes_requested': '⚠️ Cambios Solicitados', 'waived': 'Exonerada',
+        };
+        const statusColors = {
+            'not_required': 'text-amber-400', 'requested': 'text-blue-400', 'in_review': 'text-cyan-400',
+            'approved': 'text-emerald-400', 'changes_requested': 'text-orange-400', 'waived': 'text-white',
+        };
+        return (
+            <Section title="Peer Review" icon={ShieldAlert} defaultOpen={false}>
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between px-3 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg">
+                        <div className="flex flex-col">
+                            <span className="text-[10px] text-white font-bold uppercase">Requiere Revisión</span>
+                            {typeRequiresPR && <span className="text-[9px] text-indigo-400/70 mt-0.5">Obligatorio por tipo de tarea</span>}
+                        </div>
+                        <button type="button"
+                            onClick={() => { if (typeRequiresPR) return; setForm({ ...form, peerReviewRequired: !form.peerReviewRequired }); }}
+                            disabled={!canEdit || typeRequiresPR}
+                            className={`relative inline-flex items-center w-10 h-[22px] rounded-full transition-colors shrink-0 ${prRequired ? 'bg-indigo-500' : 'bg-slate-600'} ${(!canEdit || typeRequiresPR) ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}>
+                            <span className={`inline-block w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${prRequired ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} />
+                        </button>
+                    </div>
+                    {prRequired && (
+                        <>
+                            <div className="px-3 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-lg">
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="text-[10px] text-white font-bold uppercase">Estado</span>
+                                    <span className={`text-xs font-bold ${statusColors[prStatus] || 'text-amber-400'}`}>{statusLabels[prStatus] || 'Pendiente'}</span>
+                                </div>
+                                {form.peerReviewReviewerId && (
+                                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-700/50">
+                                        <span className="text-[10px] text-white font-bold">Revisor:</span>
+                                        <span className="text-xs text-indigo-300">{teamMembers.find(m => m.uid === form.peerReviewReviewerId)?.displayName || '...'}</span>
                                     </div>
-                                ) : (
-                                    <div className="px-2.5 py-1.5 border border-amber-500/30 rounded-lg text-xs bg-amber-500/10 text-amber-300 font-medium">
-                                        ⚠ Sin área mapeada para este tipo de tarea
+                                )}
+                            </div>
+                            {canEdit && (() => {
+                                const isReviewer = currentUserId === form.peerReviewReviewerId;
+                                return (
+                                    <div className="flex items-center justify-end gap-2 flex-wrap">
+                                        {(!prStatus || prStatus === 'not_required') && (
+                                            <button type="button" onClick={onOpenPRRequest}
+                                                className="px-3 py-1.5 bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 border border-indigo-500/30 rounded text-xs font-bold transition-colors">
+                                                Solicitar Revisión
+                                            </button>
+                                        )}
+                                        {prStatus === 'requested' && isReviewer && (
+                                            <button type="button" onClick={onOpenPRExecution}
+                                                className="px-3 py-1.5 bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 border border-blue-500/30 rounded text-xs font-bold transition-colors">
+                                                Ejecutar Revisión
+                                            </button>
+                                        )}
+                                        {prStatus === 'requested' && !isReviewer && (
+                                            <span className="text-[10px] text-white italic">Esperando al revisor...</span>
+                                        )}
+                                        {prStatus === 'changes_requested' && (
+                                            <>
+                                                <button type="button" onClick={onOpenPRFeedback}
+                                                    className="px-3 py-1.5 bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 rounded text-xs font-bold transition-colors">
+                                                    Ver Feedback
+                                                </button>
+                                                <button type="button" onClick={onOpenPRRequest}
+                                                    className="px-3 py-1.5 bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 border border-indigo-500/30 rounded text-xs font-bold transition-colors">
+                                                    Re-solicitar Revisión
+                                                </button>
+                                            </>
+                                        )}
+                                        {prStatus !== 'waived' && prStatus !== 'approved' && (
+                                            <button type="button" onClick={onWaivePR}
+                                                className="px-3 py-1.5 bg-slate-700/50 text-white hover:text-slate-300 hover:bg-slate-700 rounded text-xs font-bold transition-colors">
+                                                Exonerar
+                                            </button>
+                                        )}
                                     </div>
                                 );
                             })()}
-                        </div>
+                        </>
                     )}
-                </Section>
+                </div>
+            </Section>
+        );
+    })();
 
-                {/* ─── TIME ─── */}
-                <Section title="Tiempo" icon={Clock} defaultOpen={true}>
-                    <div className="grid grid-cols-2 gap-2">
-                        <div>
-                            <span className="text-[9px] font-bold text-slate-500 block mb-0.5">Horas est.</span>
-                            <input
-                                type="number"
-                                min="0"
-                                step="0.5"
-                                value={form.estimatedHours}
-                                onChange={e => setForm({ ...form, estimatedHours: e.target.value })}
-                                placeholder="0"
-                                className="w-full px-2.5 py-1.5 border border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800 text-slate-200"
-                                disabled={!canEdit}
-                            />
-                        </div>
-                        <div>
-                            <div className="flex items-center justify-between mb-0.5">
-                                <span className="text-[9px] font-bold text-slate-500">Horas reales</span>
-                                {canEdit && !isNew && (
-                                    <button 
-                                        type="button"
-                                        onClick={() => setShowManualTime(!showManualTime)}
-                                        className="text-[9px] text-indigo-400 hover:text-indigo-300 flex items-center gap-0.5 font-bold"
-                                        title="Agregar horas manuales"
-                                    >
-                                        <Plus className="w-3 h-3" /> Manual
-                                    </button>
-                                )}
-                            </div>
-                            <div className="px-2.5 py-1.5 border border-slate-700/50 rounded-lg text-xs bg-slate-800/50 text-slate-300 font-bold">
-                                {actualHours.toFixed(1)}h
-                                {form.estimatedHours > 0 && (
-                                    <span className={`ml-1 text-[9px] ${actualHours > Number(form.estimatedHours) ? 'text-red-400' : 'text-emerald-400'}`}>
-                                        ({Math.round((actualHours / Number(form.estimatedHours)) * 100)}%)
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {showManualTime && !isNew && canEdit && (
-                        <div className="mt-2 p-2 relative bg-slate-800/80 border border-slate-700 rounded-lg animate-in fade-in slide-in-from-top-2">
-                            <button
-                                type="button" 
-                                onClick={() => setShowManualTime(false)}
-                                className="absolute right-1 top-1 p-1 text-slate-500 hover:text-slate-300"
-                            >
-                                <X className="w-3 h-3"/>
-                            </button>
-                            <span className="text-[10px] font-bold text-indigo-400 block mb-2">Agregar Registro Manual</span>
-                            <div className="grid grid-cols-2 gap-2 mb-2">
-                                <div>
-                                    <label className="text-[9px] text-slate-400 block mb-0.5">Horas</label>
-                                    <input 
-                                        type="number" min="0.1" step="0.1"
-                                        value={manualHours} 
-                                        onChange={e => setManualHours(e.target.value)}
-                                        placeholder="Ej: 1.5"
-                                        className="w-full px-2 py-1 text-xs bg-slate-900 border border-slate-700 rounded outline-none text-white focus:border-indigo-500 transition-colors"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[9px] text-slate-400 block mb-0.5">Fecha</label>
-                                    <input 
-                                        type="date" 
-                                        value={manualDate} 
-                                        onChange={e => setManualDate(e.target.value)}
-                                        className="w-full px-2 py-1 text-xs bg-slate-900 border border-slate-700 rounded outline-none text-white focus:border-indigo-500 transition-colors"
-                                    />
-                                </div>
-                            </div>
-                            <div className="mb-2">
-                                <label className="text-[9px] text-slate-400 block mb-0.5">Notas (Opcional)</label>
-                                <input 
-                                    type="text" 
-                                    value={manualNotes} 
-                                    onChange={e => setManualNotes(e.target.value)}
-                                    placeholder="Motivo del registro..."
-                                    className="w-full px-2 py-1 text-xs bg-slate-900 border border-slate-700 rounded outline-none text-white focus:border-indigo-500 transition-colors"
-                                />
-                            </div>
-                            <button
-                                type="button"
-                                onClick={handleSubmitManualTime}
-                                disabled={!manualHours || isSavingManualTime}
-                                className="w-full text-[10px] font-bold bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded py-1.5 transition-colors"
-                            >
-                                {isSavingManualTime ? 'Guardando...' : 'Guardar Horas'}
-                            </button>
-                        </div>
-                    )}
-
-                    <div className="mt-2">
-                        <span className="text-[9px] font-bold text-slate-500 block mb-0.5">Fecha límite</span>
-                        <input
-                            type="date"
-                            value={form.dueDate}
-                            onChange={e => setForm({ ...form, dueDate: e.target.value })}
-                            className="w-full px-2.5 py-1.5 border border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800 text-slate-200"
-                            disabled={!canEditDates && !!form.dueDate}
-                        />
-                    </div>
-                    {/* Planned Start / End Dates — Availability Calendar */}
-                    <div className="grid grid-cols-2 gap-2 pt-1">
-                        <div>
-                            <span className="text-[9px] font-bold text-slate-500 flex items-center gap-1 mb-0.5">
-                                <CalendarDays className="w-2.5 h-2.5" /> Inicio plan
-                            </span>
-                            <AvailabilityCalendar
-                                value={form.plannedStartDate}
-                                onChange={v => setForm({ ...form, plannedStartDate: v })}
-                                planItems={userPlanItems}
-                                assignedTo={form.assignedTo}
-                                disabled={!canEditDates && !!form.plannedStartDate}
-                            />
-                        </div>
-                        <div>
-                            <span className="text-[9px] font-bold text-slate-500 flex items-center gap-1 mb-0.5">
-                                <CalendarDays className="w-2.5 h-2.5" /> Fin plan
-                            </span>
-                            <AvailabilityCalendar
-                                value={form.plannedEndDate}
-                                onChange={v => setForm({ ...form, plannedEndDate: v })}
-                                planItems={userPlanItems}
-                                assignedTo={form.assignedTo}
-                                minDate={form.plannedStartDate ? new Date(form.plannedStartDate + 'T00:00:00') : undefined}
-                                disabled={!canEditDates && !!form.plannedEndDate}
-                            />
-                        </div>
-                    </div>
-                </Section>
-
-                {/* ─── PLANIFICACIÓN ─── */}
-                {!isNew && taskPlannerItems.length > 0 && (
-                    <Section title="Planificación" icon={CalendarRange} defaultOpen={false} badge={`${taskPlannerItems.length} slots`}>
-                        <div className="space-y-1">
-                            {taskPlannerItems.map((item, i) => (
-                                <div key={item.id || i} className="flex items-center justify-between px-2 py-1.5 bg-slate-800/60 rounded-lg text-[10px]">
-                                    <span className="text-slate-300 font-medium">
-                                        {item.date || 'Sin fecha'}
-                                    </span>
-                                    <span className="text-indigo-400 font-bold">
-                                        {item.plannedHours || 0}h
-                                    </span>
-                                </div>
-                            ))}
-                            <div className="flex items-center justify-between px-2 py-1 border-t border-slate-700/50 mt-1">
-                                <span className="text-[9px] font-bold text-slate-500">Total planificado</span>
-                                <span className="text-[10px] font-black text-indigo-400">{totalPlannedHours.toFixed(1)}h</span>
-                            </div>
-                        </div>
-                    </Section>
-                )}
-
-
-
-                {/* ─── DEPENDENCIAS ─── */}
-                {!isNew && (predecessors.length > 0 || successors.length > 0) && (
-                    <Section title="Dependencias" icon={Link2} defaultOpen={false} badge={predecessors.length + successors.length}>
-                        {predecessors.length > 0 && (
-                            <div className="space-y-1">
-                                <span className="text-[9px] font-bold text-slate-500">Depende de:</span>
-                                {predecessors.map(dep => (
-                                    <div key={dep.id} className="flex items-center gap-2 px-2 py-1.5 bg-slate-800/60 rounded-lg group/dep">
-                                        <Link2 className="w-3 h-3 text-amber-400 flex-shrink-0" />
-                                        <span className="text-[10px] text-slate-300 truncate flex-1">
-                                            {getTaskTitle(dep.predecessorTaskId)}
-                                        </span>
-                                        <span className="text-[8px] font-bold text-slate-500 bg-slate-700 px-1 py-0.5 rounded">
-                                            {dep.type || 'FS'}
-                                        </span>
-                                        {onDeleteDependency && (
-                                            <button
-                                                type="button"
-                                                onClick={() => onDeleteDependency(dep.id)}
-                                                className="opacity-0 group-hover/dep:opacity-100 w-5 h-5 flex items-center justify-center rounded-md bg-red-500/20 hover:bg-red-500/40 text-red-400 transition-all"
-                                                title="Eliminar dependencia"
-                                            >
-                                                <X className="w-3 h-3" />
-                                            </button>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                        {successors.length > 0 && (
-                            <div className="space-y-1 mt-1">
-                                <span className="text-[9px] font-bold text-slate-500">Bloquea a:</span>
-                                {successors.map(dep => (
-                                    <div key={dep.id} className="flex items-center gap-2 px-2 py-1.5 bg-slate-800/60 rounded-lg group/dep">
-                                        <Link2 className="w-3 h-3 text-red-400 flex-shrink-0" />
-                                        <span className="text-[10px] text-slate-300 truncate flex-1">
-                                            {getTaskTitle(dep.successorTaskId)}
-                                        </span>
-                                        <span className="text-[8px] font-bold text-slate-500 bg-slate-700 px-1 py-0.5 rounded">
-                                            {dep.type || 'FS'}
-                                        </span>
-                                        {onDeleteDependency && (
-                                            <button
-                                                type="button"
-                                                onClick={() => onDeleteDependency(dep.id)}
-                                                className="opacity-0 group-hover/dep:opacity-100 w-5 h-5 flex items-center justify-center rounded-md bg-red-500/20 hover:bg-red-500/40 text-red-400 transition-all"
-                                                title="Eliminar dependencia"
-                                            >
-                                                <X className="w-3 h-3" />
-                                            </button>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </Section>
-                )}
-
-                {/* ─── BLOQUEOS (active delays) ─── */}
-                {!isNew && taskDelays.length > 0 && (
-                    <Section title="Bloqueos Activos" icon={ShieldAlert} defaultOpen={true} badge={taskDelays.length}>
-                        <div className="space-y-1.5">
-                            {taskDelays.map(delay => (
-                                <div key={delay.id} className="px-2.5 py-2 bg-red-500/10 border border-red-500/20 rounded-lg">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-1.5">
-                                            <ShieldAlert className="w-3 h-3 text-red-400 flex-shrink-0" />
-                                            <span className="text-[10px] font-bold text-red-300">
-                                                {delay.causeName || 'Causa desconocida'}
-                                            </span>
-                                        </div>
-                                        <button
-                                            onClick={async (e) => {
-                                                e.stopPropagation();
-                                                if (!window.confirm('¿Resolver este bloqueo?')) return;
-                                                try {
-                                                    await resolveDelay(delay.id, delay.projectId, delay.taskId || form?.id);
-                                                } catch (err) {
-                                                    console.error('Error resolviendo bloqueo:', err);
-                                                }
-                                            }}
-                                            className="flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500/15 hover:bg-emerald-500/30 border border-emerald-500/30 rounded text-[9px] font-bold text-emerald-400 transition-colors cursor-pointer"
-                                            title="Resolver bloqueo"
-                                        >
-                                            <CheckCircle className="w-3 h-3" />
-                                            Resolver
-                                        </button>
-                                    </div>
-                                    {delay.comment && (
-                                        <p className="text-[10px] text-red-300/70 mt-1 ml-4.5 leading-tight">
-                                            {delay.comment}
-                                        </p>
-                                    )}
-                                    <span className="text-[8px] text-red-400/50 mt-1 block ml-4.5">
-                                        {delay.createdAt ? new Date(delay.createdAt).toLocaleDateString() : ''}
-                                    </span>
-                                </div>
+    const WorkFolderContent = (
+        <Section title="Carpeta de Trabajo" icon={FolderOpen} defaultOpen={!!form.networkPath}>
+            <div className="space-y-2">
+                <div className="relative">
+                    <FolderOpen className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white" />
+                    <input type="text" value={form.networkPath || ''}
+                        onChange={e => setForm({ ...form, networkPath: e.target.value })}
+                        placeholder="\\\\servidor\\carpeta\\..."
+                        className="w-full pl-8 pr-2.5 py-1.5 border border-slate-700 rounded-lg text-[11px] font-mono outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800 text-slate-200 placeholder-slate-500"
+                        disabled={!canEdit}
+                    />
+                </div>
+                {form.networkPath && (
+                    <div className="px-2 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded-lg overflow-x-auto">
+                        <div className="flex items-center gap-0.5 text-[9px] text-white whitespace-nowrap">
+                            {form.networkPath.split('\\').filter(Boolean).map((segment, i, arr) => (
+                                <React.Fragment key={i}>
+                                    <span className={`px-1 py-0.5 rounded ${i === arr.length - 1 ? 'bg-indigo-500/15 text-indigo-400 font-bold' : 'hover:bg-slate-700/50'}`}>{segment}</span>
+                                    {i < arr.length - 1 && <span className="text-slate-600">›</span>}
+                                </React.Fragment>
                             ))}
                         </div>
-                    </Section>
-                )}
-
-                {/* ─── METADATA ─── */}
-                <Section title="Detalles" icon={Settings2} defaultOpen={false}>
-                    {/* Assigned By */}
-                    <div>
-                        <span className="text-[9px] font-bold text-slate-500 flex items-center gap-1 mb-0.5">
-                            <User className="w-2.5 h-2.5" /> Asignado por
-                        </span>
-                        <select
-                            value={form.assignedBy}
-                            onChange={e => setForm({ ...form, assignedBy: e.target.value })}
-                            className="w-full px-2.5 py-1.5 border border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800 text-slate-200"
-                            disabled={!canEdit}
-                        >
-                            <option value="">Desconocido</option>
-                            {teamMembers.map(u => (
-                                <option key={u.uid} value={u.uid}>{u.displayName || u.email}</option>
-                            ))}
-                        </select>
                     </div>
-                </Section>
-
+                )}
+                {form.networkPath && (
+                    <button type="button"
+                        onClick={() => { navigator.clipboard.writeText(form.networkPath).then(() => { setPathCopied(true); setTimeout(() => setPathCopied(false), 2000); }); }}
+                        className={`w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${pathCopied
+                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-slate-800 text-white border border-slate-700 hover:bg-slate-700 hover:text-slate-300'}`}>
+                        {pathCopied ? <ClipboardCheck className="w-3.5 h-3.5" /> : <Clipboard className="w-3.5 h-3.5" />}
+                        {pathCopied ? 'Ruta copiada ✓' : 'Copiar ruta'}
+                    </button>
+                )}
             </div>
+        </Section>
+    );
+
+    const AttachmentsContent = !isNew && (
+        <Section title="Archivos Adjuntos" icon={Paperclip} defaultOpen={false}>
+            <FileAttachments taskId={task?.id} canEdit={canEdit} />
+        </Section>
+    );
+
+    const MilestoneContent = (
+        <Section title="Milestone / Área" icon={Target} defaultOpen={false}>
+            <div>
+                <span className="text-[9px] font-bold text-white flex items-center gap-1 mb-0.5">
+                    <Target className="w-2.5 h-2.5" /> Milestone
+                </span>
+                <select value={form.milestoneId}
+                    onChange={e => setForm({ ...form, milestoneId: e.target.value })}
+                    className="w-full px-2.5 py-1.5 border border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800 text-slate-200"
+                    disabled={!canEdit || !form.projectId}>
+                    <option value="">Sin milestone</option>
+                    {projectMilestones.map(ms => (
+                        <option key={ms.id} value={ms.id}>{ms.name || ms.title || ms.id}</option>
+                    ))}
+                </select>
+                {!form.projectId && <p className="text-[9px] text-amber-400/70 mt-0.5 italic">Selecciona un proyecto primero</p>}
+            </div>
+            {form.milestoneId && (
+                <div>
+                    <span className="text-[9px] font-bold text-white flex items-center gap-1 mb-0.5">
+                        <MapPin className="w-2.5 h-2.5" /> Área (auto-asignada)
+                    </span>
+                    {(() => {
+                        const resolvedArea = milestoneWorkAreas.find(area => {
+                            const types = [...(area.taskTypeIds || []), ...(area.taskFilter?.typeMatch || [])];
+                            return types.includes(form.taskTypeId);
+                        });
+                        return resolvedArea ? (
+                            <div className="px-2.5 py-1.5 border border-teal-500/30 rounded-lg text-xs bg-teal-500/10 text-teal-300 font-bold flex items-center gap-1.5">
+                                <div className="w-2 h-2 rounded-full bg-teal-400 flex-shrink-0" />
+                                {resolvedArea.name}
+                            </div>
+                        ) : (
+                            <div className="px-2.5 py-1.5 border border-amber-500/30 rounded-lg text-xs bg-amber-500/10 text-amber-300 font-medium">
+                                ⚠ Sin área mapeada para este tipo de tarea
+                            </div>
+                        );
+                    })()}
+                </div>
+            )}
+        </Section>
+    );
+
+
+    // ═══════════════════════════════════════════
+    // RENDER
+    // ═══════════════════════════════════════════
+
+    return (
+        <div className="w-full flex flex-col lg:flex-row bg-slate-950 flex-1 relative overflow-hidden">
+            
+            {/* ══════════ MOBILE: Single scroll column ══════════ */}
+            <div className="lg:hidden flex-1 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+                <div className="p-4 space-y-3">
+                    {/* Control sections first */}
+                    {QuickActionsContent}
+                    {TimeContent}
+                    {PlannerContent}
+                    {BlockersContent}
+
+                    {/* Main content (Description, Subtasks, Comments) */}
+                    {children}
+
+                    {/* Secondary sections collapsed by default */}
+                    {DependenciesContent}
+                    {DetailsContent}
+                    {PeerReviewContent}
+                    {WorkFolderContent}
+                    {AttachmentsContent}
+                    {MilestoneContent}
+                </div>
+            </div>
+
+            {/* ══════════ DESKTOP: 3-column layout ══════════ */}
+
+            {/* Left Column (1/4) */}
+            <div className="hidden lg:flex w-1/4 flex-col border-r border-slate-800 overflow-y-auto flex-none">
+                <div className="p-5 space-y-4">
+                    {QuickActionsContent}
+                    {TimeContent}
+                    {PlannerContent}
+                    {DependenciesContent}
+                    {BlockersContent}
+                    {DetailsContent}
+                </div>
+            </div>
+
+            {/* Center Column (1/2) */}
+            <div className="hidden lg:flex flex-1 flex-col overflow-y-auto">
+                {children}
+            </div>
+
+            {/* Right Column (1/4) */}
+            <div className="hidden lg:flex w-1/4 flex-col border-l border-slate-800 overflow-y-auto flex-none">
+                <div className="p-5 space-y-3">
+                    {PeerReviewContent}
+                    {WorkFolderContent}
+                    {AttachmentsContent}
+                    {MilestoneContent}
+                </div>
+            </div>
+
         </div>
     );
 }

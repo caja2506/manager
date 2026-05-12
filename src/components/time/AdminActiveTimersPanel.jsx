@@ -5,8 +5,8 @@ import {
     Sunset, Sunrise
 } from 'lucide-react';
 import { stopTimer, formatElapsed, closeDay, openDay } from '../../services/timeService';
-import { updateDoc, doc } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { USE_SUPABASE } from '../../services/_backend';
+import { supabase } from '../../supabase';
 import { COLLECTIONS } from '../../models/schemas';
 
 /**
@@ -22,22 +22,47 @@ import { COLLECTIONS } from '../../models/schemas';
  *  - INICIAR DÍA: restart auto-stopped timers (8AM)
  */
 export default function AdminActiveTimersPanel({
-    timeLogs, teamMembers, tasks, projects, canManageOthers
+    timeLogs, teamMembers, tasks, projects, canManageOthers, currentUserId, resourceAssignments = []
 }) {
     const [isClosing, setIsClosing] = useState(false);
     const [isOpening, setIsOpening] = useState(false);
     const [feedback, setFeedback] = useState(null);
 
-    if (!canManageOthers) return null;
+    // Determine subordinates from BOTH hierarchies
+    const subordinateUids = (() => {
+        const uids = new Set();
+        // 1. HR: reportsTo
+        (teamMembers || []).forEach(m => {
+            if (m.reportsTo === currentUserId) uids.add(m.uid || m.id);
+        });
+        // 2. Operational: resourceAssignments (engineer → technician)
+        (resourceAssignments || []).forEach(a => {
+            if (a.engineerId === currentUserId && a.active !== false) uids.add(a.technicianId);
+        });
+        return [...uids];
+    })();
+
+    const isSupervisorOnly = !canManageOthers && subordinateUids.length > 0;
+
+    // If not admin/manager AND not a supervisor with subordinates, hide panel
+    if (!canManageOthers && !isSupervisorOnly) return null;
 
     // All running timers (endTime is null/empty)
-    const runningTimers = (timeLogs || []).filter(log => !log.endTime && log.startTime);
+    const allRunningTimers = (timeLogs || []).filter(log => !log.endTime && log.startTime);
+
+    // If supervisor-only, filter to only show subordinates' timers
+    const runningTimers = isSupervisorOnly
+        ? allRunningTimers.filter(log => subordinateUids.includes(log.userId))
+        : allRunningTimers;
 
     // Count auto-stopped timers from last 24h (for "Iniciar Día" visibility)
     const yesterday = new Date(Date.now() - 24 * 3600000);
-    const autoStoppedCount = (timeLogs || []).filter(log =>
+    const allAutoStopped = (timeLogs || []).filter(log =>
         log.autoStopped && log.endTime && new Date(log.endTime) >= yesterday
-    ).length;
+    );
+    const autoStoppedCount = isSupervisorOnly
+        ? allAutoStopped.filter(log => subordinateUids.includes(log.userId)).length
+        : allAutoStopped.length;
 
     const handleCloseDay = async () => {
         if (!confirm(`¿Cerrar el día? Se detendrán ${runningTimers.length} timer(s) activos.`)) return;
@@ -74,7 +99,7 @@ export default function AdminActiveTimersPanel({
             <div className="px-5 py-4 border-b border-slate-800 flex items-center gap-2 flex-wrap">
                 <Users className="w-4 h-4 text-emerald-500" />
                 <span className="text-xs font-black uppercase tracking-widest text-slate-400">
-                    Timers Activos del Equipo
+                    {isSupervisorOnly ? 'Timers de Mi Equipo' : 'Timers Activos del Equipo'}
                 </span>
                 {runningTimers.length > 0 && (
                     <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-black px-2.5 py-1 rounded-full border border-emerald-500/30">
@@ -208,9 +233,13 @@ function ActiveTimerRow({ log, teamMembers, tasks, projects }) {
         setIsSaving(true);
         try {
             const newStart = new Date(editStartTime).toISOString();
-            await updateDoc(doc(db, COLLECTIONS.TIME_LOGS, log.id), {
-                startTime: newStart,
-            });
+            if (USE_SUPABASE) {
+                await supabase.from('time_logs').update({ start_time: newStart }).eq('id', log.id);
+            } else {
+                const { updateDoc, doc } = await import('firebase/firestore');
+                const { db } = await import('../../firebase');
+                await updateDoc(doc(db, COLLECTIONS.TIME_LOGS, log.id), { startTime: newStart });
+            }
             setIsEditing(false);
         } catch (e) {
             console.error('Error updating start time:', e);

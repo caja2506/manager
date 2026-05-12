@@ -14,7 +14,7 @@ export const TASK_STATUS = {
 
 export const TASK_STATUS_CONFIG = {
     [TASK_STATUS.BACKLOG]:     { label: 'Backlog',      color: '#64748b', icon: 'Inbox',      order: 0 },
-    [TASK_STATUS.PENDING]:     { label: 'Planificado',  color: '#ef4444', icon: 'Clock',      order: 1 },
+    [TASK_STATUS.PENDING]:     { label: 'Pendiente',  color: '#ef4444', icon: 'Clock',      order: 1 },
     [TASK_STATUS.IN_PROGRESS]: { label: 'En Progreso',  color: '#f59e0b', icon: 'Play',       order: 2 },
     [TASK_STATUS.VALIDATION]:  { label: 'En Revisión',  color: '#8b5cf6', icon: 'CheckCircle', order: 3 },
     [TASK_STATUS.COMPLETED]:   { label: 'Completado',   color: '#22c55e', icon: 'CheckCheck', order: 4 },
@@ -161,6 +161,12 @@ export function createTaskDocument({
     showInGantt = false, plannedStartDate = null, plannedEndDate = null,
     plannedDurationHours = 0, percentComplete = 0, milestone = false,
     summaryTask = false, parentTaskId = null, ganttViewModeDefault = null,
+    // Network path (UNC)
+    networkPath = '',
+    // Peer Review defaults
+    peerReviewRequired = false, peerReviewStatus = 'not_required',
+    peerReviewDiscipline = null, peerReviewCycles = 0,
+    currentPeerReviewId = null, lastPeerReviewerId = null, lastPeerReviewAt = null,
 } = {}) {
     return {
         projectId, subprojectId, title, description, status, priority, taskTypeId,
@@ -169,6 +175,22 @@ export function createTaskDocument({
         blockedReason, tags, order,
         showInGantt, plannedStartDate, plannedEndDate, plannedDurationHours,
         percentComplete, milestone, summaryTask, parentTaskId, ganttViewModeDefault,
+        // Network path
+        networkPath,
+        // WIP Enforcement — blocked time tracking
+        blockedAt: null,
+        unblockedAt: null,
+        totalBlockedHours: 0,
+        blockedByUserId: null,
+        blockedByName: null,
+        // Peer Review
+        peerReviewRequired,
+        peerReviewStatus,
+        peerReviewDiscipline,
+        peerReviewCycles,
+        currentPeerReviewId,
+        lastPeerReviewerId,
+        lastPeerReviewAt,
         createdBy: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     };
 }
@@ -176,6 +198,33 @@ export function createTaskDocument({
 export function createSubtaskDocument({ taskId = null, title = '', completed = false, order = 0, createdBy = null } = {}) {
     const now = new Date().toISOString();
     return { taskId, title, completed, order, createdBy, updatedBy: createdBy, createdAt: now, updatedAt: now };
+}
+
+/**
+ * Create a block history entry document.
+ * Stored in subcollection: tasks/{taskId}/blockHistory/{entryId}
+ */
+export function createBlockHistoryDocument({
+    blockedAt = null,
+    unblockedAt = null,
+    durationHours = 0,
+    blockedReason = '',
+    blockedByUserId = null,
+    blockedByName = null,
+    unblockedByUserId = null,
+    type = 'manual',         // 'wip_switch' | 'manual'
+    taskSwitchedTo = null,   // taskId of the new task (only for wip_switch)
+    taskId = null,           // denormalized for collectionGroup queries
+    assignedTo = null,       // denormalized: task owner
+} = {}) {
+    return {
+        blockedAt, unblockedAt, durationHours,
+        blockedReason,
+        blockedByUserId, blockedByName,
+        unblockedByUserId,
+        type, taskSwitchedTo,
+        taskId, assignedTo,
+    };
 }
 
 export function createTimeLogDocument({
@@ -220,9 +269,69 @@ export function createDailyReportDocument({
     return { date, userId, userName, data, source, createdBy, updatedBy: createdBy, createdAt: now, updatedAt: now };
 }
 
-export function createTaskTypeDocument({ name = '', icon = 'Wrench', color = 'indigo', active = true, order = 0, createdBy = null } = {}) {
+export function createTaskTypeDocument({ name = '', icon = 'Wrench', color = 'indigo', active = true, order = 0, createdBy = null,
+    peerReviewRequired = false, peerReviewSections = [],
+} = {}) {
     const now = new Date().toISOString();
-    return { name, icon, color, active, order, createdBy, updatedBy: createdBy, createdAt: now, updatedAt: now };
+    return {
+        name, icon, color, active, order,
+        peerReviewRequired, peerReviewSections,
+        createdBy, updatedBy: createdBy, createdAt: now, updatedAt: now,
+    };
+}
+
+// ── Peer Review Factories ──
+
+export const PEER_REVIEW_STATUS = {
+    NOT_REQUIRED: 'not_required',
+    REQUESTED: 'requested',
+    IN_REVIEW: 'in_review',
+    APPROVED: 'approved',
+    CHANGES_REQUESTED: 'changes_requested',
+    WAIVED: 'waived',
+};
+
+export const PEER_REVIEW_DISCIPLINE = {
+    PROGRAMMING: 'programming',
+    ELECTRICAL: 'electrical',
+    MECHANICAL: 'mechanical',
+};
+
+export function createPeerReviewDocument({
+    taskId = null, projectId = null, cycle = 1,
+    requestedBy = null, reviewerId = null,
+    discipline = null,
+    status = PEER_REVIEW_STATUS.REQUESTED,
+    checklistItems = [],
+    decision = null, summary = '',
+    waivedBy = null, waiveReason = null,
+} = {}) {
+    const now = new Date().toISOString();
+    return {
+        taskId, projectId, cycle,
+        requestedBy, reviewerId,
+        discipline, status,
+        checklistItems,
+        decision, summary,
+        waivedBy, waiveReason,
+        requestedAt: now,
+        startedAt: null,
+        completedAt: null,
+        createdAt: now,
+    };
+}
+
+export function createPeerReviewTemplateDocument({
+    name = '', discipline = null, taskTypeId = null, active = true,
+    items = [], createdBy = null,
+} = {}) {
+    const now = new Date().toISOString();
+    return {
+        name, discipline, taskTypeId, active,
+        items,
+        createdBy, updatedBy: createdBy,
+        createdAt: now, updatedAt: now,
+    };
 }
 
 export function createTaskTypeCategoryDocument({ name = '', color = 'indigo', icon = 'Layers', order = 0, active = true, createdBy = null } = {}) {

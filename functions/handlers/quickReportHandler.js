@@ -191,18 +191,44 @@ async function submitQuickReport(adminDb, reportData) {
             }
         }
 
-        // Create timeLog entry
+        // Create timeLog entry — but only if no web timer already logged hours today
         if (report.hoursWorked && report.hoursWorked > 0) {
-            const timeLogRef = adminDb.collection(paths.TIME_LOGS).doc();
-            batch.set(timeLogRef, {
-                taskId: report.taskId,
-                userId: userId,
-                date: todayStr,
-                totalHours: report.hoursWorked,
-                description: `Quick Report: ${report.progressPercent}%`,
-                source: "telegram_webapp",
-                createdAt: now.toISOString(),
-            });
+            // Check if web timer already recorded hours for this task today
+            let skipTimeLog = false;
+            try {
+                const existingLogsSnap = await adminDb.collection(paths.TIME_LOGS)
+                    .where("taskId", "==", report.taskId)
+                    .where("userId", "==", userId)
+                    .get();
+
+                existingLogsSnap.forEach(doc => {
+                    const log = doc.data();
+                    const logSource = log.source || "web";
+                    if (logSource === "telegram" || logSource === "telegram_webapp") return;
+                    if (!log.startTime) return;
+                    const logDate = new Date(log.startTime).toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
+                    if (logDate === todayStr && (log.totalHours || log.endTime === null)) {
+                        skipTimeLog = true;
+                    }
+                });
+            } catch (err) {
+                console.warn("[quickReport] Timer check error:", err.message);
+            }
+
+            if (!skipTimeLog) {
+                const timeLogRef = adminDb.collection(paths.TIME_LOGS).doc();
+                batch.set(timeLogRef, {
+                    taskId: report.taskId,
+                    userId: userId,
+                    date: todayStr,
+                    totalHours: report.hoursWorked,
+                    description: `Quick Report: ${report.progressPercent}%`,
+                    source: "telegram_webapp",
+                    createdAt: now.toISOString(),
+                });
+            } else {
+                console.log(`[quickReport] SKIP timeLog: web timer already has hours for task ${report.taskId} today.`);
+            }
         }
 
         updatedCount++;
@@ -229,4 +255,52 @@ async function submitQuickReport(adminDb, reportData) {
     };
 }
 
-module.exports = { getQuickReportData, submitQuickReport };
+/**
+ * Create a quick task from the Mini App.
+ * @param {Object} data - { chatId, title }
+ * @returns {{ success, taskId, title }}
+ */
+async function createQuickTask(adminDb, data) {
+    const { chatId, title } = data;
+    if (!chatId || !title || !title.trim()) {
+        return { error: "chatId and title are required", success: false };
+    }
+
+    // Resolve user from chatId
+    const userData = await getQuickReportData(adminDb, chatId);
+    if (userData.error) {
+        return { error: userData.error, success: false };
+    }
+
+    const userId = userData.userId;
+    const now = new Date();
+    const todayStr = now.toISOString().substring(0, 10);
+
+    const taskDoc = {
+        title: title.trim(),
+        description: "",
+        status: "in_progress",
+        priority: "medium",
+        assignedTo: userId,
+        progressPercent: 0,
+        estimatedHours: 0,
+        hoursWorked: 0,
+        plannedStartDate: todayStr,
+        dueDate: null,
+        source: "telegram_webapp",
+        createdBy: userId,
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+    };
+
+    const ref = await adminDb.collection(paths.TASKS).add(taskDoc);
+    console.log(`[quickReport] Created task ${ref.id}: "${title}" for user ${userId}`);
+
+    return {
+        success: true,
+        taskId: ref.id,
+        title: title.trim(),
+    };
+}
+
+module.exports = { getQuickReportData, submitQuickReport, createQuickTask };

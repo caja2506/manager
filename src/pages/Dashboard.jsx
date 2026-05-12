@@ -14,7 +14,6 @@ import { RISK_LEVEL_CONFIG, TASK_STATUS_CONFIG } from '../models/schemas';
 import { useAuditData } from '../hooks/useAuditData';
 import ComplianceScoresPanel from '../components/audit/ComplianceScoresPanel';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
-import PageHeader from '../components/layout/PageHeader';
 import { resolveDelay } from '../services/delayService';
 import { calculateTeamScores } from '../core/analytics/performanceScore';
 import { getActiveAssignments } from '../services/resourceAssignmentService';
@@ -114,7 +113,7 @@ function TaskPipeline({ tasks, onTaskClick }) {
     const pipeline = useMemo(() => {
         const statuses = [
             { key: 'backlog', label: 'Backlog', subtitle: 'Pendientes', icon: Inbox, color: 'slate', desc: 'Tareas registradas pendientes de planificación y asignación.' },
-            { key: 'planned', label: 'Planificado', subtitle: 'Listo para iniciar', icon: ListTodo, color: 'blue', desc: 'Tareas asignadas y planificadas, listas para comenzar trabajo.' },
+            { key: 'planned', label: 'Pendiente', subtitle: 'Listo para iniciar', icon: ListTodo, color: 'blue', desc: 'Tareas asignadas y planificadas, listas para comenzar trabajo.' },
             { key: 'in_progress', label: 'En Progreso', subtitle: 'Trabajo activo', icon: Play, color: 'indigo', desc: 'Tareas con trabajo activo y timer de horas en tiempo real.' },
             { key: 'in_review', label: 'En Revisión', subtitle: 'Validación', icon: Eye, color: 'amber', desc: 'Tareas completadas esperando validación del responsable.' },
             { key: 'completed', label: 'Completado', subtitle: 'Finalizado', icon: CheckCircle, color: 'emerald', desc: 'Tareas terminadas y registradas en métricas.' },
@@ -579,7 +578,7 @@ export default function Dashboard() {
                     taskTypes={taskTypes} userId={user?.uid} canEdit={canEdit} canDelete={canDelete}
                 />
 
-                <PageHeader title="" showBack={true} />
+                
 
                 {/* ═══════════ HEADER ═══════════ */}
                 <section ref={headerRef} className="relative overflow-hidden">

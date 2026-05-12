@@ -31,8 +31,8 @@ export default function AIInsightsPanel({
                 <div className="flex items-center justify-between">
                     <h3 className="font-bold text-lg text-white flex items-center gap-2">
                         <BrainCircuit className="w-5 h-5 text-violet-400" />
-                        Gemini Copilot
-                        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-400 border border-violet-500/30">AI</span>
+                        Copiloto Analítico
+                        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-400 border border-violet-500/30">AUTO</span>
                     </h3>
                     {isGenerating && (
                         <div className="flex items-center gap-2 text-violet-400">
@@ -249,8 +249,8 @@ export default function AIInsightsPanel({
             {!insights && !teamAnalysis && !weeklyBrief && !isGenerating && !error && (
                 <div className="p-8 text-center">
                     <BrainCircuit className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-                    <p className="text-sm font-bold text-slate-400 mb-1">Gemini Copilot listo</p>
-                    <p className="text-xs text-slate-500">Selecciona un tipo de análisis para generar insights con IA</p>
+                    <p className="text-sm font-bold text-slate-400 mb-1">Copiloto Analítico listo</p>
+                    <p className="text-xs text-slate-500">Selecciona un tipo de análisis para generar insights analíticos</p>
                 </div>
             )}
         </div>

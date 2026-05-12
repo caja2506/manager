@@ -44,6 +44,7 @@ exports.testAIExtraction = aiExports.testAIExtraction;
 exports.testAIBriefing = aiExports.testAIBriefing;
 exports.reprocesarReporteConIA = aiExports.reprocesarReporteConIA;
 exports.analyzeStationImage = aiExports.analyzeStationImage;
+exports.improveTaskDescriptions = aiExports.improveTaskDescriptions;
 
 // ── Domain: Analytics ──
 const { createAnalyticsExports } = require("./exports/analytics");
@@ -96,3 +97,23 @@ exports.getOptimizationDashboard = optimizationExports.getOptimizationDashboard;
 const { createPlannerTriggerExports } = require("./exports/plannerTriggers");
 const plannerTriggerExports = createPlannerTriggerExports(adminDb);
 exports.onPlanItemChanged = plannerTriggerExports.onPlanItemChanged;
+
+// ── Domain: Peer Review ──
+const { createPeerReviewExports } = require("./exports/peerReviews");
+const peerReviewExports = createPeerReviewExports(adminDb, secrets);
+exports.requestPeerReview = peerReviewExports.requestPeerReview;
+exports.submitPeerReview = peerReviewExports.submitPeerReview;
+exports.waivePeerReview = peerReviewExports.waivePeerReview;
+exports.getPeerReviewTemplates = peerReviewExports.getPeerReviewTemplates;
+exports.generatePRChecklist = peerReviewExports.generatePRChecklist;
+exports.saveTaskTypeChecklist = peerReviewExports.saveTaskTypeChecklist;
+
+// ── Domain: Data Export (public HTTP endpoints for Excel / Power Query) ──
+const { createDataExportExports } = require("./exports/dataExport");
+const dataExportExports = createDataExportExports(adminDb);
+exports.exportTasksForExcel = dataExportExports.exportTasksForExcel;
+
+// ── Domain: Supabase Auth Bridge (Callable Function) ──
+// Sets `role: 'authenticated'` custom claim on all Firebase users for Supabase Third-Party Auth
+const supabaseAuthExports = require("./exports/supabaseAuth");
+exports.setSupabaseClaims = supabaseAuthExports.setSupabaseClaims;

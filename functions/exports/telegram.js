@@ -67,6 +67,19 @@ function createTelegramExports(adminDb, secrets) {
             const delayId = event.params.delayId;
             console.log(`[onDelayCreated] New delay: ${delayId}`, JSON.stringify(delay));
 
+            // ── Guard: check if blocker_notification routine is enabled ──
+            const paths = require("../automation/firestorePaths");
+            const coreSnap = await adminDb.collection(paths.SETTINGS).doc(paths.SETTINGS_DOCS.AUTOMATION_CORE).get();
+            if (coreSnap.exists && !coreSnap.data().enabled) {
+                console.log("[onDelayCreated] automationCore is disabled, skipping blocker notification.");
+                return;
+            }
+            const routineSnap = await adminDb.collection(paths.AUTOMATION_ROUTINES).doc("block_incident_alert").get();
+            if (routineSnap.exists && !routineSnap.data().enabled) {
+                console.log("[onDelayCreated] block_incident_alert routine is disabled, skipping notification.");
+                return;
+            }
+
             const token = telegramBotToken.value();
             if (!token) { console.warn("[onDelayCreated] No Telegram bot token configured, skipping notification."); return; }
 
@@ -116,18 +129,27 @@ function createTelegramExports(adminDb, secrets) {
             res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
             res.set("Access-Control-Allow-Headers", "Content-Type");
             if (req.method === "OPTIONS") { res.status(204).send(""); return; }
-            const { getQuickReportData, submitQuickReport } = require("../handlers/quickReportHandler");
             try {
                 if (req.method === "GET") {
+                    const { getQuickReportData } = require("../handlers/quickReportHandler");
                     const chatId = req.query.chatId;
                     if (!chatId) { res.status(400).json({ error: "chatId is required" }); return; }
                     const result = await getQuickReportData(adminDb, chatId);
                     res.status(200).json(result); return;
                 }
                 if (req.method === "POST") {
-                    const reportData = req.body;
-                    if (!reportData || !reportData.chatId) { res.status(400).json({ error: "chatId is required in body" }); return; }
-                    const result = await submitQuickReport(adminDb, reportData);
+                    const { getQuickReportData, submitQuickReport, createQuickTask } = require("../handlers/quickReportHandler");
+                    const body = req.body;
+                    if (!body || !body.chatId) { res.status(400).json({ error: "chatId is required in body" }); return; }
+
+                    // Route by action
+                    if (body.action === "createTask") {
+                        const result = await createQuickTask(adminDb, body);
+                        res.status(200).json(result); return;
+                    }
+
+                    // Default: submit report
+                    const result = await submitQuickReport(adminDb, body);
                     res.status(200).json(result); return;
                 }
                 res.status(405).json({ error: "Method not allowed" });

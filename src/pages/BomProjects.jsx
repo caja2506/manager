@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
-import PageHeader from '../components/layout/PageHeader';
 import { useNavigate } from 'react-router-dom';
 import { useRole } from '../contexts/RoleContext';
 import { useAppData } from '../contexts/AppDataContext';
 import { deleteBomProject } from '../services/bomCrudService';
-import { db } from '../firebase';
 import {
     FolderGit2, Plus, Trash2, ChevronRight, DollarSign, Edit3, X
 } from 'lucide-react';
@@ -30,7 +28,7 @@ export default function BomProjects() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-300">
-            <PageHeader title="" showBack={true} />
+            
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/70 backdrop-blur-sm p-6 rounded-2xl border border-slate-800 shadow-lg">
                 <h2 className="font-black text-2xl text-white tracking-tight">Tus Proyectos</h2>
                 {canEdit && (

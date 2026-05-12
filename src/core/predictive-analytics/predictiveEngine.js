@@ -6,7 +6,7 @@
  *
  * This is the main entry point for AI monitoring operations.
  *
- * @module core/ai-monitoring/aiMonitoringEngine
+ * @module core/predictive-analytics/predictiveEngine
  */
 
 import { detectRisks, summarizeRisks, RISK_SEVERITY } from './riskDetector.js';

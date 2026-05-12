@@ -2,15 +2,12 @@
  * Audit Persistence Service
  * ==========================
  * 
- * Writes audit findings, scores, and events to Firestore.
- * Used by both the client (useAuditData) and Cloud Functions.
+ * Writes audit findings, scores, and events to the database.
+ * Dual-backend: Supabase or Firebase depending on config.
  */
 
-import {
-    collection, doc, setDoc, getDocs, query, where,
-    orderBy, writeBatch, limit, serverTimestamp
-} from 'firebase/firestore';
-import { db } from '../firebase';
+import { USE_SUPABASE } from '../services/_backend';
+import { supabase } from '../supabase';
 import { COLLECTIONS } from '../models/schemas';
 
 // ============================================================
@@ -18,21 +15,69 @@ import { COLLECTIONS } from '../models/schemas';
 // ============================================================
 
 /**
- * Persist a full audit run to Firestore.
- * 
- * @param {Object} auditResult - From auditEngine.runFullAudit()
- * @param {string} userId - Current user ID (or 'system' for Cloud Functions)
- * @returns {Object} { findingsWritten, snapshotId }
+ * Persist a full audit run.
  */
 export async function persistAuditResults(auditResult, userId = 'system') {
     if (!auditResult?.findings?.length) return { findingsWritten: 0 };
 
-    const batch = writeBatch(db);
     const now = new Date().toISOString();
     const runId = `audit-${Date.now()}`;
 
-    // 1. Write new / updated findings
+    if (USE_SUPABASE) {
+        // 1. Write findings
+        const findings = (auditResult.newFindings || auditResult.findings).slice(0, 450).map(f => ({
+            ...f,
+            audit_run_id: runId,
+            created_at: now,
+            status: f.status || 'open',
+        }));
+        if (findings.length > 0) {
+            await supabase.from('audit_findings').insert(findings);
+        }
+
+        // 2. Write audit event
+        await supabase.from('audit_events').insert({
+            event_type: 'audit_run',
+            entity_type: 'system',
+            entity_id: 'department',
+            user_id: userId,
+            timestamp: now,
+            source: 'client_audit',
+            correlation_id: runId,
+            details: {
+                totalFindings: auditResult.summary?.totalFindings || 0,
+                bySeverity: auditResult.summary?.bySeverity || {},
+                scores: auditResult.scores || null,
+                dataSnapshot: auditResult.dataSnapshot || null,
+            },
+        });
+
+        // 3. Write analytics snapshot
+        if (auditResult.scores) {
+            await supabase.from('analytics_snapshots').insert({
+                scope: 'compliance',
+                entity_id: 'department',
+                snapshot_date: now.split('T')[0],
+                metrics: {
+                    ...auditResult.scores,
+                    totalFindings: auditResult.summary?.totalFindings || 0,
+                    bySeverity: auditResult.summary?.bySeverity || {},
+                },
+                created_at: now,
+                created_by: userId,
+            });
+        }
+
+        return { findingsWritten: findings.length, runId };
+    }
+
+    // Firebase fallback
+    const { collection, doc, writeBatch } = await import('firebase/firestore');
+    const { db } = await import('../firebase');
+
+    const batch = writeBatch(db);
     let findingsWritten = 0;
+
     for (const finding of auditResult.newFindings || auditResult.findings) {
         const findingRef = doc(collection(db, COLLECTIONS.AUDIT_FINDINGS));
         batch.set(findingRef, {
@@ -42,21 +87,13 @@ export async function persistAuditResults(auditResult, userId = 'system') {
             status: finding.status || 'open',
         });
         findingsWritten++;
-
-        // Limit batch size (Firestore max 500 writes per batch)
         if (findingsWritten >= 450) break;
     }
 
-    // 2. Write audit event (official schema — run summary)
     const eventRef = doc(collection(db, COLLECTIONS.AUDIT_EVENTS));
     batch.set(eventRef, {
-        eventType: 'audit_run',
-        entityType: 'system',
-        entityId: 'department',
-        userId,
-        timestamp: now,
-        source: 'client_audit',
-        correlationId: runId,
+        eventType: 'audit_run', entityType: 'system', entityId: 'department',
+        userId, timestamp: now, source: 'client_audit', correlationId: runId,
         details: {
             totalFindings: auditResult.summary?.totalFindings || 0,
             bySeverity: auditResult.summary?.bySeverity || {},
@@ -65,25 +102,17 @@ export async function persistAuditResults(auditResult, userId = 'system') {
         },
     });
 
-    // 3. Write analytics snapshot (compliance scores over time)
     if (auditResult.scores) {
         const snapshotRef = doc(collection(db, COLLECTIONS.ANALYTICS_SNAPSHOTS));
         batch.set(snapshotRef, {
-            scope: 'compliance',
-            entityId: 'department',
+            scope: 'compliance', entityId: 'department',
             snapshotDate: now.split('T')[0],
-            metrics: {
-                ...auditResult.scores,
-                totalFindings: auditResult.summary?.totalFindings || 0,
-                bySeverity: auditResult.summary?.bySeverity || {},
-            },
-            createdAt: now,
-            createdBy: userId,
+            metrics: { ...auditResult.scores, totalFindings: auditResult.summary?.totalFindings || 0, bySeverity: auditResult.summary?.bySeverity || {} },
+            createdAt: now, createdBy: userId,
         });
     }
 
     await batch.commit();
-
     return { findingsWritten, runId };
 }
 
@@ -91,50 +120,42 @@ export async function persistAuditResults(auditResult, userId = 'system') {
 // READ HISTORICAL AUDIT DATA
 // ============================================================
 
-/**
- * Fetch recent audit findings from Firestore.
- */
 export async function fetchRecentFindings(limitCount = 100) {
-    const q = query(
-        collection(db, COLLECTIONS.AUDIT_FINDINGS),
-        where('status', '==', 'open'),
-        orderBy('createdAt', 'desc'),
-        limit(limitCount)
-    );
-
+    if (USE_SUPABASE) {
+        const { data } = await supabase.from('audit_findings').select('*').eq('status', 'open').order('created_at', { ascending: false }).limit(limitCount);
+        return data || [];
+    }
+    const { collection, getDocs, query, where, orderBy, limit } = await import('firebase/firestore');
+    const { db } = await import('../firebase');
+    const q = query(collection(db, COLLECTIONS.AUDIT_FINDINGS), where('status', '==', 'open'), orderBy('createdAt', 'desc'), limit(limitCount));
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
-/**
- * Fetch compliance score history for trend analysis.
- */
 export async function fetchComplianceHistory(days = 30) {
     const since = new Date();
     since.setDate(since.getDate() - days);
+    const sinceStr = since.toISOString().split('T')[0];
 
-    const q = query(
-        collection(db, COLLECTIONS.ANALYTICS_SNAPSHOTS),
-        where('scope', '==', 'compliance'),
-        where('snapshotDate', '>=', since.toISOString().split('T')[0]),
-        orderBy('snapshotDate', 'asc')
-    );
-
+    if (USE_SUPABASE) {
+        const { data } = await supabase.from('analytics_snapshots').select('*').eq('scope', 'compliance').gte('snapshot_date', sinceStr).order('snapshot_date', { ascending: true });
+        return data || [];
+    }
+    const { collection, getDocs, query, where, orderBy } = await import('firebase/firestore');
+    const { db } = await import('../firebase');
+    const q = query(collection(db, COLLECTIONS.ANALYTICS_SNAPSHOTS), where('scope', '==', 'compliance'), where('snapshotDate', '>=', sinceStr), orderBy('snapshotDate', 'asc'));
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
-/**
- * Fetch recent audit events (run history).
- */
 export async function fetchAuditHistory(limitCount = 20) {
-    const q = query(
-        collection(db, COLLECTIONS.AUDIT_EVENTS),
-        where('eventType', '==', 'audit_run'),
-        orderBy('timestamp', 'desc'),
-        limit(limitCount)
-    );
-
+    if (USE_SUPABASE) {
+        const { data } = await supabase.from('audit_events').select('*').eq('event_type', 'audit_run').order('timestamp', { ascending: false }).limit(limitCount);
+        return data || [];
+    }
+    const { collection, getDocs, query, where, orderBy, limit } = await import('firebase/firestore');
+    const { db } = await import('../firebase');
+    const q = query(collection(db, COLLECTIONS.AUDIT_EVENTS), where('eventType', '==', 'audit_run'), orderBy('timestamp', 'desc'), limit(limitCount));
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }

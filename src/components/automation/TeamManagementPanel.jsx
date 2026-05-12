@@ -12,6 +12,8 @@ import {
     reassignTechnician,
 } from '../../services/resourceAssignmentService';
 import { useAuth } from '../../contexts/AuthContext';
+import { USE_SUPABASE } from '../../services/_backend';
+import { supabase } from '../../supabase';
 
 const functions = getFunctions();
 
@@ -427,6 +429,18 @@ function EngineerTechAssignments({ members, nameMap, showSuccess, setError }) {
                 await createInitialAssignment(selectedTech, selectedEng, user?.uid);
             }
             showSuccess(`${resolveName(selectedTech)} asignado a ${resolveName(selectedEng)}`);
+            // Sync reportsTo on the technician's user document
+            try {
+                if (USE_SUPABASE) {
+                    await supabase.from('users').update({ reports_to: selectedEng }).eq('id', selectedTech);
+                } else {
+                    const { updateDoc, doc } = await import('firebase/firestore');
+                    const { db } = await import('../../firebase');
+                    await updateDoc(doc(db, 'users', selectedTech), { reportsTo: selectedEng });
+                }
+            } catch (syncErr) {
+                console.warn('Could not sync reportsTo on user doc:', syncErr);
+            }
             setSelectedTech('');
             setSelectedEng('');
             setReason('default');

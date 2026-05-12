@@ -5,7 +5,6 @@ import { useRole } from '../contexts/RoleContext';
 import { format, startOfWeek, addDays, addWeeks } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { User, CalendarDays, ExternalLink } from 'lucide-react';
-import PageHeader from '../components/layout/PageHeader';
 
 // Sub-components
 import FocusNowCard from '../components/mywork/FocusNowCard';
@@ -19,6 +18,7 @@ import NextUpPanel from '../components/mywork/NextUpPanel';
 
 // Task modal
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
+import WipBlockModal from '../components/tasks/WipBlockModal';
 
 // Data hook
 import { useMyWorkData } from '../hooks/useMyWorkData';
@@ -43,7 +43,7 @@ export default function MyWork() {
     const { canEdit, canDelete } = useRole();
     const {
         engTasks, engProjects, engSubtasks,
-        taskTypes, teamMembers, timeLogs,
+        taskTypes, teamMembers, timeLogs, delayCauses,
     } = useEngineeringData();
 
     // ── Weekly plan items (fetched for current week) ──
@@ -81,12 +81,61 @@ export default function MyWork() {
         setTaskModalTask(task || null);
     }, []);
 
+    // ── WIP enforcement state ──
+    const [wipModalOpen, setWipModalOpen] = useState(false);
+    const [wipPendingTask, setWipPendingTask] = useState(null);
+    const [wipPendingStatus, setWipPendingStatus] = useState(null);
+    const [wipCurrentTask, setWipCurrentTask] = useState(null);
+    const [wipSwitching, setWipSwitching] = useState(false);
+
     // ── Status change handler ──
     const handleStatusChange = useCallback(async (task, newStatus) => {
+        // WIP check: if going to in_progress, see if there's already one active
+        if (newStatus === 'in_progress') {
+            const inProgress = engTasks.filter(
+                t => t.assignedTo === user?.uid && t.status === 'in_progress' && t.id !== task.id
+            );
+            if (inProgress.length > 0) {
+                setWipCurrentTask(inProgress[0]);
+                setWipPendingTask(task);
+                setWipPendingStatus(newStatus);
+                setWipModalOpen(true);
+                return;
+            }
+        }
         try {
             await updateTaskStatus(task.id, newStatus, task.projectId);
         } catch (e) { console.error('Error updating status:', e); }
-    }, []);
+    }, [engTasks, user?.uid]);
+
+    const handleWipConfirm = useCallback(async (blockData) => {
+        if (!wipCurrentTask || !wipPendingTask || !wipPendingStatus) return;
+        setWipSwitching(true);
+        try {
+            // Step 1: Block the current task
+            await updateTaskStatus(
+                wipCurrentTask.id,
+                'blocked',
+                wipCurrentTask.projectId,
+                true,
+                {
+                    blockedReason: blockData.blockedReason,
+                    blockedByUserId: blockData.blockedByUserId,
+                    blockedByName: blockData.blockedByName,
+                }
+            );
+            // Step 2: Start the new task
+            await updateTaskStatus(wipPendingTask.id, wipPendingStatus, wipPendingTask.projectId);
+
+            setWipModalOpen(false);
+            setWipCurrentTask(null);
+            setWipPendingTask(null);
+            setWipPendingStatus(null);
+        } catch (err) {
+            console.error('WIP switch error:', err);
+        }
+        setWipSwitching(false);
+    }, [wipCurrentTask, wipPendingTask, wipPendingStatus]);
 
     // ── Quick Plan handler (add plan block today) ──
     const handleQuickPlan = useCallback(async (task, hours) => {
@@ -162,7 +211,7 @@ export default function MyWork() {
             {/* ══════════════════════════════════════════
                 BACK BUTTON
             ══════════════════════════════════════════ */}
-            <PageHeader title="" showBack={true} />
+            
 
             {/* ══════════════════════════════════════════
                 HEADER — greeting + date
@@ -285,6 +334,18 @@ export default function MyWork() {
                     canDelete={canDelete}
                 />
             )}
+
+            {/* ── WIP Block Modal ── */}
+            <WipBlockModal
+                delayCauses={delayCauses}
+                isOpen={wipModalOpen}
+                onClose={() => { setWipModalOpen(false); setWipCurrentTask(null); setWipPendingTask(null); setWipPendingStatus(null); }}
+                onConfirm={handleWipConfirm}
+                currentTask={wipCurrentTask}
+                newTask={wipPendingTask}
+                teamMembers={teamMembers}
+                isLoading={wipSwitching}
+            />
         </div>
     );
 }

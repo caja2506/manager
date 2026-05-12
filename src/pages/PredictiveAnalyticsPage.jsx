@@ -13,8 +13,8 @@ import {
     CheckCircle2, XCircle, Send, Eye, RefreshCw
 } from 'lucide-react';
 import useMilestoneScore from '../hooks/useMilestoneScore';
-import { runMonitoringCycle, AI_SCHEDULE, AI_ACTION_TYPE } from '../core/ai-monitoring/aiMonitoringEngine';
-import { RISK_SEVERITY } from '../core/ai-monitoring/riskDetector';
+import { runMonitoringCycle, AI_SCHEDULE, AI_ACTION_TYPE } from '../core/predictive-analytics/predictiveEngine';
+import { RISK_SEVERITY } from '../core/predictive-analytics/riskDetector';
 
 const SEVERITY_STYLES = {
     critical: { bg: 'bg-red-500/15', border: 'border-red-500/30', text: 'text-red-400', icon: '🔴', label: 'Crítico' },
@@ -30,7 +30,7 @@ const ESCALATION_LABELS = {
     escalate_admin:     { label: 'Administrador', icon: '🛡️', color: 'text-red-400' },
 };
 
-export default function AIMonitoringPage() {
+export default function PredictiveAnalyticsPage() {
     const { milestoneId } = useParams();
     const navigate = useNavigate();
     const { milestone, workAreas, scoreResult, loading, error } = useMilestoneScore(milestoneId);
@@ -100,7 +100,7 @@ export default function AIMonitoringPage() {
                             <BrainCircuit className="w-5 h-5 text-purple-400" />
                         </div>
                         <div>
-                            <h2 className="font-black text-xl text-white tracking-tight">AI Monitoring</h2>
+                            <h2 className="font-black text-xl text-white tracking-tight">Analítica Predictiva</h2>
                             <p className="text-[11px] text-slate-500 font-bold">
                                 {milestone?.name || 'Milestone'} · Motor de detección y seguimiento
                             </p>
@@ -155,7 +155,7 @@ export default function AIMonitoringPage() {
             {!monitoringResult && (
                 <div className="bg-slate-900/70 p-12 rounded-2xl border border-slate-800 text-center">
                     <BrainCircuit className="w-12 h-12 text-purple-400/30 mx-auto mb-4" />
-                    <h3 className="text-lg font-bold text-slate-400 mb-2">Motor de AI Monitoring</h3>
+                    <h3 className="text-lg font-bold text-slate-400 mb-2">Motor de Analítica Predictiva</h3>
                     <p className="text-sm text-slate-500 max-w-md mx-auto">
                         Presiona "Ejecutar Ciclo" para analizar riesgos, generar seguimiento y evaluar escalaciones sobre este milestone.
                     </p>
@@ -179,7 +179,7 @@ export default function AIMonitoringPage() {
                             color="amber" icon={<Send className="w-6 h-6" />} />
                         <KpiCard label="Escalaciones" value={monitoringResult.escalations.length}
                             color="purple" icon={<Bell className="w-6 h-6" />} />
-                        <KpiCard label="Acciones AI" value={monitoringResult.actions.length}
+                        <KpiCard label="Acciones Automáticas" value={monitoringResult.actions.length}
                             color="indigo" icon={<Activity className="w-6 h-6" />} />
                     </div>
 
@@ -283,7 +283,7 @@ export default function AIMonitoringPage() {
                         <div className="bg-slate-900/70 p-6 rounded-2xl border border-slate-800 shadow-lg">
                             <div className="flex items-center gap-2 mb-4">
                                 <Eye className="w-5 h-5 text-indigo-400" />
-                                <h3 className="font-bold text-lg text-white">Resumen Ejecutivo AI</h3>
+                                <h3 className="font-bold text-lg text-white">Resumen Ejecutivo Predictivo</h3>
                             </div>
                             <pre className="text-xs text-slate-300 whitespace-pre-wrap font-sans leading-relaxed">
                                 {monitoringResult.executiveSummary.text}
@@ -295,7 +295,7 @@ export default function AIMonitoringPage() {
                     <div className="bg-slate-900/70 p-6 rounded-2xl border border-slate-800 shadow-lg">
                         <div className="flex items-center gap-2 mb-4">
                             <Shield className="w-5 h-5 text-emerald-400" />
-                            <h3 className="font-bold text-lg text-white">Matriz de Capacidades AI</h3>
+                            <h3 className="font-bold text-lg text-white">Matriz de Capacidades Predictivas</h3>
                         </div>
                         <div className="grid md:grid-cols-3 gap-4">
                             {/* Can Execute */}

@@ -4,11 +4,12 @@ import {
     Plus, X, CheckCircle, AlertCircle, Loader2, BarChart3,
     Shield, Target, FileText, Zap, CalendarDays
 } from 'lucide-react';
-import { doc, onSnapshot, setDoc, collection } from 'firebase/firestore';
 import { DEFAULT_TIMEZONE } from '../../utils/timezoneConfig';
 import { httpsCallable } from 'firebase/functions';
-import { db, functions } from '../../firebase';
+import { functions } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
+import { USE_SUPABASE } from '../../services/_backend';
+import { supabase } from '../../supabase';
 
 
 
@@ -56,21 +57,43 @@ export default function EmailReportSettings() {
         return d.toLocaleDateString('en-CA', { timeZone: DEFAULT_TIMEZONE });
     });
 
-    // Subscribe to Firestore
+    // Subscribe to database
     useEffect(() => {
-        const unsub = onSnapshot(doc(db, 'settings', 'emailReportConfig'), snap => {
-            if (snap.exists()) {
-                const data = snap.data();
-                setConfig(data);
-                setEnabled(data.enabled !== false);
-                setEmailChannel(data.channels?.email !== false);
-                setTelegramChannel(data.channels?.telegramPdf !== false);
-                setRecipients(data.recipients || []);
-                setScheduleTime(data.scheduleTime || '18:15');
-                if (data.sections) setSections({ ...sections, ...data.sections });
-            }
-        });
-        return unsub;
+        if (USE_SUPABASE) {
+            (async () => {
+                const { data } = await supabase.from('settings').select('*').eq('key', 'emailReportConfig').single();
+                if (data?.value) {
+                    const d = data.value;
+                    setConfig(d);
+                    setEnabled(d.enabled !== false);
+                    setEmailChannel(d.channels?.email !== false);
+                    setTelegramChannel(d.channels?.telegramPdf !== false);
+                    setRecipients(d.recipients || []);
+                    setScheduleTime(d.scheduleTime || '18:15');
+                    if (d.sections) setSections(prev => ({ ...prev, ...d.sections }));
+                }
+            })();
+            return;
+        }
+        // Firebase fallback
+        let unsub;
+        (async () => {
+            const { doc: fbDoc, onSnapshot: fbOnSnapshot } = await import('firebase/firestore');
+            const { db } = await import('../../firebase');
+            unsub = fbOnSnapshot(fbDoc(db, 'settings', 'emailReportConfig'), snap => {
+                if (snap.exists()) {
+                    const data = snap.data();
+                    setConfig(data);
+                    setEnabled(data.enabled !== false);
+                    setEmailChannel(data.channels?.email !== false);
+                    setTelegramChannel(data.channels?.telegramPdf !== false);
+                    setRecipients(data.recipients || []);
+                    setScheduleTime(data.scheduleTime || '18:15');
+                    if (data.sections) setSections(prev => ({ ...prev, ...data.sections }));
+                }
+            });
+        })();
+        return () => unsub?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -102,38 +125,37 @@ export default function EmailReportSettings() {
         setSaving(true);
         setSaved(false);
         try {
-            await setDoc(doc(db, 'settings', 'emailReportConfig'), {
+            const payload = {
                 enabled,
-                channels: {
-                    email: emailChannel,
-                    telegramPdf: telegramChannel,
-                },
-                recipients,
-                scheduleTime,
-                sections,
+                channels: { email: emailChannel, telegramPdf: telegramChannel },
+                recipients, scheduleTime, sections,
                 timezone: DEFAULT_TIMEZONE,
                 updatedAt: new Date().toISOString(),
                 updatedBy: user?.uid || null,
-            }, { merge: true });
+            };
 
-            // ── Sync with automationRoutines so the scheduler picks up the change ──
-            const [hours, minutes] = scheduleTime.split(':').map(Number);
-            const cron = `${minutes} ${hours} * * 1-5`;
-            const { getDocs: gd, query: q, where: w, updateDoc: ud } = await import('firebase/firestore');
-            const routinesSnap = await gd(q(
-                collection(db, 'automationRoutines'),
-                w('key', '==', 'daily_performance_report')
-            ));
-            if (!routinesSnap.empty) {
-                const routineDoc = routinesSnap.docs[0];
-                await ud(doc(db, 'automationRoutines', routineDoc.id), {
-                    enabled,
-                    scheduleConfig: { cron, timezone: DEFAULT_TIMEZONE },
-                    updatedAt: new Date().toISOString(),
-                });
-                console.log(`[EmailReportSettings] Synced routine ${routineDoc.id}: enabled=${enabled}, cron=${cron}`);
+            if (USE_SUPABASE) {
+                await supabase.from('settings').upsert({ key: 'emailReportConfig', value: payload, category: 'email', updated_at: payload.updatedAt, updated_by: payload.updatedBy }, { onConflict: 'key' });
             } else {
-                console.warn('[EmailReportSettings] No automationRoutines doc found for daily_performance_report');
+                const { doc: fbDoc, setDoc: fbSetDoc } = await import('firebase/firestore');
+                const { db } = await import('../../firebase');
+                await fbSetDoc(fbDoc(db, 'settings', 'emailReportConfig'), payload, { merge: true });
+            }
+
+            // Sync automationRoutines (always Firebase — Cloud Functions scheduler)
+            try {
+                const [hours, minutes] = scheduleTime.split(':').map(Number);
+                const cron = `${minutes} ${hours} * * 1-5`;
+                const { getDocs: gd, query: q, where: w, updateDoc: ud, collection: col, doc: fbDoc } = await import('firebase/firestore');
+                const { db } = await import('../../firebase');
+                const routinesSnap = await gd(q(col(db, 'automationRoutines'), w('key', '==', 'daily_performance_report')));
+                if (!routinesSnap.empty) {
+                    await ud(fbDoc(db, 'automationRoutines', routinesSnap.docs[0].id), {
+                        enabled, scheduleConfig: { cron, timezone: DEFAULT_TIMEZONE }, updatedAt: new Date().toISOString(),
+                    });
+                }
+            } catch (syncErr) {
+                console.warn('[EmailReportSettings] Routine sync error:', syncErr);
             }
 
             setSaved(true);
@@ -235,23 +257,24 @@ export default function EmailReportSettings() {
                                 const newVal = !enabled;
                                 setEnabled(newVal);
                                 try {
-                                    // Sync emailReportConfig
-                                    await setDoc(doc(db, 'settings', 'emailReportConfig'), {
-                                        enabled: newVal,
-                                        updatedAt: new Date().toISOString(),
-                                    }, { merge: true });
-                                    // Sync automationRoutines
-                                    const { getDocs: gd, query: q, where: w, updateDoc: ud } = await import('firebase/firestore');
-                                    const snap = await gd(q(
-                                        collection(db, 'automationRoutines'),
-                                        w('key', '==', 'daily_performance_report')
-                                    ));
-                                    if (!snap.empty) {
-                                        await ud(doc(db, 'automationRoutines', snap.docs[0].id), {
-                                            enabled: newVal,
-                                            updatedAt: new Date().toISOString(),
-                                        });
+                                    if (USE_SUPABASE) {
+                                        const { data: existing } = await supabase.from('settings').select('value').eq('key', 'emailReportConfig').single();
+                                        const merged = { ...(existing?.value || {}), enabled: newVal, updatedAt: new Date().toISOString() };
+                                        await supabase.from('settings').upsert({ key: 'emailReportConfig', value: merged, category: 'email', updated_at: merged.updatedAt }, { onConflict: 'key' });
+                                    } else {
+                                        const { doc: fbDoc, setDoc: fbSetDoc } = await import('firebase/firestore');
+                                        const { db } = await import('../../firebase');
+                                        await fbSetDoc(fbDoc(db, 'settings', 'emailReportConfig'), { enabled: newVal, updatedAt: new Date().toISOString() }, { merge: true });
                                     }
+                                    // Sync automationRoutines (always Firebase)
+                                    try {
+                                        const { getDocs: gd, query: q, where: w, updateDoc: ud, collection: col, doc: fbDoc } = await import('firebase/firestore');
+                                        const { db } = await import('../../firebase');
+                                        const snap = await gd(q(col(db, 'automationRoutines'), w('key', '==', 'daily_performance_report')));
+                                        if (!snap.empty) {
+                                            await ud(fbDoc(db, 'automationRoutines', snap.docs[0].id), { enabled: newVal, updatedAt: new Date().toISOString() });
+                                        }
+                                    } catch { /* noop */ }
                                     console.log(`[EmailReport] Toggle → ${newVal ? 'ON' : 'OFF'}`);
                                 } catch (e) {
                                     console.error('Error toggling report:', e);

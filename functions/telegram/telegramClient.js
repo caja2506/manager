@@ -115,6 +115,52 @@ async function answerCallbackQuery(token, callbackQueryId, text = "") {
 }
 
 /**
+ * Edit the inline keyboard of an existing message (for toggle UX).
+ *
+ * @param {string} token - Bot token
+ * @param {string|number} chatId - Chat ID
+ * @param {number} messageId - Message to edit
+ * @param {Array} inlineKeyboard - New inline keyboard
+ * @param {string} [text] - Optional: also update text. If omitted, only keyboard is updated.
+ * @returns {Promise<{ok: boolean, error?: string}>}
+ */
+async function editMessageText(token, chatId, messageId, text, inlineKeyboard, options = {}) {
+    const { parseMode = "HTML" } = options;
+    const cleanToken = (token || "").trim();
+    const url = `${BASE_URL}${cleanToken}/editMessageText`;
+
+    try {
+        const body = {
+            chat_id: chatId,
+            message_id: messageId,
+            text,
+            parse_mode: parseMode,
+        };
+        if (inlineKeyboard) {
+            body.reply_markup = { inline_keyboard: inlineKeyboard };
+        }
+        const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
+        const data = await response.json();
+        if (!data.ok) {
+            // Ignore "message is not modified" errors (user toggled same state)
+            if (data.description && data.description.includes("message is not modified")) {
+                return { ok: true };
+            }
+            console.error(`[telegramClient] editMessageText failed:`, data.description);
+            return { ok: false, error: data.description };
+        }
+        return { ok: true, messageId: data.result?.message_id };
+    } catch (err) {
+        console.error("[telegramClient] editMessageText error:", err.message);
+        return { ok: false, error: err.message };
+    }
+}
+
+/**
  * Set webhook URL for the bot (one-time setup helper).
  */
 async function setWebhook(token, webhookUrl) {
@@ -183,5 +229,5 @@ async function sendMessageWithReplyKeyboard(token, chatId, text, options = {}) {
 
 module.exports = {
     sendMessage, sendMessageWithKeyboard, sendMessageWithReplyKeyboard,
-    answerCallbackQuery, setWebhook, getWebhookInfo, MAIN_MENU_KEYBOARD,
+    answerCallbackQuery, editMessageText, setWebhook, getWebhookInfo, MAIN_MENU_KEYBOARD,
 };

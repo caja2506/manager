@@ -10,7 +10,7 @@ import { getDaysUntil, parseLocalDate } from '../../utils/dateUtils';
 
 const SOURCE_LABELS = {
     in_progress: { label: 'En Progreso', icon: ChevronsRight, color: 'text-amber-400 bg-amber-500/15 border-amber-500/30' },
-    planned:     { label: 'Planificado Hoy', icon: CheckCircle2, color: 'text-indigo-400 bg-indigo-500/15 border-indigo-500/30' },
+    planned:     { label: 'Pendiente Hoy', icon: CheckCircle2, color: 'text-indigo-400 bg-indigo-500/15 border-indigo-500/30' },
     overdue:     { label: 'Vencida', icon: AlarmClockOff, color: 'text-red-400 bg-red-500/15 border-red-500/30' },
     urgent:      { label: 'Urgente Hoy', icon: Clock, color: 'text-amber-400 bg-amber-500/15 border-amber-500/30' },
 };

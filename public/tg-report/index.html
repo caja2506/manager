@@ -393,6 +393,82 @@
             font-size: 14px;
             color: var(--text-dim);
         }
+
+        /* ── Add Task Button ── */
+        .add-task-btn {
+            width: 100%;
+            padding: 14px;
+            border: 2px dashed var(--card-border);
+            border-radius: var(--radius);
+            background: transparent;
+            color: var(--accent);
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .add-task-btn:active { background: rgba(99, 102, 241, 0.1); }
+
+        /* ── New Task Form ── */
+        .new-task-form {
+            display: none;
+            background: var(--card);
+            border: 1px solid var(--accent);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 14px;
+            animation: slideIn 0.2s ease-out;
+        }
+        .new-task-form.visible { display: block; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+        .new-task-form-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 10px;
+        }
+        .new-task-input {
+            width: 100%;
+            padding: 12px;
+            background: var(--bg);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            color: var(--text);
+            font-size: 14px;
+            outline: none;
+            margin-bottom: 10px;
+        }
+        .new-task-input:focus { border-color: var(--accent); }
+        .new-task-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .new-task-actions button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .btn-create {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+        }
+        .btn-create:disabled { opacity: 0.5; }
+        .btn-cancel-new {
+            background: var(--bg);
+            color: var(--text-dim);
+            border: 1px solid var(--card-border) !important;
+        }
     </style>
 </head>
 <body>
@@ -415,6 +491,19 @@
     </div>
 
     <div id="tasksContainer" style="display:none"></div>
+
+    <!-- Add Task Button + Form -->
+    <button class="add-task-btn" id="addTaskBtn" style="display:none" onclick="showNewTaskForm()">
+        ➕ Agregar tarea nueva
+    </button>
+    <div class="new-task-form" id="newTaskForm">
+        <div class="new-task-form-title">✏️ Nueva tarea</div>
+        <input type="text" class="new-task-input" id="newTaskTitle" placeholder="Nombre de la tarea..." maxlength="120">
+        <div class="new-task-actions">
+            <button class="btn-cancel-new" onclick="hideNewTaskForm()">Cancelar</button>
+            <button class="btn-create" id="createTaskBtn" onclick="createNewTask()">✅ Crear</button>
+        </div>
+    </div>
 
     <div class="note-section" id="noteSection" style="display:none">
         <div class="note-label">💬 Nota adicional (opcional)</div>
@@ -539,6 +628,7 @@
 
                 if (!result.tasks || result.tasks.length === 0) {
                     document.getElementById('emptyView').style.display = 'block';
+                    document.getElementById('addTaskBtn').style.display = 'flex';
                     return;
                 }
 
@@ -558,6 +648,7 @@
                 }));
 
                 renderTasks();
+                document.getElementById('addTaskBtn').style.display = 'flex';
             } catch (err) {
                 document.getElementById('loadingView').style.display = 'none';
                 showError(err.message || 'Error cargando tareas');
@@ -757,6 +848,70 @@
             d.textContent = str;
             return d.innerHTML;
         }
+
+        // ── New Task Creation ──
+
+        function showNewTaskForm() {
+            document.getElementById('newTaskForm').classList.add('visible');
+            document.getElementById('addTaskBtn').style.display = 'none';
+            document.getElementById('newTaskTitle').focus();
+        }
+
+        function hideNewTaskForm() {
+            document.getElementById('newTaskForm').classList.remove('visible');
+            document.getElementById('addTaskBtn').style.display = 'flex';
+            document.getElementById('newTaskTitle').value = '';
+        }
+
+        async function createNewTask() {
+            const titleInput = document.getElementById('newTaskTitle');
+            const title = titleInput.value.trim();
+            if (!title) { titleInput.focus(); return; }
+
+            const btn = document.getElementById('createTaskBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳...';
+
+            try {
+                const result = await apiPost({
+                    action: 'createTask',
+                    chatId: String(chatId),
+                    title: title,
+                });
+
+                if (result.error) throw new Error(result.error);
+
+                // Add the new task to the report data
+                reportData.tasks.push({
+                    taskId: result.taskId,
+                    title: result.title,
+                    progressPercent: 0,
+                    hoursWorked: 0,
+                    blocked: false,
+                    blockerNote: '',
+                    hasSubtasks: false,
+                    subtasks: [],
+                });
+
+                hideNewTaskForm();
+                document.getElementById('emptyView').style.display = 'none';
+                renderTasks();
+
+            } catch (err) {
+                alert('Error: ' + (err.message || 'No se pudo crear'));
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '✅ Crear';
+            }
+        }
+
+        // Enter key to create
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && document.activeElement.id === 'newTaskTitle') {
+                e.preventDefault();
+                createNewTask();
+            }
+        });
     </script>
 </body>
 </html>

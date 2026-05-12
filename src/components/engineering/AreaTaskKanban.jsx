@@ -3,10 +3,8 @@ import {
     DndContext, DragOverlay, closestCorners, KeyboardSensor, PointerSensor,
     useSensor, useSensors, defaultDropAnimationSideEffects, useDroppable
 } from '@dnd-kit/core';
-import {
-    collection, addDoc, doc, updateDoc, deleteDoc
-} from 'firebase/firestore';
-import { db } from '../../firebase';
+import { USE_SUPABASE } from '../../services/_backend';
+import { supabase } from '../../supabase';
 import { COLLECTIONS } from '../../models/schemas';
 import {
     SortableContext, arrayMove, sortableKeyboardCoordinates,
@@ -14,14 +12,16 @@ import {
     rectSortingStrategy, useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Compass, LayoutGrid, Plus, Check, X, Edit2, Trash2 } from 'lucide-react';
+import { GripVertical, Compass, LayoutGrid, Plus, Check, X, Edit2, Trash2, ShieldCheck, ShieldOff } from 'lucide-react';
 import { updateWorkAreaTypeMapping } from '../../services/workAreaService';
 import { useAppData } from '../../contexts/AppDataContext';
+import PeerReviewTemplateEditor from '../tasks/peerReview/PeerReviewTemplateEditor';
+import { updateTaskTypePeerReview } from '../../services/peerReviewService';
 
 // ==========================================
 // Sortable Item (Dragabble Task Type Card)
 // ==========================================
-function SortableTaskType({ taskType, onEdit, onDelete }) {
+function SortableTaskType({ taskType, onEdit, onDelete, onOpenEditor, onTogglePR }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: taskType.id });
     const [isEditing, setIsEditing] = useState(false);
     const [editName, setEditName] = useState(taskType.name || '');
@@ -73,7 +73,24 @@ function SortableTaskType({ taskType, onEdit, onDelete }) {
             <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 focus:outline-none flex-shrink-0">
                 <GripVertical className="w-4 h-4" />
             </div>
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate flex-1 leading-tight">{taskType.name}</span>
+            
+            <button 
+                onClick={() => onOpenEditor && onOpenEditor(taskType.id)} 
+                className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate flex-1 text-left leading-tight hover:underline hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                title="Editar Checklist de Peer Review"
+            >
+                {taskType.name}
+            </button>
+            
+            {onTogglePR && (
+                <button
+                    onClick={() => onTogglePR(taskType.id, !taskType.peerReviewRequired)}
+                    className={`flex-shrink-0 p-1.5 rounded-lg transition-colors ${taskType.peerReviewRequired ? 'text-indigo-600 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-500/20' : 'text-slate-300 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                    title={taskType.peerReviewRequired ? "Peer Review Obligatorio. Click para desactivar." : "Peer Review Desactivado. Click para activar."}
+                >
+                    {taskType.peerReviewRequired ? <ShieldCheck className="w-3.5 h-3.5" /> : <ShieldOff className="w-3.5 h-3.5" />}
+                </button>
+            )}
             
             {onEdit && onDelete && !isDragging && (
                 <div className="opacity-0 group-hover:opacity-100 flex items-center transition-opacity flex-shrink-0">
@@ -92,7 +109,7 @@ function SortableTaskType({ taskType, onEdit, onDelete }) {
 // ==========================================
 // Droppable Column (Bucket)
 // ==========================================
-function DroppableColumn({ id, title, icon, colorClass, items, activeQuickAdd, setActiveQuickAdd, onQuickAdd, onEditTask, onDeleteTask }) {
+function DroppableColumn({ id, title, icon, colorClass, items, activeQuickAdd, setActiveQuickAdd, onQuickAdd, onEditTask, onDeleteTask, onOpenEditor, onTogglePR }) {
     const { isOver, setNodeRef } = useDroppable({
         id: id,
         data: { type: 'column', columnId: id }
@@ -139,7 +156,7 @@ function DroppableColumn({ id, title, icon, colorClass, items, activeQuickAdd, s
                                 <span className="text-xs text-slate-400 dark:text-slate-500 font-medium px-4 text-center">Arrastra tareas aquí o presiona +</span>
                             </div>
                         ) : (
-                            items.map(item => <SortableTaskType key={item.id} taskType={item} onEdit={onEditTask} onDelete={onDeleteTask} />)
+                            items.map(item => <SortableTaskType key={item.id} taskType={item} onEdit={onEditTask} onDelete={onDeleteTask} onOpenEditor={onOpenEditor} onTogglePR={onTogglePR} />)
                         )}
                         
                         {/* Inline Quick Add Input */}
@@ -185,6 +202,7 @@ export default function AreaTaskKanban({ workAreaTypes, taskTypes }) {
     const [isSaving, setIsSaving] = useState(false);
     const [unsavedChanges, setUnsavedChanges] = useState(false);
     const [activeQuickAdd, setActiveQuickAdd] = useState(null);
+    const [editorOpenForId, setEditorOpenForId] = useState(null);
 
     // Initialize board state from props
     useEffect(() => {
@@ -349,28 +367,28 @@ export default function AreaTaskKanban({ workAreaTypes, taskTypes }) {
     const handleAddDirectTask = async (areaId, taskName) => {
         setIsSaving(true);
         try {
-            // 1. Create task_type globally
-            const typeRef = await addDoc(collection(db, COLLECTIONS.TASK_TYPES), { name: taskName });
+            let newId;
+            if (USE_SUPABASE) {
+                const { data } = await supabase.from('task_types').insert({ name: taskName }).select('id').single();
+                newId = data?.id;
+            } else {
+                const { collection, addDoc } = await import('firebase/firestore');
+                const { db } = await import('../../firebase');
+                const typeRef = await addDoc(collection(db, COLLECTIONS.TASK_TYPES), { name: taskName });
+                newId = typeRef.id;
+            }
             
-            // 2. Fetch original area mapping to append to it strictly
             const area = workAreaTypes.find(a => a.id === areaId);
-            if (!area) return;
+            if (!area || !newId) return;
             
             const rawOriginals = area.taskTypeIds || area.defaultTaskTypes || [];
             const origIds = rawOriginals.map(val => {
                 let typeObj = taskTypes.find(t => t.id === val) || taskTypes.find(t => t.name === val);
-                return typeObj ? typeObj.id : val; // Keep existing IDs
+                return typeObj ? typeObj.id : val;
             });
             
-            const newIds = [...origIds, typeRef.id];
-            
-            // 3. Update immediately in Firebase
+            const newIds = [...origIds, newId];
             await updateWorkAreaTypeMapping(areaId, newIds);
-            
-            // 4. Temporarily add to local UI unassigned to simulate creation
-            // However, the Firebase listener from Context will refresh engTasks very soon,
-            // so we don't strictly *need* to manually update the board logic here - it will reload.
-            // But let's trigger an unsaved changes reset just in case.
         } catch (error) {
             console.error("Error creating direct task type:", error);
             alert("No se pudo agregar la tarea.");
@@ -386,7 +404,13 @@ export default function AreaTaskKanban({ workAreaTypes, taskTypes }) {
 
         setIsSaving(true);
         try {
-            await updateDoc(doc(db, COLLECTIONS.TASK_TYPES, taskId), { name: newName.trim() });
+            if (USE_SUPABASE) {
+                await supabase.from('task_types').update({ name: newName.trim() }).eq('id', taskId);
+            } else {
+                const { doc, updateDoc } = await import('firebase/firestore');
+                const { db } = await import('../../firebase');
+                await updateDoc(doc(db, COLLECTIONS.TASK_TYPES, taskId), { name: newName.trim() });
+            }
         } catch (error) {
             console.error("Error updating task type:", error);
             alert("No se pudo editar la tarea.");
@@ -403,13 +427,16 @@ export default function AreaTaskKanban({ workAreaTypes, taskTypes }) {
             onConfirm: async () => {
                 setIsSaving(true);
                 try {
-                    // 1. Delete from global collection
-                    await deleteDoc(doc(db, COLLECTIONS.TASK_TYPES, taskId));
+                    if (USE_SUPABASE) {
+                        await supabase.from('task_types').delete().eq('id', taskId);
+                    } else {
+                        const { doc, deleteDoc } = await import('firebase/firestore');
+                        const { db } = await import('../../firebase');
+                        await deleteDoc(doc(db, COLLECTIONS.TASK_TYPES, taskId));
+                    }
                     
-                    // 2. Remove any references from work areas
                     for (const area of workAreaTypes) {
                         const rawOriginals = area.taskTypeIds || area.defaultTaskTypes || [];
-                        // Check if it's referenced by ID or by Name
                         if (rawOriginals.includes(taskId) || rawOriginals.includes(taskName)) {
                             const newIds = rawOriginals.filter(v => v !== taskId && v !== taskName);
                             await updateWorkAreaTypeMapping(area.id, newIds);
@@ -422,6 +449,18 @@ export default function AreaTaskKanban({ workAreaTypes, taskTypes }) {
                 setIsSaving(false);
             }
         });
+    };
+
+    // --- Toggle PR per Task Type ---
+    const handleTogglePR = async (taskId, prRequired) => {
+        setIsSaving(true);
+        try {
+            await updateTaskTypePeerReview(taskId, { peerReviewRequired: prRequired });
+        } catch (error) {
+            console.error("Error toggling PR:", error);
+            alert("No se pudo actualizar el estado de revisión.");
+        }
+        setIsSaving(false);
     };
 
     // --- Active Item lookup for DragOverlay ---
@@ -457,13 +496,19 @@ export default function AreaTaskKanban({ workAreaTypes, taskTypes }) {
                         <p className="text-xs text-slate-500">Arrastra los tipos de tarea a sus columnas correspondientes.</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2 text-xs font-bold transition-colors">
+                <div className="flex items-center gap-4 text-xs font-bold transition-colors">
+                     <button
+                        onClick={() => setEditorOpenForId('unassigned')}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400 dark:hover:bg-indigo-500/20 rounded-lg transition-colors border border-indigo-200 dark:border-indigo-500/30 shadow-sm"
+                    >
+                        <ShieldCheck className="w-4 h-4" /> Editar Checklists PR
+                     </button>
                     {isSaving ? (
-                        <span className="flex items-center gap-1.5 text-teal-500 dark:text-teal-400">
+                        <span className="flex items-center gap-1.5 text-teal-500 dark:text-teal-400 min-w-24">
                             <span className="animate-pulse text-[10px]">●</span> Guardando...
                         </span>
                     ) : (
-                        <span className="flex items-center gap-1.5 text-slate-400 dark:text-slate-500">
+                        <span className="flex items-center gap-1.5 text-slate-400 dark:text-slate-500 min-w-24">
                             <Check className="w-3.5 h-3.5" /> Guardado
                         </span>
                     )}
@@ -493,6 +538,8 @@ export default function AreaTaskKanban({ workAreaTypes, taskTypes }) {
                                 onQuickAdd={handleAddDirectTask}
                                 onEditTask={handleEditTaskType}
                                 onDeleteTask={handleDeleteTaskType}
+                                onOpenEditor={(id) => setEditorOpenForId(id)}
+                                onTogglePR={handleTogglePR}
                             />
                         </div>
 
@@ -510,6 +557,8 @@ export default function AreaTaskKanban({ workAreaTypes, taskTypes }) {
                                     onQuickAdd={handleAddDirectTask}
                                     onEditTask={handleEditTaskType}
                                     onDeleteTask={handleDeleteTaskType}
+                                    onOpenEditor={(id) => setEditorOpenForId(id)}
+                                    onTogglePR={handleTogglePR}
                                 />
                             </div>
                         ))}
@@ -520,6 +569,16 @@ export default function AreaTaskKanban({ workAreaTypes, taskTypes }) {
                     </DragOverlay>
                 </DndContext>
             </div>
+            
+            {editorOpenForId !== null && (
+                <PeerReviewTemplateEditor
+                    isOpen={true}
+                    onClose={() => setEditorOpenForId(null)}
+                    taskTypes={taskTypes}
+                    workAreaTypes={workAreaTypes}
+                    initialSelectedId={editorOpenForId !== 'unassigned' ? editorOpenForId : null}
+                />
+            )}
         </div>
     );
 }

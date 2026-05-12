@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
     DndContext, DragOverlay, closestCorners,
     PointerSensor, TouchSensor, useSensor, useSensors,
@@ -13,10 +13,12 @@ import { useRole } from '../contexts/RoleContext';
 import { useEngineeringData } from '../hooks/useEngineeringData';
 import TaskCard from '../components/tasks/TaskCard';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
+import WipBlockModal from '../components/tasks/WipBlockModal';
 import TransitionConfirmModal from '../components/workflow/TransitionConfirmModal';
 import TaskModuleBanner from '../components/layout/TaskModuleBanner';
 import { useWorkflowTransition } from '../hooks/useWorkflowTransition';
-import { handleTaskStatusTimerSync, canManageOthersTimers } from '../services/timeService';
+import { handleTaskStatusTimerSync, canManageOthersTimers, isSupervisorOf } from '../services/timeService';
+import { getActiveAssignments } from '../services/resourceAssignmentService';
 import {
     TASK_STATUS, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG
 } from '../models/schemas';
@@ -94,13 +96,13 @@ const KANBAN_COLUMNS = [
 export default function TaskManager() {
     const { user } = useAuth();
     const { canEdit, canDelete, role, teamRole } = useRole();
-    const { engProjects, engTasks, engSubtasks, teamMembers, taskTypes, timeLogs } = useEngineeringData();
+    const { engProjects, engTasks, engSubtasks, teamMembers, taskTypes, timeLogs, delayCauses } = useEngineeringData();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
     const [search, setSearch] = useState('');
     const [filterProject, setFilterProject] = useState('');
-    const [filterAssignee, setFilterAssignee] = useState('');
+    const [filterAssignee, setFilterAssignee] = useState('my-team');
     const [filterPriority, setFilterPriority] = useState('');
 
     // Drag state
@@ -115,6 +117,7 @@ export default function TaskManager() {
     const {
         requestTransition, confirmTransition, cancelTransition,
         pendingTransition, transitionError, isTransitioning,
+        wipConflict, executeWipSwitch,
     } = useWorkflowTransition();
 
     // --- Sensors ---
@@ -123,17 +126,74 @@ export default function TaskManager() {
         useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
     );
 
+    // --- Resource Assignments (team relationships) ---
+    const [resourceAssignments, setResourceAssignments] = useState([]);
+    useEffect(() => {
+        getActiveAssignments().then(setResourceAssignments).catch(console.error);
+    }, []);
+
+    // Build the set of UIDs that belong to "my team"
+    // Bidirectional: supervisor sees technicians, technician sees supervisor + fellow technicians
+    const myTeamUids = useMemo(() => {
+        const uid = user?.uid;
+        if (!uid) return new Set();
+
+        const uids = new Set([uid]); // always include myself
+
+        // --- 1. HR Hierarchy (reportsTo) ---
+        teamMembers.forEach(member => {
+            const memberId = member.uid || member.id;
+            // People reporting to me
+            if (member.reportsTo === uid) uids.add(memberId);
+            // The person I report to
+            if (uid && memberId === uid && member.reportsTo) uids.add(member.reportsTo);
+            // Also if I report to X, I want to see tasks of fellow people reporting to X
+            const myInfo = teamMembers.find(m => (m.uid || m.id) === uid);
+            if (myInfo && myInfo.reportsTo && member.reportsTo === myInfo.reportsTo) {
+                uids.add(memberId);
+            }
+        });
+
+        // --- 2. Operational Hierarchy (resourceAssignments) ---
+        // A. I'm a supervisor → add all my technicians
+        const myTechs = resourceAssignments.filter(a => a.engineerId === uid);
+        myTechs.forEach(a => uids.add(a.technicianId));
+
+        // B. I'm a technician → add my supervisor + fellow technicians under same supervisor
+        const myAssignment = resourceAssignments.find(a => a.technicianId === uid);
+        if (myAssignment) {
+            uids.add(myAssignment.engineerId); // my supervisor
+            // fellow technicians under the same supervisor
+            resourceAssignments
+                .filter(a => a.engineerId === myAssignment.engineerId)
+                .forEach(a => uids.add(a.technicianId));
+        }
+
+        return uids;
+    }, [user, resourceAssignments, teamMembers]);
+
     // --- Filter tasks ---
     const filteredTasks = useMemo(() => {
         return engTasks.filter(task => {
             const s = search.toLowerCase();
             const matchSearch = !s || (task.title || '').toLowerCase().includes(s) || (task.description || '').toLowerCase().includes(s);
             const matchProject = !filterProject || task.projectId === filterProject;
-            const matchAssignee = !filterAssignee || task.assignedTo === filterAssignee;
+            
+            let matchAssignee = true;
+            if (filterAssignee === 'my-team') {
+                // Include tasks assigned to my team OR where I'm the assigned peer reviewer
+                const isMyTeamTask = myTeamUids.has(task.assignedTo);
+                const isMyPeerReview = task.peerReviewReviewerId === user?.uid 
+                    && ['requested', 'in_review', 'changes_requested'].includes(task.peerReviewStatus);
+                matchAssignee = isMyTeamTask || isMyPeerReview;
+            } else if (filterAssignee !== '') {
+                matchAssignee = task.assignedTo === filterAssignee;
+            }
+
             const matchPriority = !filterPriority || task.priority === filterPriority;
             return matchSearch && matchProject && matchAssignee && matchPriority;
         });
-    }, [engTasks, search, filterProject, filterAssignee, filterPriority]);
+    }, [engTasks, search, filterProject, filterAssignee, filterPriority, myTeamUids, user]);
 
     // --- Group by status ---
     const tasksByStatus = useMemo(() => {
@@ -143,12 +203,15 @@ export default function TaskManager() {
             if (map[t.status]) map[t.status].push(t);
             else map[TASK_STATUS.BACKLOG].push(t);
         });
+
+        // All columns now respect the same filters consistently
+
         const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
         Object.keys(map).forEach(key => {
             map[key].sort((a, b) => (priorityOrder[a.priority] || 2) - (priorityOrder[b.priority] || 2));
         });
         return map;
-    }, [filteredTasks]);
+    }, [filteredTasks, engTasks]);
 
     // Active dragged task
     const activeTask = activeId ? engTasks.find(t => t.id === activeId) : null;
@@ -181,12 +244,15 @@ export default function TaskManager() {
 
         if (!targetStatus || targetStatus === task.status) return;
 
-        const result = requestTransition(task, targetStatus, user.uid);
+        const result = requestTransition(task, targetStatus, user.uid, { allTasks: engTasks });
 
         if (!result.allowed) {
             console.warn('Transition blocked:', result.error);
             return;
         }
+
+        // WIP conflict — modal will handle it
+        if (result.needsWipBlock) return;
 
         if (result.needsConfirmation) return;
 
@@ -197,9 +263,10 @@ export default function TaskManager() {
             const taskOwner = task.assignedTo;
             const isSelf = taskOwner === user.uid;
             const canManageOthers = canManageOthersTimers(role, teamRole);
+            const isSupervisor = isSupervisorOf(user.uid, taskOwner, teamMembers, resourceAssignments);
 
             if (targetStatus === TASK_STATUS.IN_PROGRESS && task.status !== TASK_STATUS.IN_PROGRESS) {
-                if (taskOwner && (isSelf || canManageOthers)) {
+                if (taskOwner && (isSelf || canManageOthers || isSupervisor)) {
                     const proj = engProjects.find(p => p.id === task.projectId);
                     const owner = teamMembers.find(m => (m.uid || m.id) === taskOwner);
                     await handleTaskStatusTimerSync({
@@ -213,7 +280,7 @@ export default function TaskManager() {
                     });
                 }
             } else if (task.status === TASK_STATUS.IN_PROGRESS && targetStatus !== TASK_STATUS.IN_PROGRESS) {
-                if (isSelf || canManageOthers) {
+                if (isSelf || canManageOthers || isSupervisor) {
                     await handleTaskStatusTimerSync({
                         taskId, projectId: task.projectId, newStatus: targetStatus,
                         userId: taskOwner, timeLogs,
@@ -241,11 +308,12 @@ export default function TaskManager() {
         const task = movingTask;
         setMovingTask(null);
 
-        const result = requestTransition(task, targetStatus, user.uid);
+        const result = requestTransition(task, targetStatus, user.uid, { allTasks: engTasks });
         if (!result.allowed) {
             console.warn('Transition blocked:', result.error);
             return;
         }
+        if (result.needsWipBlock) return;
         if (result.needsConfirmation) return;
 
         try {
@@ -254,9 +322,10 @@ export default function TaskManager() {
             const taskOwner = task.assignedTo;
             const isSelf = taskOwner === user.uid;
             const canManageOthers = canManageOthersTimers(role, teamRole);
+            const isSupervisor = isSupervisorOf(user.uid, taskOwner, teamMembers, resourceAssignments);
 
             if (targetStatus === TASK_STATUS.IN_PROGRESS && task.status !== TASK_STATUS.IN_PROGRESS) {
-                if (taskOwner && (isSelf || canManageOthers)) {
+                if (taskOwner && (isSelf || canManageOthers || isSupervisor)) {
                     const proj = engProjects.find(p => p.id === task.projectId);
                     const owner = teamMembers.find(m => (m.uid || m.id) === taskOwner);
                     await handleTaskStatusTimerSync({
@@ -270,7 +339,7 @@ export default function TaskManager() {
                     });
                 }
             } else if (task.status === TASK_STATUS.IN_PROGRESS && targetStatus !== TASK_STATUS.IN_PROGRESS) {
-                if (isSelf || canManageOthers) {
+                if (isSelf || canManageOthers || isSupervisor) {
                     await handleTaskStatusTimerSync({
                         taskId: task.id, projectId: task.projectId, newStatus: targetStatus,
                         userId: taskOwner, timeLogs,
@@ -280,7 +349,7 @@ export default function TaskManager() {
         } catch (err) {
             console.error('Error updating task status:', err);
         }
-    }, [movingTask, engProjects, teamMembers, user, requestTransition, role, teamRole, timeLogs]);
+    }, [movingTask, engTasks, engProjects, teamMembers, user, requestTransition, role, teamRole, timeLogs]);
 
     return (
         <div className="-m-4 md:-m-8 flex flex-col bg-slate-950 text-white" style={{ minHeight: '100vh' }}>
@@ -303,6 +372,54 @@ export default function TaskManager() {
                 isTransitioning={isTransitioning}
                 onConfirm={confirmTransition}
                 onCancel={cancelTransition}
+                delayCauses={delayCauses}
+                teamMembers={teamMembers}
+            />
+
+            {/* WIP Block Modal */}
+            <WipBlockModal
+                delayCauses={delayCauses}
+                isOpen={!!wipConflict}
+                onClose={cancelTransition}
+                onConfirm={async (blockData) => {
+                    try {
+                        const result = await executeWipSwitch(blockData);
+                        if (result?.success && wipConflict) {
+                            // Timer sync: stop old task timer, start new task timer
+                            const oldTask = wipConflict.currentInProgressTask;
+                            const newTask = wipConflict.newTask;
+                            const taskOwner = newTask.assignedTo;
+                            const isSelf = taskOwner === user.uid;
+                            const canManageOthers = canManageOthersTimers(role, teamRole);
+                            const isSupervisor = isSupervisorOf(user.uid, taskOwner, teamMembers, resourceAssignments);
+
+                            if (taskOwner && (isSelf || canManageOthers || isSupervisor)) {
+                                // Stop old timer
+                                await handleTaskStatusTimerSync({
+                                    taskId: oldTask.id, projectId: oldTask.projectId,
+                                    newStatus: 'blocked', userId: taskOwner, timeLogs,
+                                });
+                                // Start new timer
+                                const proj = engProjects.find(p => p.id === newTask.projectId);
+                                const owner = teamMembers.find(m => (m.uid || m.id) === taskOwner);
+                                await handleTaskStatusTimerSync({
+                                    taskId: newTask.id, projectId: newTask.projectId,
+                                    newStatus: 'in_progress', userId: taskOwner, timeLogs,
+                                    taskTitle: newTask.title || '',
+                                    projectName: proj?.name || '',
+                                    displayName: owner?.displayName || owner?.email || '',
+                                    onConfirm: () => true,
+                                });
+                            }
+                        }
+                    } catch (err) {
+                        console.error('WIP switch error:', err);
+                    }
+                }}
+                currentTask={wipConflict?.currentInProgressTask}
+                newTask={wipConflict?.newTask}
+                teamMembers={teamMembers}
+                isLoading={isTransitioning}
             />
 
             {/* Transition Error Toast */}
@@ -329,6 +446,7 @@ export default function TaskManager() {
                 </select>
                 <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}
                     className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer">
+                    <option value="my-team">Mis tareas y equipo</option>
                     <option value="">Todos los miembros</option>
                     {teamMembers.map(u => <option key={u.uid} value={u.uid}>{u.displayName || u.email}</option>)}
                 </select>
@@ -337,8 +455,8 @@ export default function TaskManager() {
                     <option value="">Todas las prioridades</option>
                     {Object.entries(TASK_PRIORITY_CONFIG).map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
                 </select>
-                {(search || filterProject || filterAssignee || filterPriority) && (
-                    <button onClick={() => { setSearch(''); setFilterProject(''); setFilterAssignee(''); setFilterPriority(''); }}
+                {(search !== '' || filterProject !== '' || filterAssignee !== 'my-team' || filterPriority !== '') && (
+                    <button onClick={() => { setSearch(''); setFilterProject(''); setFilterAssignee('my-team'); setFilterPriority(''); }}
                         className="text-[11px] text-rose-400 hover:text-rose-300 px-2 py-1 rounded hover:bg-rose-500/10 transition-colors">
                         Limpiar
                     </button>
@@ -357,6 +475,8 @@ export default function TaskManager() {
                     <div className="flex gap-5 h-full min-h-[400px]">
                         {KANBAN_COLUMNS.map((status) => {
                             const columnTasks = tasksByStatus[status] || [];
+                            // Hide "En Revisión" column when empty after filters
+                            if (status === TASK_STATUS.VALIDATION && columnTasks.length === 0) return null;
                             return (
                                 <KanbanColumn key={status} status={status} taskCount={columnTasks.length}
                                     isPlacementTarget={movingTask && movingTask.status !== status && validMoveTargets.has(status)}
@@ -385,6 +505,11 @@ export default function TaskManager() {
                                                     userTeamRole={teamRole}
                                                     onStartMove={canEdit ? (t) => setMovingTask(movingTask?.id === t.id ? null : t) : undefined}
                                                     isMoving={movingTask?.id === task.id}
+                                                    isPeerReviewTask={
+                                                        task.peerReviewReviewerId === user?.uid 
+                                                        && ['requested', 'in_review', 'changes_requested'].includes(task.peerReviewStatus)
+                                                    }
+                                                    resourceAssignments={resourceAssignments}
                                                 />
                                             ))
                                         )}

@@ -6,7 +6,7 @@
  *
  * ALL functions are PURE — no Firestore reads/writes.
  *
- * @module core/ai-monitoring/riskDetector
+ * @module core/predictive-analytics/riskDetector
  */
 
 // ── RISK SEVERITY LEVELS ──

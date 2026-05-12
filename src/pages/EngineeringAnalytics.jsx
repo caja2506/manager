@@ -1,5 +1,4 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
-import PageHeader from '../components/layout/PageHeader';
 import { useEngineeringData } from '../hooks/useEngineeringData';
 import {
     LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -8,7 +7,7 @@ import {
 import {
     LineChart as LineChartIcon, TrendingUp, AlertTriangle, Users,
     Calendar as CalendarIcon, Download, Clock, Briefcase, Award,
-    Filter, X, ChevronDown, Check, FolderGit2, User
+    Filter, X, ChevronDown, Check, FolderGit2, User, Pause, ShieldAlert
 } from 'lucide-react';
 import { format, subDays, isWithinInterval, startOfDay, endOfDay, parseISO, eachDayOfInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -257,6 +256,51 @@ export default function EngineeringAnalytics() {
             .sort((a, b) => b.horas - a.horas)
             .slice(0, 6);
 
+        // ---------------------------------------------------------
+        // 6. BLOCKED TIME ANALYTICS (from task.totalBlockedHours)
+        // ---------------------------------------------------------
+        const tasksWithBlocked = engTasks.filter(t => {
+            if ((t.totalBlockedHours || 0) <= 0) return false;
+            if (selectedPersons.length > 0 && !selectedPersons.includes(t.assignedTo)) return false;
+            if (selectedProjects.length > 0 && t.projectId && !selectedProjects.includes(t.projectId)) return false;
+            return true;
+        });
+
+        // Blocked hours by person
+        const blockedByPersonMap = new Map();
+        tasksWithBlocked.forEach(t => {
+            const uid = t.assignedTo;
+            if (!uid) return;
+            blockedByPersonMap.set(uid, (blockedByPersonMap.get(uid) || 0) + (t.totalBlockedHours || 0));
+        });
+
+        const blockedByPersonData = Array.from(blockedByPersonMap.entries())
+            .map(([uid, hours]) => {
+                const usr = teamMembers.find(m => m.uid === uid);
+                return {
+                    name: usr ? (usr.displayName || usr.name || usr.email?.split('@')[0]) : 'Desconocido',
+                    horas: parseFloat(hours.toFixed(1)),
+                };
+            })
+            .sort((a, b) => b.horas - a.horas)
+            .slice(0, 8);
+
+        // Responsible for delays (blockedByName)
+        const responsibleMap = new Map();
+        tasksWithBlocked.forEach(t => {
+            const responsible = t.blockedByName || null;
+            if (!responsible) return;
+            responsibleMap.set(responsible, (responsibleMap.get(responsible) || 0) + 1);
+        });
+
+        const responsibleData = Array.from(responsibleMap.entries())
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5);
+
+        const totalBlockedHours = tasksWithBlocked.reduce((sum, t) => sum + (t.totalBlockedHours || 0), 0);
+        const blockedTaskCount = tasksWithBlocked.length;
+
         return {
             trendData,
             totalStandard: parseFloat(totalStandard.toFixed(1)),
@@ -265,7 +309,12 @@ export default function EngineeringAnalytics() {
             utilizationData,
             projectData,
             projectHoursData,
-            totalLogs: filteredLogs.length
+            totalLogs: filteredLogs.length,
+            // Blocked time analytics
+            blockedByPersonData,
+            responsibleData,
+            totalBlockedHours: parseFloat(totalBlockedHours.toFixed(1)),
+            blockedTaskCount,
         };
     }, [dateFrom, dateTo, selectedPersons, selectedProjects, timeLogs, engTasks, engProjects, delays, teamMembers]);
 
@@ -292,7 +341,7 @@ export default function EngineeringAnalytics() {
 
     return (
         <div className="space-y-5 animate-in fade-in duration-300">
-            <PageHeader title="" showBack={true} />
+            
             {/* --- FILTER BAR (Power BI Style) --- */}
             <div className="bg-slate-900/70 backdrop-blur-sm rounded-2xl border border-slate-800 shadow-lg relative z-20">
                 {/* Title row */}
@@ -612,6 +661,92 @@ export default function EngineeringAnalytics() {
                     )}
                 </div>
 
+            </div>
+
+            {/* --- BLOCKED TIME ANALYTICS SECTION --- */}
+            <div className="grid lg:grid-cols-2 gap-5">
+                {/* Section Header */}
+                <div className="lg:col-span-2 flex items-center gap-3">
+                    <div className="w-10 h-10 bg-amber-600/20 border border-amber-500/30 rounded-xl flex items-center justify-center">
+                        <Pause className="w-5 h-5 text-amber-400" />
+                    </div>
+                    <div>
+                        <h2 className="font-black text-xl text-white tracking-tight">Tiempo Bloqueado (WIP)</h2>
+                        <p className="text-[11px] text-slate-500 font-bold">Análisis de tareas suspendidas y responsables de atraso</p>
+                    </div>
+                    <div className="ml-auto flex items-center gap-4">
+                        <div className="text-center">
+                            <p className="text-2xl font-black text-amber-400">{analytics.totalBlockedHours}</p>
+                            <p className="text-[9px] text-slate-500 font-black uppercase">Hrs Bloqueadas</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-2xl font-black text-rose-400">{analytics.blockedTaskCount}</p>
+                            <p className="text-[9px] text-slate-500 font-black uppercase">Tareas Afectadas</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* BLOCKED HOURS BY PERSON (Horizontal Bar) */}
+                <div className="bg-slate-900/70 p-6 rounded-2xl border border-amber-500/20 shadow-lg relative">
+                    <div className="flex items-center gap-2 mb-5">
+                        <Pause className="w-5 h-5 text-amber-400" />
+                        <h3 className="font-bold text-lg text-white">Horas Bloqueadas por Persona</h3>
+                    </div>
+                    {analytics.blockedByPersonData.length === 0 ? (
+                        <div className="h-[250px] flex items-center justify-center text-slate-400 font-bold">No hay datos de bloqueo registrados.</div>
+                    ) : (
+                        <div className="h-[250px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={analytics.blockedByPersonData} layout="vertical" margin={{ top: 0, right: 30, left: 30, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#334155" />
+                                    <XAxis type="number" hide />
+                                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} />
+                                    <Tooltip
+                                        cursor={{ fill: '#1e293b' }}
+                                        formatter={(value) => [`${value} hrs`, 'Bloqueado']}
+                                        contentStyle={{ borderRadius: '12px', border: '1px solid #f59e0b30', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3)', backgroundColor: '#1e293b', color: '#e2e8f0' }}
+                                    />
+                                    <Bar dataKey="horas" name="Horas Bloqueadas" fill="#f59e0b" radius={[0, 6, 6, 0]} barSize={24}>
+                                        {analytics.blockedByPersonData.map((entry, index) => (
+                                            <Cell key={`blocked-${index}`} fill={index === 0 ? '#ef4444' : '#f59e0b'} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )}
+                </div>
+
+                {/* TOP RESPONSABLES DE ATRASO (Horizontal Bar) */}
+                <div className="bg-slate-900/70 p-6 rounded-2xl border border-rose-500/20 shadow-lg relative">
+                    <div className="flex items-center gap-2 mb-5">
+                        <ShieldAlert className="w-5 h-5 text-rose-400" />
+                        <h3 className="font-bold text-lg text-white">Top Responsables de Atraso</h3>
+                    </div>
+                    {analytics.responsibleData.length === 0 ? (
+                        <div className="h-[250px] flex items-center justify-center text-slate-400 font-bold">No hay datos de responsables.</div>
+                    ) : (
+                        <div className="h-[250px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={analytics.responsibleData} layout="vertical" margin={{ top: 0, right: 30, left: 30, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#334155" />
+                                    <XAxis type="number" hide />
+                                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} />
+                                    <Tooltip
+                                        cursor={{ fill: '#1e293b' }}
+                                        formatter={(value) => [`${value} bloqueos`, 'Responsable']}
+                                        contentStyle={{ borderRadius: '12px', border: '1px solid #f43f5e30', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3)', backgroundColor: '#1e293b', color: '#e2e8f0' }}
+                                    />
+                                    <Bar dataKey="count" name="Bloqueos Causados" fill="#f43f5e" radius={[0, 6, 6, 0]} barSize={24}>
+                                        {analytics.responsibleData.map((entry, index) => (
+                                            <Cell key={`resp-${index}`} fill={index === 0 ? '#dc2626' : '#f43f5e'} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

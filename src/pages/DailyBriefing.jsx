@@ -15,7 +15,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
 import { getDaysUntil, parseLocalDate } from '../utils/dateUtils';
-import PageHeader from '../components/layout/PageHeader';
 
 // ─── Hook: Intersection Observer para animaciones por scroll ───
 function useScrollReveal(options = {}) {
@@ -214,7 +213,7 @@ export default function DailyBriefing() {
 
                 {/* Back button overlay — top left, always visible */}
                 <div className="absolute top-4 left-4 z-20">
-                    <PageHeader title="" showBack={true} backTo="/" className="!gap-0" />
+                    
                 </div>
 
                 {/* Central content */}

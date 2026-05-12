@@ -4,7 +4,7 @@
  * Records every AI monitoring intervention to AUDIT_TRAIL
  * with full traceability: signals, actions, approvals, results.
  *
- * @module services/aiTraceService
+ * @module services/analyticTraceService
  */
 
 import { collection, addDoc, getDocs, query, where, orderBy, limit } from 'firebase/firestore';

@@ -42,7 +42,7 @@ import EngineeringListsPage from './pages/EngineeringListsPage';
 import AutomationControlCenter from './pages/AutomationControlCenter';
 import MilestoneDetailPage from './pages/MilestoneDetailPage';
 import MilestoneHistoryPage from './pages/MilestoneHistoryPage';
-import AIMonitoringPage from './pages/AIMonitoringPage';
+import PredictiveAnalyticsPage from './pages/PredictiveAnalyticsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import DailyScrumPage from './pages/DailyScrumPage';
 import PlatformOverview from './pages/PlatformOverview';
@@ -138,7 +138,7 @@ export default function App() {
 
   const isLoading = authLoading || (user && roleLoading);
 
-  // --- Minimum loading display time (3 seconds) ---
+  // --- Minimum loading display time (5 seconds) ---
   const [minDelayDone, setMinDelayDone] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setMinDelayDone(true), 5000);
@@ -196,12 +196,12 @@ export default function App() {
           {/* Milestones — project-scoped routes (primary) */}
           <Route path="/projects/:projectId/milestones/:milestoneId" element={<ErrorBoundary module="Milestone Detalle"><MilestoneDetailPage /></ErrorBoundary>} />
           <Route path="/projects/:projectId/milestones/:milestoneId/history" element={<ErrorBoundary module="Milestone Historial"><MilestoneHistoryPage /></ErrorBoundary>} />
-          <Route path="/projects/:projectId/milestones/:milestoneId/ai-monitoring" element={<ErrorBoundary module="AI Monitoring"><AIMonitoringPage /></ErrorBoundary>} />
+          <Route path="/projects/:projectId/milestones/:milestoneId/predictive-analytics" element={<ErrorBoundary module="Predictive Analytics"><PredictiveAnalyticsPage /></ErrorBoundary>} />
 
           {/* Milestones — standalone routes (backward compat) */}
           <Route path="/milestones/:milestoneId" element={<ErrorBoundary module="Milestone Detalle"><MilestoneDetailPage /></ErrorBoundary>} />
           <Route path="/milestones/:milestoneId/history" element={<ErrorBoundary module="Milestone Historial"><MilestoneHistoryPage /></ErrorBoundary>} />
-          <Route path="/milestones/:milestoneId/ai-monitoring" element={<ErrorBoundary module="AI Monitoring"><AIMonitoringPage /></ErrorBoundary>} />
+          <Route path="/milestones/:milestoneId/predictive-analytics" element={<ErrorBoundary module="Predictive Analytics"><PredictiveAnalyticsPage /></ErrorBoundary>} />
 
           {/* Reports & Analytics — shared layout with tabs */}
           <Route element={<ReportsLayout />}>

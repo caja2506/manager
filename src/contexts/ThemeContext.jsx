@@ -1,7 +1,18 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../firebase';
 import { useAuth } from './AuthContext';
+import { USE_SUPABASE } from '../services/_backend';
+import { supabase } from '../supabase';
+
+// Firebase fallback (only loaded when not using Supabase)
+let fbGetDoc, fbSetDoc, fbDoc, fbDb;
+if (!USE_SUPABASE) {
+    const fbFirestore = await import('firebase/firestore');
+    fbGetDoc = fbFirestore.getDoc;
+    fbSetDoc = fbFirestore.setDoc;
+    fbDoc = fbFirestore.doc;
+    const fbModule = await import('../firebase');
+    fbDb = fbModule.db;
+}
 
 const ThemeContext = createContext({ theme: 'dark', toggleTheme: () => {}, isDark: true });
 
@@ -25,21 +36,25 @@ export function ThemeProvider({ children }) {
         try { localStorage.setItem(STORAGE_KEY, theme); } catch { /* noop */ }
     }, [theme]);
 
-    // Sync from Firestore on login (only once)
+    // Sync from database on login (only once)
     useEffect(() => {
         if (!user?.uid) return;
         let cancelled = false;
         (async () => {
             try {
-                const snap = await getDoc(doc(db, 'users', user.uid));
-                if (!cancelled && snap.exists()) {
-                    const saved = snap.data()?.theme;
-                    if (saved && (saved === 'dark' || saved === 'light')) {
-                        setTheme(saved);
-                    }
+                let saved;
+                if (USE_SUPABASE) {
+                    const { data } = await supabase.from('users').select('theme').eq('id', user.uid).single();
+                    saved = data?.theme;
+                } else {
+                    const snap = await fbGetDoc(fbDoc(fbDb, 'users', user.uid));
+                    if (snap.exists()) saved = snap.data()?.theme;
+                }
+                if (!cancelled && saved && (saved === 'dark' || saved === 'light')) {
+                    setTheme(saved);
                 }
             } catch (err) {
-                console.warn('ThemeContext: Could not load theme from Firestore', err);
+                console.warn('ThemeContext: Could not load theme', err);
             }
         })();
         return () => { cancelled = true; };
@@ -48,9 +63,13 @@ export function ThemeProvider({ children }) {
     const toggleTheme = useCallback(() => {
         setTheme(prev => {
             const next = prev === 'dark' ? 'light' : 'dark';
-            // Persist to Firestore in background
+            // Persist to database in background
             if (user?.uid) {
-                setDoc(doc(db, 'users', user.uid), { theme: next }, { merge: true }).catch(() => {});
+                if (USE_SUPABASE) {
+                    supabase.from('users').update({ theme: next }).eq('id', user.uid).then();
+                } else {
+                    fbSetDoc(fbDoc(fbDb, 'users', user.uid), { theme: next }, { merge: true }).catch(() => {});
+                }
             }
             return next;
         });

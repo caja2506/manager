@@ -13,10 +13,12 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
     Activity, TrendingUp, CheckSquare, RefreshCw, Timer, AlertTriangle,
     Calendar as CalendarIcon, CalendarDays, X, ChevronDown, Check, FolderGit2, User,
-    Pencil, Trash2, Save, ExternalLink, ListTodo
+    Pencil, Trash2, Save, ExternalLink, ListTodo, Zap
 } from 'lucide-react';
 import { format, subDays, addDays, eachDayOfInterval, isToday, isBefore, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { calculateBusinessHours } from '../utils/businessHours';
+import { getDaySchedule } from '../utils/breakTimeUtils';
 
 // Timer events from activityLogs are unreliable — we use timeLogs as source of truth
 const TIMER_EVENT_TYPES = ['timer_started', 'timer_stopped'];
@@ -313,7 +315,8 @@ export default function TaskActivityPage() {
             subtasksCompleted: filtered.filter(l => l.type === 'subtask_completed').length,
             statusChanges: filtered.filter(l => l.type === 'status_changed').length,
             timerSessions: kpiTimeLogs.length,
-            delaysReported: filtered.filter(l => l.type === 'delay_reported').length,
+            delaysReported: filtered.filter(l => l.type === 'delay_reported' || (l.type === 'status_changed' && l.meta?.to === 'blocked')).length,
+            preemptionCount: filtered.filter(l => l.type === 'task_preempted').length,
         };
 
         // Trend data — date range for chart
@@ -964,7 +967,7 @@ export default function TaskActivityPage() {
                     </div>
 
                     <div className="bg-slate-900/70 p-5 rounded-2xl border border-slate-800 shadow-lg">
-                        <span className="text-[10px] font-black tracking-wider text-rose-400 uppercase">Retrasos Reportados</span>
+                        <span className="text-[10px] font-black tracking-wider text-rose-400 uppercase">Veces Bloqueada</span>
                         <div className="flex items-center gap-3 mt-2">
                             <div className="w-12 h-12 rounded-full bg-rose-500/15 flex items-center justify-center text-rose-400 shrink-0">
                                 <AlertTriangle className="w-6 h-6" />
@@ -972,8 +975,87 @@ export default function TaskActivityPage() {
                             <span className="text-3xl font-black text-white">{analytics.kpis.delaysReported}</span>
                         </div>
                     </div>
+
+                    {/* Interrupciones por Prioridad KPI */}
+                    <div className="bg-slate-900/70 p-5 rounded-2xl border border-violet-500/20 shadow-lg">
+                        <span className="text-[10px] font-black tracking-wider text-violet-400 uppercase">Interrupciones por Prioridad</span>
+                        <div className="flex items-center gap-3 mt-2">
+                            <div className="w-12 h-12 rounded-full bg-violet-500/15 flex items-center justify-center text-violet-400 shrink-0">
+                                <Zap className="w-6 h-6" />
+                            </div>
+                            <span className="text-3xl font-black text-white">{analytics.kpis.preemptionCount}</span>
+                        </div>
+                    </div>
                 </div>
             )}
+
+            {/* === BLOCKED STATUS BANNER === */}
+            {activeTaskId && focusedTask && focusedTask.status === 'blocked' && (() => {
+                // Determine when it was blocked — best effort from multiple sources
+                const blockedSince = focusedTask.blockedAt
+                    || (() => {
+                        // Fallback: last status_changed → blocked from activityLogs
+                        const blockEvent = activityLogs
+                            ?.filter(l => l.taskId === activeTaskId && l.type === 'status_changed' && l.meta?.to === 'blocked')
+                            .sort((a, b) => b.timestamp.localeCompare(a.timestamp))[0];
+                        return blockEvent?.timestamp || focusedTask.updatedAt || null;
+                    })();
+                const blockedSinceDate = blockedSince ? new Date(blockedSince) : null;
+
+                return (
+                <div className="bg-linear-to-r from-rose-950/60 via-rose-900/40 to-slate-900/60 p-5 rounded-2xl border border-rose-500/30 shadow-lg shadow-rose-900/20 animate-in fade-in duration-300">
+                    <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-rose-500/20 flex items-center justify-center shrink-0">
+                            <AlertTriangle className="w-6 h-6 text-rose-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="text-xs font-black tracking-wider text-rose-400 uppercase">⛔ Tarea Bloqueada</span>
+                                {blockedSinceDate && (
+                                    <span className="text-[10px] font-bold text-rose-300/70 bg-rose-500/10 px-2 py-0.5 rounded-full">
+                                        desde {format(blockedSinceDate, "dd MMM yyyy 'a las' HH:mm", { locale: es })}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+                                {/* Razón */}
+                                <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
+                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Razón del Bloqueo</span>
+                                    <p className="text-sm font-bold text-white mt-1">{focusedTask.blockedReason || '—'}</p>
+                                </div>
+                                {/* Responsable */}
+                                <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
+                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                                        <User className="w-3 h-3" /> Responsable del Atraso
+                                    </span>
+                                    <p className="text-sm font-bold text-white mt-1">{focusedTask.blockedByName || '—'}</p>
+                                </div>
+                                {/* Tiempo bloqueado */}
+                                <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
+                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                                        <Timer className="w-3 h-3" /> Tiempo Bloqueado
+                                    </span>
+                                    <p className="text-sm font-bold text-white mt-1">
+                                        {blockedSinceDate ? (() => {
+                                            const schedule = getDaySchedule();
+                                            const hours = calculateBusinessHours(blockedSinceDate.toISOString(), new Date().toISOString(), schedule);
+                                            if (hours < 1) return `${Math.round(hours * 60)} min`;
+                                            if (hours < 24) return `${Math.round(hours * 10) / 10} horas`;
+                                            return `${Math.round(hours / 24 * 10) / 10} días (${Math.round(hours)}h)`;
+                                        })() : '—'}
+                                    </p>
+                                    {(focusedTask.totalBlockedHours || 0) > 0 && (
+                                        <span className="text-[10px] text-rose-400 font-bold">
+                                            Acumulado: {Math.round(focusedTask.totalBlockedHours * 10) / 10}h
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                );
+            })()}
 
             {/* === VISUAL TASK LIFE TIMELINE (infographic) === */}
             {activeTaskId && focusedTask && (
@@ -1817,6 +1899,53 @@ export default function TaskActivityPage() {
                                                                 <p className="text-sm text-slate-200 font-medium leading-snug">
                                                                     {log.description}
                                                                 </p>
+                                                                {/* Block/Unblock details */}
+                                                                {log.type === 'status_changed' && (log.meta?.to === 'blocked' || log.meta?.from === 'blocked') && (() => {
+                                                                    const task = engTasks?.find(t => t.id === log.taskId);
+                                                                    if (!task) return null;
+                                                                    const isBlocking = log.meta?.to === 'blocked';
+                                                                    return (
+                                                                        <div className={`mt-1.5 flex flex-wrap items-center gap-1.5`}>
+                                                                            {isBlocking && task.blockedReason && (
+                                                                                <span className="text-[10px] font-bold text-rose-300 bg-rose-500/15 px-2 py-0.5 rounded-full border border-rose-500/20">
+                                                                                    ⚠️ {task.blockedReason}
+                                                                                </span>
+                                                                            )}
+                                                                            {isBlocking && task.blockedByName && (
+                                                                                <span className="text-[10px] font-bold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/20">
+                                                                                    👤 {task.blockedByName}
+                                                                                </span>
+                                                                            )}
+                                                                            {!isBlocking && task.totalBlockedHours > 0 && (
+                                                                                <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                                                                    ✅ Desbloqueada — {Math.round(task.totalBlockedHours * 10) / 10}h bloqueada total
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })()}
+                                                                {/* Preemption details */}
+                                                                {log.type === 'task_preempted' && (() => {
+                                                                    return (
+                                                                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                                                            {log.meta?.reason && (
+                                                                                <span className="text-[10px] font-bold text-violet-300 bg-violet-500/15 px-2 py-0.5 rounded-full border border-violet-500/20">
+                                                                                    ⚡ {log.meta.reason}
+                                                                                </span>
+                                                                            )}
+                                                                            {log.meta?.preemptedBy && (
+                                                                                <span className="text-[10px] font-bold text-violet-200 bg-violet-500/10 px-2 py-0.5 rounded-full border border-violet-500/15">
+                                                                                    👤 {log.meta.preemptedBy}
+                                                                                </span>
+                                                                            )}
+                                                                            {log.meta?.replacedByTaskTitle && (
+                                                                                <span className="text-[10px] font-bold text-slate-300 bg-slate-500/15 px-2 py-0.5 rounded-full border border-slate-500/20">
+                                                                                    → {log.meta.replacedByTaskTitle}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })()}
                                                                 <div className="flex items-center gap-2 mt-0.5">
                                                                     <span className="text-[10px] font-bold text-slate-500">
                                                                         {formatTime(log.timestamp)}

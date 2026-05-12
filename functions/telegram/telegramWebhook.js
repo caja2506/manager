@@ -37,6 +37,7 @@ async function handleWebhook(adminDb, token, body) {
         try {
             await routeCallbackQuery(adminDb, token, chatId, callbackData, callbackQueryId, {
                 apiKey: body._apiKey,
+                messageId: cbQuery.message?.message_id,
             });
             return { processed: true };
         } catch (err) {

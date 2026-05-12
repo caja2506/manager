@@ -1,16 +1,12 @@
 // Archivo: src/hooks/useAutoBomData.js
 // ======================================
-// Custom hook owning all BOM-related Firestore subscriptions,
+// Custom hook owning all BOM-related subscriptions,
 // computed values, and CRUD handlers.
-// Returns an object shaped exactly like the BOM subset of
-// the old AppDataContext value, so consumers don't need to change.
+// Dual-backend: Supabase or Firebase.
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import {
-    collection, onSnapshot, doc, setDoc, getDocs,
-    deleteDoc, updateDoc, writeBatch, query, where
-} from 'firebase/firestore';
-import { db } from '../firebase';
+import { USE_SUPABASE } from '../services/_backend';
+import { supabase } from '../supabase';
 
 // ── Helpers ──
 
@@ -48,68 +44,72 @@ export function useAutoBomData() {
     const pdfInputRef = useRef(null);
     const excelInputRef = useRef(null);
 
-    // ── Firestore Subscriptions ──
+    // ── Data Subscriptions ──
 
     useEffect(() => {
-        const unsubProyectos = onSnapshot(
-            collection(db, 'proyectos_bom'),
-            s => setProyectos(
-                s.docs.map(d => ({ ...d.data(), id: d.id }))
-                    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-            )
-        );
+        if (USE_SUPABASE) {
+            // Initial fetch for all collections
+            const fetchAll = async () => {
+                const [p, c, b, cat, prov, br] = await Promise.all([
+                    supabase.from('proyectos_bom').select('*').order('created_at', { ascending: false }),
+                    supabase.from('catalogo_maestro').select('*').order('name'),
+                    supabase.from('items_bom').select('*'),
+                    supabase.from('categorias').select('*').order('name'),
+                    supabase.from('proveedores').select('*').order('name'),
+                    supabase.from('marcas').select('*').order('name'),
+                ]);
+                if (p.data) setProyectos(p.data);
+                if (c.data) setCatalogo(c.data);
+                if (b.data) setBomItems(b.data);
+                setManagedLists({
+                    categories: (cat.data || []).filter(d => d.name),
+                    providers: (prov.data || []).filter(d => d.name),
+                    brands: (br.data || []).filter(d => d.name),
+                });
+            };
+            fetchAll();
 
-        const unsubCatalogo = onSnapshot(
-            collection(db, 'catalogo_maestro'),
-            s => setCatalogo(
-                s.docs.map(d => ({ ...d.data(), id: d.id }))
-                    .sort((a, b) => safeLocaleCompare(a, b, 'name'))
-            )
-        );
+            // Realtime for key tables
+            const ch = supabase.channel('autobom-realtime')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'proyectos_bom' }, () => {
+                    supabase.from('proyectos_bom').select('*').order('created_at', { ascending: false }).then(({ data }) => data && setProyectos(data));
+                })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'catalogo_maestro' }, () => {
+                    supabase.from('catalogo_maestro').select('*').order('name').then(({ data }) => data && setCatalogo(data));
+                })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'items_bom' }, () => {
+                    supabase.from('items_bom').select('*').then(({ data }) => data && setBomItems(data));
+                })
+                .subscribe();
 
-        const unsubBom = onSnapshot(
-            collection(db, 'items_bom'),
-            s => setBomItems(s.docs.map(d => ({ ...d.data(), id: d.id })))
-        );
+            return () => supabase.removeChannel(ch);
+        }
 
-        const unsubCategories = onSnapshot(
-            collection(db, 'categorias'),
-            s => setManagedLists(prev => ({
-                ...prev,
-                categories: s.docs.map(d => ({ id: d.id, ...d.data() }))
-                    .filter(d => d.name)
-                    .sort((a, b) => safeLocaleCompare(a, b, 'name'))
-            }))
-        );
+        // Firebase fallback
+        let unsubs = [];
+        (async () => {
+            const { collection, onSnapshot } = await import('firebase/firestore');
+            const { db } = await import('../firebase');
 
-        const unsubProviders = onSnapshot(
-            collection(db, 'proveedores'),
-            s => setManagedLists(prev => ({
-                ...prev,
-                providers: s.docs.map(d => ({ id: d.id, ...d.data() }))
-                    .filter(d => d.name)
-                    .sort((a, b) => safeLocaleCompare(a, b, 'name'))
-            }))
-        );
+            unsubs.push(onSnapshot(collection(db, 'proyectos_bom'), s => setProyectos(
+                s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+            )));
+            unsubs.push(onSnapshot(collection(db, 'catalogo_maestro'), s => setCatalogo(
+                s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => safeLocaleCompare(a, b, 'name'))
+            )));
+            unsubs.push(onSnapshot(collection(db, 'items_bom'), s => setBomItems(s.docs.map(d => ({ ...d.data(), id: d.id })))));
+            unsubs.push(onSnapshot(collection(db, 'categorias'), s => setManagedLists(prev => ({
+                ...prev, categories: s.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => d.name).sort((a, b) => safeLocaleCompare(a, b, 'name'))
+            }))));
+            unsubs.push(onSnapshot(collection(db, 'proveedores'), s => setManagedLists(prev => ({
+                ...prev, providers: s.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => d.name).sort((a, b) => safeLocaleCompare(a, b, 'name'))
+            }))));
+            unsubs.push(onSnapshot(collection(db, 'marcas'), s => setManagedLists(prev => ({
+                ...prev, brands: s.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => d.name).sort((a, b) => safeLocaleCompare(a, b, 'name'))
+            }))));
+        })();
 
-        const unsubBrands = onSnapshot(
-            collection(db, 'marcas'),
-            s => setManagedLists(prev => ({
-                ...prev,
-                brands: s.docs.map(d => ({ id: d.id, ...d.data() }))
-                    .filter(d => d.name)
-                    .sort((a, b) => safeLocaleCompare(a, b, 'name'))
-            }))
-        );
-
-        return () => {
-            unsubProyectos();
-            unsubCatalogo();
-            unsubBom();
-            unsubCategories();
-            unsubProviders();
-            unsubBrands();
-        };
+        return () => unsubs.forEach(u => u());
     }, []);
 
     // ── Computed Values ──
@@ -136,15 +136,21 @@ export function useAutoBomData() {
     const handleSaveProject = async (e, projectData, editingProjectId) => {
         e.preventDefault();
         if (!projectData.name.trim()) return;
-        const data = {
-            name: projectData.name,
-            description: projectData.description,
-            createdAt: new Date().toISOString()
-        };
-        if (editingProjectId) {
-            await updateDoc(doc(db, 'proyectos_bom', editingProjectId), data);
+        const data = { name: projectData.name, description: projectData.description, createdAt: new Date().toISOString() };
+        if (USE_SUPABASE) {
+            if (editingProjectId) {
+                await supabase.from('proyectos_bom').update(data).eq('id', editingProjectId);
+            } else {
+                await supabase.from('proyectos_bom').insert(data);
+            }
         } else {
-            await setDoc(doc(collection(db, 'proyectos_bom')), data);
+            const { doc, setDoc, updateDoc, collection } = await import('firebase/firestore');
+            const { db } = await import('../firebase');
+            if (editingProjectId) {
+                await updateDoc(doc(db, 'proyectos_bom', editingProjectId), data);
+            } else {
+                await setDoc(doc(collection(db, 'proyectos_bom')), data);
+            }
         }
     };
 
@@ -155,21 +161,40 @@ export function useAutoBomData() {
     const saveMasterRecord = async (formData) => {
         if (!formData.name || !formData.partNumber) return alert('Nombre y P/N obligatorios.');
 
-        const data = {
-            name: String(formData.name).trim(),
-            partNumber: String(formData.partNumber).replace(/\s+/g, '').toUpperCase(),
-            lastPrice: Number(formData.lastPrice) || 0,
-            brand: formData.brand ? doc(db, 'marcas', formData.brand) : null,
-            category: formData.category ? doc(db, 'categorias', formData.category) : null,
-            defaultProvider: formData.defaultProvider ? doc(db, 'proveedores', formData.defaultProvider) : null,
-            leadTimeWeeks: formData.leadTimeWeeks === '' ? null : Number(formData.leadTimeWeeks),
-            imageUrl: formData.imageUrl ? String(formData.imageUrl).trim() : '',
-        };
-
-        if (editingMasterRecord) {
-            await updateDoc(doc(db, 'catalogo_maestro', editingMasterRecord.id), data);
+        if (USE_SUPABASE) {
+            const data = {
+                name: String(formData.name).trim(),
+                part_number: String(formData.partNumber).replace(/\s+/g, '').toUpperCase(),
+                last_price: Number(formData.lastPrice) || 0,
+                brand_id: formData.brand || null,
+                category_id: formData.category || null,
+                default_provider_id: formData.defaultProvider || null,
+                lead_time_weeks: formData.leadTimeWeeks === '' ? null : Number(formData.leadTimeWeeks),
+                image_url: formData.imageUrl ? String(formData.imageUrl).trim() : '',
+            };
+            if (editingMasterRecord) {
+                await supabase.from('catalogo_maestro').update(data).eq('id', editingMasterRecord.id);
+            } else {
+                await supabase.from('catalogo_maestro').insert(data);
+            }
         } else {
-            await setDoc(doc(collection(db, 'catalogo_maestro')), data);
+            const { doc, setDoc, updateDoc, collection } = await import('firebase/firestore');
+            const { db } = await import('../firebase');
+            const data = {
+                name: String(formData.name).trim(),
+                partNumber: String(formData.partNumber).replace(/\s+/g, '').toUpperCase(),
+                lastPrice: Number(formData.lastPrice) || 0,
+                brand: formData.brand ? doc(db, 'marcas', formData.brand) : null,
+                category: formData.category ? doc(db, 'categorias', formData.category) : null,
+                defaultProvider: formData.defaultProvider ? doc(db, 'proveedores', formData.defaultProvider) : null,
+                leadTimeWeeks: formData.leadTimeWeeks === '' ? null : Number(formData.leadTimeWeeks),
+                imageUrl: formData.imageUrl ? String(formData.imageUrl).trim() : '',
+            };
+            if (editingMasterRecord) {
+                await updateDoc(doc(db, 'catalogo_maestro', editingMasterRecord.id), data);
+            } else {
+                await setDoc(doc(collection(db, 'catalogo_maestro')), data);
+            }
         }
         setEditingMasterRecord(null);
         setIsMasterRecordModalOpen(false);
@@ -180,40 +205,59 @@ export function useAutoBomData() {
     // ============================================================
 
     const handleUpdateBomItem = async (itemId, updatedData, catalogLeadTimeUpdate) => {
-        const itemRef = doc(db, 'items_bom', itemId);
-        const newData = {
-            ...updatedData,
-            totalPrice: (updatedData.quantity || 0) * (updatedData.unitPrice || 0)
-        };
-        await updateDoc(itemRef, newData);
-
-        if (catalogLeadTimeUpdate !== undefined) {
-            const bomItem = bomItems.find(i => i.id === itemId);
-            if (bomItem?.masterPartRef) {
-                await updateDoc(
-                    doc(db, 'catalogo_maestro', bomItem.masterPartRef.id),
-                    { leadTimeWeeks: catalogLeadTimeUpdate }
-                );
+        const newData = { ...updatedData, totalPrice: (updatedData.quantity || 0) * (updatedData.unitPrice || 0) };
+        if (USE_SUPABASE) {
+            await supabase.from('items_bom').update(newData).eq('id', itemId);
+            if (catalogLeadTimeUpdate !== undefined) {
+                const bomItem = bomItems.find(i => i.id === itemId);
+                const refId = bomItem?.masterPartRef?.id || bomItem?.master_part_ref_id;
+                if (refId) await supabase.from('catalogo_maestro').update({ lead_time_weeks: catalogLeadTimeUpdate }).eq('id', refId);
+            }
+        } else {
+            const { doc, updateDoc } = await import('firebase/firestore');
+            const { db } = await import('../firebase');
+            await updateDoc(doc(db, 'items_bom', itemId), newData);
+            if (catalogLeadTimeUpdate !== undefined) {
+                const bomItem = bomItems.find(i => i.id === itemId);
+                if (bomItem?.masterPartRef) {
+                    await updateDoc(doc(db, 'catalogo_maestro', bomItem.masterPartRef.id), { leadTimeWeeks: catalogLeadTimeUpdate });
+                }
             }
         }
     };
 
     const handleAddFromCatalog = async (itemsToAdd, activeProject) => {
-        const batch = writeBatch(db);
-        itemsToAdd.forEach(({ item, quantity }) => {
-            const bomRef = doc(collection(db, 'items_bom'));
-            batch.set(bomRef, {
-                projectId: activeProject.id,
-                masterPartRef: doc(db, 'catalogo_maestro', item.id),
+        if (USE_SUPABASE) {
+            const rows = itemsToAdd.map(({ item, quantity }) => ({
+                project_id: activeProject.id,
+                master_part_ref_id: item.id,
                 quantity: Number(quantity),
-                unitPrice: Number(item.lastPrice || 0),
-                totalPrice: Number(quantity) * Number(item.lastPrice || 0),
-                proveedor: item.defaultProvider ? doc(db, 'proveedores', item.defaultProvider.id) : null,
+                unit_price: Number(item.lastPrice || item.last_price || 0),
+                total_price: Number(quantity) * Number(item.lastPrice || item.last_price || 0),
+                proveedor_id: item.defaultProvider?.id || item.default_provider_id || null,
                 status: 'Requerido',
-                addedAt: new Date().toISOString()
+                added_at: new Date().toISOString(),
+            }));
+            await supabase.from('items_bom').insert(rows);
+        } else {
+            const { doc, collection, writeBatch } = await import('firebase/firestore');
+            const { db } = await import('../firebase');
+            const batch = writeBatch(db);
+            itemsToAdd.forEach(({ item, quantity }) => {
+                const bomRef = doc(collection(db, 'items_bom'));
+                batch.set(bomRef, {
+                    projectId: activeProject.id,
+                    masterPartRef: doc(db, 'catalogo_maestro', item.id),
+                    quantity: Number(quantity),
+                    unitPrice: Number(item.lastPrice || 0),
+                    totalPrice: Number(quantity) * Number(item.lastPrice || 0),
+                    proveedor: item.defaultProvider ? doc(db, 'proveedores', item.defaultProvider.id) : null,
+                    status: 'Requerido',
+                    addedAt: new Date().toISOString()
+                });
             });
-        });
-        await batch.commit();
+            await batch.commit();
+        }
     };
 
     // ============================================================
@@ -223,7 +267,13 @@ export function useAutoBomData() {
     const handleImageSelect = async (url) => {
         if (!imagePickerItem) return;
         try {
-            await updateDoc(doc(db, 'catalogo_maestro', imagePickerItem.id), { imageUrl: url });
+            if (USE_SUPABASE) {
+                await supabase.from('catalogo_maestro').update({ image_url: url }).eq('id', imagePickerItem.id);
+            } else {
+                const { doc, updateDoc } = await import('firebase/firestore');
+                const { db } = await import('../firebase');
+                await updateDoc(doc(db, 'catalogo_maestro', imagePickerItem.id), { imageUrl: url });
+            }
         } catch (err) {
             console.error('Error saving image:', err);
         }

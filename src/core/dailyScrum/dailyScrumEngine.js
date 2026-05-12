@@ -97,9 +97,10 @@ export function getEvidenceYesterday(personId, tasks, timeLogs) {
         return logDate === yesterday;
     });
 
-    // Tasks that had time logged yesterday AND are assigned to this person
+    // We ONLY check if the person logged time on this task. We DO NOT check t.assignedTo
+    // because the task might have been reassigned to someone else after they worked on it.
     const loggedTaskIds = new Set(yesterdayLogs.map(l => l.taskId).filter(Boolean));
-    const yesterdayTasks = tasks.filter(t => loggedTaskIds.has(t.id) && t.assignedTo === personId);
+    const yesterdayTasks = tasks.filter(t => loggedTaskIds.has(t.id));
 
     return {
         timeLogs: yesterdayLogs,

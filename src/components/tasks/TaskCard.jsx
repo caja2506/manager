@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { formatDuration, getActiveTimerForTask, formatElapsed, startTimerSafe, stopTimer, canManageOthersTimers } from '../../services/timeService';
+import { formatDuration, getActiveTimerForTask, formatElapsed, startTimerSafe, stopTimer, canManageOthersTimers, isSupervisorOf } from '../../services/timeService';
 import {
     AlertTriangle, CheckCheck, User, Calendar, Clock,
     GripVertical, Play, Square, ArrowRightLeft
@@ -11,6 +11,7 @@ import {
     TASK_PRIORITY_CONFIG,
 } from '../../models/schemas';
 import { getDaysUntil, parseLocalDate } from '../../utils/dateUtils';
+import PeerReviewBadge from './peerReview/PeerReviewBadge';
 
 // ── Priority pill colors ──
 const PRIORITY_COLORS = {
@@ -44,7 +45,7 @@ const PRIORITY_COLORS = {
 const PILL = 'h-6 inline-flex items-center gap-1 px-2.5 rounded-full text-[10px] font-semibold border';
 const ICON = 'w-3 h-3 shrink-0';
 
-export default function TaskCard({ task, project, teamMembers, subtasks = [], onClick, isDragOverlay = false, timeLogs = [], currentUserId, userRole, userTeamRole, onStartMove, isMoving }) {
+export default function TaskCard({ task, project, teamMembers, subtasks = [], onClick, isDragOverlay = false, timeLogs = [], currentUserId, userRole, userTeamRole, onStartMove, isMoving, isPeerReviewTask = false, resourceAssignments = [] }) {
     const {
         attributes, listeners, setNodeRef, transform, transition, isDragging,
     } = useSortable({
@@ -95,9 +96,10 @@ export default function TaskCard({ task, project, teamMembers, subtasks = [], on
         const taskOwner = task.assignedTo;
         const isSelf = taskOwner === currentUserId;
         const canManage = canManageOthersTimers(userRole, userTeamRole);
+        const isSupervisor = isSupervisorOf(currentUserId, taskOwner, teamMembers, resourceAssignments);
 
         if (!taskOwner) return;
-        if (!isSelf && !canManage) return;
+        if (!isSelf && !canManage && !isSupervisor) return;
 
         setIsTimerLoading(true);
         try {
@@ -120,12 +122,13 @@ export default function TaskCard({ task, project, teamMembers, subtasks = [], on
             console.error('Timer toggle error:', err);
         }
         setIsTimerLoading(false);
-    }, [activeLog, task, project, assignee, currentUserId, userRole, userTeamRole, isTimerLoading, isDragOverlay]);
+    }, [activeLog, task, project, assignee, currentUserId, userRole, userTeamRole, teamMembers, resourceAssignments, isTimerLoading, isDragOverlay]);
 
     // Can the current user control this timer?
     const canToggleTimer = task.assignedTo && (
         task.assignedTo === currentUserId ||
-        canManageOthersTimers(userRole, userTeamRole)
+        canManageOthersTimers(userRole, userTeamRole) ||
+        isSupervisorOf(currentUserId, task.assignedTo, teamMembers, resourceAssignments)
     );
 
     // ── Card class ──
@@ -138,6 +141,7 @@ export default function TaskCard({ task, project, teamMembers, subtasks = [], on
     if (isOverdue) cardCls += ' border-red-500/40 shadow-red-500/10';
     if (activeLog) cardCls += ' ring-1 ring-emerald-500/30';
     if (isMoving) cardCls += ' ring-2 ring-emerald-400/60 shadow-emerald-500/20';
+    if (isPeerReviewTask) cardCls += ' peer-review-glow';
 
     // ── Initials helper ──
     const getInitials = (member) => {
@@ -299,6 +303,12 @@ export default function TaskCard({ task, project, teamMembers, subtasks = [], on
                             {parseLocalDate(task.dueDate).toLocaleDateString('es', { day: '2-digit', month: 'short' })}
                         </span>
                     )}
+
+                    {/* Peer Review Badge */}
+                    <PeerReviewBadge 
+                        status={task.peerReviewStatus} 
+                        required={task.peerReviewRequired} 
+                    />
                 </div>
             </div>
 

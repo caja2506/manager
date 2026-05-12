@@ -13,7 +13,7 @@
  */
 
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase.js';
+import { db } from '../firebase';
 import {
     SETTINGS_COLLECTION,
     SETTINGS_DOCS,

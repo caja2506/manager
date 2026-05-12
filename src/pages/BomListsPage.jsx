@@ -1,5 +1,4 @@
 import React from 'react';
-import PageHeader from '../components/layout/PageHeader';
 import { useAppData } from '../contexts/AppDataContext';
 import ManagedListCard from '../components/ui/ManagedListCard';
 import { Truck, Tag, LayoutList, Database } from 'lucide-react';
@@ -9,7 +8,7 @@ export default function BomListsPage() {
 
     return (
         <div className="max-w-6xl mx-auto space-y-6">
-            <PageHeader title="" showBack={true} />
+            
             
             {/* Page Header */}
             <div className="flex items-center gap-4">

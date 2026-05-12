@@ -72,20 +72,20 @@ const STATUS_TO_CATEGORY = {
 //
 // Rules:
 //   backlog      → pending, in_progress, cancelled
-//   pending      → in_progress, backlog, blocked, cancelled
-//   in_progress  → validation, pending, blocked, cancelled
+//   pending      → in_progress, completed (if 100%), backlog, blocked, cancelled
+//   in_progress  → validation, completed (if no PR required), pending, blocked, cancelled
 //   blocked      → in_progress, pending, cancelled
-//   validation   → completed, in_progress, blocked
+//   validation   → completed, in_progress, pending, blocked
 //   completed    → in_progress (reopen)
 //   cancelled    → backlog (reactivate)
 //
 
 const TRANSITIONS = {
     [STATUS.BACKLOG]: [STATUS.PENDING, STATUS.IN_PROGRESS, STATUS.CANCELLED],
-    [STATUS.PENDING]: [STATUS.IN_PROGRESS, STATUS.BACKLOG, STATUS.BLOCKED, STATUS.CANCELLED],
-    [STATUS.IN_PROGRESS]: [STATUS.VALIDATION, STATUS.PENDING, STATUS.BLOCKED, STATUS.CANCELLED],
+    [STATUS.PENDING]: [STATUS.IN_PROGRESS, STATUS.COMPLETED, STATUS.BACKLOG, STATUS.BLOCKED, STATUS.CANCELLED],
+    [STATUS.IN_PROGRESS]: [STATUS.VALIDATION, STATUS.COMPLETED, STATUS.PENDING, STATUS.BLOCKED, STATUS.CANCELLED],
     [STATUS.BLOCKED]: [STATUS.IN_PROGRESS, STATUS.PENDING, STATUS.CANCELLED],
-    [STATUS.VALIDATION]: [STATUS.COMPLETED, STATUS.IN_PROGRESS, STATUS.BLOCKED],
+    [STATUS.VALIDATION]: [STATUS.COMPLETED, STATUS.IN_PROGRESS, STATUS.PENDING, STATUS.BLOCKED],
     [STATUS.COMPLETED]: [STATUS.IN_PROGRESS],
     [STATUS.CANCELLED]: [STATUS.BACKLOG],
 };
@@ -120,6 +120,16 @@ const REQUIRED_FIELDS = {
     ],
     [STATUS.COMPLETED]: [
         { field: 'assignedTo', label: 'Responsable asignado', check: (t) => !!t.assignedTo },
+        {
+            field: 'peerReviewStatus',
+            label: 'Peer Review aprobado',
+            check: (t) => {
+                // If peer review is not required, always pass
+                if (!t.peerReviewRequired) return true;
+                // Otherwise, must be approved or waived
+                return t.peerReviewStatus === 'approved' || t.peerReviewStatus === 'waived';
+            },
+        },
     ],
     [STATUS.CANCELLED]: [],
 };

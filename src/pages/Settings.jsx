@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useRole } from '../contexts/RoleContext';
 import UserAdminPanel from '../components/admin/UserAdminPanel';
 import IPSWeightConfigPanel from '../components/admin/IPSWeightConfigPanel';
-import PageHeader from '../components/layout/PageHeader';
+import WipConfigPanel from '../components/admin/WipConfigPanel';
 import { backfillTimeLogNames } from '../services/backfillService';
 
 import { Settings as SettingsIcon, Shield, Database, Loader2 } from 'lucide-react';
@@ -44,7 +44,7 @@ export default function SettingsPage() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-300">
-            <PageHeader title="" showBack={true} />
+            
             <div className="bg-slate-900/70 backdrop-blur-sm p-6 rounded-2xl border border-slate-800 shadow-lg">
                 <div className="flex items-center gap-3 mb-6">
                     <div className="w-12 h-12 bg-indigo-600/20 border border-indigo-500/30 rounded-2xl flex items-center justify-center">
@@ -57,6 +57,7 @@ export default function SettingsPage() {
                 </div>
             </div>
             <UserAdminPanel />
+            <WipConfigPanel />
             <IPSWeightConfigPanel />
 
             {/* Migration Tools */}

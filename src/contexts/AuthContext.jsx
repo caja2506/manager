@@ -8,6 +8,8 @@ import {
     updateProfile,
 } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
+import { USE_SUPABASE } from '../services/_backend';
+import { syncFirebaseTokenToSupabase } from '../supabase';
 
 const AuthContext = createContext(null);
 
@@ -22,11 +24,30 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             setUser(firebaseUser);
             setLoading(false);
+
+            // Sync Firebase token → Supabase for RLS
+            if (USE_SUPABASE) {
+                await syncFirebaseTokenToSupabase(firebaseUser);
+            }
         });
-        return () => unsubscribe();
+
+        // Also set up token refresh listener when using Supabase
+        let unsubToken = null;
+        if (USE_SUPABASE) {
+            unsubToken = auth.onIdTokenChanged(async (firebaseUser) => {
+                if (firebaseUser) {
+                    await syncFirebaseTokenToSupabase(firebaseUser);
+                }
+            });
+        }
+
+        return () => {
+            unsubscribe();
+            if (unsubToken) unsubToken();
+        };
     }, []);
 
     const signInWithGoogle = async () => {

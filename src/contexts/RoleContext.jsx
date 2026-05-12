@@ -1,14 +1,25 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { db } from '../firebase';
 import { useAuth } from './AuthContext';
 import { ensureUserProfile } from '../services/userProfileService';
+import { USE_SUPABASE } from '../services/_backend';
+import { supabase } from '../supabase';
+
+// Firebase fallback (only loaded when not using Supabase)
+let fbOnSnapshot, fbSetDoc, fbDoc, fbDb;
+if (!USE_SUPABASE) {
+    const fbFirestore = await import('firebase/firestore');
+    fbOnSnapshot = fbFirestore.onSnapshot;
+    fbSetDoc = fbFirestore.setDoc;
+    fbDoc = fbFirestore.doc;
+    const fbModule = await import('../firebase');
+    fbDb = fbModule.db;
+}
 
 const RoleContext = createContext(null);
 
 // ══════════════════════════════════════════════════════════════
 // SUPER ADMIN — emails that ALWAYS have admin role.
-// If Firestore says otherwise, the role is auto-repaired.
+// If the database says otherwise, the role is auto-repaired.
 // Add your email(s) here to prevent accidental lockout.
 // ══════════════════════════════════════════════════════════════
 const SUPER_ADMIN_EMAILS = [
@@ -46,68 +57,143 @@ export function RoleProvider({ children }) {
 
         setRoleLoading(true);
 
-        // ── Unified: users/{uid} is the single source of truth ──
-        // rbacRole lives in the same document as the operational profile.
-        // Firestore security rules also read from users/{uid}.rbacRole.
-        const userDocRef = doc(db, 'users', user.uid);
+        if (USE_SUPABASE) {
+            // ── Supabase path ──
+            let cancelled = false;
 
-        const unsubscribe = onSnapshot(userDocRef, async (userSnap) => {
-            let resolvedRole = null;
-
-            // 1. Primary (and only) source: users/{uid}.rbacRole
-            if (userSnap.exists() && userSnap.data().rbacRole) {
-                resolvedRole = userSnap.data().rbacRole;
-            }
-
-            // 2. Default for new users — auto-create users/{uid} doc
-            //    SECURITY: Do NOT write rbacRole here. Only admins can set rbacRole.
-            //    New users get 'viewer' by default (resolved in-memory, not stored).
-            if (!resolvedRole) {
-                resolvedRole = isSuperAdmin ? 'admin' : 'viewer';
-
-                // ── Auto-register: create users/{uid} with NON-privileged fields only ──
+            (async () => {
                 try {
-                    const createPayload = {
-                        email: user.email || '',
-                        displayName: user.displayName || '',
-                        createdAt: new Date().toISOString(),
-                    };
-                    // Only super admins can self-assign admin role via frontend
-                    if (isSuperAdmin) {
-                        createPayload.rbacRole = 'admin';
+                    const { data: userData, error } = await supabase
+                        .from('users')
+                        .select('*')
+                        .eq('id', user.uid)
+                        .single();
+
+                    if (cancelled) return;
+
+                    let resolvedRole = null;
+
+                    if (!error && userData?.rbac_role) {
+                        resolvedRole = userData.rbac_role;
                     }
-                    await setDoc(userDocRef, createPayload, { merge: true });
-                    console.log(`[RoleContext] Auto-registered ${user.email} (rbacRole=${isSuperAdmin ? 'admin' : 'not set — viewer default'})`);
+
+                    // Default for new users
+                    if (!resolvedRole) {
+                        resolvedRole = isSuperAdmin ? 'admin' : 'viewer';
+
+                        // Auto-register
+                        try {
+                            const createPayload = {
+                                id: user.uid,
+                                email: user.email || '',
+                                display_name: user.displayName || '',
+                                created_at: new Date().toISOString(),
+                            };
+                            if (isSuperAdmin) {
+                                createPayload.rbac_role = 'admin';
+                            }
+                            await supabase.from('users').upsert(createPayload, { onConflict: 'id' });
+                            console.log(`[RoleContext] Auto-registered ${user.email} (rbacRole=${isSuperAdmin ? 'admin' : 'not set — viewer default'})`);
+                        } catch (err) {
+                            console.warn('[RoleContext] Failed to auto-register:', err);
+                        }
+                    }
+
+                    // Super Admin Auto-Recovery
+                    if (isSuperAdmin && resolvedRole !== 'admin') {
+                        console.warn(`🔒 Super Admin auto-recovery: role was "${resolvedRole}", restoring to "admin" for ${user.email}`);
+                        resolvedRole = 'admin';
+                        await supabase.from('users').update({ rbac_role: 'admin' }).eq('id', user.uid);
+                    }
+
+                    setRole(resolvedRole);
+
+                    // Bootstrap user profile
+                    try {
+                        const profile = await ensureUserProfile(user);
+                        setUserProfile(profile);
+                    } catch (err) {
+                        console.error('[RoleContext] Failed to bootstrap user profile:', err);
+                    }
+
+                    setRoleLoading(false);
                 } catch (err) {
-                    console.warn('[RoleContext] Failed to auto-register:', err);
+                    console.error('[RoleContext] Supabase error:', err);
+                    setRole(isSuperAdmin ? 'admin' : 'viewer');
+                    setRoleLoading(false);
                 }
-            }
+            })();
 
-            // ── Super Admin Auto-Recovery ──
-            if (isSuperAdmin && resolvedRole !== 'admin') {
-                console.warn(
-                    `🔒 Super Admin auto-recovery: role was "${resolvedRole}", restoring to "admin" for ${user.email}`
-                );
-                resolvedRole = 'admin';
+            // Supabase Realtime subscription for role changes
+            const channel = supabase
+                .channel(`role-${user.uid}-${Date.now()}`)
+                .on('postgres_changes',
+                    { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${user.uid}` },
+                    (payload) => {
+                        const newRole = payload.new?.rbac_role;
+                        if (newRole && newRole !== role) {
+                            console.log(`[RoleContext] Role updated via Realtime: ${newRole}`);
+                            setRole(isSuperAdmin && newRole !== 'admin' ? 'admin' : newRole);
+                        }
+                    }
+                )
+                .subscribe();
+
+            return () => {
+                cancelled = true;
+                supabase.removeChannel(channel);
+            };
+        } else {
+            // ── Firebase path (original) ──
+            const userDocRef = fbDoc(fbDb, 'users', user.uid);
+
+            const unsubscribe = fbOnSnapshot(userDocRef, async (userSnap) => {
+                let resolvedRole = null;
+
+                if (userSnap.exists() && userSnap.data().rbacRole) {
+                    resolvedRole = userSnap.data().rbacRole;
+                }
+
+                if (!resolvedRole) {
+                    resolvedRole = isSuperAdmin ? 'admin' : 'viewer';
+                    try {
+                        const createPayload = {
+                            email: user.email || '',
+                            displayName: user.displayName || '',
+                            createdAt: new Date().toISOString(),
+                        };
+                        if (isSuperAdmin) {
+                            createPayload.rbacRole = 'admin';
+                        }
+                        await fbSetDoc(userDocRef, createPayload, { merge: true });
+                        console.log(`[RoleContext] Auto-registered ${user.email} (rbacRole=${isSuperAdmin ? 'admin' : 'not set — viewer default'})`);
+                    } catch (err) {
+                        console.warn('[RoleContext] Failed to auto-register:', err);
+                    }
+                }
+
+                if (isSuperAdmin && resolvedRole !== 'admin') {
+                    console.warn(`🔒 Super Admin auto-recovery: role was "${resolvedRole}", restoring to "admin" for ${user.email}`);
+                    resolvedRole = 'admin';
+                    try {
+                        await fbSetDoc(userDocRef, { rbacRole: 'admin' }, { merge: true });
+                    } catch { /* safety */ }
+                }
+
+                setRole(resolvedRole);
+
                 try {
-                    await setDoc(userDocRef, { rbacRole: 'admin' }, { merge: true });
-                } catch { /* safety */ }
-            }
+                    const profile = await ensureUserProfile(user);
+                    setUserProfile(profile);
+                } catch (err) {
+                    console.error('[RoleContext] Failed to bootstrap user profile:', err);
+                }
 
-            setRole(resolvedRole);
+                setRoleLoading(false);
+            });
 
-            // ── Bootstrap users/{uid} operational profile ──
-            try {
-                const profile = await ensureUserProfile(user);
-                setUserProfile(profile);
-            } catch (err) {
-                console.error('[RoleContext] Failed to bootstrap user profile:', err);
-            }
-
-            setRoleLoading(false);
-        });
-
-        return () => unsubscribe();
+            return () => unsubscribe();
+        }
     }, [user, isSuperAdmin]);
 
     const isAdmin = role === 'admin';

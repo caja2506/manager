@@ -115,6 +115,8 @@ const TELEGRAM_SESSION_STATE = {
     ASKING_OVERTIME: "asking_overtime",
     AWAIT_OVERTIME_HOURS: "await_overtime_hours",
     SELECTING_OVERTIME_TASK: "selecting_overtime_task",
+    // Subtask selection flow
+    SELECTING_SUBTASKS: "selecting_subtasks",
 };
 
 const TELEGRAM_SESSION_EVENT = {
@@ -143,6 +145,10 @@ const TELEGRAM_SESSION_EVENT = {
     OVERTIME_NO: "OVERTIME_NO",
     OVERTIME_HOURS_ENTERED: "OVERTIME_HOURS_ENTERED",
     OVERTIME_TASK_SELECTED: "OVERTIME_TASK_SELECTED",
+    // Subtask selection flow
+    SUBTASKS_SHOWN: "SUBTASKS_SHOWN",
+    SUBTASK_TOGGLED: "SUBTASK_TOGGLED",
+    SUBTASKS_CONFIRMED: "SUBTASKS_CONFIRMED",
 };
 
 const TELEGRAM_BOT_LOG_EVENT = {

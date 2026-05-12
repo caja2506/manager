@@ -143,82 +143,57 @@ export default function TaskHealthScore({ form, subtaskCount = 0 }) {
     const failedResults = results.filter(r => !r.passed);
 
     return (
-        <div className={`mx-4 lg:mx-5 rounded-xl border ${theme.border} ${theme.bgFaded} overflow-hidden transition-all duration-300`}>
-            {/* Main bar — always visible */}
+        <div className={`relative rounded-xl border ${theme.border} ${theme.bgFaded} transition-all duration-300 w-full`}>
+            {/* Main block */}
             <button
                 type="button"
                 onClick={() => setExpanded(!expanded)}
-                className="w-full flex items-center gap-3 px-3.5 py-2.5 group"
+                className="w-full flex items-center justify-between gap-2.5 px-3 py-1.5 outline-none group"
             >
-                {/* Radial score indicator */}
-                <div className="relative w-10 h-10 flex-shrink-0">
-                    <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-                        {/* Background circle  */}
-                        <circle
-                            cx="18" cy="18" r="14"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="3"
-                            className="text-slate-800"
-                        />
-                        {/* Score arc */}
-                        <circle
-                            cx="18" cy="18" r="14"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="3"
-                            strokeLinecap="round"
-                            strokeDasharray={`${(score / 100) * 87.96} 87.96`}
-                            className={`${theme.color} transition-all duration-700 ease-out`}
-                        />
-                    </svg>
-                    <span className={`absolute inset-0 flex items-center justify-center text-[10px] font-black ${theme.color}`}>
-                        {score}
-                    </span>
-                </div>
-
-                {/* Label */}
-                <div className="flex-1 text-left min-w-0">
-                    <div className="flex items-center gap-1.5">
-                        <HeartPulse className={`w-3.5 h-3.5 ${theme.color} flex-shrink-0`} />
-                        <span className="text-[11px] font-black text-slate-300 uppercase tracking-wide">
-                            Health Score
-                        </span>
-                        <span className={`text-[10px] font-bold ${theme.color}`}>
-                            {theme.label}
-                        </span>
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="relative w-8 h-8 flex-shrink-0">
+                        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                            <circle cx="18" cy="18" r="16" fill="none" className="stroke-slate-800" strokeWidth="4" />
+                            <circle 
+                                cx="18" cy="18" r="16" fill="none" 
+                                className={`stroke-current ${theme.color} transition-all duration-1000 ease-out`} 
+                                strokeWidth="4" strokeDasharray="100" strokeDashoffset={100 - score} strokeLinecap="round" 
+                            />
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <span className={`text-[9px] font-black ${theme.color}`}>{score}</span>
+                        </div>
                     </div>
-                    <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
-                        {passedCount}/{results.length} criterios cumplidos
-                        {failedResults.length > 0 && (
-                            <span className="text-slate-600 ml-1">
-                                — {failedResults.length} pendiente{failedResults.length > 1 ? 's' : ''}
-                            </span>
-                        )}
-                    </p>
+
+                    <div className="flex-1 min-w-0 text-left flex flex-col justify-center">
+                        <div className="flex items-center gap-1.5 leading-none mb-0.5">
+                            <HeartPulse className={`w-3 h-3 ${theme.color} flex-shrink-0`} />
+                            <span className="text-[10px] font-black text-white tracking-wide uppercase leading-none mt-0.5">HEALTH SCORE</span>
+                            <span className={`text-[10px] font-bold ${theme.color} leading-none mt-0.5`}>{theme.label}</span>
+                        </div>
+                        <p className="text-[9px] text-slate-400 leading-none">
+                            {passedCount}/{results.length} criterios cumplidos — {failedResults.length} pendientes
+                        </p>
+                    </div>
                 </div>
 
                 {/* Expand chevron */}
-                <div className={`p-1 rounded-lg transition-colors ${theme.color} opacity-60 group-hover:opacity-100`}>
-                    {expanded
-                        ? <ChevronUp className="w-3.5 h-3.5" />
-                        : <ChevronDown className="w-3.5 h-3.5" />
-                    }
-                </div>
+                {expanded
+                    ? <ChevronUp className={`w-3.5 h-3.5 ${theme.color} opacity-60 flex-shrink-0`} />
+                    : <ChevronDown className={`w-3.5 h-3.5 ${theme.color} opacity-60 flex-shrink-0`} />
+                }
             </button>
 
             {/* Expanded checklist */}
             {expanded && (
-                <div className="border-t border-slate-700/40 px-3.5 py-2.5 space-y-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                <div className={`absolute top-full left-0 right-0 mt-2 z-50 rounded-xl border-2 border-slate-700/50 shadow-2xl p-3 lg:p-4 space-y-1.5 animate-in fade-in slide-in-from-top-2 bg-slate-900`}>
                     {results.map(r => {
                         const Icon = r.icon;
                         return (
                             <div
                                 key={r.key}
-                                className={`flex items-start gap-2 px-2 py-1.5 rounded-lg transition-all ${
-                                    r.passed
-                                        ? 'opacity-60'
-                                        : 'bg-slate-800/40'
+                                className={`flex items-start gap-2.5 px-2 py-1.5 rounded-lg transition-all ${
+                                    r.passed ? 'opacity-60' : 'bg-slate-800/80 shadow-inner'
                                 }`}
                             >
                                 {r.passed ? (
@@ -228,22 +203,22 @@ export default function TaskHealthScore({ form, subtaskCount = 0 }) {
                                 )}
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-1.5">
-                                        <Icon className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                                        <Icon className="w-3 h-3 text-slate-400 flex-shrink-0" />
                                         <span className={`text-[11px] font-bold ${
-                                            r.passed ? 'text-slate-500 line-through' : 'text-slate-300'
+                                            r.passed ? 'text-slate-500 line-through' : 'text-slate-200'
                                         }`}>
                                             {r.label}
                                         </span>
                                         <span className={`text-[8px] font-bold px-1 py-0.5 rounded ${
                                             r.passed
                                                 ? 'bg-emerald-500/15 text-emerald-400'
-                                                : 'bg-slate-700 text-slate-400'
+                                                : 'bg-slate-700 text-slate-300'
                                         }`}>
                                             {r.weight}pts
                                         </span>
                                     </div>
                                     {!r.passed && (
-                                        <p className="text-[10px] text-slate-500 mt-0.5 leading-tight ml-4.5">
+                                        <p className="text-[10px] text-slate-400 mt-0.5 leading-tight ml-4.5">
                                             💡 {r.hint}
                                         </p>
                                     )}

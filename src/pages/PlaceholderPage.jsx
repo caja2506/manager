@@ -1,6 +1,5 @@
 import React from 'react';
 import { Sparkles } from 'lucide-react';
-import PageHeader from '../components/layout/PageHeader';
 
 /**
  * Reusable placeholder page for features under development.
@@ -9,7 +8,7 @@ import PageHeader from '../components/layout/PageHeader';
 export default function PlaceholderPage({ icon: Icon, title, description, phase, features = [] }) {
     return (
         <div className="flex items-center justify-center min-h-[70vh] animate-in fade-in duration-500">
-            <PageHeader title="" showBack={true} />
+            
             <div className="max-w-lg w-full text-center p-8">
                 {/* Decorative ring */}
                 <div className="relative mx-auto w-28 h-28 mb-8">

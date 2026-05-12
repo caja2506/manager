@@ -30,4 +30,4 @@ export {
     handlePdfUpload,
     executePdfImport,
     executeExcelImport,
-} from '../../services/aiService';
+} from '../../services/analyticService';

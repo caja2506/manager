@@ -1,15 +1,14 @@
-// Archivo: src/services/aiService.js
+// Archivo: src/services/analyticService.js
 // ===================================
 // Stateless service for PDF text extraction, Gemini AI analysis,
 // Excel catalog import, and AI connectivity testing.
 // All UI-state side effects (loading, status messages) are injected
 // via a `callbacks` parameter to keep this module React-free.
 
-import {
-    collection, doc, getDocs, writeBatch, updateDoc
-} from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { db, functions } from '../firebase';
+import { functions } from '../firebase';
+import { USE_SUPABASE } from './_backend';
+import { supabase } from '../supabase';
 import { normalizePartNumber, findSimilarProviders } from '../utils/normalizers';
 
 import * as pdfjsLib from 'pdfjs-dist';
@@ -22,6 +21,13 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 // Cloud Function references
 const analyzeQuotePdfFn = httpsCallable(functions, 'analyzeQuotePdf');
 const testGeminiConnectionFn = httpsCallable(functions, 'testGeminiConnection');
+
+/** Helper to lazily get Firebase modules */
+async function getFirebase() {
+    const { collection, doc, getDocs, writeBatch, updateDoc } = await import('firebase/firestore');
+    const { db } = await import('../firebase');
+    return { collection, doc, getDocs, writeBatch, updateDoc, db };
+}
 
 // ============================================================
 // PDF — Text Extraction
@@ -137,8 +143,15 @@ export async function handlePdfUpload(file, activeProject, providers, callbacks)
         if (aiData.items) {
             setProcessingStatus('Analizando datos...');
 
-            const catalogSnapshot = await getDocs(collection(db, 'catalogo_maestro'));
-            const currentCatalog = catalogSnapshot.docs.map(d => ({ ...d.data(), id: d.id }));
+            let currentCatalog;
+            if (USE_SUPABASE) {
+                const { data } = await supabase.from('catalogo_maestro').select('*');
+                currentCatalog = data || [];
+            } else {
+                const { collection, getDocs, db } = await getFirebase();
+                const catalogSnapshot = await getDocs(collection(db, 'catalogo_maestro'));
+                currentCatalog = catalogSnapshot.docs.map(d => ({ ...d.data(), id: d.id }));
+            }
 
             const { reviewItems, supplierAnalysis } = buildReviewItems(aiData, currentCatalog, providers);
 
@@ -173,6 +186,44 @@ export async function executePdfImport(reviewedData, activeProject) {
     const { items, prcr, supplierDecision } = reviewedData;
     if (items.length === 0) return;
 
+    if (USE_SUPABASE) {
+        let supplierId = null;
+        if (supplierDecision.action === 'use_existing' && supplierDecision.selectedProviderId) {
+            supplierId = supplierDecision.selectedProviderId;
+        } else if (supplierDecision.name) {
+            const { data: newProv } = await supabase.from('proveedores').insert({ name: supplierDecision.name }).select('id').single();
+            supplierId = newProv?.id || null;
+        }
+
+        for (const item of items) {
+            let partId;
+            if (item.isNew) {
+                const { data: newCat } = await supabase.from('catalogo_maestro').insert({
+                    name: item.description, part_number: item.pn, last_price: item.unitPrice,
+                    lead_time_weeks: item.leadTimeWeeks, default_provider_id: supplierId,
+                }).select('id').single();
+                partId = newCat?.id;
+            } else {
+                partId = item.existingPartId;
+                const upd = { last_price: item.unitPrice };
+                if (item.leadTimeWeeks != null) upd.lead_time_weeks = item.leadTimeWeeks;
+                if (supplierId) upd.default_provider_id = supplierId;
+                await supabase.from('catalogo_maestro').update(upd).eq('id', partId);
+            }
+
+            await supabase.from('items_bom').insert({
+                project_id: activeProject.id, master_part_ref_id: partId,
+                quantity: item.quantity, unit_price: item.unitPrice,
+                total_price: item.quantity * item.unitPrice,
+                lead_time_weeks: item.leadTimeWeeks, proveedor_id: supplierId,
+                prcr: prcr || '', status: 'En Cotización', added_at: new Date().toISOString(),
+            });
+        }
+        return;
+    }
+
+    // Firebase fallback
+    const { collection, doc, writeBatch, db } = await getFirebase();
     const batch = writeBatch(db);
 
     let supplierId = null;
@@ -189,9 +240,7 @@ export async function executePdfImport(reviewedData, activeProject) {
         if (item.isNew) {
             const catRef = doc(collection(db, 'catalogo_maestro'));
             batch.set(catRef, {
-                name: item.description,
-                partNumber: item.pn,
-                lastPrice: item.unitPrice,
+                name: item.description, partNumber: item.pn, lastPrice: item.unitPrice,
                 leadTimeWeeks: item.leadTimeWeeks,
                 defaultProvider: supplierId ? doc(db, 'proveedores', supplierId) : null,
                 brand: null, category: null
@@ -207,16 +256,11 @@ export async function executePdfImport(reviewedData, activeProject) {
 
         const bomRef = doc(collection(db, 'items_bom'));
         batch.set(bomRef, {
-            projectId: activeProject.id,
-            masterPartRef: doc(db, 'catalogo_maestro', partId),
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            totalPrice: item.quantity * item.unitPrice,
+            projectId: activeProject.id, masterPartRef: doc(db, 'catalogo_maestro', partId),
+            quantity: item.quantity, unitPrice: item.unitPrice, totalPrice: item.quantity * item.unitPrice,
             leadTimeWeeks: item.leadTimeWeeks,
             proveedor: supplierId ? doc(db, 'proveedores', supplierId) : null,
-            prcr: prcr || '',
-            status: 'En Cotización',
-            addedAt: new Date().toISOString()
+            prcr: prcr || '', status: 'En Cotización', addedAt: new Date().toISOString()
         });
     }
 
@@ -270,6 +314,8 @@ export async function executeExcelImport(file, callbacks) {
 
         setProcessingStatus(`Procesando ${json.length} filas...`);
 
+        // Excel import always uses Firebase batch (complex doc references)
+        const { collection, doc, getDocs, writeBatch, updateDoc, db } = await getFirebase();
         const batch = writeBatch(db);
 
         const catalogSnapshot = await getDocs(collection(db, 'catalogo_maestro'));
@@ -354,7 +400,7 @@ export async function executeExcelImport(file, callbacks) {
             }
         }
 
-        setProcessingStatus('Guardando en Firebase...');
+        setProcessingStatus('Guardando datos...');
         await batch.commit();
         setProcessingStatus(`✨ ¡Catálogo actualizado con ${json.length} registros!`);
 
@@ -396,7 +442,7 @@ export async function testGeminiConnection(callbacks) {
 
     try {
         const result = await testGeminiConnectionFn();
-        setProcessingStatus(`✅ IA RESPONDE: ${result.data.response}`);
+        setProcessingStatus(`✅ MOTOR ANALÍTICO RESPONDE: ${result.data.response}`);
     } catch (err) {
         setLastError(err.message);
         setProcessingStatus('❌ FALLO LA CONEXIÓN');

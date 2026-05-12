@@ -30,7 +30,9 @@ service cloud.firestore {
 
     function getTeamRole() {
       let userData = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      return userData != null ? userData.teamRole : null;
+      let role = userData != null ? userData.teamRole : null;
+      // Fallback: operationalRole is the primary field set by TeamManagementPanel
+      return role != null ? role : (userData != null ? userData.operationalRole : null);
     }
 
     function isAuthenticated() {
@@ -60,6 +62,12 @@ service cloud.firestore {
 
     function isEngineer() {
       return isAuthenticated() && getTeamRole() in ['manager', 'team_lead', 'engineer'];
+    }
+
+    // Check if current user is supervisor of targetUserId via reportsTo field
+    function isSupervisorOfUser(targetUserId) {
+      return isAuthenticated()
+        && get(/databases/$(database)/documents/users/$(targetUserId)).data.reportsTo == request.auth.uid;
     }
 
     // ============================================================
@@ -190,6 +198,15 @@ service cloud.firestore {
         allow update, delete: if isAuthenticated()
           && resource.data.userId == request.auth.uid;
       }
+
+      // --- blockHistory (sub-collection) ---
+      // WIP enforcement: tracks blocked/unblocked cycles for analytics.
+      // APPEND-ONLY from client. CF (Admin SDK) writes on unblock.
+      match /blockHistory/{entryId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+        allow update, delete: if isAdmin();
+      }
     }
 
     // --- activityLog collectionGroup ---
@@ -216,12 +233,18 @@ service cloud.firestore {
     // Source of truth for hours.
     // Users can create their own time logs.
     // Users can update/delete their own logs; admins can update/delete any.
+    // Engineers/supervisors can update/delete their subordinates' logs
+    // (UI enforces supervisor hierarchy via resourceAssignments).
     match /timeLogs/{docId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if isAuthenticated()
-        && (resource.data.userId == request.auth.uid || isAdmin());
-      allow delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+        && (resource.data.userId == request.auth.uid
+            || isAdmin()
+            || isEngineer());
+      allow delete: if isAdmin()
+        || (isAuthenticated() && resource.data.userId == request.auth.uid)
+        || isEngineer();
     }
 
     // --- delayCauses (configurable list) ---
@@ -575,6 +598,29 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isEditor();
       allow update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    // ============================================================
+    // PEER REVIEW SYSTEM
+    // ============================================================
+
+    // --- peerReviewTemplates ---
+    // Templates are read by all authenticated. Seed/edit by admin or team leads.
+    match /peerReviewTemplates/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isTeamLead() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // --- peerReviews ---
+    // Review documents: read by all auth (transparency), mutations via Cloud Functions.
+    // Client create by editors (requestPeerReview CF handles this, but allow client fallback).
+    // Update restricted to admin (CF uses Admin SDK).
+    match /peerReviews/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isEditor();
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 

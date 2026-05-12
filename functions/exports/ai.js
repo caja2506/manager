@@ -280,8 +280,101 @@ Reglas:
             }
         }
     );
+    // ── Improve Task Descriptions with AI ──
+    const improveTaskDescriptions = onCall(
+        { secrets: [geminiApiKey], timeoutSeconds: 120 },
+        async (request) => {
+            if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
+            const { tasks } = request.data;
+            if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
+                throw new HttpsError("invalid-argument", "Se requiere un array de tareas.");
+            }
+            if (tasks.length > 20) {
+                throw new HttpsError("invalid-argument", "Máximo 20 tareas por lote.");
+            }
 
-    return { testGeminiConnection, analyzeQuotePdf, searchImages, generateInsights, testAIExtraction, testAIBriefing, reprocesarReporteConIA, analyzeStationImage };
+            const apiKey = geminiApiKey.value();
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
+
+            const taskList = tasks.map((t, i) => {
+                let entry = `${i + 1}. Título: "${t.title || ""}"`;
+                if (t.description) entry += `\n   Descripción: "${t.description}"`;
+                if (t.area) entry += `\n   Área: ${t.area}`;
+                if (t.taskType) entry += `\n   Tipo de tarea: ${t.taskType}`;
+                if (t.project) entry += `\n   Proyecto: ${t.project}`;
+                return entry;
+            }).join("\n");
+
+            const prompt = `Eres un ingeniero de proyectos senior en una planta de manufactura de dispositivos médicos en Costa Rica. Tu trabajo es mejorar los títulos y descripciones de tareas de ingeniería para que sean más claras y profesionales.
+
+Tareas a mejorar:
+${taskList}
+
+Reglas:
+1. El título mejorado debe ser conciso (máx 80 caracteres), en formato de acción (ej: "Realizar prueba de...", "Configurar setup de...", "Revisar backspike del...")
+2. Si el título ya es claro, mantenlo igual o haz ajustes mínimos
+3. La descripción mejorada debe ser clara y con contexto técnico (máx 200 caracteres). Si no hay descripción original, genera una breve basada en el título
+4. USA EL CONTEXTO del área, tipo de tarea y proyecto para generar descripciones más relevantes y específicas al dominio. Por ejemplo: si el área es "Ensamblaje" y el tipo es "Mantenimiento Preventivo", la descripción debe reflejar ese contexto
+5. IMPORTANTE: El equipo usa spanglish (mezcla de español e inglés), esto es NORMAL. Respeta los términos técnicos en inglés tal cual (ej: backspike, fixture, jig, setup, tape, liner, station, feeder, tooling, BOM, PLC, HMI, OEE, etc). NO traduzcas estos términos al español
+6. No cambies el significado técnico
+7. Corrige errores ortográficos y mejora la claridad, pero respeta el estilo spanglish natural del equipo
+8. El resultado puede mezclar español e inglés naturalmente, como lo haría un ingeniero tico
+
+Responde EXCLUSIVAMENTE con un JSON array:
+[
+  {
+    "index": 1,
+    "improvedTitle": "Título mejorado",
+    "improvedDescription": "Descripción mejorada"
+  }
+]
+
+Devuelve SOLO el JSON sin delimitadores markdown.`;
+
+            try {
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { response_mime_type: "application/json", temperature: 0.3 },
+                    }),
+                });
+
+                const result = await response.json();
+                if (!response.ok) {
+                    throw new HttpsError("internal", `Error de IA: ${result.error?.message || "Fallo desconocido"}`);
+                }
+
+                const rawJson = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!rawJson) throw new HttpsError("internal", "La IA no devolvió respuesta.");
+
+                const parsed = JSON.parse(rawJson.replace(/```json/g, "").replace(/```/g, "").trim());
+
+                // Map back to task IDs
+                const suggestions = tasks.map((task, i) => {
+                    const suggestion = parsed.find(s => s.index === i + 1) || {};
+                    return {
+                        id: task.id,
+                        originalTitle: task.title || "",
+                        originalDescription: task.description || "",
+                        improvedTitle: suggestion.improvedTitle || task.title || "",
+                        improvedDescription: suggestion.improvedDescription || task.description || "",
+                    };
+                });
+
+                return { suggestions };
+            } catch (err) {
+                if (err instanceof HttpsError) throw err;
+                if (err instanceof SyntaxError) {
+                    throw new HttpsError("internal", "La IA devolvió JSON inválido. Intenta de nuevo.");
+                }
+                throw new HttpsError("internal", err.message);
+            }
+        }
+    );
+
+    return { testGeminiConnection, analyzeQuotePdf, searchImages, generateInsights, testAIExtraction, testAIBriefing, reprocesarReporteConIA, analyzeStationImage, improveTaskDescriptions };
 }
 
 module.exports = { createAiExports };

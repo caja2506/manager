@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
+import { Activity } from 'lucide-react';
 import {
     TASK_STATUS, TASK_PRIORITY,
 } from '../../models/schemas';
 import { createTask, updateTask, updateTaskStatus, deleteTask } from '../../services/taskService';
-import { handleTaskStatusTimerSync, canManageOthersTimers, addSimpleManualTimeLog } from '../../services/timeService';
+import { handleTaskStatusTimerSync, canManageOthersTimers, isSupervisorOf, addSimpleManualTimeLog, forceStopTaskTimers } from '../../services/timeService';
+import WipBlockModal from './WipBlockModal';
 import { resolveAreaSync } from '../../services/mappingService';
 import { canAutoScheduleFor, autoScheduleTask, determineStrategy } from '../../services/autoPlannerService';
 import { plannerService } from '../../services/plannerService';
@@ -21,6 +24,8 @@ import {
     fetchTaskPlannerItems,
 } from '../../services/engineeringDataService';
 import { deleteDependency } from '../../services/ganttService';
+import { USE_SUPABASE } from '../../services/_backend';
+import { supabase } from '../../supabase';
 
 // Editor subcomponents
 import TaskHeader from './editor/TaskHeader';
@@ -30,6 +35,10 @@ import TaskMainPanel from './editor/TaskMainPanel';
 import TaskControlPanel from './editor/TaskControlPanel';
 import TaskFooter from './editor/TaskFooter';
 import AutoPlannerModal from '../planner/AutoPlannerModal';
+import TransitionConfirmModal from '../workflow/TransitionConfirmModal';
+import PeerReviewRequestModal from './peerReview/PeerReviewRequestModal';
+import PeerReviewExecutionModal from './peerReview/PeerReviewExecutionModal';
+import { requestPeerReview, waivePeerReview } from '../../services/peerReviewService';
 
 export default function TaskDetailModal({
     isOpen, onClose, task, projects = [], teamMembers = [], subtasks = [],
@@ -39,7 +48,8 @@ export default function TaskDetailModal({
         setIsDelayReportOpen, setDelayReportTarget, setListManager,
     } = useAppData();
     const { role, teamRole, canEditDates, isAdmin } = useRole();
-    const { timeLogs, engTasks, engProjects, delays, workAreaTypes } = useEngineeringData();
+    const { timeLogs, engTasks, engProjects, delays, workAreaTypes, delayCauses } = useEngineeringData();
+    const navigate = useNavigate();
     const isNew = !task;
     
     // El usuario puede editar si tiene permisos globales, si es el encargado de la tarea, o si es una tarea nueva
@@ -65,6 +75,7 @@ export default function TaskDetailModal({
         estimatedHours: '',
         blockedReason: '',
         percentComplete: 0,
+        networkPath: '',
     });
 
     const [isSaving, setIsSaving] = useState(false);
@@ -84,6 +95,67 @@ export default function TaskDetailModal({
     const [autoPlannerOpen, setAutoPlannerOpen] = useState(false);
     const [pendingNewTask, setPendingNewTask] = useState(null); // Task created but pending planner confirmation
     const [resourceAssignments, setResourceAssignments] = useState([]); // engineer→technician assignments
+    // WIP enforcement state
+    const [wipModalOpen, setWipModalOpen] = useState(false);
+    const [wipPendingStatus, setWipPendingStatus] = useState(null);
+    const [wipCurrentTask, setWipCurrentTask] = useState(null);
+    const [wipSwitching, setWipSwitching] = useState(false);
+    // Transition reason modal state (for in_progress → backward)
+    const [transitionPending, setTransitionPending] = useState(null);
+    const [isTransitioningReason, setIsTransitioningReason] = useState(false);
+    
+    // Peer Review state
+    const [prRequestModalOpen, setPrRequestModalOpen] = useState(false);
+    const [prExecModalOpen, setPrExecModalOpen] = useState(false);
+    const [prViewMode, setPrViewMode] = useState(false); // true = read-only feedback view
+    const [activePeerReview, setActivePeerReview] = useState(null);
+
+    // Load the active peer review doc for this task (needed by execution modal)
+    useEffect(() => {
+        const prId = task?.currentPeerReviewId;
+        if (!prId) {
+            setActivePeerReview(null);
+            return;
+        }
+
+        if (USE_SUPABASE) {
+            // Initial fetch
+            (async () => {
+                const { data } = await supabase.from('peer_reviews').select('*').eq('id', prId).single();
+                if (data) setActivePeerReview(data);
+                else setActivePeerReview(null);
+            })();
+
+            // Realtime subscription
+            const channel = supabase
+                .channel(`pr-${prId}-${Date.now()}`)
+                .on('postgres_changes',
+                    { event: '*', schema: 'public', table: 'peer_reviews', filter: `id=eq.${prId}` },
+                    (payload) => {
+                        if (payload.eventType === 'DELETE') setActivePeerReview(null);
+                        else setActivePeerReview(payload.new);
+                    }
+                )
+                .subscribe();
+
+            return () => supabase.removeChannel(channel);
+        }
+
+        // Firebase fallback
+        let unsub;
+        (async () => {
+            const { doc: fbDoc, onSnapshot: fbOnSnapshot } = await import('firebase/firestore');
+            const { db: fbDb } = await import('../../firebase');
+            unsub = fbOnSnapshot(fbDoc(fbDb, 'peerReviews', prId), (snap) => {
+                if (snap.exists()) setActivePeerReview({ id: snap.id, ...snap.data() });
+                else setActivePeerReview(null);
+            }, (err) => {
+                console.error('[TaskDetailModal] PR doc listener error:', err);
+                setActivePeerReview(null);
+            });
+        })();
+        return () => unsub?.();
+    }, [task?.currentPeerReviewId]);
 
     // Load resource assignments for permission checks
     useEffect(() => {
@@ -113,6 +185,11 @@ export default function TaskDetailModal({
                 estimatedHours: task.estimatedHours || '',
                 blockedReason: task.blockedReason || '',
                 percentComplete: task.percentComplete ?? 0,
+                // Peer Review fields
+                peerReviewRequired: task.peerReviewRequired || false,
+                peerReviewStatus: task.peerReviewStatus || '',
+                peerReviewReviewerId: task.peerReviewReviewerId || '',
+                networkPath: task.networkPath || '',
             });
         } else {
             setForm({
@@ -122,6 +199,7 @@ export default function TaskDetailModal({
                 dueDate: '',
                 plannedStartDate: '', plannedEndDate: '',
                 estimatedHours: '', blockedReason: '', percentComplete: 0,
+                networkPath: '',
             });
         }
     }, [task]);
@@ -278,6 +356,7 @@ export default function TaskDetailModal({
                 plannedEndDate: form.plannedEndDate || null,
                 estimatedHours: form.estimatedHours ? Number(form.estimatedHours) : 0,
                 percentComplete: autoProgress !== null ? autoProgress : Number(form.percentComplete ?? 0),
+                networkPath: form.networkPath || '',
             };
 
             if (isNew) {
@@ -370,10 +449,43 @@ export default function TaskDetailModal({
     const handleStatusChange = async (newStatus) => {
         if (!task) return;
         const oldStatus = form.status;
+
+        // ★ WIP CHECK: if moving to in_progress, check for existing in_progress tasks
+        if (newStatus === TASK_STATUS.IN_PROGRESS) {
+            const taskOwner = form.assignedTo || task?.assignedTo;
+            if (taskOwner) {
+                const inProgressTasks = engTasks.filter(
+                    t => t.assignedTo === taskOwner && t.status === 'in_progress' && t.id !== task.id
+                );
+                if (inProgressTasks.length > 0) {
+                    // Show WIP modal
+                    setWipCurrentTask(inProgressTasks[0]);
+                    setWipPendingStatus(newStatus);
+                    setWipModalOpen(true);
+                    return; // Don't proceed — modal will handle it
+                }
+            }
+        }
+        // ★ BACKWARD CHECK: if moving FROM in_progress to a backward state, show reason modal
+        if (form.status === TASK_STATUS.IN_PROGRESS && newStatus !== TASK_STATUS.IN_PROGRESS && newStatus !== TASK_STATUS.VALIDATION && newStatus !== TASK_STATUS.COMPLETED) {
+            setTransitionPending({
+                task: { ...task, ...form, id: task.id },
+                targetStatus: newStatus,
+                warnings: [],
+                missingFields: [],
+            });
+            return; // Modal will handle transition
+        }
+
+        await _executeStatusChange(oldStatus, newStatus);
+    };
+
+    // Execute status change (called directly or after WIP modal confirmation)
+    const _executeStatusChange = async (oldStatus, newStatus) => {
         setForm(f => ({ ...f, status: newStatus }));
         await updateTaskStatus(task.id, newStatus, task.projectId || form.projectId);
 
-        // Log the status change (who made the change, not the assignee)
+        // Log the status change
         const loggedInUserName = teamMembers?.find(m => m.uid === userId)?.displayName || null;
         logActivity(task.id, {
             type: ACTIVITY_TYPES.STATUS_CHANGED,
@@ -383,7 +495,6 @@ export default function TaskDetailModal({
             meta: { from: oldStatus, to: newStatus },
         });
 
-        // If task is now completed, log that too
         if (newStatus === 'done') {
             logActivity(task.id, {
                 type: ACTIVITY_TYPES.TASK_COMPLETED,
@@ -394,15 +505,14 @@ export default function TaskDetailModal({
             });
         }
 
-        // Auto-Timer logic for IN_PROGRESS
-        // Timer is created for the task's assignedTo user (not the logged-in user)
+        // Auto-Timer logic
         const taskOwner = form.assignedTo || task?.assignedTo;
         const isSelf = taskOwner === userId;
         const canManageOthers = canManageOthersTimers(role, teamRole);
+        const isSupervisor = isSupervisorOf(userId, taskOwner, teamMembers, resourceAssignments);
 
         if (newStatus === TASK_STATUS.IN_PROGRESS && oldStatus !== TASK_STATUS.IN_PROGRESS) {
-            // Only start if: user is the assignee OR has permission to manage others
-            if (taskOwner && (isSelf || canManageOthers)) {
+            if (taskOwner && (isSelf || canManageOthers || isSupervisor)) {
                 const proj = projects?.find(p => p.id === (task.projectId || form.projectId));
                 const owner = teamMembers?.find(m => (m.uid || m.id) === taskOwner);
                 await handleTaskStatusTimerSync({
@@ -411,19 +521,72 @@ export default function TaskDetailModal({
                     taskTitle: form.title || task.title || '',
                     projectName: proj?.name || '',
                     displayName: owner?.displayName || owner?.email || '',
-                    onConfirm: ({ activeTaskTitle, newTaskTitle }) =>
-                        window.confirm(`Ya tienes un timer activo en "${activeTaskTitle}". ¿Detenerlo e iniciar "${newTaskTitle}"?`),
+                    onConfirm: () => true,
                 });
             }
         } else if (oldStatus === TASK_STATUS.IN_PROGRESS && newStatus !== TASK_STATUS.IN_PROGRESS) {
-            // Stop the task's active timer (if any)
-            if (isSelf || canManageOthers) {
+            if (isSelf || canManageOthers || isSupervisor) {
                 await handleTaskStatusTimerSync({
                     taskId: task.id, projectId: task.projectId || form.projectId,
                     newStatus, userId: taskOwner, timeLogs,
                 });
             }
         }
+    };
+
+    // WIP switch handler: block current task, then start new one
+    const handleWipConfirm = async (blockData) => {
+        if (!wipCurrentTask || !wipPendingStatus || !task) return;
+        setWipSwitching(true);
+        try {
+            // Step 1: Pause the current in_progress task → pending (NOT blocked)
+            await updateTaskStatus(
+                wipCurrentTask.id,
+                'pending',
+                wipCurrentTask.projectId,
+                true,
+                {}
+            );
+
+            // Log preemption event on the paused task
+            const loggedInUserName = teamMembers?.find(m => m.uid === userId)?.displayName || null;
+            await logActivity(wipCurrentTask.id, {
+                type: ACTIVITY_TYPES.TASK_PREEMPTED,
+                description: `⚡ Interrumpida: ${blockData.blockedReason || 'Cambio de prioridad'}`,
+                userId,
+                userName: loggedInUserName,
+                meta: {
+                    reason: blockData.blockedReason || 'Cambio de prioridad',
+                    preemptedBy: blockData.blockedByName || loggedInUserName || null,
+                    preemptedByUserId: blockData.blockedByUserId || userId,
+                    replacedByTaskId: task.id,
+                    replacedByTaskTitle: task.title || form.title || 'Nueva tarea',
+                },
+            });
+
+            // Stop the old task's timer
+            const taskOwner = form.assignedTo || task?.assignedTo;
+            const isSelf = taskOwner === userId;
+            const canManageOthers = canManageOthersTimers(role, teamRole);
+            const isSupervisor = isSupervisorOf(userId, taskOwner, teamMembers, resourceAssignments);
+            if (taskOwner && (isSelf || canManageOthers || isSupervisor)) {
+                await handleTaskStatusTimerSync({
+                    taskId: wipCurrentTask.id, projectId: wipCurrentTask.projectId,
+                    newStatus: 'pending', userId: taskOwner, timeLogs,
+                });
+            }
+
+            // Step 2: Activate the new task
+            const oldStatus = form.status;
+            await _executeStatusChange(oldStatus, wipPendingStatus);
+
+            setWipModalOpen(false);
+            setWipCurrentTask(null);
+            setWipPendingStatus(null);
+        } catch (err) {
+            console.error('WIP switch error:', err);
+        }
+        setWipSwitching(false);
     };
 
     const handleDelete = () => {
@@ -483,14 +646,41 @@ export default function TaskDetailModal({
         }
     };
 
+    // ── Peer Review Handlers ──
+
+    const handleRequestReview = async (taskId, reviewerId) => {
+        try {
+            await requestPeerReview(taskId, reviewerId);
+            // Update local state immediately so UI reflects the change
+            setForm(f => ({
+                ...f,
+                peerReviewRequired: true,
+                peerReviewStatus: 'requested',
+                peerReviewReviewerId: reviewerId,
+            }));
+        } catch (err) {
+            console.error('Error requesting PR:', err);
+            alert('Error al solicitar revisión: ' + err.message);
+        }
+    };
+
+    const handleWaiveReview = async () => {
+        const reason = window.prompt('Motivo para exonerar el Peer Review:');
+        if (!reason?.trim()) return;
+        try {
+            await waivePeerReview(task.id, reason);
+            setForm(f => ({ ...f, peerReviewStatus: 'waived' }));
+        } catch (err) {
+            console.error('Error waiving PR:', err);
+            alert('Error: ' + err.message);
+        }
+    };
+
     // ── Render ──
 
     return createPortal(
-        <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-start md:items-start justify-center md:p-4 md:pt-6 overflow-y-auto"
-            onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-        >
-            <div className="relative bg-slate-900 shadow-2xl w-full md:max-w-4xl animate-in zoom-in-95 duration-200 flex flex-col min-h-screen md:min-h-0 md:max-h-[90vh] md:my-4 md:rounded-2xl md:ring-1 md:ring-slate-700 md:border md:border-slate-800">
+        <div className="fixed inset-0 z-[300] w-full h-full bg-slate-900 overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div className="flex-1 w-full h-full flex flex-col overflow-hidden relative">
 
                 {/* Header */}
                 <TaskHeader
@@ -505,90 +695,42 @@ export default function TaskDetailModal({
                     stations={projectStations}
                     canEdit={effectiveCanEdit}
                     canDelete={canDelete}
+                    subtaskCount={(subtasks || []).length}
                     onClose={onClose}
                     onDelete={handleDelete}
                     onOpenListManager={setListManager}
                     onTaskTypeChange={handleTaskTypeChange}
                     onAreaChange={handleAreaChange}
+                    onStatusChange={handleStatusChange}
                 />
 
-                {/* Horizontal Status Stepper — only for existing tasks */}
-                {!isNew && (
-                    <TaskStatusStepper
-                        currentStatus={form.status}
-                        onStatusChange={handleStatusChange}
-                        canEdit={effectiveCanEdit}
-                    />
-                )}
 
-                {/* Health Score — quality indicator */}
+
+                {/* Third Row: 5 states Stepper & Health Score */}
                 {!isNew && (
-                    <div className="py-2">
-                        <TaskHealthScore
-                            form={form}
-                            subtaskCount={(subtasks || []).length}
-                        />
+                    <div className="flex flex-col lg:flex-row bg-slate-900 border-b border-slate-800 relative z-20">
+                        <div className="flex-1 lg:w-1/2 overflow-hidden lg:border-r border-slate-800 flex items-center">
+                            <TaskStatusStepper
+                                currentStatus={form.status}
+                                onStatusChange={handleStatusChange}
+                                canEdit={effectiveCanEdit}
+                                variant="inline"
+                            />
+                        </div>
+                        <div className="hidden lg:flex flex-1 lg:w-1/2 p-1.5 items-center justify-center bg-slate-900">
+                            <TaskHealthScore
+                                form={form}
+                                subtaskCount={(subtasks || []).length}
+                            />
+                        </div>
                     </div>
                 )}
 
                 {/* Body — Two Columns */}
 
-                {/* ── Auto-Planner Button ── */}
-                {(form.assignedTo || task?.assignedTo) && (isAdmin || isNew || canAutoScheduleFor(teamRole, userId, form.assignedTo || task?.assignedTo, resourceAssignments)) && (() => {
-                    const hasData = form.plannedStartDate || form.estimatedHours;
-                    const totalPlanned = plannerItems.reduce((s, pi) => s + (pi.plannedHours || 0), 0);
-                    const isFullyPlanned = !isNew && form.estimatedHours && totalPlanned >= form.estimatedHours;
-                    const willAutoOnSave = isNew && form.plannedStartDate && form.estimatedHours;
-                    return (
-                        <div className="px-6 pb-2">
-                            <button
-                                type="button"
-                                onClick={() => !isNew && hasData && !isFullyPlanned ? setAutoPlannerOpen(true) : null}
-                                disabled={!hasData || isFullyPlanned}
-                                className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-[0.98] ${
-                                    !hasData
-                                        ? 'bg-slate-800/50 border border-slate-700/50 text-slate-500 cursor-not-allowed'
-                                        : willAutoOnSave
-                                            ? 'bg-teal-500/10 border border-teal-500/20 text-teal-400 cursor-default'
-                                            : isFullyPlanned
-                                                ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 cursor-default'
-                                                : 'bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 hover:border-indigo-500/40 text-indigo-400'
-                                }`}
-                            >
-                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                </svg>
-                                {!hasData
-                                    ? '⚠️ Agrega fecha inicio u horas estimadas para planificar'
-                                    : willAutoOnSave
-                                        ? `🤖 Se auto-planificará al crear (${form.estimatedHours}h)`
-                                        : isFullyPlanned
-                                            ? `✅ Completamente planificada (${totalPlanned.toFixed(1)}h)`
-                                            : <>🗓️ Auto-planificar
-                                                {form.estimatedHours > 0 && (
-                                                    <span className="text-[10px] ml-1 opacity-70">({form.estimatedHours}h est. — {totalPlanned.toFixed(1)}h plan.)</span>
-                                                )}
-                                            </>
-                                }
-                            </button>
-                        </div>
-                    );
-                })()}
                 <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
 
-                    {/* Left: Content & Execution */}
-                    <TaskMainPanel
-                        form={form}
-                        setForm={setForm}
-                        isNew={isNew}
-                        task={task}
-                        subtasks={subtasks}
-                        canEdit={effectiveCanEdit}
-                        userId={userId}
-                        userName={teamMembers?.find(m => m.uid === userId)?.displayName || null}
-                    />
-
-                    {/* Right: Control */}
+                    {/* Main Layout containing 3 columns */}
                     <TaskControlPanel
                         form={form}
                         setForm={setForm}
@@ -613,7 +755,24 @@ export default function TaskDetailModal({
                         onDeleteDependency={handleDeleteDependency}
                         onAddManualTime={handleAddManualTime}
                         isSavingManualTime={isSavingManualTime}
-                    />
+                        onOpenPRRequest={() => setPrRequestModalOpen(true)}
+                        onOpenPRExecution={() => { setPrViewMode(false); setPrExecModalOpen(true); }}
+                        onOpenPRFeedback={() => { setPrViewMode(true); setPrExecModalOpen(true); }}
+                        onWaivePR={handleWaiveReview}
+                        activePeerReview={activePeerReview}
+                        currentUserId={userId}
+                    >
+                        <TaskMainPanel
+                            form={form}
+                            setForm={setForm}
+                            isNew={isNew}
+                            task={task}
+                            subtasks={subtasks}
+                            canEdit={effectiveCanEdit}
+                            userId={userId}
+                            userName={teamMembers?.find(m => m.uid === userId)?.displayName || null}
+                        />
+                    </TaskControlPanel>
                 </div>
 
                 {/* Footer */}
@@ -625,7 +784,63 @@ export default function TaskDetailModal({
                     onSave={handleSave}
                     onClose={pendingNewTask ? onClose : onClose}
                     willAutoPlan={isNew && !!form.plannedStartDate && !!form.estimatedHours && !!form.assignedTo}
-                />
+                >
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full">
+                        {/* ── Auto-Planner Button ── */}
+                        {(form.assignedTo || task?.assignedTo) && (isAdmin || isNew || canAutoScheduleFor(teamRole, userId, form.assignedTo || task?.assignedTo, resourceAssignments)) && (() => {
+                            const hasData = form.plannedStartDate || form.estimatedHours;
+                            const totalPlanned = plannerItems.reduce((s, pi) => s + (pi.plannedHours || 0), 0);
+                            const isFullyPlanned = !isNew && form.estimatedHours && totalPlanned >= form.estimatedHours;
+                            const willAutoOnSave = isNew && form.plannedStartDate && form.estimatedHours;
+                            return (
+                                <button
+                                    type="button"
+                                    onClick={() => !isNew && hasData && !isFullyPlanned ? setAutoPlannerOpen(true) : null}
+                                    disabled={!hasData || isFullyPlanned}
+                                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-[0.98] ${
+                                        !hasData
+                                            ? 'bg-slate-800/50 border border-slate-700/50 text-white cursor-not-allowed'
+                                            : willAutoOnSave
+                                                ? 'bg-teal-500/10 border border-teal-500/20 text-teal-400 cursor-default'
+                                                : isFullyPlanned
+                                                    ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 cursor-default'
+                                                    : 'bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 hover:border-indigo-500/40 text-indigo-400'
+                                    }`}
+                                >
+                                    <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                    <span className="truncate">
+                                        {!hasData
+                                            ? 'Auto planificar (requiere config)'
+                                            : willAutoOnSave
+                                                ? `Se auto-planificará al crear (${form.estimatedHours}h)`
+                                                : isFullyPlanned
+                                                    ? `Completamente planificada (${totalPlanned.toFixed(1)}h)`
+                                                    : <>Auto-planificar
+                                                        {form.estimatedHours > 0 && (
+                                                            <span className="text-[10px] ml-1 opacity-70">({form.estimatedHours}h est. — {totalPlanned.toFixed(1)}h plan.)</span>
+                                                        )}
+                                                    </>
+                                        }
+                                    </span>
+                                </button>
+                            );
+                        })()}
+
+                        {/* Activity Timeline Link */}
+                        {!isNew && task?.id && (
+                            <button
+                                type="button"
+                                onClick={() => navigate(`/reports/activity?taskId=${task.id}`)}
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-sm font-bold hover:bg-emerald-600/20 hover:border-emerald-500/50 transition-all group"
+                            >
+                                <Activity className="w-4 h-4 group-hover:scale-110 transition-transform flex-shrink-0" />
+                                <span className="truncate">Ver Avance y Actividad</span>
+                            </button>
+                        )}
+                    </div>
+                </TaskFooter>
 
                 {/* Custom Delete Confirmation Overlay */}
                 {showDeleteConfirm && (
@@ -639,7 +854,7 @@ export default function TaskDetailModal({
                                 </div>
                                 <div>
                                     <h3 className="text-sm font-bold text-white">Eliminar Tarea</h3>
-                                    <p className="text-xs text-slate-400 mt-0.5">Esta acción no se puede deshacer</p>
+                                    <p className="text-xs text-white mt-0.5">Esta acción no se puede deshacer</p>
                                 </div>
                             </div>
                             <p className="text-sm text-slate-300">
@@ -679,7 +894,72 @@ export default function TaskDetailModal({
                 )}
             </div>
 
-            {/* ── Auto-Planner Modal ── */}
+            {/* ── WIP Block Modal ── */}
+            <WipBlockModal
+                delayCauses={delayCauses}
+                isOpen={wipModalOpen}
+                onClose={() => { setWipModalOpen(false); setWipCurrentTask(null); setWipPendingStatus(null); }}
+                onConfirm={handleWipConfirm}
+                currentTask={wipCurrentTask}
+                newTask={task}
+                teamMembers={teamMembers}
+                isLoading={wipSwitching}
+            />
+
+            {/* ── Transition Reason Modal (in_progress → backward) ── */}
+            <TransitionConfirmModal
+                isOpen={!!transitionPending}
+                pending={transitionPending}
+                isTransitioning={isTransitioningReason}
+                onConfirm={async (reasonData) => {
+                    if (!transitionPending || !task) return;
+                    setIsTransitioningReason(true);
+                    try {
+                        const oldStatus = form.status;
+                        const finalStatus = reasonData.targetStatus || transitionPending.targetStatus;
+
+                        // ★ FORCE STOP TIMER — direct Firestore query, no conditions
+                        await forceStopTaskTimers(task.id, `tarea → ${finalStatus}`);
+
+                        // Execute the transition (status + activity log)
+                        await _executeStatusChange(oldStatus, finalStatus);
+
+                        // Log preemption event if category is priority change
+                        if (reasonData.logType === 'task_preempted') {
+                            const loggedInUserName = teamMembers?.find(m => m.uid === userId)?.displayName || null;
+                            logActivity(task.id, {
+                                type: ACTIVITY_TYPES.TASK_PREEMPTED,
+                                description: `⚡ Interrumpida: ${reasonData.reason || 'Cambio de prioridad'}`,
+                                userId,
+                                userName: loggedInUserName,
+                                meta: {
+                                    reason: reasonData.reason || 'Cambio de prioridad',
+                                    preemptedBy: reasonData.responsibleName || loggedInUserName || null,
+                                    preemptedByUserId: reasonData.responsibleUserId || userId,
+                                },
+                            });
+                        }
+
+                        // If impediment, also pass block data
+                        if (reasonData.pauseCategory === 'impediment') {
+                            await updateTaskStatus(task.id, 'blocked', task.projectId || form.projectId, true, {
+                                blockedReason: reasonData.reason || reasonData.causeName || '',
+                                blockedByUserId: reasonData.responsibleUserId || '',
+                                blockedByName: reasonData.responsibleName || '',
+                            });
+                            setForm(f => ({ ...f, status: 'blocked' }));
+                        }
+
+                        setTransitionPending(null);
+                    } catch (err) {
+                        console.error('Transition reason error:', err);
+                    }
+                    setIsTransitioningReason(false);
+                }}
+                onCancel={() => setTransitionPending(null)}
+                delayCauses={delayCauses}
+                teamMembers={teamMembers}
+            />
             {((!isNew && task) || pendingNewTask) && (
                 <AutoPlannerModal
                     isOpen={autoPlannerOpen}
@@ -718,6 +998,23 @@ export default function TaskDetailModal({
                     }}
                 />
             )}
+            
+            <PeerReviewRequestModal
+                isOpen={prRequestModalOpen}
+                onClose={() => setPrRequestModalOpen(false)}
+                task={{...task, ...form}}
+                teamMembers={teamMembers}
+                onRequestReview={handleRequestReview}
+            />
+
+            <PeerReviewExecutionModal
+                isOpen={prExecModalOpen}
+                onClose={() => { setPrExecModalOpen(false); setPrViewMode(false); }}
+                task={{...task, ...form}}
+                peerReviewDoc={activePeerReview}
+                teamMembers={teamMembers}
+                viewOnly={prViewMode}
+            />
         </div>,
         document.body
     );

@@ -25,8 +25,28 @@ export default function SubtaskList({ subtasks = [], taskId, readOnly = false, o
     const inputRef = useRef(null);
     const editInputRef = useRef(null);
 
-    // Sort by order field
-    const sorted = [...subtasks].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+    // Sort alphabetically + numerically (natural sort)
+    const sorted = [...subtasks].sort((a, b) => {
+        const ta = (a.title || '').toLowerCase();
+        const tb = (b.title || '').toLowerCase();
+        // Natural sort: split into text and number segments
+        const partsA = ta.match(/(\d+|\D+)/g) || [];
+        const partsB = tb.match(/(\d+|\D+)/g) || [];
+        for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+            if (i >= partsA.length) return -1;
+            if (i >= partsB.length) return 1;
+            const isNumA = /^\d+$/.test(partsA[i]);
+            const isNumB = /^\d+$/.test(partsB[i]);
+            if (isNumA && isNumB) {
+                const diff = parseInt(partsA[i], 10) - parseInt(partsB[i], 10);
+                if (diff !== 0) return diff;
+            } else {
+                const cmp = partsA[i].localeCompare(partsB[i]);
+                if (cmp !== 0) return cmp;
+            }
+        }
+        return 0;
+    });
 
     const completed = subtasks.filter(s => s.completed).length;
     const total = subtasks.length;

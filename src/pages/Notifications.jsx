@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import PageHeader from '../components/layout/PageHeader';
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
 import { useAuditData } from '../hooks/useAuditData';
@@ -117,7 +116,7 @@ export default function Notifications() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-300">
-            <PageHeader title="" showBack={true} />
+            
 
             {/* ── Header ── */}
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">

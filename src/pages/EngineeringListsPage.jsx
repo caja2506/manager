@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import PageHeader from '../components/layout/PageHeader';
 import { useAppData } from '../contexts/AppDataContext';
 import { useEngineeringData } from '../hooks/useEngineeringData';
 import ManagedListCard from '../components/ui/ManagedListCard';
@@ -158,7 +157,7 @@ export default function EngineeringListsPage() {
 
     return (
         <div className="w-full space-y-6 pb-20">
-            <PageHeader title="" showBack={true} />
+            
             
             {/* Page Header */}
             <div className="flex items-center gap-4 mb-4">

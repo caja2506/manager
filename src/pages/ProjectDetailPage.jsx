@@ -2,7 +2,7 @@
  * Project Detail Page — V5
  * ==========================
  * Real project detail: summary, milestones, score, setup,
- * and gateway to milestone detail/history/ai-monitoring.
+ * and gateway to milestone detail/history/predictive-analytics.
  *
  * Route: /projects/:projectId
  */
@@ -306,7 +306,7 @@ export default function ProjectDetailPage() {
                             Este proyecto aún no tiene milestones configurados.
                         </p>
                         <p className="text-[11px] text-slate-600">
-                            Crea tu primer milestone para activar el motor de score, tendencia y AI Monitoring.
+                            Crea tu primer milestone para activar el motor de score, tendencia y Analítica Predictiva.
                         </p>
                     </div>
                 ) : (

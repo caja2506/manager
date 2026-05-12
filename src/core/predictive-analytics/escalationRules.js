@@ -4,7 +4,7 @@
  * Pure-function escalation engine. Determines who should be notified,
  * when, and how urgently based on risk severity, time, and roles.
  *
- * @module core/ai-monitoring/escalationRules
+ * @module core/predictive-analytics/escalationRules
  */
 
 export const ESCALATION_LEVEL = {

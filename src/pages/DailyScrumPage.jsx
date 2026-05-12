@@ -515,9 +515,9 @@ export default function DailyScrumPage() {
                                                             if (yd.getDay() === 6) yd.setDate(yd.getDate() - 1);
                                                             const yStr = `${yd.getFullYear()}-${String(yd.getMonth()+1).padStart(2,'0')}-${String(yd.getDate()).padStart(2,'0')}`;
 
-                                                            // Get all person's tasks and find subtasks completed yesterday
-                                                            const pTaskIds = new Set(engTasks.filter(t => t.assignedTo === person.uid).map(t => t.id));
-                                                            const allSubs = engSubtasks.filter(s => pTaskIds.has(s.taskId));
+                                                            // Get all tasks this person logged time on yesterday, disregarding who they are assigned to TODAY
+                                                            const personTaskIdsYesterday = new Set(person.yesterdayEvidence.tasks.map(t => t.id));
+                                                            const allSubs = engSubtasks.filter(s => personTaskIdsYesterday.has(s.taskId));
                                                             const completedYesterday = allSubs.filter(s => {
                                                                 if (!s.completed) return false;
                                                                 const cAt = s.completedAt;
@@ -527,63 +527,80 @@ export default function DailyScrumPage() {
                                                                 return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` === yStr;
                                                             });
 
-                                                            // Group by parent task
-                                                            const taskMap = {};
-                                                            completedYesterday.forEach(sub => {
-                                                                if (!taskMap[sub.taskId]) taskMap[sub.taskId] = [];
-                                                                taskMap[sub.taskId].push(sub);
-                                                            });
-                                                            const taskEntries = Object.entries(taskMap);
+                                                            const yesterdayTasks = person.yesterdayEvidence.tasks;
+                                                            
+                                                            // Filter yesterday comments for the tasks this person worked on
+                                                            const personYdComments = ydComments.filter(c => personTaskIdsYesterday.has(c.taskId) && c.userId === person.uid);
 
-                                                            // Filter yesterday comments for this person's tasks
-                                                            const personYdComments = ydComments.filter(c => pTaskIds.has(c.taskId));
-
-                                                            if (taskEntries.length === 0 && personYdComments.length === 0) {
+                                                            if (yesterdayTasks.length === 0 && personYdComments.length === 0) {
                                                                 return <span className="text-[10px] text-slate-600">{"\u2014"}</span>;
                                                             }
 
                                                             return (
-                                                                <div className="space-y-2">
-                                                                    {taskEntries.map(([taskId, subs]) => {
-                                                                        const parentTask = engTasks.find(t => t.id === taskId);
+                                                                <div className="space-y-3">
+                                                                    {yesterdayTasks.map(task => {
+                                                                        const subs = completedYesterday.filter(s => s.taskId === task.id);
+                                                                        const comments = personYdComments.filter(c => c.taskId === task.id);
+
                                                                         return (
-                                                                            <div key={taskId} className="border-l-2 border-emerald-500/40 pl-2">
+                                                                            <div key={task.id} className="border-l-2 border-emerald-500/40 pl-2">
                                                                                 <div className="flex items-center gap-1.5">
                                                                                     <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-emerald-400" />
-                                                                                    <span className="text-[11px] font-bold text-slate-300 truncate max-w-[180px]">{parentTask?.title || '?'}</span>
-                                                                                    <span className="text-[9px] font-bold px-1 py-0.5 rounded shrink-0 bg-emerald-500/15 text-emerald-400">
-                                                                                        {subs.length}
-                                                                                    </span>
-                                                                                </div>
-                                                                                {parentTask?.projectId && projectMap[parentTask.projectId] && (
-                                                                                    <span className="text-[8px] text-indigo-400/70 font-semibold ml-3">{"\uD83D\uDCC1"} {projectMap[parentTask.projectId]}</span>
-                                                                                )}
-                                                                                <div className="ml-3 mt-0.5 space-y-0.5">
-                                                                                    {subs.slice(0, 5).map(sub => (
-                                                                                        <div key={sub.id} className="flex items-center gap-1 text-[10px]">
-                                                                                            <span className="text-emerald-400 shrink-0">{"\u2713"}</span>
-                                                                                            <span className="text-emerald-300/70">{sub.title}</span>
-                                                                                        </div>
-                                                                                    ))}
-                                                                                    {subs.length > 5 && (
-                                                                                        <span className="text-[9px] text-slate-600">+{subs.length - 5} m{"\u00E1"}s</span>
+                                                                                    <span className="text-[11px] font-bold text-slate-300 truncate max-w-[180px]">{task.title || '?'}</span>
+                                                                                    {subs.length > 0 && (
+                                                                                        <span className="text-[9px] font-bold px-1 py-0.5 rounded shrink-0 bg-emerald-500/15 text-emerald-400">
+                                                                                            {subs.length} sub
+                                                                                        </span>
                                                                                     )}
                                                                                 </div>
+                                                                                {task.projectId && projectMap[task.projectId] && (
+                                                                                    <span className="text-[8px] text-indigo-400/70 font-semibold ml-3">{"\uD83D\uDCC1"} {projectMap[task.projectId]}</span>
+                                                                                )}
+
+                                                                                {subs.length > 0 && (
+                                                                                    <div className="ml-3 mt-0.5 space-y-0.5">
+                                                                                        {subs.slice(0, 5).map(sub => (
+                                                                                            <div key={sub.id} className="flex items-center gap-1 text-[10px]">
+                                                                                                <span className="text-emerald-400 shrink-0">{"\u2713"}</span>
+                                                                                                <span className="text-emerald-300/70">{sub.title}</span>
+                                                                                            </div>
+                                                                                        ))}
+                                                                                        {subs.length > 5 && (
+                                                                                            <span className="text-[9px] text-slate-600">+{subs.length - 5} m{"\u00E1"}s</span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                )}
+
+                                                                                {comments.length > 0 && (
+                                                                                    <div className="ml-3 mt-1 space-y-0.5">
+                                                                                        {comments.slice(0, 5).map(c => (
+                                                                                            <div key={c.id} className="flex items-start gap-1 text-[10px]">
+                                                                                                <span className="text-indigo-400 shrink-0">{"\uD83D\uDCAC"}</span>
+                                                                                                <span className="text-indigo-300/80"><strong>{c.userName || '?'}:</strong> {(c.text || '').slice(0, 80)}</span>
+                                                                                            </div>
+                                                                                        ))}
+                                                                                        {comments.length > 5 && (
+                                                                                            <span className="text-[9px] text-slate-600">+{comments.length - 5} m{"\u00E1"}s</span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                )}
                                                                             </div>
                                                                         );
                                                                     })}
-                                                                    {/* Yesterday comments */}
-                                                                    {personYdComments.length > 0 && (
-                                                                        <div className="mt-1 space-y-0.5">
-                                                                            {personYdComments.slice(0, 5).map(c => (
-                                                                                <div key={c.id} className="flex items-start gap-1 text-[10px]">
-                                                                                    <span className="text-indigo-400 shrink-0">{"\uD83D\uDCAC"}</span>
-                                                                                    <span className="text-indigo-300/80"><strong>{c.userName || '?'}:</strong> {(c.text || '').slice(0, 80)}</span>
-                                                                                </div>
-                                                                            ))}
-                                                                            {personYdComments.length > 5 && (
-                                                                                <span className="text-[9px] text-slate-600">+{personYdComments.length - 5} m{"\u00E1"}s</span>
-                                                                            )}
+                                                                    {/* Render comments for tasks that aren't in yesterdayTasks (e.g. comments without time logs) */}
+                                                                    {personYdComments.filter(c => !personTaskIdsYesterday.has(c.taskId)).length > 0 && (
+                                                                        <div className="border-l-2 border-indigo-500/40 pl-2">
+                                                                            <div className="flex items-center gap-1.5 mb-1">
+                                                                                <span className="text-[11px] font-bold text-slate-400">Otros comentarios</span>
+                                                                            </div>
+                                                                            <div className="ml-3 mt-1 space-y-0.5">
+                                                                                {personYdComments.filter(c => !personTaskIdsYesterday.has(c.taskId)).slice(0, 5).map(c => (
+                                                                                    <div key={c.id} className="flex items-start gap-1 text-[10px]">
+                                                                                        <span className="text-indigo-400 shrink-0">{"\uD83D\uDCAC"}</span>
+                                                                                        <span className="text-indigo-300/80"><strong>{c.userName || '?'}:</strong> {(c.text || '').slice(0, 80)}</span>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
                                                                         </div>
                                                                     )}
                                                                 </div>

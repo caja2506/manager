@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Compass, Edit2, Plus, Trash2, Search } from 'lucide-react';
-import { db } from '../../firebase';
-import { collection, doc, writeBatch } from 'firebase/firestore';
+import { USE_SUPABASE } from '../../services/_backend';
+import { supabase } from '../../supabase';
 import { COLLECTIONS } from '../../models/schemas';
 
 export default function WorkAreasCard({ workAreas = [] }) {
@@ -30,33 +30,48 @@ export default function WorkAreasCard({ workAreas = [] }) {
     const handleSave = async () => {
         setIsSaving(true);
         try {
-            const batch = writeBatch(db);
-            const collRef = collection(db, COLLECTIONS.WORK_AREA_TYPES);
+            if (USE_SUPABASE) {
+                // Supabase: individual operations
+                const toAdd = editItems.filter(i => i.isNew && i.name.trim());
+                const toUpdate = editItems.filter(i => !i.isNew);
+                const keptIds = toUpdate.map(i => i.id);
+                const toDelete = workAreas.filter(wa => !keptIds.includes(wa.id));
 
-            // New items
-            const toAdd = editItems.filter(i => i.isNew && i.name.trim());
-            for (const item of toAdd) {
-                batch.set(doc(collRef), { name: item.name.trim(), color: item.color });
-            }
-
-            // Updates
-            const toUpdate = editItems.filter(i => !i.isNew);
-            for (const item of toUpdate) {
-                const original = workAreas.find(w => w.id === item.id);
-                if (original && (original.name !== item.name.trim() || original.color !== item.color)) {
-                    batch.update(doc(collRef, item.id), { name: item.name.trim(), color: item.color });
+                if (toAdd.length > 0) {
+                    await supabase.from('work_area_types').insert(toAdd.map(i => ({ name: i.name.trim(), color: i.color })));
                 }
-            }
-
-            // Deletes
-            const keptIds = editItems.filter(i => !i.isNew).map(i => i.id);
-            for (const wa of workAreas) {
-                if (!keptIds.includes(wa.id)) {
-                    batch.delete(doc(collRef, wa.id));
+                for (const item of toUpdate) {
+                    const original = workAreas.find(w => w.id === item.id);
+                    if (original && (original.name !== item.name.trim() || original.color !== item.color)) {
+                        await supabase.from('work_area_types').update({ name: item.name.trim(), color: item.color }).eq('id', item.id);
+                    }
                 }
-            }
+                for (const wa of toDelete) {
+                    await supabase.from('work_area_types').delete().eq('id', wa.id);
+                }
+            } else {
+                const { collection, doc, writeBatch } = await import('firebase/firestore');
+                const { db } = await import('../../firebase');
+                const batch = writeBatch(db);
+                const collRef = collection(db, COLLECTIONS.WORK_AREA_TYPES);
 
-            await batch.commit();
+                const toAdd = editItems.filter(i => i.isNew && i.name.trim());
+                for (const item of toAdd) {
+                    batch.set(doc(collRef), { name: item.name.trim(), color: item.color });
+                }
+                const toUpdate = editItems.filter(i => !i.isNew);
+                for (const item of toUpdate) {
+                    const original = workAreas.find(w => w.id === item.id);
+                    if (original && (original.name !== item.name.trim() || original.color !== item.color)) {
+                        batch.update(doc(collRef, item.id), { name: item.name.trim(), color: item.color });
+                    }
+                }
+                const keptIds = toUpdate.map(i => i.id);
+                for (const wa of workAreas) {
+                    if (!keptIds.includes(wa.id)) batch.delete(doc(collRef, wa.id));
+                }
+                await batch.commit();
+            }
             setIsEditing(false);
         } catch (err) {
             console.error('Error saving work areas:', err);

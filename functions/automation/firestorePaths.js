@@ -34,6 +34,10 @@ module.exports = {
     WEEKLY_PLAN_ITEMS: "weeklyPlanItems",
     SCHEDULED_TIMER_EVENTS: "scheduledTimerEvents",
 
+    // ── Peer Review ──
+    PEER_REVIEWS: "peerReviews",
+    PEER_REVIEW_TEMPLATES: "peerReviewTemplates",
+
     // ── BOM (legacy naming preserved) ──
     PROYECTOS_BOM: "proyectos_bom",
     CATALOGO_MAESTRO: "catalogo_maestro",

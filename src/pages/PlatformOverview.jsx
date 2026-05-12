@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import PageHeader from '../components/layout/PageHeader';
 import { useNavigate } from 'react-router-dom';
 import {
     BrainCircuit, LayoutDashboard, ListTodo, Clock, BarChart3, Users,
@@ -96,7 +95,7 @@ const METHODOLOGIES = [
 // ─── Datos: Flujo de Trabajo ───
 const WORKFLOW_STEPS = [
     { status: 'Backlog', label: 'Backlog', color: 'slate', icon: Database, desc: 'Todo el trabajo pendiente por priorizar' },
-    { status: 'Planificado', label: 'Planificado', color: 'blue', icon: CalendarDays, desc: 'Tareas asignadas y programadas para la semana' },
+    { status: 'Pendiente', label: 'Pendiente', color: 'blue', icon: CalendarDays, desc: 'Tareas asignadas y programadas para la semana' },
     { status: 'En Progreso', label: 'En Progreso', color: 'indigo', icon: Play, desc: 'Trabajo activo con timer de horas en tiempo real' },
     { status: 'En Revisión', label: 'En Revisión', color: 'amber', icon: Eye, desc: 'Validación por el ingeniero responsable' },
     { status: 'Completado', label: 'Completado', color: 'emerald', icon: CheckCircle, desc: 'Tarea terminada y registrada en métricas' },
@@ -110,12 +109,12 @@ const MODULES = [
     { id: 'gantt', title: 'Project Gantt', desc: 'Vista Gantt con dependencias, milestones y vista semanal/mensual', icon: GanttChartSquare, color: 'cyan', path: '/gantt' },
     { id: 'time', title: 'Time Tracking', desc: 'Timer integrado, registro de horas, overtime y bitácora de trabajo', icon: Clock, color: 'amber', path: '/work-logs' },
     { id: 'analytics', title: 'Analítica', desc: 'Métricas de rendimiento, tendencias, velocidad y forecasting', icon: LineChart, color: 'emerald', path: '/analytics' },
-    { id: 'control', title: 'Control Tower', desc: 'Centro de comando ejecutivo con motor de reglas e insights de IA', icon: Radar, color: 'rose', path: '/control-tower' },
+    { id: 'control', title: 'Control Tower', desc: 'Centro de comando ejecutivo con motor de reglas y analítica predictiva', icon: Radar, color: 'rose', path: '/control-tower' },
     { id: 'audit', title: 'Auditoría', desc: 'Evaluación de cumplimiento, hallazgos y scoring automático', icon: Shield, color: 'orange', path: '/audit' },
     { id: 'projects', title: 'Proyectos', desc: 'Gestión de proyectos de ingeniería con riesgo, progreso y equipo', icon: Briefcase, color: 'purple', path: '/projects' },
     { id: 'reports', title: 'Reportes', desc: 'Reportes diarios y semanales autogenerados con exportación a Excel', icon: FileText, color: 'teal', path: '/reports/daily' },
     { id: 'team', title: 'Equipo', desc: 'Vista general del equipo, roles, capacidad y métricas individuales', icon: Users, color: 'sky', path: '/team' },
-    { id: 'bom', title: 'AutoBOM', desc: 'Gestión de BOM con catálogo maestro, importación AI de PDF y Excel', icon: Database, color: 'slate', path: '/bom/projects' },
+    { id: 'bom', title: 'AutoBOM', desc: 'Gestión de BOM con catálogo maestro, importación analítica de PDF y Excel', icon: Database, color: 'slate', path: '/bom/projects' },
 ];
 
 // ─── Datos: Telegram ───
@@ -147,7 +146,7 @@ const TELEGRAM_FEATURES = [
     {
         icon: CalendarDays,
         title: 'Digest Programado',
-        desc: 'Resúmenes semanales y briefs ejecutivos generados por IA, entregados automáticamente cada lunes.',
+        desc: 'Resúmenes semanales y briefs ejecutivos generados por analítica predictiva, entregados automáticamente cada lunes.',
         color: 'violet',
     },
     {
@@ -235,7 +234,7 @@ export default function PlatformOverview() {
 
     return (
         <div className="min-h-screen pb-20">
-            <PageHeader title="" showBack={true} />
+            
 
             {/* ═══════════════════════════════════════════════════
                 SECCIÓN 1: HERO

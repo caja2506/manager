@@ -10,17 +10,25 @@
  *     Cloud Function for server-enforced execution
  *   - Audit events are created server-side (no duplicate writes)
  *
+ * WIP ENFORCEMENT (v2):
+ *   - Before allowing transition to in_progress, checks if user has
+ *     another task already in_progress (WIP limit)
+ *   - If so, returns { needsWipBlock: true } so the UI can show WipBlockModal
+ *   - After user provides block reason + responsible, calls executeWipSwitch()
+ *
  * Flow:
  *   1. requestTransition() → client-side validation (immediate)
  *   2. If warnings/missing fields → show confirmation UI
- *   3. executeTransition() or confirmTransition() → calls CF via taskService
- *   4. CF validates again server-side → writes status + audit event atomically
+ *   3. If WIP conflict → show WipBlockModal
+ *   4. executeTransition() or confirmTransition() → calls CF via taskService
+ *   5. CF validates again server-side → writes status + audit event atomically
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { validateTransition } from '../core/workflow/transitionValidator';
 import { getRequiredFields, getWorkflowSequence } from '../core/workflow/workflowModel';
 import { updateTaskStatus } from '../services/taskService';
+import { forceStopTaskTimers } from '../services/timeService';
 
 /**
  * @returns Hook for managing validated workflow transitions.
@@ -30,13 +38,28 @@ export function useWorkflowTransition() {
     const [transitionError, setTransitionError] = useState(null);
     const [isTransitioning, setIsTransitioning] = useState(false);
 
+    // WIP-specific state
+    const [wipConflict, setWipConflict] = useState(null);
+    // { currentInProgressTask, newTask, targetStatus, userId }
+
+    // Ref to break circular dependency between requestTransition and executeTransition
+    const executeTransitionRef = useRef(null);
+
     /**
      * Attempt to transition a task to a new status.
      * Performs client-side validation for instant feedback.
      * Returns a result object that indicates if the transition needs confirmation.
+     *
+     * @param {Object} task - the task to transition
+     * @param {string} targetStatus - the desired target status
+     * @param {string} userId - the current user
+     * @param {Object} [context] - extra context
+     * @param {Array} [context.allTasks] - all tasks (for WIP check)
+     * @param {number} [context.wipLimit] - WIP limit (default 1)
      */
-    const requestTransition = useCallback((task, targetStatus, userId) => {
+    const requestTransition = useCallback((task, targetStatus, userId, context = {}) => {
         setTransitionError(null);
+        setWipConflict(null);
 
         // Client-side validation (instant UX — server re-validates)
         const validation = validateTransition(task, targetStatus);
@@ -47,8 +70,37 @@ export function useWorkflowTransition() {
             return {
                 allowed: false,
                 needsConfirmation: false,
+                needsWipBlock: false,
                 error: errorMsg,
             };
+        }
+
+        // ★ WIP LIMIT CHECK (client-side, fast UX feedback)
+        if (targetStatus === 'in_progress' && context.allTasks) {
+            const wipLimit = context.wipLimit || 1;
+            const assignedTo = task.assignedTo;
+            if (assignedTo) {
+                const inProgressTasks = context.allTasks.filter(
+                    t => t.assignedTo === assignedTo && t.status === 'in_progress' && t.id !== task.id
+                );
+                if (inProgressTasks.length >= wipLimit) {
+                    // WIP conflict — need to show WipBlockModal
+                    const conflictData = {
+                        currentInProgressTask: inProgressTasks[0], // first one
+                        allInProgressTasks: inProgressTasks,
+                        newTask: task,
+                        targetStatus,
+                        userId,
+                    };
+                    setWipConflict(conflictData);
+                    return {
+                        allowed: true,
+                        needsConfirmation: false,
+                        needsWipBlock: true,
+                        wipConflict: conflictData,
+                    };
+                }
+            }
         }
 
         // Check required fields for the target status
@@ -91,12 +143,13 @@ export function useWorkflowTransition() {
         return {
             allowed: true,
             needsConfirmation,
+            needsWipBlock: false,
             warnings,
             missingFields,
             transitionData,
             execute: needsConfirmation
                 ? null
-                : () => executeTransition(transitionData),
+                : () => executeTransitionRef.current?.(transitionData),
         };
     }, []);
 
@@ -105,7 +158,7 @@ export function useWorkflowTransition() {
      * If called after user confirmation (pending), sends force=true
      * to allow the CF to skip required field validation.
      */
-    const executeTransition = useCallback(async (transitionData, forceOverride = false) => {
+    const executeTransition = useCallback(async (transitionData, forceOverride = false, extraData = {}) => {
         const data = transitionData || pendingTransition;
         const { task, targetStatus } = data || {};
         if (!task || !targetStatus) return;
@@ -114,12 +167,21 @@ export function useWorkflowTransition() {
         setTransitionError(null);
 
         try {
+            // ★ FORCE STOP TIMER — if leaving in_progress, ensure the timer actually stops
+            if (task.status === 'in_progress' && targetStatus !== 'in_progress') {
+                try {
+                    await forceStopTaskTimers(task.id, `kanban → ${targetStatus}`);
+                } catch (err) {
+                    console.error('[useWorkflowTransition] error stopping timer:', err);
+                }
+            }
+
             // force=true when user confirmed despite warnings/missing fields
             const force = forceOverride || (data.missingFields?.length > 0);
 
             // Calls Cloud Function via taskService.updateTaskStatus()
             // CF handles: validation, status write, audit event, risk recalc
-            const result = await updateTaskStatus(task.id, targetStatus, task.projectId, force);
+            const result = await updateTaskStatus(task.id, targetStatus, task.projectId, force, extraData);
 
             setPendingTransition(null);
             return { success: true, ...result };
@@ -134,20 +196,91 @@ export function useWorkflowTransition() {
         }
     }, [pendingTransition]);
 
+    // Keep ref in sync
+    executeTransitionRef.current = executeTransition;
+
+    /**
+     * Execute a WIP switch: block the current task, then start the new one.
+     *
+     * @param {Object} blockData - { blockedReason, blockedByUserId, blockedByName }
+     */
+    const executeWipSwitch = useCallback(async () => {
+        if (!wipConflict) return;
+
+        const { allInProgressTasks, newTask, targetStatus } = wipConflict;
+        setIsTransitioning(true);
+        setTransitionError(null);
+
+        try {
+            // Step 1: Pause ALL in-progress tasks → pending (NOT blocked)
+            for (const inProgressTask of allInProgressTasks) {
+                await updateTaskStatus(
+                    inProgressTask.id,
+                    'pending',
+                    inProgressTask.projectId,
+                    true, // force
+                    {}
+                );
+            }
+
+            // Step 2: Move new task to in_progress (WIP slot now free)
+            const result = await updateTaskStatus(
+                newTask.id,
+                targetStatus,
+                newTask.projectId,
+                true // force — skip field checks since we just freed the WIP slot
+            );
+
+            setWipConflict(null);
+            return { success: true, ...result };
+        } catch (err) {
+            const cfMessage = err?.message || err?.details || 'Error desconocido';
+            const error = `Error en cambio WIP: ${cfMessage}`;
+            setTransitionError(error);
+            return { success: false, error };
+        } finally {
+            setIsTransitioning(false);
+        }
+    }, [wipConflict]);
+
     /**
      * Cancel a pending transition.
      */
     const cancelTransition = useCallback(() => {
         setPendingTransition(null);
         setTransitionError(null);
+        setWipConflict(null);
     }, []);
 
     /**
      * Confirm and execute a pending transition (force=true).
      */
-    const confirmTransition = useCallback(async () => {
+    const confirmTransition = useCallback(async (reasonData = {}) => {
         if (pendingTransition) {
-            return executeTransition(pendingTransition, true);
+            const data = pendingTransition;
+
+            // If reason data routes to a different status
+            if (reasonData.targetStatus && reasonData.targetStatus !== data.targetStatus) {
+                const redirected = { ...data, targetStatus: reasonData.targetStatus };
+                return executeTransition(redirected, true, {
+                    blockedReason: reasonData.reason || null,
+                    blockedByUserId: reasonData.responsibleUserId || null,
+                    blockedByName: reasonData.responsibleName || null,
+                    pauseCategory: reasonData.pauseCategory || null,
+                    logType: reasonData.logType || null,
+                    preemptedReason: reasonData.reason || null,
+                    preemptedByUserId: reasonData.responsibleUserId || null,
+                    preemptedByName: reasonData.responsibleName || null,
+                });
+            }
+
+            return executeTransition(data, true, {
+                pauseCategory: reasonData.pauseCategory || null,
+                logType: reasonData.logType || null,
+                preemptedReason: reasonData.reason || null,
+                preemptedByUserId: reasonData.responsibleUserId || null,
+                preemptedByName: reasonData.responsibleName || null,
+            });
         }
     }, [pendingTransition, executeTransition]);
 
@@ -156,6 +289,10 @@ export function useWorkflowTransition() {
         executeTransition,
         confirmTransition,
         cancelTransition,
+
+        // WIP-specific
+        executeWipSwitch,
+        wipConflict,
 
         pendingTransition,
         transitionError,

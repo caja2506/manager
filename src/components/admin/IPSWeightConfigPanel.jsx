@@ -6,8 +6,8 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { USE_SUPABASE } from '../../services/_backend';
+import { supabase } from '../../supabase';
 import { COLLECTIONS } from '../../models/schemas';
 import { DEFAULT_WEIGHTS } from '../../core/analytics/performanceScore';
 import {
@@ -42,9 +42,14 @@ function deepClone(obj) {
  */
 export async function loadCustomWeights() {
     try {
-        const snap = await getDoc(doc(db, COLLECTIONS.SETTINGS, SETTINGS_KEY));
-        if (snap.exists()) {
-            return snap.data().value || null;
+        if (USE_SUPABASE) {
+            const { data } = await supabase.from('settings').select('value').eq('key', SETTINGS_KEY).single();
+            return data?.value || null;
+        } else {
+            const { doc: fbDoc, getDoc: fbGetDoc } = await import('firebase/firestore');
+            const { db } = await import('../../firebase');
+            const snap = await fbGetDoc(fbDoc(db, COLLECTIONS.SETTINGS, SETTINGS_KEY));
+            if (snap.exists()) return snap.data().value || null;
         }
     } catch (e) {
         console.warn('[IPS Config] Could not load custom weights:', e.message);
@@ -106,20 +111,27 @@ export default function IPSWeightConfigPanel() {
         setSaving(true);
         setError(null);
         try {
-            // Validate sums (should be ~1.0 per role)
             for (const [role, dims] of Object.entries(weights)) {
                 const sum = Object.values(dims).reduce((a, b) => a + b, 0);
                 if (Math.abs(sum - 1.0) > 0.02) {
                     throw new Error(`${ROLE_META[role]?.label || role}: suma = ${sum.toFixed(2)} (debe ser ≈ 1.00)`);
                 }
             }
-            await setDoc(doc(db, COLLECTIONS.SETTINGS, SETTINGS_KEY), {
-                key: SETTINGS_KEY,
-                value: weights,
-                description: 'Pesos de dimensiones IPS por rol',
-                category: 'performance',
-                updatedAt: new Date().toISOString(),
-            });
+            if (USE_SUPABASE) {
+                await supabase.from('settings').upsert({
+                    key: SETTINGS_KEY, value: weights,
+                    description: 'Pesos de dimensiones IPS por rol',
+                    category: 'performance', updated_at: new Date().toISOString(),
+                }, { onConflict: 'key' });
+            } else {
+                const { doc: fbDoc, setDoc: fbSetDoc } = await import('firebase/firestore');
+                const { db } = await import('../../firebase');
+                await fbSetDoc(fbDoc(db, COLLECTIONS.SETTINGS, SETTINGS_KEY), {
+                    key: SETTINGS_KEY, value: weights,
+                    description: 'Pesos de dimensiones IPS por rol',
+                    category: 'performance', updatedAt: new Date().toISOString(),
+                });
+            }
             setSaved(true);
             setTimeout(() => setSaved(false), 3000);
         } catch (e) {

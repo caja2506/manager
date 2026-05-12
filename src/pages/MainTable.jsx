@@ -6,16 +6,21 @@ import { useEngineeringData } from '../hooks/useEngineeringData';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
 import TransitionConfirmModal from '../components/workflow/TransitionConfirmModal';
 import TaskModuleBanner from '../components/layout/TaskModuleBanner';
+import AiReviewModal from '../components/tasks/AiReviewModal';
 import { useWorkflowTransition } from '../hooks/useWorkflowTransition';
 import { updateTask, updateTaskStatus, toggleSubtask, createSubtask, createTask } from '../services/taskService';
+import { exportMainTableToExcel } from '../utils/excelExport';
 import { logActivity, ACTIVITY_TYPES } from '../services/activityLogService';
+import { getActiveAssignments } from '../services/resourceAssignmentService';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../firebase';
 import {
     TASK_STATUS, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG, formatStationLabel
 } from '../models/schemas';
 import { onProjectStations, hasMultipleIndexers } from '../services/stationService';
 import {
     Search, Filter, X, ChevronDown, ChevronRight, User, Calendar,
-    Check, Plus, Maximize2
+    Check, Plus, Maximize2, Download, Sparkles, Loader2
 } from 'lucide-react';
 
 // ============================================================
@@ -32,8 +37,8 @@ const STATUS_GROUPS = [
     { status: TASK_STATUS.CANCELLED,   label: 'Cancelado',   color: '#6b7280' },
 ];
 
-// 15-column grid: ☐ | Task | Owner | Project | STN | Status | Área | Tipo | Avance | Health | Score | Timeline | Hours | Priority | Asig.
-const GRID_COLS = '28px minmax(200px, 1fr) 36px 68px 55px 86px 68px 68px 56px 48px 48px minmax(105px,150px) minmax(65px,95px) 76px 36px';
+// 13-column grid: ☐ | Task | Owner | Project | STN | Status | Área | Tipo | Avance | Timeline | Hours | Priority | Asig.
+const GRID_COLS = '28px minmax(200px, 1fr) 36px 68px 55px 86px 68px 68px 56px minmax(105px,150px) minmax(65px,95px) 76px 36px';
 
 // ============================================================
 // SAVE FEEDBACK HOOK
@@ -398,7 +403,26 @@ function SubtaskExpander({ subtasks, taskId, canEdit }) {
     return (
         <div className="pl-10 pr-4 py-2.5 bg-slate-900/50 border-t border-slate-700/30 animate-in fade-in slide-in-from-top-1 duration-200" onClick={e => e.stopPropagation()}>
             <div className="space-y-1 max-w-md">
-                {subtasks.map(sub => (
+                {[...subtasks].sort((a, b) => {
+                    const ta = (a.title || '').toLowerCase();
+                    const tb = (b.title || '').toLowerCase();
+                    const partsA = ta.match(/(\d+|\D+)/g) || [];
+                    const partsB = tb.match(/(\d+|\D+)/g) || [];
+                    for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+                        if (i >= partsA.length) return -1;
+                        if (i >= partsB.length) return 1;
+                        const isNumA = /^\d+$/.test(partsA[i]);
+                        const isNumB = /^\d+$/.test(partsB[i]);
+                        if (isNumA && isNumB) {
+                            const diff = parseInt(partsA[i], 10) - parseInt(partsB[i], 10);
+                            if (diff !== 0) return diff;
+                        } else {
+                            const cmp = partsA[i].localeCompare(partsB[i]);
+                            if (cmp !== 0) return cmp;
+                        }
+                    }
+                    return 0;
+                }).map(sub => (
                     <div key={sub.id} className="flex items-center gap-2 py-0.5 group/sub">
                         <button
                             onClick={() => handleToggle(sub)}
@@ -445,7 +469,15 @@ function StationCell({ task, canEdit, onSave }) {
     const [stations, setStations] = useState(() => _stationCache[task.projectId] || []);
 
     useEffect(() => {
-        if (!task.projectId || _stationCache[task.projectId]) return;
+        if (!task.projectId) {
+            setStations([]);
+            return;
+        }
+
+        // If cache already exists, use it immediately but still subscribe for updates
+        if (_stationCache[task.projectId]) {
+            setStations(_stationCache[task.projectId]);
+        }
 
         const unsub = onProjectStations(task.projectId, (data) => {
             _stationCache[task.projectId] = data;
@@ -512,7 +544,7 @@ function StationCell({ task, canEdit, onSave }) {
 // TASK ROW
 // ============================================================
 
-function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDates, onOpenModal, groupColor, isLast, savedField, onSaved, taskTypes, workAreaTypes }) {
+function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDates, onOpenModal, groupColor, isLast, savedField, onSaved, taskTypes, workAreaTypes, isSelected, onToggleSelect }) {
     const [popover, setPopover] = useState(null); // 'health' | 'score' | null
     const healthRef = useRef(null);
     const scoreRef = useRef(null);
@@ -656,11 +688,14 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                 className={`grid items-stretch px-2 py-1.5 transition-all duration-150 hover:bg-indigo-500/6 group/row ${!isLast ? 'border-b border-slate-800/30' : ''}`}
                 style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${groupColor}` }}
             >
-                {/* Checkbox / Open */}
+                {/* Checkbox / Select */}
                 <div className="flex items-center justify-center" onClick={e => e.stopPropagation()}>
-                    <button onClick={(e) => { e.stopPropagation(); onOpenModal(task); }} className="text-slate-700 hover:text-indigo-400 transition-colors shrink-0" title="Abrir detalle">
-                        <Maximize2 className="w-3.5 h-3.5" />
-                    </button>
+                    <input
+                        type="checkbox"
+                        checked={!!isSelected}
+                        onChange={() => onToggleSelect?.(task.id)}
+                        className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-700 text-violet-500 focus:ring-violet-500/30 cursor-pointer"
+                    />
                 </div>
 
                 {/* Task Name + subtask chevron + subtask count badge */}
@@ -839,59 +874,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                     </div>
                 </div>
 
-                {/* ── Health (metodología) ── */}
-                <div className="flex items-center justify-center relative" onClick={e => e.stopPropagation()}>
-                    <div
-                        ref={healthRef}
-                        className="relative flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
-                        title={`Metodología ${methHealth}/100`}
-                        onClick={() => setPopover(popover === 'health' ? null : 'health')}
-                    >
-                        <svg width="30" height="30" viewBox="0 0 36 36" className="-rotate-90">
-                            <circle cx="18" cy="18" r="14" fill="none" stroke="#1e293b" strokeWidth="4" />
-                            <circle cx="18" cy="18" r="14" fill="none" stroke={methColor} strokeWidth="4"
-                                strokeDasharray={`${(methHealth / 100) * 87.96} 87.96`}
-                                strokeLinecap="round" className="transition-all duration-700" />
-                        </svg>
-                        <span className="absolute text-[8px] font-black" style={{ color: methColor }}>{methHealth}</span>
-                    </div>
-                    {popover === 'health' && (
-                        <ScorePopover
-                            type="health" score={methHealth} color={methColor}
-                            items={healthItems} anchorRef={healthRef}
-                            onClose={() => setPopover(null)}
-                        />
-                    )}
-                </div>
 
-                {/* ── Score (operativo) ── */}
-                <div className="flex items-center justify-center relative" onClick={e => e.stopPropagation()}>
-                    {opScore !== null ? (
-                        <div
-                            ref={scoreRef}
-                            className="relative flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
-                            title={`Score operativo ${opScore}/100`}
-                            onClick={() => setPopover(popover === 'score' ? null : 'score')}
-                        >
-                            <svg width="30" height="30" viewBox="0 0 36 36" className="-rotate-90">
-                                <circle cx="18" cy="18" r="14" fill="none" stroke="#1e293b" strokeWidth="4" />
-                                <circle cx="18" cy="18" r="14" fill="none" stroke={opScoreColor} strokeWidth="4"
-                                    strokeDasharray={`${(opScore / 100) * 87.96} 87.96`}
-                                    strokeLinecap="round" className="transition-all duration-700" />
-                            </svg>
-                            <span className="absolute text-[8px] font-black" style={{ color: opScoreColor }}>{opScore}</span>
-                        </div>
-                    ) : (
-                        <span className="text-[11px] text-slate-600">—</span>
-                    )}
-                    {popover === 'score' && opScore !== null && (
-                        <ScorePopover
-                            type="score" score={opScore} color={opScoreColor}
-                            items={scoreItems} anchorRef={scoreRef}
-                            onClose={() => setPopover(null)}
-                        />
-                    )}
-                </div>
 
                 {/* Timeline */}
                 <div className="min-w-0 overflow-hidden flex flex-col items-center justify-end gap-1.5 py-1.5 px-1" onClick={e => e.stopPropagation()}>
@@ -1216,7 +1199,7 @@ function MobileTaskCard({ task, engProjects, teamMembers, subtasks, canEdit, onO
 // TABLE GROUP (responsive: grid on desktop, cards on mobile)
 // ============================================================
 
-function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers, canEdit, canEditDates, onOpenModal, isExpanded, onToggle, savedField, onSaved, taskTypes, workAreaTypes, groupStatus, user }) {
+function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers, canEdit, canEditDates, onOpenModal, isExpanded, onToggle, savedField, onSaved, taskTypes, workAreaTypes, groupStatus, user, selectedTaskIds, onToggleSelect, onTaskCreated, activeFilterProject, activeFilterAssignee }) {
     const [addingTask, setAddingTask] = useState(false);
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const addInputRef = useRef(null);
@@ -1224,9 +1207,16 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
     const handleAddTask = async () => {
         if (!newTaskTitle.trim()) return;
         try {
-            await createTask({ title: newTaskTitle.trim(), status: groupStatus || 'pending' }, user?.uid);
+            const taskData = { title: newTaskTitle.trim(), status: groupStatus || 'pending' };
+            // Auto-assign filter values so the task matches current view
+            if (activeFilterProject) taskData.projectId = activeFilterProject;
+            if (activeFilterAssignee && activeFilterAssignee !== 'my-team' && activeFilterAssignee !== '') {
+                taskData.assignedTo = activeFilterAssignee;
+            }
+            const newId = await createTask(taskData, user?.uid);
             setNewTaskTitle('');
-            setAddingTask(false);
+            if (newId && onTaskCreated) onTaskCreated(newId);
+            setTimeout(() => addInputRef.current?.focus(), 50);
         } catch (err) { console.error('Failed to create task:', err); }
     };
 
@@ -1283,7 +1273,15 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                             className="grid items-center px-2 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-800/40 text-center"
                             style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${color}` }}
                         >
-                            <div></div>
+                            <div className="flex items-center justify-center">
+                                <input
+                                    type="checkbox"
+                                    checked={tasks.length > 0 && tasks.every(t => selectedTaskIds?.has(t.id))}
+                                    onChange={() => { tasks.forEach(t => onToggleSelect?.(t.id)); }}
+                                    className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-700 text-violet-500 focus:ring-violet-500/30 cursor-pointer"
+                                    title="Seleccionar todo el grupo"
+                                />
+                            </div>
                             <div className="text-left">Tarea</div>
                             <div>Resp</div>
                             <div>Proyecto</div>
@@ -1292,8 +1290,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                             <div>Área</div>
                             <div>Tipo</div>
                             <div>Avance</div>
-                            <div>Health</div>
-                            <div>Score</div>
+
                             <div>Timeline</div>
                             <div>Horas</div>
                             <div>Prioridad</div>
@@ -1321,20 +1318,22 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                     onSaved={onSaved}
                                     taskTypes={taskTypes}
                                     workAreaTypes={workAreaTypes}
+                                    isSelected={selectedTaskIds?.has(task.id)}
+                                    onToggleSelect={onToggleSelect}
                                 />
                             ))
                         )}
 
-                        {/* Inline Add Task Row — Monday.com style */}
+                        {/* Inline Add Task Row */}
                         {canEdit && (
                             <div
                                 className="grid items-center px-2 py-1.5 border-t border-slate-800/30"
                                 style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${color}` }}
                             >
                                 <div></div>
-                                <div className="col-span-13">
+                                <div className="min-w-0">
                                     {addingTask ? (
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-1">
                                             <input
                                                 ref={addInputRef}
                                                 value={newTaskTitle}
@@ -1344,10 +1343,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                                 className="flex-1 bg-transparent text-sm text-slate-300 placeholder:text-slate-600 outline-none"
                                                 autoFocus
                                             />
-                                            <button onClick={handleAddTask} className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 px-2 py-1 rounded hover:bg-indigo-500/10 transition-colors">
-                                                Crear
-                                            </button>
-                                            <button onClick={() => { setAddingTask(false); setNewTaskTitle(''); }} className="text-[11px] text-slate-600 hover:text-slate-400">
+                                            <button onClick={() => { setAddingTask(false); setNewTaskTitle(''); }} className="text-slate-600 hover:text-slate-400 shrink-0">
                                                 <X className="w-3.5 h-3.5" />
                                             </button>
                                         </div>
@@ -1360,6 +1356,8 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                         </button>
                                     )}
                                 </div>
+                                {/* Rest of columns empty */}
+                                <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
                             </div>
                         )}
 
@@ -1393,8 +1391,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                 <div></div> {/* 7. Área */}
                                 <div></div> {/* 8. Tipo */}
                                 <div></div> {/* 9. Avance placeholder */}
-                                <div></div> {/* 10. Health placeholder */}
-                                <div></div> {/* 11. Score placeholder */}
+
                                 
                                 {/* 12. Date range (Timeline) */}
                                 <div className="flex items-center justify-center">
@@ -1473,19 +1470,65 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
 export default function MainTable() {
     const { user } = useAuth();
     const { canEdit, canEditDates, canDelete } = useRole();
-    const { engProjects, engTasks, engSubtasks, teamMembers, taskTypes, workAreaTypes } = useEngineeringData();
+    const { engProjects, engTasks, engSubtasks, teamMembers, taskTypes, workAreaTypes, delayCauses } = useEngineeringData();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
     const [search, setSearch] = useState('');
     const [filterProject, setFilterProject] = useState('');
-    const [filterAssignee, setFilterAssignee] = useState('');
+    const [filterAssignee, setFilterAssignee] = useState('my-team');
     const [filterPriority, setFilterPriority] = useState('');
     const [collapsedGroups, setCollapsedGroups] = useState(() => {
         const init = {};
         STATUS_GROUPS.forEach(g => { init[g.status] = true; });
         return init;
     });
+
+    // --- Resource Assignments (team relationships) ---
+    const [resourceAssignments, setResourceAssignments] = useState([]);
+    useEffect(() => {
+        getActiveAssignments().then(setResourceAssignments).catch(console.error);
+    }, []);
+
+    // Build the set of UIDs that belong to "my team"
+    // Bidirectional: supervisor sees technicians, technician sees supervisor + fellow technicians
+    const myTeamUids = useMemo(() => {
+        const uid = user?.uid;
+        if (!uid) return new Set();
+
+        const uids = new Set([uid]); // always include myself
+
+        // --- 1. HR Hierarchy (reportsTo) ---
+        teamMembers.forEach(member => {
+            const memberId = member.uid || member.id;
+            // People reporting to me
+            if (member.reportsTo === uid) uids.add(memberId);
+            // The person I report to
+            if (uid && memberId === uid && member.reportsTo) uids.add(member.reportsTo);
+            // Also if I report to X, I want to see tasks of fellow people reporting to X
+            const myInfo = teamMembers.find(m => (m.uid || m.id) === uid);
+            if (myInfo && myInfo.reportsTo && member.reportsTo === myInfo.reportsTo) {
+                uids.add(memberId);
+            }
+        });
+
+        // --- 2. Operational Hierarchy (resourceAssignments) ---
+        // A. I'm a supervisor → add all my technicians
+        const myTechs = resourceAssignments.filter(a => a.engineerId === uid);
+        myTechs.forEach(a => uids.add(a.technicianId));
+
+        // B. I'm a technician → add my supervisor + fellow technicians under same supervisor
+        const myAssignment = resourceAssignments.find(a => a.technicianId === uid);
+        if (myAssignment) {
+            uids.add(myAssignment.engineerId); // my supervisor
+            // fellow technicians under the same supervisor
+            resourceAssignments
+                .filter(a => a.engineerId === myAssignment.engineerId)
+                .forEach(a => uids.add(a.technicianId));
+        }
+
+        return uids;
+    }, [user, resourceAssignments, teamMembers]);
     const { savedField, show: showSaved } = useSaveFeedback();
 
     const openNew = () => { setSelectedTask(null); setIsModalOpen(true); };
@@ -1494,16 +1537,46 @@ export default function MainTable() {
 
     const { pendingTransition, transitionError, isTransitioning, confirmTransition, cancelTransition } = useWorkflowTransition();
 
+    // Recently created tasks bypass filters for 30 seconds
+    const [recentlyCreatedIds, setRecentlyCreatedIds] = useState(new Set());
+
+    const handleTaskCreated = useCallback((newTaskId) => {
+        if (!newTaskId) return;
+        setRecentlyCreatedIds(prev => new Set(prev).add(newTaskId));
+        // Remove grace after 30 minutes
+        setTimeout(() => {
+            setRecentlyCreatedIds(prev => {
+                const next = new Set(prev);
+                next.delete(newTaskId);
+                return next;
+            });
+        }, 1800000);
+    }, []);
+
     const filteredTasks = useMemo(() => {
         return engTasks.filter(task => {
+            // Grace period: always show recently created tasks
+            if (recentlyCreatedIds.has(task.id)) return true;
+
             const s = search.toLowerCase();
             const matchSearch = !s || (task.title || '').toLowerCase().includes(s) || (task.description || '').toLowerCase().includes(s);
             const matchProject = !filterProject || task.projectId === filterProject;
-            const matchAssignee = !filterAssignee || task.assignedTo === filterAssignee;
+
+            let matchAssignee = true;
+            if (filterAssignee === 'my-team') {
+                // Include tasks assigned to my team OR where I'm the assigned peer reviewer
+                const isMyTeamTask = myTeamUids.has(task.assignedTo);
+                const isMyPeerReview = task.peerReviewReviewerId === user?.uid
+                    && ['requested', 'in_review', 'changes_requested'].includes(task.peerReviewStatus);
+                matchAssignee = isMyTeamTask || isMyPeerReview;
+            } else if (filterAssignee !== '') {
+                matchAssignee = task.assignedTo === filterAssignee;
+            }
+
             const matchPriority = !filterPriority || task.priority === filterPriority;
             return matchSearch && matchProject && matchAssignee && matchPriority;
         });
-    }, [engTasks, search, filterProject, filterAssignee, filterPriority]);
+    }, [engTasks, search, filterProject, filterAssignee, filterPriority, myTeamUids, user, recentlyCreatedIds]);
 
     const tasksByStatus = useMemo(() => {
         const map = {};
@@ -1534,13 +1607,93 @@ export default function MainTable() {
     }, [tasksByStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const toggleGroup = (status) => setCollapsedGroups(prev => ({ ...prev, [status]: !prev[status] }));
-    const activeFilterCount = [search, filterProject, filterAssignee, filterPriority].filter(Boolean).length;
+    const activeFilterCount = [search, filterProject, filterAssignee !== 'my-team' ? filterAssignee : '', filterPriority].filter(Boolean).length;
+
+    const [isExporting, setIsExporting] = useState(false);
+    const handleExport = useCallback(() => {
+        setIsExporting(true);
+        setTimeout(() => {
+            try {
+                exportMainTableToExcel({
+                    tasks: filteredTasks,
+                    engProjects,
+                    teamMembers,
+                    taskTypes,
+                    workAreaTypes,
+                    engSubtasks,
+                });
+            } catch (err) {
+                console.error('Export failed:', err);
+            } finally {
+                setIsExporting(false);
+            }
+        }, 80);
+    }, [filteredTasks, engProjects, teamMembers, taskTypes, workAreaTypes, engSubtasks]);
+
+    // ── Task Selection + AI Improvement ──
+    const [selectedTaskIds, setSelectedTaskIds] = useState(new Set());
+    const [aiSuggestions, setAiSuggestions] = useState([]);
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiModalOpen, setAiModalOpen] = useState(false);
+
+    const toggleSelectTask = useCallback((taskId) => {
+        setSelectedTaskIds(prev => {
+            const next = new Set(prev);
+            if (next.has(taskId)) next.delete(taskId);
+            else next.add(taskId);
+            return next;
+        });
+    }, []);
+
+    const handleImproveWithAI = useCallback(async () => {
+        const selected = filteredTasks.filter(t => selectedTaskIds.has(t.id));
+        if (selected.length === 0) return;
+        setAiModalOpen(true);
+        setAiLoading(true);
+        setAiSuggestions([]);
+        try {
+            const fn = httpsCallable(functions, 'improveTaskDescriptions');
+            const tasksPayload = selected.map(t => {
+                const area = (workAreaTypes || []).find(a => a.id === t.workAreaTypeId);
+                const tipo = (taskTypes || []).find(tt => tt.id === t.taskTypeId);
+                const proj = (engProjects || []).find(p => p.id === t.projectId);
+                return {
+                    id: t.id,
+                    title: t.title,
+                    description: t.description,
+                    area: area?.name || '',
+                    taskType: tipo?.name || '',
+                    project: proj?.name || '',
+                };
+            });
+            const result = await fn({ tasks: tasksPayload });
+            setAiSuggestions(result.data.suggestions || []);
+        } catch (err) {
+            console.error('AI improvement failed:', err);
+        } finally {
+            setAiLoading(false);
+        }
+    }, [filteredTasks, selectedTaskIds, workAreaTypes, taskTypes, engProjects]);
+
+    const handleApplyAiSuggestions = useCallback(async (updates) => {
+        for (const u of updates) {
+            await updateTask(u.id, { title: u.title, description: u.description });
+        }
+        setSelectedTaskIds(new Set());
+    }, []);
 
     return (
         <div className="-m-4 md:-m-8 flex flex-col" style={{ background: 'var(--bg-app)', color: 'var(--text-primary)', minHeight: '100vh' }}>
             <TaskDetailModal isOpen={isModalOpen} onClose={closeModal} task={selectedTask} projects={engProjects} teamMembers={teamMembers}
                 subtasks={selectedTask ? engSubtasks.filter(s => s.taskId === selectedTask.id) : []} taskTypes={taskTypes} userId={user?.uid} canEdit={canEdit} canDelete={canDelete} />
-            <TransitionConfirmModal isOpen={!!pendingTransition} pending={pendingTransition} isTransitioning={isTransitioning} onConfirm={confirmTransition} onCancel={cancelTransition} />
+            <TransitionConfirmModal isOpen={!!pendingTransition} pending={pendingTransition} isTransitioning={isTransitioning} onConfirm={confirmTransition} onCancel={cancelTransition} delayCauses={delayCauses} teamMembers={teamMembers} />
+            <AiReviewModal
+                isOpen={aiModalOpen}
+                onClose={() => { setAiModalOpen(false); setAiSuggestions([]); }}
+                suggestions={aiSuggestions}
+                isLoading={aiLoading}
+                onApply={handleApplyAiSuggestions}
+            />
 
             {transitionError && (
                 <div className="fixed bottom-24 md:bottom-4 left-1/2 -translate-x-1/2 z-50 bg-rose-600 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-lg animate-in fade-in slide-in-from-bottom-4">
@@ -1565,6 +1718,7 @@ export default function MainTable() {
                 </select>
                 <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}
                     className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer">
+                    <option value="my-team">Mis tareas y equipo</option>
                     <option value="">Todos los miembros</option>
                     {teamMembers.map(u => <option key={u.uid} value={u.uid}>{u.displayName || u.email}</option>)}
                 </select>
@@ -1574,16 +1728,62 @@ export default function MainTable() {
                     {Object.entries(TASK_PRIORITY_CONFIG).map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
                 </select>
                 {activeFilterCount > 0 && (
-                    <button onClick={() => { setSearch(''); setFilterProject(''); setFilterAssignee(''); setFilterPriority(''); }}
+                    <button onClick={() => { setSearch(''); setFilterProject(''); setFilterAssignee('my-team'); setFilterPriority(''); }}
                         className="text-[11px] text-rose-400 hover:text-rose-300 px-2 py-1 rounded hover:bg-rose-500/10 transition-colors">
                         Limpiar
                     </button>
                 )}
+                <button
+                    onClick={handleExport}
+                    disabled={isExporting || filteredTasks.length === 0}
+                    className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs font-semibold transition-all hover:bg-emerald-500/10 hover:border-emerald-500/40 hover:text-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-400 bg-slate-800/60 ml-auto"
+                    title={`Exportar ${filteredTasks.length} tareas a Excel`}
+                >
+                    <Download className={`w-3.5 h-3.5 ${isExporting ? 'animate-bounce' : ''}`} />
+                    <span className="hidden sm:inline">{isExporting ? 'Exportando...' : 'Exportar'}</span>
+                </button>
             </div>
 
 
 
             <div className="flex-1 overflow-y-auto pb-4 px-6 pt-1">
+
+                {/* Floating selection action bar */}
+                {selectedTaskIds.size > 0 && (
+                    <div
+                        className="sticky top-0 z-30 flex items-center gap-3 rounded-xl px-4 py-2.5 mb-3 backdrop-blur-md shadow-lg border"
+                        style={{
+                            background: 'var(--bg-card, rgba(30,41,59,0.95))',
+                            borderColor: 'var(--border-color, rgba(139,92,246,0.3))',
+                            boxShadow: '0 4px 20px rgba(139,92,246,0.15)',
+                        }}
+                    >
+                        <div className="w-6 h-6 rounded-lg bg-violet-500/20 flex items-center justify-center shrink-0">
+                            <Sparkles className="w-3.5 h-3.5 text-violet-500" />
+                        </div>
+                        <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
+                            {selectedTaskIds.size} tarea{selectedTaskIds.size !== 1 ? 's' : ''} seleccionada{selectedTaskIds.size !== 1 ? 's' : ''}
+                        </span>
+                        <div className="flex-1" />
+                        <button
+                            onClick={handleImproveWithAI}
+                            disabled={selectedTaskIds.size > 20}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-40"
+                        >
+                            <Sparkles className="w-3.5 h-3.5" /> Mejorar Descripción
+                        </button>
+                        <button
+                            onClick={() => setSelectedTaskIds(new Set())}
+                            className="text-[11px] px-2 py-1 rounded transition-colors"
+                            style={{ color: 'var(--text-secondary, #94a3b8)' }}
+                            onMouseEnter={e => { e.target.style.color = '#f87171'; e.target.style.background = 'rgba(239,68,68,0.1)'; }}
+                            onMouseLeave={e => { e.target.style.color = 'var(--text-secondary, #94a3b8)'; e.target.style.background = 'transparent'; }}
+                        >
+                            Deseleccionar
+                        </button>
+                    </div>
+                )}
+
                 {STATUS_GROUPS.map(group => {
                     const tasks = tasksByStatus[group.status] || [];
                     if (tasks.length === 0 && (group.status === TASK_STATUS.COMPLETED || group.status === TASK_STATUS.CANCELLED)) return null;
@@ -1607,6 +1807,11 @@ export default function MainTable() {
                             workAreaTypes={workAreaTypes}
                             groupStatus={group.status}
                             user={user}
+                            selectedTaskIds={selectedTaskIds}
+                            onToggleSelect={toggleSelectTask}
+                            onTaskCreated={handleTaskCreated}
+                            activeFilterProject={filterProject}
+                            activeFilterAssignee={filterAssignee}
                         />
                     );
                 })}

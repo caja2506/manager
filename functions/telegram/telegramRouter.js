@@ -6,7 +6,7 @@
  * and confidence-based confirmation flows.
  */
 
-const { sendMessage, sendMessageWithKeyboard, sendMessageWithReplyKeyboard, answerCallbackQuery } = require("./telegramClient");
+const { sendMessage, sendMessageWithKeyboard, sendMessageWithReplyKeyboard, answerCallbackQuery, editMessageText } = require("./telegramClient");
 const { parseReportText, parseCommand } = require("./telegramParsers");
 const templates = require("./telegramTemplates");
 const {
@@ -118,6 +118,11 @@ async function routeInboundMessage(adminDb, token, chatId, text, rawMessage, ext
             } else {
                 await handleTaskReportText(adminDb, token, chatIdStr, userId, text, session, extras);
             }
+            break;
+
+        case TELEGRAM_SESSION_STATE.SELECTING_SUBTASKS:
+            // Text messages in subtask selection state — guide to use buttons
+            await sendMessage(token, chatIdStr, "👆 Usa los botones para marcar/desmarcar subtareas, luego toca \"Siguiente →\".");
             break;
 
         case TELEGRAM_SESSION_STATE.ASKING_MORE_TASKS: {
@@ -610,6 +615,99 @@ async function getUserName(adminDb, userId) {
 }
 
 /**
+ * Get timer hours for a specific task on a given date.
+ * Returns { hasTimerHours, totalHours } from timeLogs with source !== "telegram"
+ */
+async function getTimerHoursForTaskToday(adminDb, taskId, userId, dateStr) {
+    try {
+        const logsSnap = await adminDb.collection(paths.TIME_LOGS)
+            .where("taskId", "==", taskId)
+            .where("userId", "==", userId)
+            .get();
+
+        let totalHours = 0;
+        let hasTimerHours = false;
+
+        logsSnap.forEach(doc => {
+            const log = doc.data();
+            const logSource = log.source || "web";
+            // Only count non-telegram sources (web timers)
+            if (logSource === "telegram" || logSource === "telegram_webapp") return;
+            // Check if the log is from the target date
+            if (!log.startTime) return;
+            const logDate = new Date(log.startTime).toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
+            if (logDate !== dateStr) return;
+            // Count completed logs
+            if (log.totalHours && log.endTime) {
+                totalHours += log.totalHours;
+                hasTimerHours = true;
+            }
+            // Also count running timers (no endTime yet)
+            if (!log.endTime && log.startTime) {
+                const elapsed = (Date.now() - new Date(log.startTime).getTime()) / 3600000;
+                totalHours += elapsed;
+                hasTimerHours = true;
+            }
+        });
+
+        return { hasTimerHours, totalHours: parseFloat(totalHours.toFixed(2)) };
+    } catch (err) {
+        console.warn("[getTimerHours] Error:", err.message);
+        return { hasTimerHours: false, totalHours: 0 };
+    }
+}
+
+/**
+ * Load subtasks for a task.
+ */
+async function loadSubtasksForTask(adminDb, taskId) {
+    const subsSnap = await adminDb.collection(paths.SUBTASKS)
+        .where("taskId", "==", taskId)
+        .get();
+
+    const subtasks = subsSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+    return subtasks;
+}
+
+/**
+ * Build inline keyboard for subtask toggle.
+ * toggledIds is a Set of subtask IDs that the user has toggled in this session.
+ */
+function buildSubtaskKeyboard(subtasks, toggledIds = new Set()) {
+    const keyboard = subtasks.map(st => {
+        const isChecked = st.completed || toggledIds.has(st.id);
+        const icon = isChecked ? "✅" : "☐";
+        return [{ text: `${icon} ${(st.title || st.name || "?").substring(0, 40)}`, callback_data: `sub:${st.id}` }];
+    });
+
+    keyboard.push([
+        { text: "✅ Todas", callback_data: "sub:all" },
+        { text: "Siguiente →", callback_data: "sub:done" },
+    ]);
+    keyboard.push([{ text: "❌ Cancelar", callback_data: "cancel" }]);
+
+    return keyboard;
+}
+
+/**
+ * Build the text header for the subtask selection message.
+ */
+function buildSubtaskMessageText(taskTitle, timerInfo, subtasks, toggledIds) {
+    let msg = `📌 <b>${taskTitle}</b>\n`;
+    if (timerInfo.hasTimerHours) {
+        msg += `⏱ <b>${timerInfo.totalHours}h</b> registradas por timer\n`;
+    }
+    const pending = subtasks.filter(st => !st.completed && !toggledIds.has(st.id)).length;
+    const done = subtasks.filter(st => st.completed || toggledIds.has(st.id)).length;
+    msg += `\n📋 Subtareas: ${done}/${subtasks.length} completadas`;
+    if (pending > 0) msg += ` (${pending} pendientes)`;
+    msg += `\n\nMarca las subtareas que completaste:`;
+    return msg;
+}
+
+/**
  * Legacy saveReport — used by old handleReportSubmission/Audio/Confirmation flows.
  */
 async function saveReport(adminDb, token, chatId, userId, userName, data) {
@@ -751,22 +849,162 @@ async function routeCallbackQuery(adminDb, token, chatId, callbackData, callback
         }
 
         const taskData = taskDoc.data();
+        const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
 
-        // Store selected task in session metadata
+        // Check for existing timer hours
+        const timerInfo = await getTimerHoursForTaskToday(adminDb, taskRef, userId, today);
+
+        // Store selected task + timer info in session metadata
         await adminDb.collection(paths.TELEGRAM_SESSIONS).doc(session.id).update({
             "metadata.selectedTaskId": taskRef,
             "metadata.selectedTaskTitle": taskData.title || "Sin título",
+            "metadata.timerHoursDetected": timerInfo.hasTimerHours,
+            "metadata.timerHoursAmount": timerInfo.totalHours,
             updatedAt: new Date().toISOString(),
         });
 
+        // Check if task has subtasks — show subtask toggle screen first
+        const subtasks = await loadSubtasksForTask(adminDb, taskRef);
+        const pendingSubtasks = subtasks.filter(st => !st.completed);
+
+        if (pendingSubtasks.length > 0) {
+            // Store subtask data in session for toggle tracking
+            await adminDb.collection(paths.TELEGRAM_SESSIONS).doc(session.id).update({
+                "metadata.subtaskIds": subtasks.map(st => st.id),
+                "metadata.toggledSubtaskIds": [],
+                updatedAt: new Date().toISOString(),
+            });
+
+            await transitionState(adminDb, chatIdStr, TELEGRAM_SESSION_EVENT.SUBTASKS_SHOWN);
+
+            const toggledIds = new Set();
+            const text = buildSubtaskMessageText(taskData.title, timerInfo, subtasks, toggledIds);
+            const keyboard = buildSubtaskKeyboard(subtasks, toggledIds);
+            await sendMessageWithKeyboard(token, chatIdStr, text, keyboard);
+            return;
+        }
+
+        // No subtasks — go directly to report prompt
         await transitionState(adminDb, chatIdStr, TELEGRAM_SESSION_EVENT.TASK_SELECTED);
-        await sendMessage(token, chatIdStr,
-            `📌 <b>Tarea:</b> ${taskData.title}\n\n` +
-            "Envía tu reporte por 🎤 audio o ✍️ texto:\n" +
-            "• <b>Avance</b> (%)\n" +
-            "• <b>Horas</b> trabajadas\n" +
-            "• ¿<b>Bloqueos</b>?"
-        );
+
+        if (timerInfo.hasTimerHours) {
+            await sendMessage(token, chatIdStr,
+                `📌 <b>Tarea:</b> ${taskData.title}\n` +
+                `⏱ <b>${timerInfo.totalHours}h</b> registradas por timer\n\n` +
+                "Solo reporta tu avance:\n" +
+                "• <b>Avance</b> (%)\n" +
+                "• ¿<b>Bloqueos</b>?"
+            );
+        } else {
+            await sendMessage(token, chatIdStr,
+                `📌 <b>Tarea:</b> ${taskData.title}\n\n` +
+                "Envía tu reporte por 🎤 audio o ✍️ texto:\n" +
+                "• <b>Avance</b> (%)\n" +
+                "• <b>Horas</b> trabajadas\n" +
+                "• ¿<b>Bloqueos</b>?"
+            );
+        }
+        return;
+    }
+
+    // ── Subtask toggle: "sub:{subtaskId}" / "sub:done" / "sub:all" ──
+    if (callbackData.startsWith("sub:")) {
+        const subAction = callbackData.split(":")[1];
+        const freshSession = await getOrCreateSession(adminDb, chatIdStr);
+        const taskId = freshSession.metadata?.selectedTaskId;
+        const taskTitle = freshSession.metadata?.selectedTaskTitle || "Tarea";
+        const timerInfo = {
+            hasTimerHours: freshSession.metadata?.timerHoursDetected || false,
+            totalHours: freshSession.metadata?.timerHoursAmount || 0,
+        };
+
+        if (subAction === "done") {
+            // Confirm subtasks and move to report
+            const toggledIds = new Set(freshSession.metadata?.toggledSubtaskIds || []);
+            const now = new Date().toISOString();
+
+            // Batch update toggled subtasks in Firestore
+            if (toggledIds.size > 0) {
+                const batch = adminDb.batch();
+                for (const stId of toggledIds) {
+                    batch.update(adminDb.collection(paths.SUBTASKS).doc(stId), {
+                        completed: true,
+                        completedAt: now,
+                        completedBy: userId,
+                    });
+                }
+                await batch.commit();
+                console.log(`[subtaskToggle] Marked ${toggledIds.size} subtasks as completed for task ${taskId}`);
+            }
+
+            await transitionState(adminDb, chatIdStr, TELEGRAM_SESSION_EVENT.SUBTASKS_CONFIRMED);
+
+            const completedMsg = toggledIds.size > 0 ? `\n✅ ${toggledIds.size} subtarea(s) marcada(s) como completada(s)\n` : "";
+
+            if (timerInfo.hasTimerHours) {
+                await sendMessage(token, chatIdStr,
+                    `📌 <b>${taskTitle}</b>${completedMsg}\n` +
+                    `⏱ <b>${timerInfo.totalHours}h</b> registradas por timer\n\n` +
+                    "Solo reporta tu avance:\n" +
+                    "• <b>Avance</b> (%)\n" +
+                    "• ¿<b>Bloqueos</b>?"
+                );
+            } else {
+                await sendMessage(token, chatIdStr,
+                    `📌 <b>${taskTitle}</b>${completedMsg}\n` +
+                    "Envía tu reporte:\n" +
+                    "• <b>Avance</b> (%)\n" +
+                    "• <b>Horas</b> trabajadas\n" +
+                    "• ¿<b>Bloqueos</b>?"
+                );
+            }
+            return;
+        }
+
+        // Toggle a single subtask or all
+        let toggledIds = new Set(freshSession.metadata?.toggledSubtaskIds || []);
+        const subtasks = await loadSubtasksForTask(adminDb, taskId);
+
+        if (subAction === "all") {
+            // Toggle all pending subtasks
+            const pendingIds = subtasks.filter(st => !st.completed).map(st => st.id);
+            const allToggled = pendingIds.every(id => toggledIds.has(id));
+            if (allToggled) {
+                // Un-toggle all
+                pendingIds.forEach(id => toggledIds.delete(id));
+            } else {
+                // Toggle all
+                pendingIds.forEach(id => toggledIds.add(id));
+            }
+        } else {
+            // Toggle single subtask
+            if (toggledIds.has(subAction)) {
+                toggledIds.delete(subAction);
+            } else {
+                toggledIds.add(subAction);
+            }
+        }
+
+        // Save toggled state to session
+        await adminDb.collection(paths.TELEGRAM_SESSIONS).doc(freshSession.id).update({
+            "metadata.toggledSubtaskIds": Array.from(toggledIds),
+            updatedAt: new Date().toISOString(),
+        });
+
+        // Re-render the message with updated keyboard
+        const msgText = buildSubtaskMessageText(taskTitle, timerInfo, subtasks, toggledIds);
+        const keyboard = buildSubtaskKeyboard(subtasks, toggledIds);
+
+        // Use editMessageText to update in-place (if we have the message_id)
+        const messageId = extras.messageId;
+        if (messageId) {
+            await editMessageText(token, chatIdStr, messageId, msgText, keyboard);
+        } else {
+            // Fallback: send new message
+            await sendMessageWithKeyboard(token, chatIdStr, msgText, keyboard);
+        }
+
+        await transitionState(adminDb, chatIdStr, TELEGRAM_SESSION_EVENT.SUBTASK_TOGGLED);
         return;
     }
 
@@ -1023,28 +1261,43 @@ async function saveTaskReport(adminDb, token, chatId, userId, userName, data) {
         throw e;
     }
 
-    // 2. Create schema-compatible timeLog
+    // 2. Smart hour detection: only create timeLog if timer hasn't already recorded hours
     if (taskId && hours > 0) {
         try {
-            const startHour = new Date(`${today}T08:00:00`);
-            const endHour = new Date(startHour.getTime() + (hours * 3600000));
+            // Check if the web timer already logged hours for this task today
+            const timerCheck = await getTimerHoursForTaskToday(adminDb, taskId, userId || "unknown", today);
 
-            const timeLogDoc = JSON.parse(JSON.stringify({
-                taskId: taskId,
-                projectId: null,
-                userId: userId || "unknown",
-                displayName: userName || "Usuario",
-                startTime: startHour.toISOString(),
-                endTime: endHour.toISOString(),
-                totalHours: hours,
-                overtime: false,
-                overtimeHours: 0,
-                notes: `Reporte vía Telegram: ${safe.normalizedSummary || ""}`.substring(0, 200),
-                source: "telegram",
-                createdAt: now,
-            }));
-            await adminDb.collection(paths.TIME_LOGS).add(timeLogDoc);
-            await recalculateTaskHoursBackend(adminDb, taskId);
+            if (timerCheck.hasTimerHours) {
+                // Timer already has hours — DON'T create a duplicate timeLog
+                console.log(`[saveTaskReport] SKIP timeLog: timer already has ${timerCheck.totalHours}h for task ${taskId} today. Telegram reported ${hours}h.`);
+                // Store reference in the telegram report for traceability
+                try {
+                    // Update the just-created report doc with timer reference
+                    // (we don't have the ref here, but the data is logged)
+                } catch (_) { /* non-critical */ }
+            } else {
+                // No timer hours — create timeLog from Telegram report
+                const startHour = new Date(`${today}T08:00:00`);
+                const endHour = new Date(startHour.getTime() + (hours * 3600000));
+
+                const timeLogDoc = JSON.parse(JSON.stringify({
+                    taskId: taskId,
+                    projectId: null,
+                    userId: userId || "unknown",
+                    displayName: userName || "Usuario",
+                    startTime: startHour.toISOString(),
+                    endTime: endHour.toISOString(),
+                    totalHours: hours,
+                    overtime: false,
+                    overtimeHours: 0,
+                    notes: `Reporte vía Telegram: ${safe.normalizedSummary || ""}`.substring(0, 200),
+                    source: "telegram",
+                    createdAt: now,
+                }));
+                await adminDb.collection(paths.TIME_LOGS).add(timeLogDoc);
+                await recalculateTaskHoursBackend(adminDb, taskId);
+                console.log(`[saveTaskReport] Created timeLog: ${hours}h for task ${taskId} (no timer data found).`);
+            }
         } catch (e) {
             console.error("[saveTaskReport] STEP 2 timeLog failed:", e.message);
         }

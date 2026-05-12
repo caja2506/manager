@@ -3,9 +3,7 @@ import { useAppData } from '../../contexts/AppDataContext';
 import { useEngineeringData } from '../../hooks/useEngineeringData';
 import { useAuth } from '../../contexts/AuthContext';
 import { createDelay, createDelayCause, deleteDelayCause } from '../../services/delayService';
-import { updateTaskStatus } from '../../services/taskService';
-import { TASK_STATUS } from '../../models/schemas';
-import { AlertOctagon, X, Check, ChevronDown, Plus } from 'lucide-react';
+import { AlertOctagon, X, Check, ChevronDown, Plus, User } from 'lucide-react';
 import ListManagerModal from '../ui/ListManagerModal';
 
 export default function DelayReportModal() {
@@ -13,7 +11,7 @@ export default function DelayReportModal() {
         isDelayReportOpen, setIsDelayReportOpen,
         delayReportTarget, setDelayReportTarget,
     } = useAppData();
-    const { delayCauses, engProjects, engTasks } = useEngineeringData();
+    const { delayCauses, engProjects, engTasks, teamMembers } = useEngineeringData();
     const { user } = useAuth();
 
     const [selectedCauseId, setSelectedCauseId] = useState('');
@@ -21,6 +19,8 @@ export default function DelayReportModal() {
     const [impact, setImpact] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showCauseManager, setShowCauseManager] = useState(false);
+    const [blockedByUserId, setBlockedByUserId] = useState('');
+    const [blockedByName, setBlockedByName] = useState('');
 
     if (!isDelayReportOpen || !delayReportTarget) return null;
 
@@ -37,6 +37,8 @@ export default function DelayReportModal() {
         setSelectedCauseId('');
         setComment('');
         setImpact('');
+        setBlockedByUserId('');
+        setBlockedByName('');
         setShowCauseManager(false);
     };
 
@@ -60,16 +62,15 @@ export default function DelayReportModal() {
         setIsSubmitting(true);
         try {
             const cause = delayCauses.find(c => c.id === selectedCauseId);
+            const currentTask = taskId ? engTasks?.find(t => t.id === taskId) : null;
             await createDelay({
                 projectId, taskId,
                 causeId: cause.id, causeName: cause.name,
                 comment, impact,
+                blockedByUserId: blockedByUserId || null,
+                blockedByName: blockedByName || null,
+                previousStatus: currentTask?.status || 'in_progress',
             }, user.uid);
-
-            // Actually set the task status to blocked
-            if (taskId) {
-                await updateTaskStatus(taskId, TASK_STATUS.BLOCKED, projectId);
-            }
 
             handleClose();
         } catch (error) {
@@ -149,6 +150,49 @@ export default function DelayReportModal() {
                                 </button>
                             </div>
 
+                            {/* Responsible Person */}
+                            <div>
+                                <label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                                    <User className="w-3.5 h-3.5" />
+                                    ¿Por quién es el retraso? <span className="text-rose-500">*</span>
+                                </label>
+                                <div className="relative">
+                                    <select
+                                        required
+                                        value={blockedByUserId}
+                                        onChange={(e) => {
+                                            const uid = e.target.value;
+                                            setBlockedByUserId(uid);
+                                            if (uid === '__external__') {
+                                                setBlockedByName('Externo');
+                                            } else if (uid === '__na__') {
+                                                setBlockedByName('No aplica');
+                                            } else {
+                                                const member = teamMembers.find(m => (m.uid || m.id) === uid);
+                                                setBlockedByName(member?.displayName || member?.name || member?.email?.split('@')[0] || uid);
+                                            }
+                                        }}
+                                        className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-rose-500"
+                                    >
+                                        <option value="" disabled>Seleccionar persona responsable...</option>
+                                        {teamMembers
+                                            .filter(m => m.uid || m.id)
+                                            .sort((a, b) => (a.displayName || a.name || '').localeCompare(b.displayName || b.name || ''))
+                                            .map(m => {
+                                                const uid = m.uid || m.id;
+                                                const name = m.displayName || m.name || m.email?.split('@')[0] || uid;
+                                                return <option key={uid} value={uid}>{name}</option>;
+                                            })
+                                        }
+                                        <option value="__external__">🌐 Externo (proveedor/cliente)</option>
+                                        <option value="__na__">— No aplica</option>
+                                    </select>
+                                    <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
+                                        <ChevronDown className="w-4 h-4 text-slate-400" />
+                                    </div>
+                                </div>
+                            </div>
+
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                                     Comentarios Adicionales
@@ -186,7 +230,7 @@ export default function DelayReportModal() {
                             </button>
                             <button
                                 type="submit"
-                                disabled={!selectedCauseId || isSubmitting}
+                                disabled={!selectedCauseId || !blockedByUserId || isSubmitting}
                                 className="flex items-center gap-2 bg-rose-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-rose-700 transition-colors shadow-lg shadow-rose-600/30 disabled:opacity-50"
                             >
                                 {isSubmitting ? (

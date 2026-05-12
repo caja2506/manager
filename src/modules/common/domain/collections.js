@@ -87,6 +87,14 @@ export const COLLECTIONS = {
     SCORE_SNAPSHOTS: 'scoreSnapshots',
     RESOURCE_ASSIGNMENTS: 'resourceAssignments',
     DAILY_SCORE_LOGS: 'dailyScoreLogs',
+
+    // ── WIP Enforcement (@classification: core) ──
+    // Subcollection: tasks/{taskId}/blockHistory
+    BLOCK_HISTORY: 'blockHistory',
+
+    // ── Peer Review ──
+    PEER_REVIEWS: 'peerReviews',
+    PEER_REVIEW_TEMPLATES: 'peerReviewTemplates',
 };
 
 

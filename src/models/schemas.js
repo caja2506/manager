@@ -64,6 +64,11 @@ export {
     createTaskDependencyDocument,
     createStationDocument,
     formatStationLabel,
+    createBlockHistoryDocument,
+    PEER_REVIEW_STATUS,
+    PEER_REVIEW_DISCIPLINE,
+    createPeerReviewDocument,
+    createPeerReviewTemplateDocument,
 } from '../modules/tasks/domain/taskModel';
 
 // ── Planning Domain ──

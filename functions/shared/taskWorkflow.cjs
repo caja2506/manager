@@ -72,8 +72,8 @@ const STATUS_TO_CATEGORY = {
 //
 // Rules:
 //   backlog      → pending, in_progress, cancelled
-//   pending      → in_progress, backlog, blocked, cancelled
-//   in_progress  → validation, pending, blocked, cancelled
+//   pending      → in_progress, completed (if 100%), backlog, blocked, cancelled
+//   in_progress  → validation, completed (if no PR required), pending, blocked, cancelled
 //   blocked      → in_progress, pending, cancelled
 //   validation   → completed, in_progress, blocked
 //   completed    → in_progress (reopen)
@@ -82,8 +82,8 @@ const STATUS_TO_CATEGORY = {
 
 const TRANSITIONS = {
     [STATUS.BACKLOG]: [STATUS.PENDING, STATUS.IN_PROGRESS, STATUS.CANCELLED],
-    [STATUS.PENDING]: [STATUS.IN_PROGRESS, STATUS.BACKLOG, STATUS.BLOCKED, STATUS.CANCELLED],
-    [STATUS.IN_PROGRESS]: [STATUS.VALIDATION, STATUS.PENDING, STATUS.BLOCKED, STATUS.CANCELLED],
+    [STATUS.PENDING]: [STATUS.IN_PROGRESS, STATUS.COMPLETED, STATUS.BACKLOG, STATUS.BLOCKED, STATUS.CANCELLED],
+    [STATUS.IN_PROGRESS]: [STATUS.VALIDATION, STATUS.COMPLETED, STATUS.PENDING, STATUS.BLOCKED, STATUS.CANCELLED],
     [STATUS.BLOCKED]: [STATUS.IN_PROGRESS, STATUS.PENDING, STATUS.CANCELLED],
     [STATUS.VALIDATION]: [STATUS.COMPLETED, STATUS.IN_PROGRESS, STATUS.BLOCKED],
     [STATUS.COMPLETED]: [STATUS.IN_PROGRESS],

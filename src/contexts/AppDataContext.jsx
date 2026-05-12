@@ -5,7 +5,7 @@
  *
  * Engineering data subscriptions → use useEngineeringData directly
  * BOM data (projects, catalog, items, managed lists) → useAutoBomData
- * AI/PDF/Excel operations → aiService
+ * Predictive Analytics/PDF/Excel operations → analyticService
  * Managed list CRUD → managedListService
  *
  * This context retains ONLY:
@@ -25,7 +25,7 @@ import {
     executePdfImport,
     executeExcelImport,
     testGeminiConnection as aiTestConnection,
-} from '../services/aiService';
+} from '../services/analyticService';
 import { saveManagedList } from '../services/managedListService';
 
 // --- Version ---
@@ -69,7 +69,7 @@ export function AppDataProvider({ children }) {
     const [delayReportTarget, setDelayReportTarget] = useState(null);
 
     // ============================================================
-    // HANDLERS — AI/PDF/Excel (delegated to aiService)
+    // HANDLERS — Predictive Analytics/PDF/Excel (delegated to analyticService)
     // ============================================================
 
     const processingCallbacks = {

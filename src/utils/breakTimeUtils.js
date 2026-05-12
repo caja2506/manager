@@ -4,12 +4,11 @@
  * Shared break band definitions and effective-hours calculator.
  * Used by Planner, Timer, and Reports to deduct break time from hours.
  *
- * V3: Reads break bands from Firestore (settings/daySchedule.breakBands)
- * and caches them. Falls back to defaults if Firestore is unavailable.
+ * V4: Dual-backend — reads from Supabase or Firebase depending on config.
  */
 
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase';
+import { USE_SUPABASE } from '../services/_backend';
+import { supabase } from '../supabase';
 import { DEFAULT_TIMEZONE } from './timezoneConfig';
 
 const DEFAULTS_BREAKS = [
@@ -20,32 +19,44 @@ const DEFAULTS_BREAKS = [
 
 const TZ = DEFAULT_TIMEZONE;
 
-// ── Live cache from Firestore ──
+// ── Live cache ──
 let _cachedBands = DEFAULTS_BREAKS;
+let _cachedSchedule = { openTime: '08:00', closeTime: '18:00', breakBands: [] };
 let _subscribed = false;
 
+function _applyScheduleData(data) {
+    _cachedSchedule = data;
+    if (data.breakBands?.length) {
+        _cachedBands = data.breakBands.map(b => ({
+            id: b.id,
+            start: timeStringToDecimal(b.start),
+            end: timeStringToDecimal(b.end),
+        }));
+    }
+}
+
 /**
- * Subscribe to Firestore settings/daySchedule once.
+ * Subscribe to settings/daySchedule once.
  * All subsequent calls to getBreakBands() use the cached value.
  */
 function ensureSubscription() {
     if (_subscribed) return;
     _subscribed = true;
     try {
-        onSnapshot(doc(db, 'settings', 'daySchedule'), snap => {
-            if (snap.exists()) {
-                const data = snap.data();
-                if (data.breakBands?.length) {
-                    _cachedBands = data.breakBands.map(b => ({
-                        id: b.id,
-                        start: timeStringToDecimal(b.start),
-                        end: timeStringToDecimal(b.end),
-                    }));
-                }
-            }
-        });
+        if (USE_SUPABASE) {
+            supabase.from('settings').select('value').eq('key', 'daySchedule').single()
+                .then(({ data }) => { if (data?.value) _applyScheduleData(data.value); });
+        } else {
+            import('firebase/firestore').then(({ doc, onSnapshot }) => {
+                import('../firebase').then(({ db }) => {
+                    onSnapshot(doc(db, 'settings', 'daySchedule'), snap => {
+                        if (snap.exists()) _applyScheduleData(snap.data());
+                    });
+                });
+            });
+        }
     } catch {
-        // Firestore not available, keep defaults
+        // DB not available, keep defaults
     }
 }
 
@@ -64,6 +75,15 @@ function timeStringToDecimal(timeStr) {
 export function getBreakBands() {
     ensureSubscription();
     return _cachedBands;
+}
+
+/**
+ * Get the full day schedule config (live from Firestore).
+ * Returns { openTime, closeTime, breakBands, timezone, ... }
+ */
+export function getDaySchedule() {
+    ensureSubscription();
+    return _cachedSchedule;
 }
 
 /** @deprecated Use getBreakBands() instead */

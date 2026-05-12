@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
@@ -7,7 +7,8 @@ import ActiveTimer from '../components/time/ActiveTimer';
 import AdminActiveTimersPanel from '../components/time/AdminActiveTimersPanel';
 import ManualTimeEntry from '../components/time/ManualTimeEntry';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
-import { deleteTimeLog, formatDuration, stopTimer, canManageOthersTimers } from '../services/timeService';
+import { deleteTimeLog, formatDuration, stopTimer, canManageOthersTimers, isSupervisorOf } from '../services/timeService';
+import { getActiveAssignments } from '../services/resourceAssignmentService';
 import {
     Clock, Plus, Trash2, Zap, Calendar, ListTodo, FolderGit2,
     BarChart3, ChevronLeft, ChevronRight, FileText, AlertTriangle,
@@ -16,7 +17,7 @@ import {
 
 export default function WorkLogs() {
     const { user } = useAuth();
-    const { canEdit, canDelete, role, teamRole } = useRole();
+    const { canEdit, canDelete, role, teamRole, userProfile } = useRole();
     const { engProjects, engTasks, engSubtasks, timeLogs, teamMembers, taskTypes } = useEngineeringData();
 
     // Get selectedUser from shared ReportsLayout via outlet context
@@ -28,8 +29,17 @@ export default function WorkLogs() {
     const [selectedTask, setSelectedTask] = useState(null);
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
     const [weekOffset, setWeekOffset] = useState(0);
+
+    // Load resource assignments for supervisor checks
+    const [resourceAssignments, setResourceAssignments] = useState([]);
+    useEffect(() => {
+        getActiveAssignments().then(setResourceAssignments).catch(console.error);
+    }, []);
     const [deletingId, setDeletingId] = useState(null);
     const [deleteError, setDeleteError] = useState('');
+    const [confirmDeleteLog, setConfirmDeleteLog] = useState(null);
+    const [confirmCode, setConfirmCode] = useState('');
+    const confirmInputRef = useRef(null);
 
     // --- Week Navigation ---
     const weekDates = useMemo(() => {
@@ -142,13 +152,15 @@ export default function WorkLogs() {
                 editLog={editingLog}
             />
 
-            {/* Admin: Active Timers Panel */}
+            {/* Admin / Supervisor: Active Timers Panel */}
             <AdminActiveTimersPanel
                 timeLogs={timeLogs}
                 teamMembers={teamMembers}
                 tasks={engTasks}
                 projects={engProjects}
                 canManageOthers={canManageOthersTimers(role, teamRole)}
+                currentUserId={user?.uid}
+                resourceAssignments={resourceAssignments}
             />
 
             {/* Action bar (smaller, no duplicate banner) */}
@@ -353,7 +365,7 @@ export default function WorkLogs() {
                                                 </span>
 
                                                 {/* Stop button for running logs */}
-                                                {isRunning && (canEdit || log.userId === user?.uid) && (
+                                                {isRunning && (canEdit || log.userId === user?.uid || isSupervisorOf(user?.uid, log.userId, teamMembers, resourceAssignments)) && (
                                                     <button
                                                         onClick={async (e) => {
                                                             e.stopPropagation();
@@ -378,39 +390,30 @@ export default function WorkLogs() {
                                                 )}
 
                                                 {/* Edit button for completed logs */}
-                                                {!isRunning && (canEdit || log.userId === user?.uid) && (
+                                                {!isRunning && (canEdit || log.userId === user?.uid || isSupervisorOf(user?.uid, log.userId, teamMembers, resourceAssignments)) && (
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); setEditingLog(log); }}
-                                                        className="p-1.5 rounded-lg transition-all text-indigo-400 opacity-0 group-hover:opacity-100 hover:bg-indigo-50"
+                                                        className="p-1.5 rounded-lg transition-all text-indigo-400 hover:bg-indigo-500/15"
                                                         title="Editar registro"
                                                     >
                                                         <Pencil className="w-4 h-4" />
                                                     </button>
                                                 )}
 
-                                                {/* Delete button — always visible for running, hover for others */}
-                                                {(canDelete || log.userId === user?.uid) && (
+                                                {/* Delete button — always visible */}
+                                                {(canDelete || log.userId === user?.uid || isSupervisorOf(user?.uid, log.userId, teamMembers, resourceAssignments)) && (
                                                     <button
-                                                        onClick={async (e) => {
+                                                        onClick={(e) => {
                                                             e.stopPropagation();
                                                             if (deletingId) return;
-                                                            setDeletingId(log.id);
-                                                            setDeleteError('');
-                                                            try {
-                                                                await deleteTimeLog(log.id, log.taskId, log.projectId);
-                                                            } catch (err) {
-                                                                console.error("Delete Error:", err);
-                                                                setDeleteError(err.message || "Error eliminando el registro");
-                                                            } finally {
-                                                                setDeletingId(null);
-                                                            }
+                                                            setConfirmDeleteLog(log);
+                                                            setConfirmCode('');
+                                                            setTimeout(() => confirmInputRef.current?.focus(), 100);
                                                         }}
                                                         disabled={deletingId === log.id}
                                                         className={`p-1.5 rounded-lg transition-all ${deletingId === log.id
-                                                            ? 'text-slate-400 cursor-not-allowed bg-slate-100 opacity-100'
-                                                            : isRunning
-                                                                ? 'text-red-400 opacity-100 hover:bg-red-50'
-                                                                : 'text-red-400 opacity-0 group-hover:opacity-100 hover:bg-red-50'
+                                                            ? 'text-slate-400 cursor-not-allowed bg-slate-800'
+                                                            : 'text-red-400 hover:bg-red-500/15'
                                                             }`}
                                                         title="Eliminar registro"
                                                     >
@@ -430,6 +433,85 @@ export default function WorkLogs() {
                     )}
                 </div>
             </div>
+
+            {/* ═══ Delete Confirmation Modal ═══ */}
+            {confirmDeleteLog && (
+                <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setConfirmDeleteLog(null)}>
+                    <div
+                        className="bg-slate-900 border border-red-500/40 rounded-2xl shadow-2xl shadow-red-500/10 p-6 w-full max-w-sm mx-4"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="p-2.5 bg-red-500/15 rounded-xl border border-red-500/30">
+                                <AlertTriangle className="w-6 h-6 text-red-400" />
+                            </div>
+                            <div>
+                                <h3 className="text-base font-black text-white">Eliminar Registro</h3>
+                                <p className="text-xs text-slate-400">Esta acción no se puede deshacer</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-800/80 rounded-xl p-3 mb-4 border border-slate-700">
+                            <p className="text-xs text-slate-300">
+                                <span className="font-bold text-white">{getTaskName(confirmDeleteLog.taskId, confirmDeleteLog) || 'Sin tarea'}</span>
+                                {' — '}
+                                {formatDate(confirmDeleteLog.startTime)}
+                                {' · '}
+                                <span className="font-bold text-indigo-400">{formatDurationSec(confirmDeleteLog.totalHours)}</span>
+                            </p>
+                        </div>
+
+                        <p className="text-xs text-slate-300 mb-3">
+                            Para confirmar, escriba <span className="font-black text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">1234</span> en el campo:
+                        </p>
+
+                        <input
+                            ref={confirmInputRef}
+                            type="text"
+                            value={confirmCode}
+                            onChange={(e) => setConfirmCode(e.target.value)}
+                            placeholder="Escriba 1234"
+                            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/30 font-mono tracking-widest text-center"
+                            autoComplete="off"
+                        />
+
+                        <div className="flex gap-3 mt-5">
+                            <button
+                                onClick={() => { setConfirmDeleteLog(null); setConfirmCode(''); }}
+                                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                disabled={confirmCode !== '1234' || deletingId}
+                                onClick={async () => {
+                                    if (confirmCode !== '1234') return;
+                                    const log = confirmDeleteLog;
+                                    setDeletingId(log.id);
+                                    setDeleteError('');
+                                    setConfirmDeleteLog(null);
+                                    setConfirmCode('');
+                                    try {
+                                        await deleteTimeLog(log.id, log.taskId, log.projectId);
+                                    } catch (err) {
+                                        console.error("Delete Error:", err);
+                                        setDeleteError(err.message || "Error eliminando el registro");
+                                    } finally {
+                                        setDeletingId(null);
+                                    }
+                                }}
+                                className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-black transition-all ${
+                                    confirmCode === '1234'
+                                        ? 'bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-500/20 border border-red-500'
+                                        : 'bg-slate-800 text-slate-600 cursor-not-allowed border border-slate-700'
+                                }`}
+                            >
+                                Eliminar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Task Detail Modal */}
             {isTaskModalOpen && selectedTask && (
