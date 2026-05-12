@@ -44,6 +44,36 @@ export function useAutoBomData() {
     const pdfInputRef = useRef(null);
     const excelInputRef = useRef(null);
 
+    // ── Supabase → camelCase mappers ──
+    const mapProject = (r) => ({
+        ...r,
+        createdAt: r.created_at || r.createdAt,
+        createdBy: r.created_by || r.createdBy,
+    });
+
+    const mapCatalogItem = (r) => ({
+        ...r,
+        partNumber: r.part_number || r.partNumber || '',
+        lastPrice: Number(r.last_price ?? r.lastPrice ?? 0),
+        brand: r.brand_id ? { id: r.brand_id } : r.brand || null,
+        category: r.category_id ? { id: r.category_id } : r.category || null,
+        defaultProvider: r.default_provider_id ? { id: r.default_provider_id } : r.defaultProvider || null,
+        leadTimeWeeks: r.lead_time_weeks ?? r.leadTimeWeeks ?? null,
+        imageUrl: r.image_url || r.imageUrl || '',
+    });
+
+    const mapBomItem = (r) => ({
+        ...r,
+        projectId: r.project_id || r.projectId,
+        masterPartRef: r.master_part_ref_id ? { id: r.master_part_ref_id } : r.masterPartRef || null,
+        quantity: Number(r.quantity || 0),
+        unitPrice: Number(r.unit_price ?? r.unitPrice ?? 0),
+        totalPrice: Number(r.total_price ?? r.totalPrice ?? 0),
+        proveedor: r.proveedor_id ? { id: r.proveedor_id } : r.proveedor || null,
+        addedAt: r.added_at || r.addedAt || r.created_at || '',
+        leadTimeWeeks: r.lead_time_weeks ?? r.leadTimeWeeks ?? null,
+    });
+
     // ── Data Subscriptions ──
 
     useEffect(() => {
@@ -58,9 +88,9 @@ export function useAutoBomData() {
                     supabase.from('proveedores').select('*').order('name'),
                     supabase.from('marcas').select('*').order('name'),
                 ]);
-                if (p.data) setProyectos(p.data);
-                if (c.data) setCatalogo(c.data);
-                if (b.data) setBomItems(b.data);
+                if (p.data) setProyectos(p.data.map(mapProject));
+                if (c.data) setCatalogo(c.data.map(mapCatalogItem));
+                if (b.data) setBomItems(b.data.map(mapBomItem));
                 setManagedLists({
                     categories: (cat.data || []).filter(d => d.name),
                     providers: (prov.data || []).filter(d => d.name),
@@ -72,13 +102,13 @@ export function useAutoBomData() {
             // Realtime for key tables
             const ch = supabase.channel('autobom-realtime')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'proyectos_bom' }, () => {
-                    supabase.from('proyectos_bom').select('*').order('created_at', { ascending: false }).then(({ data }) => data && setProyectos(data));
+                    supabase.from('proyectos_bom').select('*').order('created_at', { ascending: false }).then(({ data }) => data && setProyectos(data.map(mapProject)));
                 })
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'catalogo_maestro' }, () => {
-                    supabase.from('catalogo_maestro').select('*').order('name').then(({ data }) => data && setCatalogo(data));
+                    supabase.from('catalogo_maestro').select('*').order('name').then(({ data }) => data && setCatalogo(data.map(mapCatalogItem)));
                 })
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'items_bom' }, () => {
-                    supabase.from('items_bom').select('*').then(({ data }) => data && setBomItems(data));
+                    supabase.from('items_bom').select('*').then(({ data }) => data && setBomItems(data.map(mapBomItem)));
                 })
                 .subscribe();
 
@@ -138,10 +168,11 @@ export function useAutoBomData() {
         if (!projectData.name.trim()) return;
         const data = { name: projectData.name, description: projectData.description, createdAt: new Date().toISOString() };
         if (USE_SUPABASE) {
+            const sbData = { name: projectData.name, description: projectData.description || '', created_at: new Date().toISOString() };
             if (editingProjectId) {
-                await supabase.from('proyectos_bom').update(data).eq('id', editingProjectId);
+                await supabase.from('proyectos_bom').update(sbData).eq('id', editingProjectId);
             } else {
-                await supabase.from('proyectos_bom').insert(data);
+                await supabase.from('proyectos_bom').insert(sbData);
             }
         } else {
             const { doc, setDoc, updateDoc, collection } = await import('firebase/firestore');
