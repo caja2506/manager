@@ -1815,8 +1815,8 @@ export default function MainTable() {
                             selectedTaskIds={selectedTaskIds}
                             onToggleSelect={toggleSelectTask}
                             onTaskCreated={handleTaskCreated}
-                            activeFilterProject={filterProject}
-                            activeFilterAssignee={filterAssignee}
+                            activeFilterProject={taskFilterProject}
+                            activeFilterAssignee={taskFilterAssignee}
                         />
                     );
                 })}
