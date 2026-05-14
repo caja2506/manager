@@ -77,6 +77,12 @@ export function EngineeringDataProvider({ children }) {
     const [delayCauses, setDelayCauses] = useState([]);
     const [delays, setDelays] = useState([]);
 
+    // --- Global Task Filters ---
+    const [taskSearch, setTaskSearch] = useState('');
+    const [taskFilterProject, setTaskFilterProject] = useState('');
+    const [taskFilterAssignee, setTaskFilterAssignee] = useState('my-team');
+    const [taskFilterPriority, setTaskFilterPriority] = useState('');
+
     // Track readiness: all subscriptions must fire at least once
     const [isReady, setIsReady] = useState(false);
     const loadedCountRef = useRef(0);
@@ -155,6 +161,11 @@ export function EngineeringDataProvider({ children }) {
         delayCauses,
         delays,
         isReady,
+        // Global Filters
+        taskSearch, setTaskSearch,
+        taskFilterProject, setTaskFilterProject,
+        taskFilterAssignee, setTaskFilterAssignee,
+        taskFilterPriority, setTaskFilterPriority,
     };
 
     return (
