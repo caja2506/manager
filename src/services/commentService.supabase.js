@@ -87,7 +87,17 @@ export async function fetchComments(taskId) {
         .eq('task_id', taskId)
         .order('created_at', { ascending: true });
     if (error) { console.warn('[commentService.sb] fetchComments:', error.message); return []; }
-    return data || [];
+    // Map snake_case → camelCase for component compatibility
+    return (data || []).map(c => ({
+        id: c.id,
+        taskId: c.task_id,
+        text: c.text,
+        userId: c.user_id,
+        userName: c.user_name,
+        edited: c.edited,
+        createdAt: c.created_at,
+        updatedAt: c.updated_at,
+    }));
 }
 
 /**

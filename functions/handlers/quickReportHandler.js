@@ -5,9 +5,17 @@
  * 
  * getQuickReportData: returns user's active tasks + subtasks for today
  * submitQuickReport: saves progress reports and updates task/subtask data
+ *
+ * [SUPABASE MIGRATION] Core data (tasks, subtasks, time_logs, users)
+ * now read/written via coreDataReader (Supabase).
+ * Telegram reports still written to Firestore.
  */
 
 const paths = require("../automation/firestorePaths");
+const {
+    loadAllUsers, loadUser, loadUserTasks, loadTaskSubtasks,
+    loadTaskUserTimeLogs, updateTask, updateSubtask, insertTimeLog, insertTask,
+} = require("../db/coreDataReader");
 
 /**
  * Load active tasks + subtasks for a user identified by Telegram chatId.
@@ -15,96 +23,65 @@ const paths = require("../automation/firestorePaths");
 async function getQuickReportData(adminDb, chatId) {
     const chatIdStr = String(chatId);
 
-    // ── 1. Try direct field: users.telegramChatId ──
-    let usersSnap = await adminDb.collection(paths.USERS)
-        .where("telegramChatId", "==", chatIdStr)
-        .limit(1)
-        .get();
+    // ── 1. Find user by telegramChatId or providerLinks in Supabase ──
+    const allUsers = await loadAllUsers();
 
-    if (!usersSnap.empty) {
-        const userDoc = usersSnap.docs[0];
-        return await buildReportData(adminDb, userDoc.id, userDoc.data());
+    let foundUser = null;
+
+    // Try direct telegramChatId match
+    foundUser = allUsers.find(u => String(u.telegramChatId) === chatIdStr);
+
+    // Try providerLinks.telegram.chatId
+    if (!foundUser) {
+        foundUser = allUsers.find(u => {
+            const linkedChatId = u.providerLinks?.telegram?.chatId;
+            return linkedChatId && String(linkedChatId) === chatIdStr;
+        });
     }
 
-    // ── 2. Try providerLinks.telegram.chatId (scan automation participants) ──
-    const participantsSnap = await adminDb.collection(paths.USERS)
-        .where("isAutomationParticipant", "==", true)
-        .get();
+    // ── 2. Fallback: try telegramSessions (Firestore) ──
+    if (!foundUser) {
+        const sessionSnap = await adminDb.collection(paths.TELEGRAM_SESSIONS)
+            .where("chatId", "==", chatIdStr)
+            .limit(1)
+            .get();
 
-    for (const doc of participantsSnap.docs) {
-        const u = doc.data();
-        const linkedChatId = u.providerLinks?.telegram?.chatId;
-        if (linkedChatId && String(linkedChatId) === chatIdStr) {
-            return await buildReportData(adminDb, doc.id, u);
-        }
-    }
-
-    // ── 3. Try telegramSessions ──
-    const sessionSnap = await adminDb.collection(paths.TELEGRAM_SESSIONS)
-        .where("chatId", "==", chatIdStr)
-        .limit(1)
-        .get();
-
-    if (!sessionSnap.empty) {
-        const session = sessionSnap.docs[0].data();
-        if (session.userId) {
-            const userDoc = await adminDb.collection(paths.USERS).doc(session.userId).get();
-            if (userDoc.exists) {
-                return await buildReportData(adminDb, userDoc.id, userDoc.data());
+        if (!sessionSnap.empty) {
+            const session = sessionSnap.docs[0].data();
+            if (session.userId) {
+                foundUser = await loadUser(session.userId);
             }
         }
     }
 
-    console.warn(`[quickReport] User not found for chatId: ${chatIdStr}`);
-    return { error: "user_not_found", tasks: [] };
+    if (!foundUser) {
+        console.warn(`[quickReport] User not found for chatId: ${chatIdStr}`);
+        return { error: "user_not_found", tasks: [] };
+    }
+
+    return await buildReportData(foundUser.id, foundUser);
 }
 
-async function buildReportData(adminDb, userId, userData) {
+async function buildReportData(userId, userData) {
     const today = new Date().toISOString().substring(0, 10);
     const TERMINAL = ["completed", "cancelled"];
 
-    // ── Get all tasks assigned to this user ──
-    const tasksSnap = await adminDb.collection(paths.TASKS)
-        .where("assignedTo", "==", userId)
-        .get();
-
-    const allTasks = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // ── Get all tasks assigned to this user from Supabase ──
+    const allTasks = await loadUserTasks(userId);
 
     // Filter to active tasks relevant for today
     const todayTasks = allTasks.filter(t => {
         if (TERMINAL.includes(t.status)) return false;
         const startDate = t.plannedStartDate ? String(t.plannedStartDate).substring(0, 10) : null;
-        const dueDate = t.dueDate ? String(t.dueDate).substring(0, 10) : null;
         if (startDate && startDate > today) return false;
         return true;
     });
 
-    // ── Get subtasks for these tasks ──
-    const taskIds = todayTasks.map(t => t.id);
-    let allSubtasks = [];
-
-    // Firestore 'in' queries support max 30 values
-    for (let i = 0; i < taskIds.length; i += 30) {
-        const batch = taskIds.slice(i, i + 30);
-        if (batch.length === 0) continue;
-        const subSnap = await adminDb.collection(paths.SUBTASKS)
-            .where("taskId", "in", batch)
-            .get();
-        allSubtasks = allSubtasks.concat(
-            subSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-        );
-    }
-
-    // Group subtasks by taskId
+    // ── Get subtasks for these tasks from Supabase ──
     const subtasksByTask = {};
-    for (const st of allSubtasks) {
-        if (!subtasksByTask[st.taskId]) subtasksByTask[st.taskId] = [];
-        subtasksByTask[st.taskId].push(st);
-    }
-
-    // Sort subtasks by order
-    for (const key of Object.keys(subtasksByTask)) {
-        subtasksByTask[key].sort((a, b) => (a.order || 0) - (b.order || 0));
+    for (const task of todayTasks) {
+        const subs = await loadTaskSubtasks(task.id);
+        if (subs.length > 0) subtasksByTask[task.id] = subs;
     }
 
     // ── Build response ──
@@ -135,7 +112,7 @@ async function buildReportData(adminDb, userId, userData) {
 
     return {
         userId,
-        userName: userData.displayName || userData.email || userId,
+        userName: userData.displayName || userData.name || userData.email || userId,
         date: today,
         tasks,
         error: null,
@@ -163,16 +140,12 @@ async function submitQuickReport(adminDb, reportData) {
     const userId = userData.userId;
     const now = new Date();
     const todayStr = now.toISOString().substring(0, 10);
-    const batch = adminDb.batch();
     let updatedCount = 0;
 
     for (const report of taskReports) {
-        const taskRef = adminDb.collection(paths.TASKS).doc(report.taskId);
-
-        // Update task progress
+        // Update task progress in Supabase
         const taskUpdate = {
             progressPercent: report.progressPercent || 0,
-            updatedAt: now.toISOString(),
             updatedBy: userId,
         };
 
@@ -181,43 +154,37 @@ async function submitQuickReport(adminDb, reportData) {
             taskUpdate.blockedReason = report.blockerNote;
         }
 
-        batch.update(taskRef, taskUpdate);
+        await updateTask(report.taskId, taskUpdate);
 
-        // Update subtasks if provided
+        // Update subtasks in Supabase if provided
         if (report.subtasks && report.subtasks.length > 0) {
             for (const st of report.subtasks) {
-                const stRef = adminDb.collection(paths.SUBTASKS).doc(st.id);
-                batch.update(stRef, { completed: !!st.completed });
+                await updateSubtask(st.id, { completed: !!st.completed });
             }
         }
 
-        // Create timeLog entry — but only if no web timer already logged hours today
+        // Create timeLog entry in Supabase — but only if no web timer already logged hours today
         if (report.hoursWorked && report.hoursWorked > 0) {
-            // Check if web timer already recorded hours for this task today
             let skipTimeLog = false;
             try {
-                const existingLogsSnap = await adminDb.collection(paths.TIME_LOGS)
-                    .where("taskId", "==", report.taskId)
-                    .where("userId", "==", userId)
-                    .get();
+                const existingLogs = await loadTaskUserTimeLogs(report.taskId, userId);
 
-                existingLogsSnap.forEach(doc => {
-                    const log = doc.data();
+                for (const log of existingLogs) {
                     const logSource = log.source || "web";
-                    if (logSource === "telegram" || logSource === "telegram_webapp") return;
-                    if (!log.startTime) return;
+                    if (logSource === "telegram" || logSource === "telegram_webapp") continue;
+                    if (!log.startTime) continue;
                     const logDate = new Date(log.startTime).toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
                     if (logDate === todayStr && (log.totalHours || log.endTime === null)) {
                         skipTimeLog = true;
+                        break;
                     }
-                });
+                }
             } catch (err) {
                 console.warn("[quickReport] Timer check error:", err.message);
             }
 
             if (!skipTimeLog) {
-                const timeLogRef = adminDb.collection(paths.TIME_LOGS).doc();
-                batch.set(timeLogRef, {
+                await insertTimeLog({
                     taskId: report.taskId,
                     userId: userId,
                     date: todayStr,
@@ -234,9 +201,8 @@ async function submitQuickReport(adminDb, reportData) {
         updatedCount++;
     }
 
-    // Create telegram report record
-    const reportRef = adminDb.collection(paths.TELEGRAM_REPORTS).doc();
-    batch.set(reportRef, {
+    // Create telegram report record in Firestore (automation-only data)
+    await adminDb.collection(paths.TELEGRAM_REPORTS).add({
         userId,
         chatId: String(chatId),
         reportDate: todayStr,
@@ -245,8 +211,6 @@ async function submitQuickReport(adminDb, reportData) {
         note: note || null,
         createdAt: now.toISOString(),
     });
-
-    await batch.commit();
 
     return {
         success: true,
@@ -276,7 +240,8 @@ async function createQuickTask(adminDb, data) {
     const now = new Date();
     const todayStr = now.toISOString().substring(0, 10);
 
-    const taskDoc = {
+    // Insert task in Supabase
+    const task = await insertTask({
         title: title.trim(),
         description: "",
         status: "in_progress",
@@ -289,16 +254,17 @@ async function createQuickTask(adminDb, data) {
         dueDate: null,
         source: "telegram_webapp",
         createdBy: userId,
-        createdAt: now.toISOString(),
-        updatedAt: now.toISOString(),
-    };
+    });
 
-    const ref = await adminDb.collection(paths.TASKS).add(taskDoc);
-    console.log(`[quickReport] Created task ${ref.id}: "${title}" for user ${userId}`);
+    if (!task) {
+        return { error: "Failed to create task", success: false };
+    }
+
+    console.log(`[quickReport] Created task ${task.id}: "${title}" for user ${userId}`);
 
     return {
         success: true,
-        taskId: ref.id,
+        taskId: task.id,
         title: title.trim(),
     };
 }

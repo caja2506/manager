@@ -230,6 +230,7 @@ export default function AreaTaskKanban({ workAreaTypes, taskTypes }) {
             rawTypes.forEach(val => {
                 let typeObj = taskTypes.find(t => t.id === val);
                 if (!typeObj) typeObj = taskTypes.find(t => t.name === val); // Legacy fallback
+                if (!typeObj) typeObj = taskTypes.find(t => t.firestoreId === val); // Migration fallback
                 
                 if (typeObj) {
                     resolvedTypes.push(typeObj);

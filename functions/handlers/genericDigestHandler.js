@@ -1,24 +1,23 @@
 /**
  * Generic Digest Handler — Backend (CJS)
  * ========================================
- * Handles digest & alert routines with real Firestore data.
+ * Handles digest & alert routines with real data from Supabase.
  * Works for: engineer_risk_digest, block_incident_alert, and future digests.
+ *
+ * [SUPABASE MIGRATION] Core data (tasks, delays) now read via coreDataReader.
  */
 
 const { sendToTargets } = require("../telegram/telegramProvider");
-const paths = require("../automation/firestorePaths");
+const { loadAllTasks, loadAllDelays } = require("../db/coreDataReader");
 
 /**
- * Pre-load task & delay data from Firestore.
+ * Pre-load task & delay data from Supabase.
  */
-async function loadDigestData(adminDb) {
-    const [tasksSnap, delaysSnap] = await Promise.all([
-        adminDb.collection(paths.TASKS).get(),
-        adminDb.collection(paths.DELAYS).get(),
+async function loadDigestData() {
+    const [allTasks, allDelays] = await Promise.all([
+        loadAllTasks(),
+        loadAllDelays(),
     ]);
-
-    const allTasks = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const allDelays = delaysSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
     const now = new Date();
     const activeTasks = allTasks.filter(t => !["completed", "cancelled"].includes(t.status));
@@ -33,7 +32,7 @@ async function loadDigestData(adminDb) {
 
 const engineerRiskDigest = {
     async execute(adminDb, token, targets, context) {
-        const data = await loadDigestData(adminDb);
+        const data = await loadDigestData();
 
         const messageBuilder = async (target) => {
             const uid = target.uid;
@@ -81,7 +80,7 @@ const engineerRiskDigest = {
 
 const blockIncidentAlert = {
     async execute(adminDb, token, targets, context) {
-        const data = await loadDigestData(adminDb);
+        const data = await loadDigestData();
 
         const messageBuilder = async (target) => {
             const name = target.name || "Usuario";

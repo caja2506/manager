@@ -128,8 +128,17 @@ export async function generatePRChecklist(taskTypeName, context = '') {
 }
 
 export async function saveTaskTypeChecklist(taskTypeId, sections) {
-    const result = await saveTaskTypeChecklistFn({ taskTypeId, sections });
-    return result.data;
+    const { data, error } = await supabase
+        .from('task_types')
+        .update({ 
+            peer_review_sections: sections || [],
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', taskTypeId)
+        .select();
+        
+    if (error) throw new Error(`[peerReviewService.sb] saveChecklist: ${error.message}`);
+    return data;
 }
 
 // ── TaskType → Peer Review Resolution ──

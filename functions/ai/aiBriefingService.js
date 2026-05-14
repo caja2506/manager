@@ -41,17 +41,16 @@ async function loadAIConfig(adminDb) {
 }
 
 /**
- * Load operational data for briefings from Firestore.
+ * Load operational data for briefings from Supabase.
  */
 async function loadBriefingData(adminDb, userId, role) {
+    const { loadAllTasks, loadAllProjects, loadAllUsers } = require("../db/coreDataReader");
     const now = new Date();
     const data = {};
 
-    // Active tasks
-    const tasksSnap = await adminDb.collection(paths.TASKS)
-        .where("status", "not-in", ["completed", "cancelled"])
-        .get();
-    const allTasks = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Active tasks from Supabase
+    const allTasksRaw = await loadAllTasks();
+    const allTasks = allTasksRaw.filter(t => !["completed", "cancelled"].includes(t.status));
 
     data.totalTasks = allTasks.length;
     data.userTasks = allTasks.filter(t => t.assignedTo === userId);
@@ -61,7 +60,7 @@ async function loadBriefingData(adminDb, userId, role) {
     data.overdueCount = data.overdueTasks.length;
     data.blockedCount = data.blockedTasks.length;
 
-    // Open incidents
+    // Open incidents (still Firestore — not a migrated table)
     try {
         const incidentsSnap = await adminDb.collection(paths.OPERATION_INCIDENTS)
             .where("status", "==", "open")
@@ -71,20 +70,18 @@ async function loadBriefingData(adminDb, userId, role) {
         data.openIncidents = 0;
     }
 
-    // Active projects
+    // Active projects from Supabase
     try {
-        const projectsSnap = await adminDb.collection(paths.PROJECTS).get();
-        data.activeProjects = projectsSnap.size;
+        const projects = await loadAllProjects();
+        data.activeProjects = projects.length;
     } catch {
         data.activeProjects = 0;
     }
 
-    // Team size
+    // Team size from Supabase
     try {
-        const usersSnap = await adminDb.collection(paths.USERS)
-            .where("isAutomationParticipant", "==", true)
-            .get();
-        data.teamSize = usersSnap.size;
+        const allUsers = await loadAllUsers();
+        data.teamSize = allUsers.filter(u => u.isAutomationParticipant).length;
     } catch {
         data.teamSize = 0;
     }

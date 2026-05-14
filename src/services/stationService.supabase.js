@@ -32,19 +32,11 @@ export async function getProjectStations(projectId) {
 export function onProjectStations(projectId, callback) {
     if (!projectId) { callback([]); return () => {}; }
 
-    // Initial fetch
+    // Just fetch — no per-row Realtime subscription needed.
+    // Stations rarely change, and having N channels (one per task row) crashes Supabase.
     getProjectStations(projectId).then(callback);
 
-    // Realtime subscription
-    const channel = supabase
-        .channel(`stations-${projectId}`)
-        .on('postgres_changes',
-            { event: '*', schema: 'public', table: 'project_stations', filter: `project_id=eq.${projectId}` },
-            () => { getProjectStations(projectId).then(callback); }
-        )
-        .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
+    return () => {};
 }
 
 export async function addStation(projectId, stationData, userId = null) {

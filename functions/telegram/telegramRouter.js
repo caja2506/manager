@@ -18,6 +18,7 @@ const {
 const { createDelivery, markResponded } = require("./telegramDeliveryTracker");
 const { incrementTodayMetrics } = require("../automation/metricsUpdater");
 const paths = require("../automation/firestorePaths");
+const coreReader = require("../db/coreDataReader");
 const {
     TELEGRAM_SESSION_STATE,
     TELEGRAM_SESSION_EVENT,
@@ -182,9 +183,33 @@ async function routeInboundMessage(adminDb, token, chatId, text, rawMessage, ext
                     "🎙️ Recibí tu nota de voz, pero no estoy esperando un reporte.\nToca <b>📝 Reportar</b> para iniciar."
                 );
             } else {
-                await sendMessageWithReplyKeyboard(token, chatIdStr,
-                    "📬 Mensaje recibido. Usa los botones del menú para interactuar."
-                );
+                // ── ARIA Conversation Engine ──
+                // Route free-text messages through the AI agent for natural conversation
+                try {
+                    const { processMessage } = require("../agent/conversationEngine");
+                    const user = await coreReader.loadUser(userId) || {};
+                    const userRole = user.operationalRole || user.teamRole || "engineer";
+
+                    const ariaResult = await processMessage({
+                        userId,
+                        chatId: chatIdStr,
+                        userMessage: text,
+                        userName: user.name || user.displayName || "Usuario",
+                        userRole,
+                        keys: {
+                            nvidiaKey: extras.nvidiaKey || null,
+                            geminiKey: extras.apiKey || null,
+                        },
+                    });
+
+                    await sendMessage(token, chatIdStr, ariaResult.response);
+                    console.log(`[telegramRouter] ARIA response sent (${ariaResult.latencyMs}ms, provider=${ariaResult.provider}, tools=[${ariaResult.toolsUsed.join(",")}])`);
+                } catch (ariaErr) {
+                    console.error("[telegramRouter] ARIA engine error:", ariaErr);
+                    await sendMessageWithReplyKeyboard(token, chatIdStr,
+                        "📬 Mensaje recibido. Usa los botones del menú para interactuar."
+                    );
+                }
             }
             break;
     }
@@ -217,8 +242,7 @@ async function handleCommand(adminDb, token, chatId, userId, cmd, session) {
                 await sendMessage(token, chatId, templates.unknownUserMessage());
                 return;
             }
-            const userDoc = await adminDb.collection(paths.USERS).doc(userId).get();
-            const user = userDoc.exists ? userDoc.data() : {};
+            const user = await coreReader.loadUser(userId) || {};
             await sendMessage(token, chatId, templates.statusMessage({
                 name: user.name || "Usuario",
                 role: user.operationalRole || user.teamRole || "No asignado",
@@ -583,22 +607,14 @@ async function handleBlockCause(adminDb, token, chatId, userId, text, session, e
 async function getUserName(adminDb, userId) {
     if (!userId) return "Usuario";
     try {
-        // Try 'users' collection first
-        const userDoc = await adminDb.collection(paths.USERS).doc(userId).get();
-        if (userDoc.exists) {
-            const data = userDoc.data();
-            if (data.name) return data.name;
-            if (data.displayName) return data.displayName;
-            if (data.firstName) return `${data.firstName} ${data.lastName || ""}`.trim();
-        }
-
-        // Try 'users_roles' collection
-        const roleDoc = await adminDb.collection(paths.USERS_ROLES).doc(userId).get();
-        if (roleDoc.exists) {
-            const data = roleDoc.data();
-            if (data.name) return data.name;
-            if (data.displayName) return data.displayName;
-            if (data.email) return data.email.split("@")[0];
+        // Read from Supabase via coreDataReader
+        const { loadUser } = require("../db/coreDataReader");
+        const user = await loadUser(userId);
+        if (user) {
+            if (user.name) return user.name;
+            if (user.displayName) return user.displayName;
+            if (user.firstName) return `${user.firstName} ${user.lastName || ""}`.trim();
+            if (user.email) return user.email.split("@")[0];
         }
 
         // Final fallback: Firebase Auth record
@@ -620,35 +636,28 @@ async function getUserName(adminDb, userId) {
  */
 async function getTimerHoursForTaskToday(adminDb, taskId, userId, dateStr) {
     try {
-        const logsSnap = await adminDb.collection(paths.TIME_LOGS)
-            .where("taskId", "==", taskId)
-            .where("userId", "==", userId)
-            .get();
+        const { loadTaskUserTimeLogs } = require("../db/coreDataReader");
+        const logs = await loadTaskUserTimeLogs(taskId, userId);
 
         let totalHours = 0;
         let hasTimerHours = false;
 
-        logsSnap.forEach(doc => {
-            const log = doc.data();
+        for (const log of logs) {
             const logSource = log.source || "web";
-            // Only count non-telegram sources (web timers)
-            if (logSource === "telegram" || logSource === "telegram_webapp") return;
-            // Check if the log is from the target date
-            if (!log.startTime) return;
+            if (logSource === "telegram" || logSource === "telegram_webapp") continue;
+            if (!log.startTime) continue;
             const logDate = new Date(log.startTime).toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
-            if (logDate !== dateStr) return;
-            // Count completed logs
+            if (logDate !== dateStr) continue;
             if (log.totalHours && log.endTime) {
                 totalHours += log.totalHours;
                 hasTimerHours = true;
             }
-            // Also count running timers (no endTime yet)
             if (!log.endTime && log.startTime) {
                 const elapsed = (Date.now() - new Date(log.startTime).getTime()) / 3600000;
                 totalHours += elapsed;
                 hasTimerHours = true;
             }
-        });
+        }
 
         return { hasTimerHours, totalHours: parseFloat(totalHours.toFixed(2)) };
     } catch (err) {
@@ -661,14 +670,8 @@ async function getTimerHoursForTaskToday(adminDb, taskId, userId, dateStr) {
  * Load subtasks for a task.
  */
 async function loadSubtasksForTask(adminDb, taskId) {
-    const subsSnap = await adminDb.collection(paths.SUBTASKS)
-        .where("taskId", "==", taskId)
-        .get();
-
-    const subtasks = subsSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => (a.order || 0) - (b.order || 0));
-
-    return subtasks;
+    const { loadTaskSubtasks } = require("../db/coreDataReader");
+    return await loadTaskSubtasks(taskId);
 }
 
 /**
@@ -752,19 +755,13 @@ async function saveReport(adminDb, token, chatId, userId, userName, data) {
  * Show task selection keyboard with inline buttons.
  */
 async function showTaskSelectionKeyboard(adminDb, token, chatId, userId) {
-    // Fetch active tasks for this user
-    const tasksSnap = await adminDb.collection(paths.TASKS)
-        .where("assignedTo", "==", userId)
-        .get();
+    // Fetch active tasks for this user from Supabase
+    const { loadUserTasks } = require("../db/coreDataReader");
+    const userTasks = await loadUserTasks(userId);
 
-    const activeTasks = [];
-    tasksSnap.forEach(doc => {
-        const t = doc.data();
-        const status = t.status || "pending";
-        if (status !== "completed" && status !== "cancelled") {
-            activeTasks.push({ id: doc.id, title: t.title || "Sin título", status });
-        }
-    });
+    const activeTasks = userTasks
+        .filter(t => t.status !== "completed" && t.status !== "cancelled")
+        .map(t => ({ id: t.id, title: t.title || "Sin título", status: t.status || "pending" }));
 
     // Build inline keyboard — each task as a button row, + "Create new"
     const keyboard = activeTasks.slice(0, 8).map(task => {
@@ -773,7 +770,6 @@ async function showTaskSelectionKeyboard(adminDb, token, chatId, userId) {
         return [{ text: `${icon} ${task.title.substring(0, 35)}`, callback_data: `task:${task.id}` }];
     });
 
-    // Build keyboard with ❌ Cancelar
     keyboard.push([{ text: "➕ Crear tarea nueva", callback_data: "task:new" }]);
     keyboard.push([{ text: "❌ Cancelar", callback_data: "cancel" }]);
 
@@ -841,14 +837,14 @@ async function routeCallbackQuery(adminDb, token, chatId, callbackData, callback
             return;
         }
 
-        // Selected an existing task
-        const taskDoc = await adminDb.collection(paths.TASKS).doc(taskRef).get();
-        if (!taskDoc.exists) {
+        // Selected an existing task — load from Supabase
+        const { loadTask: loadTaskSB } = require("../db/coreDataReader");
+        const taskData = await loadTaskSB(taskRef);
+        if (!taskData) {
             await sendMessage(token, chatIdStr, "⚠️ Tarea no encontrada. Intenta de nuevo.");
             return;
         }
 
-        const taskData = taskDoc.data();
         const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
 
         // Check for existing timer hours
@@ -923,17 +919,16 @@ async function routeCallbackQuery(adminDb, token, chatId, callbackData, callback
             const toggledIds = new Set(freshSession.metadata?.toggledSubtaskIds || []);
             const now = new Date().toISOString();
 
-            // Batch update toggled subtasks in Firestore
+            // Update toggled subtasks in Supabase
             if (toggledIds.size > 0) {
-                const batch = adminDb.batch();
+                const { updateSubtask: updateSubtaskSB } = require("../db/coreDataReader");
                 for (const stId of toggledIds) {
-                    batch.update(adminDb.collection(paths.SUBTASKS).doc(stId), {
+                    await updateSubtaskSB(stId, {
                         completed: true,
                         completedAt: now,
                         completedBy: userId,
                     });
                 }
-                await batch.commit();
                 console.log(`[subtaskToggle] Marked ${toggledIds.size} subtasks as completed for task ${taskId}`);
             }
 
@@ -1058,23 +1053,8 @@ async function routeCallbackQuery(adminDb, token, chatId, callbackData, callback
 async function recalculateTaskHoursBackend(adminDb, taskId) {
     if (!taskId) return;
     try {
-        const logsSnap = await adminDb.collection(paths.TIME_LOGS)
-            .where("taskId", "==", taskId)
-            .get();
-
-        let totalHours = 0;
-        logsSnap.forEach(doc => {
-            const data = doc.data();
-            if (data.totalHours && data.endTime) {
-                totalHours += data.totalHours;
-            }
-        });
-
-        totalHours = parseFloat(totalHours.toFixed(4));
-        await adminDb.collection(paths.TASKS).doc(taskId).update({
-            actualHours: totalHours,
-            updatedAt: new Date().toISOString(),
-        });
+        const { recalculateTaskHours: recalcSB } = require("../db/coreDataReader");
+        const totalHours = await recalcSB(taskId);
         console.log(`[recalculate] Task ${taskId} actualHours=${totalHours}`);
     } catch (err) {
         console.error("[recalculate] Error recalculating task hours:", err.message);
@@ -1105,20 +1085,20 @@ async function handleCreateTask(adminDb, token, chatId, userId, text, session, r
         return;
     }
 
-    // Create task in Firestore
+    // Create task in Supabase
     const now = new Date().toISOString();
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
-    const taskRef = await adminDb.collection(paths.TASKS).add({
+    const { insertTask: insertTaskSB } = require("../db/coreDataReader");
+    const newTask = await insertTaskSB({
         title: taskTitle.trim(),
         assignedTo: userId,
         status: "in_progress",
         progress: 0,
         priority: "medium",
-        createdAt: now,
-        updatedAt: now,
         startDate: today,
         source: "telegram",
     });
+    const taskRef = { id: newTask?.id };
 
     // Store in session
     await adminDb.collection(paths.TELEGRAM_SESSIONS).doc(session.id).update({
@@ -1276,11 +1256,12 @@ async function saveTaskReport(adminDb, token, chatId, userId, userName, data) {
                     // (we don't have the ref here, but the data is logged)
                 } catch (_) { /* non-critical */ }
             } else {
-                // No timer hours — create timeLog from Telegram report
+                // No timer hours — create timeLog in Supabase from Telegram report
                 const startHour = new Date(`${today}T08:00:00`);
                 const endHour = new Date(startHour.getTime() + (hours * 3600000));
 
-                const timeLogDoc = JSON.parse(JSON.stringify({
+                const { insertTimeLog: insertTL } = require("../db/coreDataReader");
+                await insertTL({
                     taskId: taskId,
                     projectId: null,
                     userId: userId || "unknown",
@@ -1292,9 +1273,7 @@ async function saveTaskReport(adminDb, token, chatId, userId, userName, data) {
                     overtimeHours: 0,
                     notes: `Reporte vía Telegram: ${safe.normalizedSummary || ""}`.substring(0, 200),
                     source: "telegram",
-                    createdAt: now,
-                }));
-                await adminDb.collection(paths.TIME_LOGS).add(timeLogDoc);
+                });
                 await recalculateTaskHoursBackend(adminDb, taskId);
                 console.log(`[saveTaskReport] Created timeLog: ${hours}h for task ${taskId} (no timer data found).`);
             }
@@ -1306,9 +1285,10 @@ async function saveTaskReport(adminDb, token, chatId, userId, userName, data) {
     // 3. Update task progress
     if (taskId && progress > 0) {
         try {
-            const updateData = { progress, updatedAt: now };
+            const { updateTask: updateTaskSB } = require("../db/coreDataReader");
+            const updateData = { progress };
             if (hasBlocker) updateData.status = "blocked";
-            await adminDb.collection(paths.TASKS).doc(taskId).update(updateData);
+            await updateTaskSB(taskId, updateData);
         } catch (e) {
             console.error("[saveTaskReport] STEP 3 task update failed:", e.message);
         }
@@ -1402,11 +1382,12 @@ async function handleOvertimeForTask(adminDb, token, chatId, userId, taskId, ses
     const now = new Date().toISOString();
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
 
-    // Create overtime timeLog (schema-compatible)
+    // Create overtime timeLog in Supabase
     const startHour = new Date(`${today}T18:00:00`);
     const endHour = new Date(startHour.getTime() + (overtimeHours * 3600000));
 
-    await adminDb.collection(paths.TIME_LOGS).add({
+    const { insertTimeLog: insertOT } = require("../db/coreDataReader");
+    await insertOT({
         taskId,
         projectId: null,
         userId,
@@ -1418,7 +1399,6 @@ async function handleOvertimeForTask(adminDb, token, chatId, userId, taskId, ses
         overtimeHours: overtimeHours,
         notes: "Horas extra vía Telegram",
         source: "telegram",
-        createdAt: now,
     });
 
     // Recalculate task hours

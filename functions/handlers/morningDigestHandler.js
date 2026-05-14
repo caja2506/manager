@@ -2,19 +2,22 @@
  * Morning Digest Handler — Backend (CJS) — Phase 3 + Daily Scrum
  * ================================================================
  * Sends role-appropriate morning briefings to all participants.
- * Queries real task data from Firestore for each target.
+ * Queries real task data from Supabase for each target.
  * 
  * V5 Enhancement: Managers/Engineers/Team Leads get the Daily Scrum 
  * team summary using the SAME logic as the Equipo Hoy page.
  * Technicians get their individual briefing (unchanged).
+ *
+ * [SUPABASE MIGRATION] Core data (tasks, time_logs, delays, users)
+ * now read via coreDataReader (Supabase).
  */
 
 const { sendToTargets } = require("../telegram/telegramProvider");
 const { fallbackBriefing } = require("../ai/aiFallbacks");
 const templates = require("../telegram/telegramTemplates");
-const paths = require("../automation/firestorePaths");
 const { OPERATIONAL_ROLES } = require("../automation/constants");
 const { buildDailyScrumData, buildSummary } = require("../dailyScrum/dailyScrumEngine");
+const { loadAllTasks, loadAllTimeLogs, loadAllDelays, loadAllUsers } = require("../db/coreDataReader");
 
 /**
  * Execute morning digest routine.
@@ -24,18 +27,16 @@ const { buildDailyScrumData, buildSummary } = require("../dailyScrum/dailyScrumE
  */
 async function execute(adminDb, token, targets, context) {
     // ── Pre-load ALL data once (avoid N queries) ──
-    const [tasksSnap, timeLogsSnap, delaysSnap, usersSnap, assignmentsSnap] = await Promise.all([
-        adminDb.collection(paths.TASKS).get(),
-        adminDb.collection(paths.TIME_LOGS).get(),
-        adminDb.collection(paths.DELAYS).get(),
-        adminDb.collection(paths.USERS).get(),
+    // Core data from Supabase, resourceAssignments from Firestore (automation-only)
+    const [allTasks, allTimeLogs, allDelays, allUsers, assignmentsSnap] = await Promise.all([
+        loadAllTasks(),
+        loadAllTimeLogs(),
+        loadAllDelays(),
+        loadAllUsers(),
         adminDb.collection("resourceAssignments").where("active", "==", true).get(),
     ]);
 
-    const allTasks = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const allTimeLogs = timeLogsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const allDelays = delaysSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const teamMembers = usersSnap.docs.map(d => ({ id: d.id, uid: d.id, ...d.data() }));
+    const teamMembers = allUsers.map(u => ({ ...u, uid: u.id }));
     const activeAssignments = assignmentsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
     const now = new Date();

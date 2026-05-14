@@ -13,18 +13,29 @@ export function subscribeToNotifications(userId, onData, onError) {
     if (!userId) return () => {};
 
     // Initial fetch
-    fetchNotifications(userId).then(onData).catch(onError);
+    fetchNotifications(userId).then(onData).catch(err => {
+        console.warn('[notificationService.sb] Initial fetch failed:', err.message);
+        onData([]); // Return empty array instead of crashing
+    });
 
-    // Realtime
-    const channel = supabase
-        .channel(`notifications-${userId}`)
-        .on('postgres_changes',
+    // Realtime — wrap in try/catch to prevent ErrorBoundary crash
+    let channel;
+    try {
+        channel = supabase.channel(`notifications-${userId}`);
+        channel.on('postgres_changes',
             { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
-            () => { fetchNotifications(userId).then(onData).catch(onError); }
-        )
-        .subscribe();
+            () => { fetchNotifications(userId).then(onData).catch(err => console.warn('[notificationService.sb] Realtime refetch failed:', err.message)); }
+        );
+        channel.subscribe((status) => {
+            if (status === 'CHANNEL_ERROR') {
+                console.warn('[notificationService.sb] Channel error for notifications');
+            }
+        });
+    } catch (err) {
+        console.warn('[notificationService.sb] Realtime subscription failed:', err.message);
+    }
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { if (channel) supabase.removeChannel(channel); };
 }
 
 /**

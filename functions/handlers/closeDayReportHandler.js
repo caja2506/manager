@@ -8,6 +8,10 @@
  *   4. Send team summary to managers + team leads
  *
  * Triggered by: scheduledCloseDay (cron) or manual via admin panel
+ *
+ * [SUPABASE MIGRATION] Core data (tasks, time_logs, projects, delays)
+ * now read/written via coreDataReader (Supabase).
+ * Telegram reports still read from Firestore.
  */
 
 const { sendToTargets, sendToUser } = require("../telegram/telegramProvider");
@@ -15,6 +19,10 @@ const templates = require("../telegram/telegramTemplates");
 const paths = require("../automation/firestorePaths");
 const { OPERATIONAL_ROLES } = require("../automation/constants");
 const { loadBreakBands, getBreakHoursInRange } = require("../utils/breakTimeUtils");
+const {
+    loadAllTimeLogs, loadAllTasks, loadAllProjects, loadAllDelays,
+    updateTimeLog, recalculateTaskHours,
+} = require("../db/coreDataReader");
 
 /**
  * Execute the day close routine.
@@ -30,18 +38,15 @@ async function execute(adminDb, token, targets, context) {
     await loadBreakBands(adminDb);
 
     // ── 1. Load all data ──
-    const [timeLogsSnap, tasksSnap, projectsSnap, delaysSnap, reportsSnap] = await Promise.all([
-        adminDb.collection(paths.TIME_LOGS).get(),
-        adminDb.collection(paths.TASKS).get(),
-        adminDb.collection(paths.PROJECTS).get(),
-        adminDb.collection(paths.DELAYS).get(),
+    // Core data from Supabase, telegram reports from Firestore
+    const [allTimeLogs, allTasks, allProjects, allDelays, reportsSnap] = await Promise.all([
+        loadAllTimeLogs(),
+        loadAllTasks(),
+        loadAllProjects(),
+        loadAllDelays(),
         adminDb.collection(paths.TELEGRAM_REPORTS).where("date", "==", today).get(),
     ]);
 
-    const allTimeLogs = timeLogsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const allTasks = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const allProjects = projectsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const allDelays = delaysSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const todayReports = reportsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
     // ── 2. Stop all active timers ──
@@ -57,7 +62,7 @@ async function execute(adminDb, token, targets, context) {
                 let totalHours = parseFloat(Math.max(0, grossHours - breakHours).toFixed(6));
                 if (totalHours < 0.016666) totalHours = 0.016666;
 
-                await adminDb.collection(paths.TIME_LOGS).doc(log.id).update({
+                await updateTimeLog(log.id, {
                     endTime: now.toISOString(),
                     totalHours,
                     totalHoursGross: parseFloat(grossHours.toFixed(6)),
@@ -68,7 +73,7 @@ async function execute(adminDb, token, targets, context) {
 
                 // Recalculate task hours
                 if (log.taskId) {
-                    await recalculateTaskHours(adminDb, log.taskId);
+                    await recalculateTaskHours(log.taskId);
                 }
                 stoppedCount++;
             } catch (err) {
@@ -252,31 +257,6 @@ async function execute(adminDb, token, targets, context) {
         errors: individualResults.errors,
         stoppedTimers: stoppedCount,
     };
-}
-
-/**
- * Recalculate task actualHours from all completed time logs.
- */
-async function recalculateTaskHours(adminDb, taskId) {
-    try {
-        const logsSnap = await adminDb.collection(paths.TIME_LOGS)
-            .where("taskId", "==", taskId)
-            .get();
-
-        let totalHours = 0;
-        logsSnap.docs.forEach(d => {
-            const log = d.data();
-            if (log.endTime && log.totalHours) {
-                totalHours += log.totalHours;
-            }
-        });
-
-        await adminDb.collection(paths.TASKS).doc(taskId).update({
-            actualHours: parseFloat(totalHours.toFixed(2)),
-        });
-    } catch (err) {
-        console.warn(`[closeDay] recalculate error for task ${taskId}:`, err.message);
-    }
 }
 
 module.exports = { execute };

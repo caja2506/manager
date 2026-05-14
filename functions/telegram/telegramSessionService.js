@@ -10,6 +10,7 @@ const {
     TELEGRAM_SESSION_EVENT,
     TELEGRAM_BOT_LOG_EVENT,
 } = require("../automation/constants");
+const { updateUser, loadAllUsers } = require("../db/coreDataReader");
 
 // ── State Machine (server-side mirror) ──
 // Must stay in sync with src/automation/telegram/telegramStateMachine.js
@@ -188,14 +189,10 @@ async function linkIdentity(adminDb, chatId, userId) {
         updatedAt: now,
     });
 
-    // Also update user's providerLinks
-    await adminDb.collection(paths.USERS).doc(userId).update({
-        "providerLinks.telegram": {
-            chatId: String(chatId),
-            linkedAt: now,
-        },
+    // Also update user's Telegram link in Supabase
+    await updateUser(userId, {
+        telegramChatId: String(chatId),
         isAutomationParticipant: true,
-        updatedAt: now,
     });
 
     await logBotEvent(adminDb, String(chatId), TELEGRAM_BOT_LOG_EVENT.IDENTITY_LINKED, { userId });
@@ -218,14 +215,11 @@ async function findUserByChatId(adminDb, chatId) {
         if (userId) return userId;
     }
 
-    // Fallback: search users collection
-    const userSnap = await adminDb.collection(paths.USERS)
-        .where("providerLinks.telegram.chatId", "==", chatIdStr)
-        .limit(1)
-        .get();
-
-    if (!userSnap.empty) {
-        return userSnap.docs[0].id;
+    // Fallback: search users in Supabase by telegramChatId
+    const allUsers = await loadAllUsers();
+    const matchedUser = allUsers.find(u => u.telegramChatId === chatIdStr);
+    if (matchedUser) {
+        return matchedUser.id;
     }
 
     return null;

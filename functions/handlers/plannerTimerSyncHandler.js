@@ -17,6 +17,11 @@
 
 const paths = require("../automation/firestorePaths");
 const { loadBreakBands, getBreakHoursInRange } = require("../utils/breakTimeUtils");
+const {
+    loadActiveTimerForUser, loadActiveTimersForUser,
+    insertTimeLog, updateTimeLog, loadTask, updateTask,
+    recalculateTaskHours,
+} = require("../db/coreDataReader");
 
 const TZ = "America/Costa_Rica";
 const PLANNER_SOURCE = "planner_auto";
@@ -127,18 +132,20 @@ async function execute(adminDb, token, targets, context) {
         itemsByUser[uid].push(item);
     }
 
-    // ── 6. Get ALL active timers (endTime === null) ──
-    const activeTimersSnap = await adminDb.collection(paths.TIME_LOGS)
-        .where("endTime", "==", null)
-        .get();
-
-    const activeTimers = activeTimersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    // Use ARRAY per user to detect ghost/duplicate timers (F-14)
+    // ── 6. Get ALL active timers (endTime IS NULL) from Supabase ──
+    // We need all users' active timers, so load per-user from itemsByUser + any planner_auto
     const timersByUser = {};
     const now = new Date().toISOString();
-    for (const timer of activeTimers) {
-        if (!timersByUser[timer.userId]) timersByUser[timer.userId] = [];
-        timersByUser[timer.userId].push(timer);
+
+    // Load active timers for all relevant users
+    const allRelevantUserIds = new Set(Object.keys(itemsByUser));
+    // We need to also check for orphan planner timers — load all active timers
+    // Unfortunately Supabase doesn't have a direct "get all where end_time IS NULL"
+    // across all users efficiently without a view, so we'll load per-user for known users.
+    // For orphan detection we'll also check each user from planner items.
+    for (const uid of allRelevantUserIds) {
+        const timers = await loadActiveTimersForUser(uid);
+        if (timers.length > 0) timersByUser[uid] = timers;
     }
 
     // ── 6b. Detect and clean up ghost timers ──
@@ -166,10 +173,14 @@ async function execute(adminDb, token, targets, context) {
     let switched = 0;
     const errors = [];
 
-    // Get all unique users (from planner + active planner_auto timers)
+    // Collect all active timers for unique user set
+    const activeTimersList = [];
+    for (const timers of Object.values(timersByUser)) {
+        activeTimersList.push(...timers);
+    }
     const allUsers = new Set([
         ...Object.keys(itemsByUser),
-        ...activeTimers.filter(t => t.source === PLANNER_SOURCE).map(t => t.userId),
+        ...activeTimersList.filter(t => t.source === PLANNER_SOURCE).map(t => t.userId),
     ]);
 
     for (const userId of allUsers) {
@@ -277,27 +288,21 @@ function getDecimalHour(d) {
  */
 async function startPlannerTimer(adminDb, userId, block, now) {
     // GUARD: Verify no active timer exists (mutex)
-    const existingSnap = await adminDb.collection(paths.TIME_LOGS)
-        .where("userId", "==", userId)
-        .where("endTime", "==", null)
-        .limit(1)
-        .get();
+    const existingTimer = await loadActiveTimerForUser(userId);
 
-    if (!existingSnap.empty) {
-        const existing = existingSnap.docs[0].data();
-        if (existing.taskId === block.taskId) {
+    if (existingTimer) {
+        if (existingTimer.taskId === block.taskId) {
             console.log(`[plannerTimerSync] Timer already running for ${userId} on ${block.taskId}, skipping.`);
             return;
         }
-        if (existing.source !== PLANNER_SOURCE) {
-            console.log(`[plannerTimerSync] ${userId} has manual timer on ${existing.taskId}, not starting planner timer.`);
+        if (existingTimer.source !== PLANNER_SOURCE) {
+            console.log(`[plannerTimerSync] ${userId} has manual timer on ${existingTimer.taskId}, not starting planner timer.`);
             return;
         }
         // It's a planner timer for a different task — should have been stopped by caller
     }
 
-    const newLogRef = adminDb.collection(paths.TIME_LOGS).doc();
-    await newLogRef.set({
+    await insertTimeLog({
         taskId: block.taskId || null,
         projectId: block.projectId || null,
         userId,
@@ -310,24 +315,19 @@ async function startPlannerTimer(adminDb, userId, block, now) {
         notes: `Auto-iniciado por planner: ${block.taskTitleSnapshot || block.taskId}`,
         source: PLANNER_SOURCE,
         planItemId: block.id || null,
-        createdAt: now,
     });
 
     // ── Auto-transition task to in_progress ──
-    // Valid transitions: backlog→in_progress, pending→in_progress, blocked→in_progress
     if (block.taskId) {
         try {
-            const taskRef = adminDb.collection(paths.TASKS).doc(block.taskId);
-            const taskSnap = await taskRef.get();
-            if (taskSnap.exists) {
-                const taskData = taskSnap.data();
+            const taskData = await loadTask(block.taskId);
+            if (taskData) {
                 const CAN_AUTO_START = ["backlog", "pending", "blocked"];
                 if (CAN_AUTO_START.includes(taskData.status)) {
-                    await taskRef.update({
+                    await updateTask(block.taskId, {
                         status: "in_progress",
                         statusChangedAt: now,
                         statusChangedBy: "planner_auto",
-                        updatedAt: now,
                     });
                     console.log(`[plannerTimerSync] Task ${block.taskId} transitioned: ${taskData.status} → in_progress`);
                 }
@@ -350,30 +350,18 @@ async function stopPlannerTimer(adminDb, timer, now) {
     const breakHours = getBreakHoursInRange(start, end);
     const netHours = Math.max(0, grossHours - breakHours);
 
-    await adminDb.collection(paths.TIME_LOGS).doc(timer.id).update({
+    await updateTimeLog(timer.id, {
         endTime: now,
         totalHours: parseFloat(netHours.toFixed(6)),
         totalHoursGross: parseFloat(grossHours.toFixed(6)),
         breakHoursDeducted: parseFloat(breakHours.toFixed(4)),
         autoStopped: true,
-        updatedAt: now,
     });
 
     // Recalculate task actualHours
     if (timer.taskId) {
         try {
-            const logsSnap = await adminDb.collection(paths.TIME_LOGS)
-                .where("taskId", "==", timer.taskId)
-                .get();
-            let total = 0;
-            logsSnap.docs.forEach(d => {
-                const dd = d.data();
-                if (dd.totalHours && dd.endTime) total += dd.totalHours;
-            });
-            await adminDb.collection(paths.TASKS).doc(timer.taskId).update({
-                actualHours: parseFloat(total.toFixed(4)),
-                updatedAt: now,
-            });
+            await recalculateTaskHours(timer.taskId);
         } catch (err) {
             console.warn(`[plannerTimerSync] Error recalculating task ${timer.taskId}:`, err.message);
         }

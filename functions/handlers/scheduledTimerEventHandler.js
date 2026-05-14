@@ -16,6 +16,11 @@
 
 const paths = require("../automation/firestorePaths");
 const { loadBreakBands, getBreakHoursInRange } = require("../utils/breakTimeUtils");
+const {
+    loadActiveTimerForUser, loadActiveTimerForUserTask,
+    insertTimeLog, updateTimeLog, loadTask, updateTask,
+    recalculateTaskHours,
+} = require("../db/coreDataReader");
 
 const PLANNER_SOURCE = "planner_auto";
 const STALE_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 hours
@@ -81,26 +86,21 @@ async function execute(adminDb, token, targets, context) {
 
             if (event.type === "start") {
                 // ── START: Check if user already has an active timer ──
-                const existingSnap = await adminDb.collection(paths.TIME_LOGS)
-                    .where("userId", "==", event.userId)
-                    .where("endTime", "==", null)
-                    .limit(1)
-                    .get();
+                const existingTimer = await loadActiveTimerForUser(event.userId);
 
-                if (!existingSnap.empty) {
-                    const existing = existingSnap.docs[0].data();
-                    if (existing.taskId === event.taskId) {
+                if (existingTimer) {
+                    if (existingTimer.taskId === event.taskId) {
                         // Already running for this task — skip
                         console.log(`${tag} Timer already running for ${event.userId} on ${event.taskId}. Marking processed.`);
                         await eventDoc.ref.update({ processed: true, processedAt: nowISO, skipped: true, skipReason: "timer_already_running" });
                         continue;
                     }
-                    if (existing.source === PLANNER_SOURCE) {
+                    if (existingTimer.source === PLANNER_SOURCE) {
                         // Different planner timer → stop it first, then start new one
-                        await stopPlannerTimer(adminDb, { id: existingSnap.docs[0].id, ...existing }, nowISO);
+                        await stopPlannerTimer(adminDb, existingTimer, nowISO);
                         console.log(`${tag} Stopped existing planner timer for ${event.userId} before starting new one.`);
                     } else {
-                        // Manual timer → DON'T touch it (per user decision)
+                        // Manual timer → DON'T touch it
                         console.log(`${tag} ${event.userId} has manual timer. Skipping start event.`);
                         await eventDoc.ref.update({ processed: true, processedAt: nowISO, skipped: true, skipReason: "manual_timer_active" });
                         continue;
@@ -113,16 +113,10 @@ async function execute(adminDb, token, targets, context) {
 
             } else if (event.type === "stop") {
                 // ── STOP: Find the active planner_auto timer for this task ──
-                const activeSnap = await adminDb.collection(paths.TIME_LOGS)
-                    .where("userId", "==", event.userId)
-                    .where("taskId", "==", event.taskId)
-                    .where("endTime", "==", null)
-                    .where("source", "==", PLANNER_SOURCE)
-                    .limit(1)
-                    .get();
+                const activeTimer = await loadActiveTimerForUserTask(event.userId, event.taskId, PLANNER_SOURCE);
 
-                if (!activeSnap.empty) {
-                    await stopPlannerTimer(adminDb, { id: activeSnap.docs[0].id, ...activeSnap.docs[0].data() }, nowISO);
+                if (activeTimer) {
+                    await stopPlannerTimer(adminDb, activeTimer, nowISO);
                     stopped++;
                 } else {
                     console.log(`${tag} No active planner timer found for ${event.userId}/${event.taskId}. Skipping stop.`);
@@ -156,8 +150,7 @@ async function execute(adminDb, token, targets, context) {
  * Start a new planner-managed timer.
  */
 async function startPlannerTimer(adminDb, event, now) {
-    const newLogRef = adminDb.collection(paths.TIME_LOGS).doc();
-    await newLogRef.set({
+    await insertTimeLog({
         taskId: event.taskId || null,
         projectId: event.projectId || null,
         userId: event.userId,
@@ -170,7 +163,6 @@ async function startPlannerTimer(adminDb, event, now) {
         notes: `Auto-iniciado por planner: ${event.taskTitleSnapshot || event.taskId}`,
         source: PLANNER_SOURCE,
         planItemId: event.planItemId || null,
-        createdAt: now,
     });
 
     console.log(`[scheduledTimerEvent] STARTED timer for ${event.userId} → ${event.taskId}`);
@@ -178,17 +170,14 @@ async function startPlannerTimer(adminDb, event, now) {
     // Auto-transition task to in_progress if applicable
     if (event.taskId) {
         try {
-            const taskRef = adminDb.collection(paths.TASKS).doc(event.taskId);
-            const taskSnap = await taskRef.get();
-            if (taskSnap.exists) {
-                const taskData = taskSnap.data();
+            const taskData = await loadTask(event.taskId);
+            if (taskData) {
                 const CAN_AUTO_START = ["backlog", "pending", "blocked"];
                 if (CAN_AUTO_START.includes(taskData.status)) {
-                    await taskRef.update({
+                    await updateTask(event.taskId, {
                         status: "in_progress",
                         statusChangedAt: now,
                         statusChangedBy: "planner_auto",
-                        updatedAt: now,
                     });
                     console.log(`[scheduledTimerEvent] Task ${event.taskId}: ${taskData.status} → in_progress`);
                 }
@@ -211,13 +200,12 @@ async function stopPlannerTimer(adminDb, timer, now) {
     const breakHours = getBreakHoursInRange(start, end);
     const netHours = Math.max(0, grossHours - breakHours);
 
-    await adminDb.collection(paths.TIME_LOGS).doc(timer.id).update({
+    await updateTimeLog(timer.id, {
         endTime: now,
         totalHours: parseFloat(netHours.toFixed(6)),
         totalHoursGross: parseFloat(grossHours.toFixed(6)),
         breakHoursDeducted: parseFloat(breakHours.toFixed(4)),
         autoStopped: true,
-        updatedAt: now,
     });
 
     console.log(`[scheduledTimerEvent] STOPPED timer ${timer.id} for ${timer.userId} (net: ${netHours.toFixed(2)}h)`);
@@ -225,18 +213,7 @@ async function stopPlannerTimer(adminDb, timer, now) {
     // Recalculate task actualHours
     if (timer.taskId) {
         try {
-            const logsSnap = await adminDb.collection(paths.TIME_LOGS)
-                .where("taskId", "==", timer.taskId)
-                .get();
-            let total = 0;
-            logsSnap.docs.forEach(d => {
-                const dd = d.data();
-                if (dd.totalHours && dd.endTime) total += dd.totalHours;
-            });
-            await adminDb.collection(paths.TASKS).doc(timer.taskId).update({
-                actualHours: parseFloat(total.toFixed(4)),
-                updatedAt: now,
-            });
+            await recalculateTaskHours(timer.taskId);
         } catch (err) {
             console.warn(`[scheduledTimerEvent] Error recalculating task ${timer.taskId}:`, err.message);
         }

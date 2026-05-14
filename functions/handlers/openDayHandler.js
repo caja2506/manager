@@ -7,9 +7,16 @@
  *   3. Clear autoStopped flag
  *
  * Triggered by: scheduledOpenDay (cron at 08:00)
+ *
+ * [SUPABASE MIGRATION] Core data (time_logs, tasks) now read/written
+ * via coreDataReader (Supabase).
  */
 
-const paths = require("../automation/firestorePaths");
+const {
+    loadAllTimeLogs, loadTask,
+    insertTimeLog, updateTimeLog,
+    loadTaskUserTimeLogs,
+} = require("../db/coreDataReader");
 
 /**
  * Execute the day open routine.
@@ -22,15 +29,14 @@ async function execute(adminDb, token, targets, context) {
     const now = new Date().toISOString();
 
     // ── 1. Find auto-stopped timers from the last 24 hours ──
-    // Use targeted query instead of full collection scan
+    const allTimeLogs = await loadAllTimeLogs();
     const yesterdayISO = yesterday.toISOString();
-    const timeLogsSnap = await adminDb.collection(paths.TIME_LOGS)
-        .where("autoStopped", "==", true)
-        .where("endTime", ">=", yesterdayISO)
-        .get();
 
-    const autoStoppedTimers = timeLogsSnap.docs
-        .map(d => ({ id: d.id, ...d.data() }));
+    const autoStoppedTimers = allTimeLogs.filter(log =>
+        log.autoStopped === true &&
+        log.endTime &&
+        log.endTime >= yesterdayISO
+    );
 
     if (autoStoppedTimers.length === 0) {
         console.log("[openDay] No auto-stopped timers found. Nothing to restart.");
@@ -49,15 +55,11 @@ async function execute(adminDb, token, targets, context) {
     }
 
     // ── 3. Check which tasks are still in_progress ──
-    const taskIds = [...new Set(uniqueTimers.map(t => t.taskId).filter(Boolean))];
     const tasksMap = {};
-    if (taskIds.length > 0) {
-        // Fetch tasks in batches of 10 (Firestore 'in' limit)
-        for (let i = 0; i < taskIds.length; i += 10) {
-            const batch = taskIds.slice(i, i + 10);
-            const snap = await adminDb.collection(paths.TASKS).where("__name__", "in", batch).get();
-            snap.docs.forEach(d => { tasksMap[d.id] = d.data(); });
-        }
+    const taskIds = [...new Set(uniqueTimers.map(t => t.taskId).filter(Boolean))];
+    for (const taskId of taskIds) {
+        const task = await loadTask(taskId);
+        if (task) tasksMap[taskId] = task;
     }
 
     // ── 4. Restart valid timers ──
@@ -74,14 +76,10 @@ async function execute(adminDb, token, targets, context) {
         }
 
         // Check if there's already an active timer
-        const existingSnap = await adminDb.collection(paths.TIME_LOGS)
-            .where("taskId", "==", log.taskId)
-            .where("userId", "==", log.userId)
-            .where("endTime", "==", null)
-            .limit(1)
-            .get();
+        const userTaskLogs = await loadTaskUserTimeLogs(log.taskId, log.userId);
+        const hasActiveTimer = userTaskLogs.some(l => !l.endTime);
 
-        if (!existingSnap.empty) {
+        if (hasActiveTimer) {
             console.log(`[openDay] Timer already running for task ${log.taskId} / user ${log.userId}`);
             continue;
         }
@@ -93,9 +91,8 @@ async function execute(adminDb, token, targets, context) {
         }
 
         try {
-            // Create new timer
-            const newLogRef = adminDb.collection(paths.TIME_LOGS).doc();
-            await newLogRef.set({
+            // Create new timer in Supabase
+            await insertTimeLog({
                 taskId: log.taskId || null,
                 projectId: log.projectId || null,
                 userId: log.userId,
@@ -111,9 +108,7 @@ async function execute(adminDb, token, targets, context) {
             });
 
             // Clear autoStopped flag on originals
-            await adminDb.collection(paths.TIME_LOGS).doc(log.id).update({
-                autoStopped: false,
-            });
+            await updateTimeLog(log.id, { autoStopped: false });
 
             restarted++;
         } catch (err) {

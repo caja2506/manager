@@ -80,8 +80,43 @@ async function handleWebhook(adminDb, token, body) {
 
     try {
         if (text) {
+            // ── Check if this is a reply to an ARIA nudge ──
+            const replyToMsgId = message.reply_to_message?.message_id;
+            if (replyToMsgId) {
+                try {
+                    const { handleNudgeReply } = require("../agent/nudgeReplyHandler");
+                    const { findUserByChatId } = require("./telegramSessionService");
+                    const coreReader = require("../db/coreDataReader");
+                    const { sendMessage } = require("./telegramClient");
+
+                    const userId = await findUserByChatId(adminDb, chatId);
+                    if (userId) {
+                        const user = await coreReader.loadUser(userId) || {};
+                        const replyResult = await handleNudgeReply({
+                            chatId: String(chatId),
+                            userId,
+                            userName: user.displayName || user.email || "Usuario",
+                            replyText: text,
+                            replyToMessageId: replyToMsgId,
+                        });
+
+                        if (replyResult.handled && !replyResult.error) {
+                            await sendMessage(token, chatId,
+                                `✅ <b>Comentario guardado</b> en la tarea:\n📋 <i>${replyResult.taskTitle}</i>\n\nTu equipo podrá verlo en AutoBOM Pro.`,
+                                { parseMode: "HTML" }
+                            );
+                            return { processed: true };
+                        }
+                        // If not handled (not a nudge reply), fall through to normal routing
+                    }
+                } catch (nrErr) {
+                    console.warn("[webhook] nudgeReply check failed (falling through):", nrErr.message);
+                }
+            }
+
             await routeInboundMessage(adminDb, token, chatId, text, message, {
                 apiKey: body._apiKey,
+                nvidiaKey: body._nvidiaKey,
             });
             return { processed: true };
         }
@@ -90,6 +125,7 @@ async function handleWebhook(adminDb, token, body) {
             await routeInboundMessage(adminDb, token, chatId, null, message, {
                 inputType: "audio",
                 apiKey: body._apiKey,
+                nvidiaKey: body._nvidiaKey,
             });
             return { processed: true };
         }

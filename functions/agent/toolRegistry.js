@@ -1,0 +1,232 @@
+/**
+ * ARIA Agent — Tool Registry
+ * =============================
+ * Tools that ARIA can use to query and act on system data.
+ * Each tool has a description (for the LLM) and an execute function.
+ *
+ * The conversation engine detects tool calls from the LLM response
+ * and executes them, then feeds results back into the conversation.
+ */
+
+const coreReader = require("../db/coreDataReader");
+
+/**
+ * Registry of tools available to ARIA.
+ * Each tool has:
+ *   - name: unique identifier
+ *   - description: what it does (shown to the LLM)
+ *   - parameters: expected inputs
+ *   - execute: async function that returns data
+ */
+const TOOL_REGISTRY = {
+
+    getMyTasks: {
+        name: "getMyTasks",
+        description: "Obtiene las tareas asignadas al usuario actual, con estado y prioridad.",
+        parameters: "userId (string)",
+        execute: async (userId) => {
+            const tasks = await coreReader.loadUserTasks(userId);
+            return tasks.map(t => ({
+                title: t.title,
+                status: t.status,
+                priority: t.priority,
+                dueDate: t.dueDate,
+                estimatedHours: t.estimatedHours,
+                actualHours: t.actualHours,
+            }));
+        },
+    },
+
+    getTaskDetails: {
+        name: "getTaskDetails",
+        description: "Obtiene el detalle completo de una tarea específica, incluyendo subtareas.",
+        parameters: "taskId (string)",
+        execute: async (taskId) => {
+            const task = await coreReader.loadTask(taskId);
+            if (!task) return { error: "Tarea no encontrada" };
+            const subtasks = await coreReader.loadTaskSubtasks(taskId);
+            return { ...task, subtasks };
+        },
+    },
+
+    getTeamStatus: {
+        name: "getTeamStatus",
+        description: "Obtiene el estado general del equipo: tareas activas, bloqueadas, vencidas por persona.",
+        parameters: "none",
+        execute: async () => {
+            const [users, tasks] = await Promise.all([
+                coreReader.loadAllUsers(),
+                coreReader.loadAllTasks(),
+            ]);
+
+            const today = new Date().toISOString().split("T")[0];
+            const activeUsers = users.filter(u => u.active !== false);
+
+            return activeUsers.map(user => {
+                const userTasks = tasks.filter(t => t.assignedTo === user.id);
+                const inProgress = userTasks.filter(t => t.status === "in_progress").length;
+                const blocked = userTasks.filter(t => t.status === "blocked").length;
+                const overdue = userTasks.filter(t => t.dueDate && t.dueDate < today && !["completed", "cancelled"].includes(t.status)).length;
+                const completed = userTasks.filter(t => t.status === "completed").length;
+
+                return {
+                    name: user.name || user.displayName || user.email,
+                    role: user.operationalRole || user.teamRole,
+                    inProgress,
+                    blocked,
+                    overdue,
+                    completed,
+                    totalActive: userTasks.filter(t => !["completed", "cancelled"].includes(t.status)).length,
+                };
+            });
+        },
+    },
+
+    getOverdueTasks: {
+        name: "getOverdueTasks",
+        description: "Obtiene todas las tareas vencidas (pasadas de fecha) del equipo.",
+        parameters: "none",
+        execute: async () => {
+            const tasks = await coreReader.loadAllTasks();
+            const today = new Date().toISOString().split("T")[0];
+
+            return tasks
+                .filter(t => t.dueDate && t.dueDate < today && !["completed", "cancelled"].includes(t.status))
+                .map(t => ({
+                    title: t.title,
+                    assignedTo: t.assignedTo,
+                    dueDate: t.dueDate,
+                    status: t.status,
+                    daysOverdue: Math.floor((Date.now() - new Date(t.dueDate).getTime()) / 86400000),
+                }));
+        },
+    },
+
+    getProjectMetrics: {
+        name: "getProjectMetrics",
+        description: "Obtiene métricas de un proyecto: progreso, tareas, horas, riesgo.",
+        parameters: "projectId (string)",
+        execute: async (projectId) => {
+            const [project, tasks] = await Promise.all([
+                coreReader.loadProject(projectId),
+                coreReader.loadAllTasks(),
+            ]);
+
+            if (!project) return { error: "Proyecto no encontrado" };
+
+            const projectTasks = tasks.filter(t => t.projectId === projectId);
+            const completed = projectTasks.filter(t => t.status === "completed").length;
+            const total = projectTasks.length;
+
+            return {
+                name: project.name,
+                status: project.status,
+                progress: total > 0 ? Math.round((completed / total) * 100) : 0,
+                totalTasks: total,
+                completedTasks: completed,
+                blockedTasks: projectTasks.filter(t => t.status === "blocked").length,
+                riskScore: project.riskScore,
+                riskLevel: project.riskLevel,
+            };
+        },
+    },
+
+    getMyHoursToday: {
+        name: "getMyHoursToday",
+        description: "Obtiene las horas registradas del usuario hoy.",
+        parameters: "userId (string)",
+        execute: async (userId) => {
+            const logs = await coreReader.loadUserTimeLogs(userId);
+            const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
+
+            let totalHours = 0;
+            let activeTimer = null;
+            const todayLogs = [];
+
+            for (const log of logs) {
+                const logDate = log.startTime
+                    ? new Date(log.startTime).toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" })
+                    : null;
+
+                if (logDate !== today) continue;
+
+                if (log.endTime && log.totalHours) {
+                    totalHours += log.totalHours;
+                    todayLogs.push({ taskId: log.taskId, hours: log.totalHours });
+                } else if (!log.endTime) {
+                    const elapsed = (Date.now() - new Date(log.startTime).getTime()) / 3600000;
+                    activeTimer = { taskId: log.taskId, runningHours: parseFloat(elapsed.toFixed(2)) };
+                }
+            }
+
+            return {
+                totalHours: parseFloat(totalHours.toFixed(2)),
+                activeTimer,
+                logs: todayLogs,
+            };
+        },
+    },
+
+    getAllProjects: {
+        name: "getAllProjects",
+        description: "Lista todos los proyectos activos con su estado y progreso.",
+        parameters: "none",
+        execute: async () => {
+            const projects = await coreReader.loadAllProjects();
+            return projects
+                .filter(p => p.status !== "cancelled")
+                .map(p => ({
+                    name: p.name,
+                    status: p.status,
+                    priority: p.priority,
+                    riskLevel: p.riskLevel,
+                    progress: p.progress,
+                }));
+        },
+    },
+};
+
+/**
+ * Get tool descriptions formatted for the LLM system prompt.
+ * @returns {string}
+ */
+function getToolDescriptionsForPrompt() {
+    const tools = Object.values(TOOL_REGISTRY);
+    return tools.map(t =>
+        `- <b>${t.name}</b>(${t.parameters}): ${t.description}`
+    ).join("\n");
+}
+
+/**
+ * Execute a tool by name.
+ * @param {string} toolName
+ * @param {*} args - Arguments to pass to the tool
+ * @returns {Promise<*>}
+ */
+async function executeTool(toolName, ...args) {
+    const tool = TOOL_REGISTRY[toolName];
+    if (!tool) {
+        return { error: `Tool "${toolName}" not found` };
+    }
+    try {
+        return await tool.execute(...args);
+    } catch (err) {
+        console.error(`[toolRegistry] Error executing ${toolName}:`, err.message);
+        return { error: `Tool execution failed: ${err.message}` };
+    }
+}
+
+/**
+ * List available tool names.
+ * @returns {string[]}
+ */
+function listTools() {
+    return Object.keys(TOOL_REGISTRY);
+}
+
+module.exports = {
+    TOOL_REGISTRY,
+    getToolDescriptionsForPrompt,
+    executeTool,
+    listTools,
+};

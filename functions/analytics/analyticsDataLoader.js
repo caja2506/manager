@@ -56,7 +56,7 @@ async function loadAnalyticsData(adminDb, startDate, endDate) {
         loadCollection(adminDb, paths.TELEGRAM_ESCALATIONS, "createdAt", startISO, endISO),
         loadCollection(adminDb, paths.OPERATION_INCIDENTS, "createdAt", startISO, endISO),
         loadCollection(adminDb, paths.AI_EXECUTIONS, "executedAt", startISO, endISO),
-        loadAllUsers(adminDb),
+        loadAllUsers(),
         loadAllRoutines(adminDb),
         loadDailyMetrics(adminDb, startDate, endDate),
     ]);
@@ -92,18 +92,19 @@ async function loadCollection(adminDb, collectionPath, timestampField, startISO,
 }
 
 /**
- * Load all users with automation participation.
+ * Load all users with automation participation from Supabase.
  */
-async function loadAllUsers(adminDb) {
+async function loadAllUsers() {
     try {
-        const snap = await adminDb.collection(paths.USERS).get();
-        return snap.docs.map(d => ({
-            id: d.id,
-            name: d.data().displayName || d.data().name || "Unknown",
-            email: d.data().email,
-            operationalRole: d.data().operationalRole || d.data().teamRole || "unassigned",
-            telegramChatId: d.data().telegramChatId || null,
-            isAutomationParticipant: d.data().isAutomationParticipant || false,
+        const { loadAllUsers: loadUsersSB } = require("../db/coreDataReader");
+        const users = await loadUsersSB();
+        return users.map(u => ({
+            id: u.id,
+            name: u.displayName || u.name || "Unknown",
+            email: u.email,
+            operationalRole: u.operationalRole || u.teamRole || "unassigned",
+            telegramChatId: u.telegramChatId || null,
+            isAutomationParticipant: u.isAutomationParticipant || false,
         }));
     } catch (err) {
         console.warn("[analyticsDataLoader] Error loading users:", err.message);

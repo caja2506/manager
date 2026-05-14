@@ -9,16 +9,23 @@ const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { getUserRbacRole, requireAdmin } = require("../middleware/authGuard");
 
 function createTelegramExports(adminDb, secrets) {
-    const { telegramBotToken, geminiApiKey } = secrets;
+    const { telegramBotToken, geminiApiKey, supabaseUrl, supabaseServiceRoleKey, nvidiaApiKey } = secrets;
+
+    /** Initialize Supabase admin client */
+    function initSupabase() {
+        const { getSupabase } = require("../db/supabaseAdmin");
+        getSupabase(supabaseUrl.value(), supabaseServiceRoleKey.value());
+    }
 
     const telegramWebhookEndpoint = onRequest(
-        { secrets: [telegramBotToken, geminiApiKey], cors: false, maxInstances: 10 },
+        { secrets: [telegramBotToken, geminiApiKey, supabaseUrl, supabaseServiceRoleKey, nvidiaApiKey], cors: false, maxInstances: 10 },
         async (req, res) => {
             if (req.method !== "POST") { res.status(405).send("Method Not Allowed"); return; }
             try {
+                initSupabase();
                 const { handleWebhook } = require("../telegram/telegramWebhook");
                 const token = telegramBotToken.value();
-                const body = { ...req.body, _apiKey: geminiApiKey.value() };
+                const body = { ...req.body, _apiKey: geminiApiKey.value(), _nvidiaKey: nvidiaApiKey.value() };
                 const result = await handleWebhook(adminDb, token, body);
                 if (result.processed) { res.status(200).json({ ok: true }); } else { console.warn("[webhook] Not processed:", result.error); res.status(200).json({ ok: true, skipped: result.error }); }
             } catch (err) {
@@ -59,8 +66,9 @@ function createTelegramExports(adminDb, secrets) {
     );
 
     const onDelayCreated = onDocumentCreated(
-        { document: "delays/{delayId}", secrets: [telegramBotToken] },
+        { document: "delays/{delayId}", secrets: [telegramBotToken, supabaseUrl, supabaseServiceRoleKey] },
         async (event) => {
+            initSupabase();
             const snap = event.data;
             if (!snap) return;
             const delay = snap.data();

@@ -30,8 +30,11 @@ const googleCseKey = defineSecret("GOOGLE_CSE_KEY");
 const googleCx = defineSecret("GOOGLE_CX");
 const telegramBotToken = defineSecret("TELEGRAM_BOT_TOKEN");
 const resendApiKey = defineSecret("RESEND_API_KEY");
+const supabaseUrl = defineSecret("SUPABASE_URL");
+const supabaseServiceRoleKey = defineSecret("SUPABASE_SERVICE_ROLE_KEY");
+const nvidiaApiKey = defineSecret("NVIDIA_NIM_API_KEY");
 
-const secrets = { geminiApiKey, googleCseKey, googleCx, telegramBotToken, resendApiKey };
+const secrets = { geminiApiKey, googleCseKey, googleCx, telegramBotToken, resendApiKey, supabaseUrl, supabaseServiceRoleKey, nvidiaApiKey };
 
 // ── Domain: AI ──
 const { createAiExports } = require("./exports/ai");

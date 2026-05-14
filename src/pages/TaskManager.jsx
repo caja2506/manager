@@ -96,14 +96,17 @@ const KANBAN_COLUMNS = [
 export default function TaskManager() {
     const { user } = useAuth();
     const { canEdit, canDelete, role, teamRole } = useRole();
-    const { engProjects, engTasks, engSubtasks, teamMembers, taskTypes, timeLogs, delayCauses } = useEngineeringData();
+    const { 
+        engProjects, engTasks, engSubtasks, teamMembers, 
+        taskTypes, timeLogs, delayCauses,
+        taskSearch, setTaskSearch,
+        taskFilterProject, setTaskFilterProject,
+        taskFilterAssignee, setTaskFilterAssignee,
+        taskFilterPriority, setTaskFilterPriority
+    } = useEngineeringData();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
-    const [search, setSearch] = useState('');
-    const [filterProject, setFilterProject] = useState('');
-    const [filterAssignee, setFilterAssignee] = useState('my-team');
-    const [filterPriority, setFilterPriority] = useState('');
 
     // Drag state
     const [activeId, setActiveId] = useState(null);
@@ -175,25 +178,25 @@ export default function TaskManager() {
     // --- Filter tasks ---
     const filteredTasks = useMemo(() => {
         return engTasks.filter(task => {
-            const s = search.toLowerCase();
+            const s = taskSearch.toLowerCase();
             const matchSearch = !s || (task.title || '').toLowerCase().includes(s) || (task.description || '').toLowerCase().includes(s);
-            const matchProject = !filterProject || task.projectId === filterProject;
+            const matchProject = !taskFilterProject || task.projectId === taskFilterProject;
             
             let matchAssignee = true;
-            if (filterAssignee === 'my-team') {
+            if (taskFilterAssignee === 'my-team') {
                 // Include tasks assigned to my team OR where I'm the assigned peer reviewer
                 const isMyTeamTask = myTeamUids.has(task.assignedTo);
                 const isMyPeerReview = task.peerReviewReviewerId === user?.uid 
                     && ['requested', 'in_review', 'changes_requested'].includes(task.peerReviewStatus);
                 matchAssignee = isMyTeamTask || isMyPeerReview;
-            } else if (filterAssignee !== '') {
-                matchAssignee = task.assignedTo === filterAssignee;
+            } else if (taskFilterAssignee !== '') {
+                matchAssignee = task.assignedTo === taskFilterAssignee;
             }
 
-            const matchPriority = !filterPriority || task.priority === filterPriority;
+            const matchPriority = !taskFilterPriority || task.priority === taskFilterPriority;
             return matchSearch && matchProject && matchAssignee && matchPriority;
         });
-    }, [engTasks, search, filterProject, filterAssignee, filterPriority, myTeamUids, user]);
+    }, [engTasks, taskSearch, taskFilterProject, taskFilterAssignee, taskFilterPriority, myTeamUids, user]);
 
     // --- Group by status ---
     const tasksByStatus = useMemo(() => {
@@ -436,27 +439,27 @@ export default function TaskManager() {
             <div className="flex flex-wrap gap-2 items-center px-6 py-2 border-b border-slate-800/40">
                 <div className="relative flex-1 min-w-[160px] max-w-xs">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
-                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar..."
+                    <input value={taskSearch} onChange={e => setTaskSearch(e.target.value)} placeholder="Buscar..."
                         className="pl-8 pr-3 py-1.5 w-full border border-slate-700/60 rounded-lg text-xs text-white outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 placeholder:text-slate-600" />
                 </div>
-                <select value={filterProject} onChange={e => setFilterProject(e.target.value)}
+                <select value={taskFilterProject} onChange={e => setTaskFilterProject(e.target.value)}
                     className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer">
                     <option value="">Todos los proyectos</option>
                     {engProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
-                <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}
+                <select value={taskFilterAssignee} onChange={e => setTaskFilterAssignee(e.target.value)}
                     className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer">
                     <option value="my-team">Mis tareas y equipo</option>
                     <option value="">Todos los miembros</option>
                     {teamMembers.map(u => <option key={u.uid} value={u.uid}>{u.displayName || u.email}</option>)}
                 </select>
-                <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}
+                <select value={taskFilterPriority} onChange={e => setTaskFilterPriority(e.target.value)}
                     className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer">
                     <option value="">Todas las prioridades</option>
                     {Object.entries(TASK_PRIORITY_CONFIG).map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
                 </select>
-                {(search !== '' || filterProject !== '' || filterAssignee !== 'my-team' || filterPriority !== '') && (
-                    <button onClick={() => { setSearch(''); setFilterProject(''); setFilterAssignee('my-team'); setFilterPriority(''); }}
+                {(taskSearch !== '' || taskFilterProject !== '' || taskFilterAssignee !== 'my-team' || taskFilterPriority !== '') && (
+                    <button onClick={() => { setTaskSearch(''); setTaskFilterProject(''); setTaskFilterAssignee('my-team'); setTaskFilterPriority(''); }}
                         className="text-[11px] text-rose-400 hover:text-rose-300 px-2 py-1 rounded hover:bg-rose-500/10 transition-colors">
                         Limpiar
                     </button>

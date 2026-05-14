@@ -55,17 +55,23 @@ async function execute(adminDb, token, targets, context) {
     // ══════════════════════════════════════════
     // 1. LOAD ALL DATA
     // ══════════════════════════════════════════
+    // Core data from Supabase, automation/planning data from Firestore
+    const {
+        loadAllTasks, loadAllTimeLogs, loadAllDelays, loadAllUsers,
+        loadAllSubtasks, loadAllProjects,
+    } = require("../db/coreDataReader");
+
     const [
-        tasksSnap, timeLogsSnap, delaysSnap, usersSnap,
-        subtasksSnap, planItemsTodaySnap, planItemsTomorrowSnap,
+        allTasks, allTimeLogs, allDelays, allUsers, allSubtasks, allProjects,
+        planItemsTodaySnap, planItemsTomorrowSnap,
         telegramReportsSnap, commentsSnap, yesterdayCommentsSnap,
-        projectsSnap,
     ] = await Promise.all([
-        adminDb.collection(paths.TASKS).get(),
-        adminDb.collection(paths.TIME_LOGS).get(),
-        adminDb.collection(paths.DELAYS).get(),
-        adminDb.collection(paths.USERS).get(),
-        adminDb.collection(paths.SUBTASKS).get(),
+        loadAllTasks(),
+        loadAllTimeLogs(),
+        loadAllDelays(),
+        loadAllUsers(),
+        loadAllSubtasks(),
+        loadAllProjects(),
         adminDb.collection("weeklyPlanItems").where("date", "==", today).get(),
         adminDb.collection("weeklyPlanItems").where("date", "==", tomorrow).get(),
         adminDb.collection(paths.TELEGRAM_REPORTS)
@@ -80,14 +86,8 @@ async function execute(adminDb, token, targets, context) {
             .where("createdAt", ">=", yesterdayStart.toISOString())
             .where("createdAt", "<=", yesterdayEnd.toISOString())
             .get(),
-        adminDb.collection(paths.PROJECTS).get(),
     ]);
 
-    const allTasks = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const allTimeLogs = timeLogsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const allDelays = delaysSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const allUsers = usersSnap.docs.map(d => ({ id: d.id, uid: d.id, ...d.data() }));
-    const allSubtasks = subtasksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const planItemsToday = planItemsTodaySnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const planItemsTomorrow = planItemsTomorrowSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const telegramReportsToday = telegramReportsSnap.docs.map(d => d.data());
@@ -98,7 +98,6 @@ async function execute(adminDb, token, targets, context) {
         const taskId = pathParts.length >= 2 ? pathParts[pathParts.length - 3] : null;
         return { id: d.id, taskId, ...d.data() };
     });
-    const allProjects = projectsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
     console.log(`[perfReport] Loaded: ${allTasks.length} tasks, ${allTimeLogs.length} timeLogs, ${allSubtasks.length} subtasks, ${allProjects.length} projects, ${planItemsToday.length} planItems today, ${planItemsTomorrow.length} tomorrow, ${todayComments.length} comments today, ${yesterdayComments.length} comments yesterday`);
 

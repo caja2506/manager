@@ -45,25 +45,24 @@ export default function StationTaskMatrix({ projectId, canEdit, userId }) {
 
     const multiIdx = useMemo(() => hasMultipleIndexers(stations), [stations]);
 
-    // Data computation
-    const columnsData = useMemo(() => {
-        if (!workAreaTypes || !taskTypes) return [];
-        return workAreaTypes
-            .filter(area => !hiddenAreas.includes(area.id))
-            .map(area => {
-            const rawTypes = area.taskTypeIds || area.defaultTaskTypes || [];
-            const types = [];
-            rawTypes.forEach(val => {
-                let typeObj = taskTypes.find(t => t.id === val) || taskTypes.find(t => t.name === val);
-                if (typeObj) types.push(typeObj);
-            });
-            return { area, types };
-        }).filter(c => c.types.length > 0);
-    }, [workAreaTypes, taskTypes, hiddenAreas]);
-
     const prjTasks = useMemo(() => {
         return engTasks.filter(t => t.projectId === projectId && t.status !== 'cancelled');
     }, [engTasks, projectId]);
+
+    // Data computation
+    // Data computation
+    const columnsData = useMemo(() => {
+        if (!workAreaTypes || !taskTypes || !prjTasks) return [];
+        return workAreaTypes
+            .filter(area => !hiddenAreas.includes(area.id))
+            .map(area => {
+                const areaTasks = prjTasks.filter(t => t.workAreaTypeId === area.id && t.taskTypeId);
+                const usedTypeIds = new Set(areaTasks.map(t => t.taskTypeId));
+                
+                const types = taskTypes.filter(t => usedTypeIds.has(t.id));
+                return { area, types };
+            }).filter(c => c.types.length > 0);
+    }, [workAreaTypes, taskTypes, hiddenAreas, prjTasks]);
 
     // Total counts for sticky positioning offsets
 

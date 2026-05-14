@@ -37,7 +37,16 @@ export async function createProject(data, userId) {
             owner_id: userId,
             start_date: data.startDate || null,
             due_date: data.dueDate || null,
+            completed_date: data.completedDate || null,
             progress: data.progress || 0,
+            client: data.client || null,
+            team_member_ids: data.teamMemberIds || [],
+            bom_project_id: data.bomProjectId || null,
+            tags: data.tags || [],
+            risk_score: data.riskScore || 0,
+            risk_level: data.riskLevel || 'low',
+            risk_factors: data.riskFactors || [],
+            risk_summary: data.riskSummary || null,
             created_by: userId,
         })
         .select('id')
@@ -55,7 +64,17 @@ export async function updateProject(projectId, updates) {
     if (updates.priority !== undefined) mapped.priority = updates.priority;
     if (updates.startDate !== undefined) mapped.start_date = updates.startDate;
     if (updates.dueDate !== undefined) mapped.due_date = updates.dueDate;
+    if (updates.completedDate !== undefined) mapped.completed_date = updates.completedDate;
     if (updates.progress !== undefined) mapped.progress = updates.progress;
+    if (updates.client !== undefined) mapped.client = updates.client;
+    if (updates.teamMemberIds !== undefined) mapped.team_member_ids = updates.teamMemberIds;
+    if (updates.bomProjectId !== undefined) mapped.bom_project_id = updates.bomProjectId;
+    if (updates.tags !== undefined) mapped.tags = updates.tags;
+    if (updates.riskScore !== undefined) mapped.risk_score = updates.riskScore;
+    if (updates.riskLevel !== undefined) mapped.risk_level = updates.riskLevel;
+    if (updates.riskFactors !== undefined) mapped.risk_factors = updates.riskFactors;
+    if (updates.riskSummary !== undefined) mapped.risk_summary = updates.riskSummary;
+    if (updates.riskUpdatedAt !== undefined) mapped.risk_updated_at = updates.riskUpdatedAt;
 
     const { error } = await supabase
         .from('projects')
@@ -148,6 +167,13 @@ export async function createTask(data, userId) {
             counts_for_score: countsForScore,
             peer_review_required: prRequired,
             peer_review_discipline: prDiscipline,
+            peer_review_cycles: data.peerReviewCycles || 0,
+            sort_order: data.sortOrder || 0,
+            gantt_view_mode_default: data.ganttViewModeDefault || null,
+            network_path: data.networkPath || null,
+            blocked_at: data.blockedAt || null,
+            unblocked_at: data.unblockedAt || null,
+            total_blocked_hours: data.totalBlockedHours || 0,
             created_by: userId,
         })
         .select('id')
@@ -204,17 +230,28 @@ export async function updateTask(taskId, updates) {
         dueDate: 'due_date', tags: 'tags',
         stationId: 'station_id', milestoneId: 'milestone_id',
         areaId: 'area_id', countsForScore: 'counts_for_score',
+        workAreaTypeId: 'area_id', // legacy alias used by MainTable
         projectId: 'project_id', blockedReason: 'blocked_reason',
         blockedByUserId: 'blocked_by_user_id', blockedByName: 'blocked_by_name',
         peerReviewRequired: 'peer_review_required',
         peerReviewDiscipline: 'peer_review_discipline',
         peerReviewStatus: 'peer_review_status',
+        peerReviewCycles: 'peer_review_cycles',
+        currentPeerReviewId: 'current_peer_review_id',
+        lastPeerReviewerId: 'last_peer_reviewer_id',
+        lastPeerReviewAt: 'last_peer_review_at',
         showInGantt: 'show_in_gantt',
         plannedStartDate: 'planned_start_date',
         plannedEndDate: 'planned_end_date',
         plannedDurationHours: 'planned_duration_hours',
         percentComplete: 'percent_complete',
         parentTaskId: 'parent_task_id',
+        ganttViewModeDefault: 'gantt_view_mode_default',
+        networkPath: 'network_path',
+        blockedAt: 'blocked_at',
+        unblockedAt: 'unblocked_at',
+        totalBlockedHours: 'total_blocked_hours',
+        sortOrder: 'sort_order',
     };
 
     for (const [camel, snake] of Object.entries(fieldMap)) {
@@ -318,7 +355,7 @@ export async function createSubtask(taskId, title) {
             task_id: taskId,
             title,
             completed: false,
-            order: 999, // will be reordered
+            sort_order: 999, // will be reordered
         })
         .select('id')
         .single();
@@ -370,7 +407,8 @@ export async function updateSubtask(subtaskId, updates) {
     const mapped = {};
     if (updates.title !== undefined) mapped.title = updates.title;
     if (updates.completed !== undefined) mapped.completed = updates.completed;
-    if (updates.order !== undefined) mapped.order = updates.order;
+    if (updates.order !== undefined) mapped.sort_order = updates.order;
+    if (updates.sort_order !== undefined) mapped.sort_order = updates.sort_order;
 
     const { error } = await supabase
         .from('subtasks')
@@ -386,7 +424,7 @@ export async function reorderSubtasks(orderedIds) {
     for (let i = 0; i < orderedIds.length; i++) {
         await supabase
             .from('subtasks')
-            .update({ order: i })
+            .update({ sort_order: i })
             .eq('id', orderedIds[i]);
     }
 }

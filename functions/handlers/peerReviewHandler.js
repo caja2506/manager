@@ -8,6 +8,7 @@
  */
 
 const paths = require("../automation/firestorePaths");
+const { loadTask, updateTask: updateTaskSB } = require("../db/coreDataReader");
 
 // ── Request Peer Review ──
 
@@ -16,10 +17,8 @@ async function requestPeerReview(adminDb, { taskId, reviewerId, requestedBy }) {
     if (!reviewerId) throw new Error("reviewerId is required");
     if (!requestedBy) throw new Error("requestedBy is required");
 
-    const taskRef = adminDb.collection(paths.TASKS).doc(taskId);
-    const taskSnap = await taskRef.get();
-    if (!taskSnap.exists) throw new Error(`Task ${taskId} not found`);
-    const task = taskSnap.data();
+    const task = await loadTask(taskId);
+    if (!task) throw new Error(`Task ${taskId} not found`);
 
     // Reviewer cannot be the assignee
     if (reviewerId === task.assignedTo) {
@@ -81,7 +80,7 @@ async function requestPeerReview(adminDb, { taskId, reviewerId, requestedBy }) {
     const reviewRef = await adminDb.collection(paths.PEER_REVIEWS).add(reviewDoc);
 
     // Update task summary fields
-    await taskRef.update({
+    await updateTaskSB(taskId, {
         peerReviewRequired: true,
         peerReviewStatus: "requested",
         peerReviewDiscipline: discipline,
@@ -89,7 +88,6 @@ async function requestPeerReview(adminDb, { taskId, reviewerId, requestedBy }) {
         currentPeerReviewId: reviewRef.id,
         peerReviewReviewerId: reviewerId,
         status: "validation",
-        updatedAt: now,
     });
 
     // Audit event
@@ -145,21 +143,18 @@ async function submitPeerReview(adminDb, { reviewId, decision, checklistItems, s
     });
 
     // Update task
-    const taskRef = adminDb.collection(paths.TASKS).doc(review.taskId);
+    const taskRef_unused = null; // kept for reference
     const taskUpdates = {
         peerReviewStatus: decision,
         lastPeerReviewerId: userId,
         lastPeerReviewAt: now,
-        updatedAt: now,
     };
 
     if (decision === "changes_requested") {
-        // Move task back to planned (To Do) so assignee must re-start it
         taskUpdates.status = "planned";
     }
-    // If approved, task stays in validation — user completes manually
 
-    await taskRef.update(taskUpdates);
+    await updateTaskSB(review.taskId, taskUpdates);
 
     // Audit event
     await adminDb.collection("auditEvents").add({
@@ -194,14 +189,10 @@ async function waivePeerReview(adminDb, { taskId, reason, userId, userRole }) {
         throw new Error("Only admin, manager, or team_lead can waive peer review");
     }
 
-    const taskRef = adminDb.collection(paths.TASKS).doc(taskId);
-    const taskSnap = await taskRef.get();
-    if (!taskSnap.exists) throw new Error(`Task ${taskId} not found`);
+    const task = await loadTask(taskId);
+    if (!task) throw new Error(`Task ${taskId} not found`);
 
     const now = new Date().toISOString();
-
-    // If there's an active review, mark it as waived
-    const task = taskSnap.data();
     if (task.currentPeerReviewId) {
         const reviewRef = adminDb.collection(paths.PEER_REVIEWS).doc(task.currentPeerReviewId);
         await reviewRef.update({
@@ -213,10 +204,9 @@ async function waivePeerReview(adminDb, { taskId, reason, userId, userRole }) {
         });
     }
 
-    // Update task
-    await taskRef.update({
+    // Update task in Supabase
+    await updateTaskSB(taskId, {
         peerReviewStatus: "waived",
-        updatedAt: now,
     });
 
     // Audit event

@@ -7,11 +7,18 @@ const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { requireAdmin } = require("../middleware/authGuard");
 
 function createAutomationExports(adminDb, secrets) {
-    const { telegramBotToken, geminiApiKey, resendApiKey } = secrets;
+    const { telegramBotToken, geminiApiKey, resendApiKey, supabaseUrl, supabaseServiceRoleKey, nvidiaApiKey } = secrets;
+
+    /** Initialize Supabase admin client (must be called inside handler when secrets are resolved) */
+    function initSupabase() {
+        const { getSupabase } = require("../db/supabaseAdmin");
+        getSupabase(supabaseUrl.value(), supabaseServiceRoleKey.value());
+    }
 
     const unifiedRoutineScheduler = onSchedule(
-        { schedule: "*/15 * * * *", timeZone: "America/Costa_Rica", timeoutSeconds: 180, secrets: [telegramBotToken, geminiApiKey, resendApiKey] },
+        { schedule: "*/15 * * * *", timeZone: "America/Costa_Rica", timeoutSeconds: 180, secrets: [telegramBotToken, geminiApiKey, resendApiKey, supabaseUrl, supabaseServiceRoleKey, nvidiaApiKey] },
         async () => {
+            initSupabase();
             console.log("[scheduler] Unified scheduler tick...");
             try {
                 const { executeRoutine } = require("../automation/routineExecutor");
@@ -185,6 +192,21 @@ function createAutomationExports(adminDb, secrets) {
                     console.error("[scheduler] daySchedule processing error:", dsErr);
                 }
 
+                // ── ARIA Proactive Heartbeat ──
+                // Runs every tick. Uses NVIDIA (free) optionally to personalize.
+                // NEVER uses Gemini — no fallback to avoid cost loops.
+                try {
+                    const { ariaHeartbeatHandler } = require("../handlers/ariaHeartbeatHandler");
+                    const heartbeatResult = await ariaHeartbeatHandler({
+                        telegramToken: token,
+                        nvidiaKey: nvidiaApiKey ? nvidiaApiKey.value() : null,
+                        adminDb,
+                    });
+                    console.log(`[scheduler] aria_heartbeat result:`, JSON.stringify(heartbeatResult));
+                } catch (ariaErr) {
+                    console.error("[scheduler] aria_heartbeat error:", ariaErr.message);
+                }
+
                 console.log("[scheduler] Tick complete.");
             } catch (err) {
                 console.error("[scheduler] Fatal error:", err);
@@ -195,8 +217,9 @@ function createAutomationExports(adminDb, secrets) {
     const { requireAdmin } = require("../middleware/authGuard");
 
     const executeRoutineManually = onCall(
-        { secrets: [telegramBotToken, resendApiKey], timeoutSeconds: 120 },
+        { secrets: [telegramBotToken, resendApiKey, supabaseUrl, supabaseServiceRoleKey], timeoutSeconds: 120 },
         async (request) => {
+            initSupabase();
             await requireAdmin(adminDb, request);
             const { routineKey } = request.data;
             if (!routineKey) throw new HttpsError("invalid-argument", "routineKey is required.");
@@ -216,8 +239,9 @@ function createAutomationExports(adminDb, secrets) {
     );
 
     const sendTestMessage = onCall(
-        { secrets: [telegramBotToken], timeoutSeconds: 30 },
+        { secrets: [telegramBotToken, supabaseUrl, supabaseServiceRoleKey], timeoutSeconds: 30 },
         async (request) => {
+            initSupabase();
             if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
             await requireAdmin(adminDb, request);
             const { userId, message } = request.data;
@@ -235,8 +259,9 @@ function createAutomationExports(adminDb, secrets) {
 
     // Manual performance report execution (callable from UI)
     const executePerformanceReport = onCall(
-        { secrets: [telegramBotToken, resendApiKey], timeoutSeconds: 120 },
+        { secrets: [telegramBotToken, resendApiKey, supabaseUrl, supabaseServiceRoleKey], timeoutSeconds: 120 },
         async (request) => {
+            initSupabase();
             await requireAdmin(adminDb, request);
             try {
                 const { executeRoutine } = require("../automation/routineExecutor");

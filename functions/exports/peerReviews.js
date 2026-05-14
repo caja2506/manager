@@ -75,12 +75,12 @@ function createPeerReviewExports(adminDb, secrets = {}) {
             const userId = request.auth.uid;
             const { taskId, reason } = request.data;
 
-            // Fetch user role from Firestore
+            // Fetch user role from Supabase
             let userRole = "viewer";
             try {
-                const userDoc = await adminDb.collection(paths.USERS).doc(userId).get();
-                if (userDoc.exists) {
-                    const userData = userDoc.data();
+                const { loadUser } = require("../db/coreDataReader");
+                const userData = await loadUser(userId);
+                if (userData) {
                     userRole = userData.teamRole || userData.rbacRole || "viewer";
                 }
             } catch (err) {

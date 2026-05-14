@@ -7,6 +7,7 @@
 
 const paths = require("../automation/firestorePaths");
 const crypto = require("crypto");
+const { loadUser, loadAllUsers, updateUser } = require("../db/coreDataReader");
 
 // ── Link Code Generation ──
 
@@ -19,12 +20,10 @@ const crypto = require("crypto");
  * @returns {{ code: string, expiresAt: string }}
  */
 async function generateLinkCode(adminDb, userId) {
-    // Validate user exists
-    const userDoc = await adminDb.collection(paths.USERS).doc(userId).get();
-    if (!userDoc.exists) {
+    const userData = await loadUser(userId);
+    if (!userData) {
         throw new Error(`User ${userId} not found in users collection`);
     }
-    const userData = userDoc.data();
 
     // Invalidate any existing unused codes for this user
     const existingSnap = await adminDb.collection("telegramLinkCodes")
@@ -104,18 +103,16 @@ async function validateAndConsumeLinkCode(adminDb, code, chatId) {
 
     // ── Link the user ──
 
-    // 1. Update user doc
-    const userRef = adminDb.collection(paths.USERS).doc(codeData.userId);
-    const userSnap = await userRef.get();
-    if (!userSnap.exists) {
+    // 1. Update user doc in Supabase
+    const userData = await loadUser(codeData.userId);
+    if (!userData) {
         return { valid: false, error: "user_not_found" };
     }
 
     const now = new Date().toISOString();
-    await userRef.update({
+    await updateUser(codeData.userId, {
         telegramChatId: chatIdStr,
         isAutomationParticipant: true,
-        updatedAt: now,
     });
 
     // 2. Create/update Telegram session
@@ -150,7 +147,6 @@ async function validateAndConsumeLinkCode(adminDb, code, chatId) {
         usedByChatId: chatIdStr,
     });
 
-    const userData = userSnap.data();
     return {
         valid: true,
         userId: codeData.userId,
@@ -165,24 +161,16 @@ async function validateAndConsumeLinkCode(adminDb, code, chatId) {
  * Remove Telegram link from a user.
  */
 async function unlinkTelegramUser(adminDb, userId) {
-    const userRef = adminDb.collection(paths.USERS).doc(userId);
-    const userSnap = await userRef.get();
-    if (!userSnap.exists) throw new Error(`User ${userId} not found`);
+    const userData = await loadUser(userId);
+    if (!userData) throw new Error(`User ${userId} not found`);
 
-    const userData = userSnap.data();
     const chatId = userData.telegramChatId ||
         userData.providerLinks?.telegram?.chatId;
 
-    // Clear both possible locations of the Telegram link
-    const updatePayload = {
+    // Clear Telegram link in Supabase
+    await updateUser(userId, {
         telegramChatId: null,
-        updatedAt: new Date().toISOString(),
-    };
-    // Also clear providerLinks.telegram if it exists
-    if (userData.providerLinks?.telegram) {
-        updatePayload["providerLinks.telegram"] = null;
-    }
-    await userRef.update(updatePayload);
+    });
 
     // Deactivate Telegram session if exists
     if (chatId) {
@@ -215,11 +203,10 @@ async function updateTeamMember(adminDb, userId, fields) {
     }
     updates.updatedAt = new Date().toISOString();
 
-    const userRef = adminDb.collection(paths.USERS).doc(userId);
-    const snap = await userRef.get();
-    if (!snap.exists) throw new Error(`User ${userId} not found`);
+    const existingUser = await loadUser(userId);
+    if (!existingUser) throw new Error(`User ${userId} not found`);
 
-    await userRef.update(updates);
+    await updateUser(userId, updates);
 
     // SECURITY: users_roles is FROZEN. Do NOT write to it.
     // All operational role data lives in users/{uid} only.
@@ -239,11 +226,11 @@ async function updateTeamMember(adminDb, userId, fields) {
  * when you need to create missing user profiles.
  */
 async function getTeamMembers(adminDb) {
-    // 1. Load operational users
-    const usersSnap = await adminDb.collection(paths.USERS).get();
+    // 1. Load operational users from Supabase
+    const allUsersList = await loadAllUsers();
     const usersMap = {};
-    for (const doc of usersSnap.docs) {
-        usersMap[doc.id] = { id: doc.id, ...doc.data() };
+    for (const u of allUsersList) {
+        usersMap[u.id] = u;
     }
 
     // 2. Load RBAC users (source of truth for who's registered)
@@ -324,24 +311,22 @@ async function getTeamMembers(adminDb) {
  * @returns {{ created: number, total: number }}
  */
 async function ensureTeamMemberProfiles(adminDb) {
-    const usersSnap = await adminDb.collection(paths.USERS).get();
-    const existingUids = new Set(usersSnap.docs.map(d => d.id));
+    const allUsersList = await loadAllUsers();
+    const existingUids = new Set(allUsersList.map(u => u.id));
 
     const rolesSnap = await adminDb.collection(paths.USERS_ROLES).get();
-    const now = new Date().toISOString();
+    const { upsertUser } = require("../db/coreDataReader");
     let created = 0;
 
     for (const doc of rolesSnap.docs) {
         if (!existingUids.has(doc.id)) {
             const rd = doc.data();
-            await adminDb.collection(paths.USERS).doc(doc.id).set({
+            await upsertUser(doc.id, {
                 displayName: rd.displayName || rd.name || rd.email || doc.id,
                 name: rd.displayName || rd.name || rd.email || doc.id,
                 email: rd.email || "",
                 active: true,
                 isAutomationParticipant: false,
-                createdAt: now,
-                updatedAt: now,
                 createdBy: "system",
                 updatedBy: "system",
             });

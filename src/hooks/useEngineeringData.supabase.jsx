@@ -47,6 +47,12 @@ export function EngineeringDataProvider({ children }) {
     const [delayCauses, setDelayCauses] = useState([]);
     const [delays, setDelays] = useState([]);
 
+    // --- Global Task Filters ---
+    const [taskSearch, setTaskSearch] = useState('');
+    const [taskFilterProject, setTaskFilterProject] = useState('');
+    const [taskFilterAssignee, setTaskFilterAssignee] = useState('my-team');
+    const [taskFilterPriority, setTaskFilterPriority] = useState('');
+
     const [isReady, setIsReady] = useState(false);
     const loadedCountRef = useRef(0);
     const readyFiredRef = useRef(false);
@@ -67,7 +73,7 @@ export function EngineeringDataProvider({ children }) {
             tasks:          { query: 'tasks',            setter: setEngTasks,      mapper: mapTask },
             subtasks:       { query: 'subtasks',         setter: setEngSubtasks,   mapper: mapSubtask },
             task_types:     { query: 'task_types',       setter: setTaskTypes,     mapper: mapTaskType,    sort: (a, b) => safeLocaleCompare(a, b, 'name') },
-            work_area_types:{ query: 'work_area_types',  setter: setWorkAreaTypes, mapper: r => ({ ...r }),sort: (a, b) => safeLocaleCompare(a, b, 'name') },
+            work_area_types:{ query: 'work_area_types',  setter: setWorkAreaTypes, mapper: r => ({ ...r, defaultTaskTypes: r.default_task_types || [] }),sort: (a, b) => safeLocaleCompare(a, b, 'name') },
             milestone_types:{ query: 'milestone_types',  setter: setMilestoneTypes,mapper: r => ({ ...r }),sort: (a, b) => safeLocaleCompare(a, b, 'name') },
             users:          { query: 'users',            setter: setTeamMembers,   mapper: mapUser },
             time_logs:      { query: 'time_logs',        setter: setTimeLogs,      mapper: mapTimeLog,     sort: (a, b) => new Date(b.startTime || 0) - new Date(a.startTime || 0) },
@@ -112,7 +118,7 @@ export function EngineeringDataProvider({ children }) {
             markLoaded();
             setTaskTypes((tt || []).map(mapTaskType).sort((a, b) => safeLocaleCompare(a, b, 'name')));
             markLoaded();
-            setWorkAreaTypes((wa || []).map(r => ({ ...r })).sort((a, b) => safeLocaleCompare(a, b, 'name')));
+            setWorkAreaTypes((wa || []).map(r => ({ ...r, defaultTaskTypes: r.default_task_types || [] })).sort((a, b) => safeLocaleCompare(a, b, 'name')));
             markLoaded();
             setMilestoneTypes((mt || []).map(r => ({ ...r })).sort((a, b) => safeLocaleCompare(a, b, 'name')));
             markLoaded();
@@ -151,6 +157,8 @@ export function EngineeringDataProvider({ children }) {
             'tasks': { setter: setEngTasks, mapper: mapTask },
             'subtasks': { setter: setEngSubtasks, mapper: mapSubtask },
             'task_types': { setter: setTaskTypes, mapper: mapTaskType },
+            'work_area_types': { setter: setWorkAreaTypes, mapper: r => ({ ...r, defaultTaskTypes: r.default_task_types || [] }) },
+            'milestone_types': { setter: setMilestoneTypes, mapper: r => ({ ...r }) },
             'users': { setter: setTeamMembers, mapper: mapUser },
             'time_logs': { setter: setTimeLogs, mapper: mapTimeLog },
             'delay_causes': { setter: setDelayCauses, mapper: mapDelayCause },
@@ -185,6 +193,11 @@ export function EngineeringDataProvider({ children }) {
         teamMembers, timeLogs, delayCauses, delays,
         isReady,
         refetch: refetchTable,
+        // Global Filters
+        taskSearch, setTaskSearch,
+        taskFilterProject, setTaskFilterProject,
+        taskFilterAssignee, setTaskFilterAssignee,
+        taskFilterPriority, setTaskFilterPriority,
     };
 
     return (
@@ -202,9 +215,14 @@ function mapProject(r) {
     if (!r) return {};
     return {
         id: r.id, name: r.name, description: r.description,
-        status: r.status, priority: r.priority,
-        ownerId: r.owner_id, startDate: r.start_date,
-        dueDate: r.due_date, progress: r.progress,
+        client: r.client, priority: r.priority, status: r.status,
+        ownerId: r.owner_id, teamMemberIds: r.team_member_ids,
+        startDate: r.start_date, dueDate: r.due_date,
+        completedDate: r.completed_date, progress: r.progress,
+        bomProjectId: r.bom_project_id, tags: r.tags,
+        riskScore: r.risk_score, riskLevel: r.risk_level,
+        riskFactors: r.risk_factors, riskSummary: r.risk_summary,
+        riskUpdatedAt: r.risk_updated_at,
         createdAt: r.created_at, createdBy: r.created_by,
         updatedAt: r.updated_at,
     };
@@ -222,10 +240,15 @@ function mapTask(r) {
         dueDate: r.due_date, completedDate: r.completed_date,
         tags: r.tags, stationId: r.station_id,
         milestoneId: r.milestone_id, areaId: r.area_id,
+        workAreaTypeId: r.area_id, // legacy alias used by MainTable
         countsForScore: r.counts_for_score,
         peerReviewRequired: r.peer_review_required,
         peerReviewDiscipline: r.peer_review_discipline,
         peerReviewStatus: r.peer_review_status,
+        peerReviewCycles: r.peer_review_cycles,
+        currentPeerReviewId: r.current_peer_review_id,
+        lastPeerReviewerId: r.last_peer_reviewer_id,
+        lastPeerReviewAt: r.last_peer_review_at,
         showInGantt: r.show_in_gantt,
         plannedStartDate: r.planned_start_date,
         plannedEndDate: r.planned_end_date,
@@ -233,9 +256,15 @@ function mapTask(r) {
         percentComplete: r.percent_complete,
         milestone: r.milestone, summaryTask: r.summary_task,
         parentTaskId: r.parent_task_id,
+        ganttViewModeDefault: r.gantt_view_mode_default,
+        networkPath: r.network_path,
         blockedReason: r.blocked_reason,
         blockedByUserId: r.blocked_by_user_id,
         blockedByName: r.blocked_by_name,
+        blockedAt: r.blocked_at,
+        unblockedAt: r.unblocked_at,
+        totalBlockedHours: r.total_blocked_hours,
+        sortOrder: r.sort_order,
         createdAt: r.created_at, createdBy: r.created_by,
         updatedAt: r.updated_at,
     };
@@ -254,7 +283,11 @@ function mapSubtask(r) {
 function mapTaskType(r) {
     if (!r) return {};
     return {
-        id: r.id, name: r.name, icon: r.icon, color: r.color,
+        id: r.id, firestoreId: r.firestore_id,
+        name: r.name, icon: r.icon, color: r.color,
+        active: r.active, sortOrder: r.sort_order,
+        peerReviewRequired: r.peer_review_required,
+        peerReviewSections: r.peer_review_sections,
     };
 }
 
@@ -264,10 +297,11 @@ function mapUser(r) {
         uid: r.id, id: r.id,
         displayName: r.display_name, email: r.email,
         teamRole: r.team_role, rbacRole: r.rbac_role,
+        department: r.department,
         reportsTo: r.reports_to,
         weeklyCapacityHours: r.weekly_capacity_hours,
         photoURL: r.photo_url,
-        active: r.active,
+        active: r.active, theme: r.theme,
     };
 }
 
