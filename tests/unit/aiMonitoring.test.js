@@ -5,9 +5,9 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { detectRisks, summarizeRisks, RISK_SEVERITY, RISK_SIGNAL } from '../../src/core/ai-monitoring/riskDetector.js';
-import { computeEscalations, isWithinCooldown, ESCALATION_LEVEL } from '../../src/core/ai-monitoring/escalationRules.js';
-import { runMonitoringCycle, AI_SCHEDULE, AI_ACTION_TYPE } from '../../src/core/ai-monitoring/aiMonitoringEngine.js';
+import { detectRisks, summarizeRisks, RISK_SEVERITY, RISK_SIGNAL } from '../../src/core/predictive-analytics/riskDetector.js';
+import { computeEscalations, isWithinCooldown, ESCALATION_LEVEL } from '../../src/core/predictive-analytics/escalationRules.js';
+import { runMonitoringCycle, AI_SCHEDULE, AI_ACTION_TYPE } from '../../src/core/predictive-analytics/predictiveEngine.js';
 
 // ── Test helpers ──
 function makeMilestoneResult(overrides = {}) {

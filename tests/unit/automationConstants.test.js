@@ -117,7 +117,7 @@ describe('Automation Constants', () => {
 
     describe('ROUTINE_KEYS', () => {
         it('should define all 7 routine keys', () => {
-            expect(Object.keys(ROUTINE_KEYS)).toHaveLength(7);
+            expect(Object.keys(ROUTINE_KEYS)).toHaveLength(10);
             expect(ROUTINE_KEYS.MORNING_DIGEST_ALL).toBe('morning_digest_all');
             expect(ROUTINE_KEYS.TECHNICIAN_EVENING_CHECK).toBe('technician_evening_check');
             expect(ROUTINE_KEYS.MISSING_REPORT_ESCALATION).toBe('missing_report_escalation');
