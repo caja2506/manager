@@ -9,7 +9,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "security:audit": "npm audit && cd functions && npm audit",
+    "security:deps": "npm ls --depth=0 && echo --- functions --- && cd functions && npm ls --depth=0",
+    "security:check": "npm audit --audit-level=high"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

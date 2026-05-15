@@ -52,4 +52,19 @@ vite_log.txt
 
 # ── Security: user bootstrap data (contains passwords) ──
 users.json
+users_export.json
 functions/scripts/users.json
+
+# ── Security: service account keys and credentials ──
+**/serviceAccountKey*.json
+**/service-account*.json
+**/*application_default_credentials*.json
+
+# ── Security: temporary test/diagnostic scripts with hardcoded secrets ──
+check-msg.cjs
+test-db.cjs
+test-db.mjs
+test-nim.cjs
+test-realtime*.mjs
+tmp_test_tasks.js
+add_telegram_chat_id.sql

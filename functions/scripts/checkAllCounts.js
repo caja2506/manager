@@ -1,9 +1,9 @@
 // Quick check: row counts for all tables in Supabase
 const { createClient } = require("@supabase/supabase-js");
-const sb = createClient(
-    "https://mkymgptfmtlqpdswvywo.supabase.co",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1reW1ncHRmbXRscXBkc3d2eXdvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3ODE4MjEwMiwiZXhwIjoyMDkzNzU4MTAyfQ.IzegMIzSgWNXALkiHrsFRBJW2wmS6aG7YP5TJ02FYRY"
-);
+const SUPABASE_URL = process.env.SUPABASE_URL || "https://mkymgptfmtlqpdswvywo.supabase.co";
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+if (!SUPABASE_SERVICE_KEY) throw new Error("Missing SUPABASE_SERVICE_KEY env var.");
+const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 const TABLES = [
     "users", "projects", "task_types", "work_area_types", "milestone_types",
