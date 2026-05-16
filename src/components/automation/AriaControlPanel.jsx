@@ -3,7 +3,7 @@ import {
     Bot, Power, PowerOff, Clock, Shield, Brain, MessageSquare,
     Eye, Trash2, ChevronDown, ChevronUp, Save, Loader2,
     CheckCircle, AlertTriangle, Edit3, History, Zap, Search,
-    RefreshCw, Star, Tag, User
+    RefreshCw, Star, Tag, User, ClipboardList
 } from 'lucide-react';
 import { supabase } from '../../supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -16,6 +16,7 @@ export default function AriaControlPanel() {
     return (
         <div className="space-y-4">
             <AriaStatusCard />
+            <AriaReviewDashboard />
             <AriaSoulEditor />
             <AriaMemoryViewer />
         </div>
@@ -125,7 +126,7 @@ function AriaStatusCard() {
                 <StatBox label="Nudges Hoy" value={nudgeStats.today} color="text-indigo-400" />
                 <StatBox label="Nudges 7 días" value={nudgeStats.week} color="text-violet-400" />
                 <StatBox label="Max/día/usuario" value={config?.maxNudgesPerDay || 3} color="text-amber-400" />
-                <StatBox label="Reglas Activas" value="4" color="text-emerald-400" />
+                <StatBox label="Reglas Activas" value="11" color="text-emerald-400" />
             </div>
 
             {/* Schedule */}
@@ -425,6 +426,107 @@ function AriaMemoryViewer() {
                             ))}
                         </div>
                     )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 4. REVIEW TASK DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+
+function AriaReviewDashboard() {
+    const [expanded, setExpanded] = useState(false);
+    const [reviews, setReviews] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [lastRun, setLastRun] = useState(null);
+
+    const loadReviews = useCallback(async () => {
+        setLoading(true);
+        try {
+            const { data } = await supabase.from('settings').select('value').eq('key', 'ariaLastReviews').single();
+            if (data?.value) {
+                setReviews(data.value.reviews || []);
+                setLastRun(data.value.lastRun);
+            }
+        } catch { setReviews([]); }
+        setLoading(false);
+    }, []);
+
+    useEffect(() => { if (expanded && !reviews) loadReviews(); }, [expanded, reviews, loadReviews]);
+
+    const REVIEW_ICONS = {
+        gantt_review: { icon: '📅', label: 'Revisión Gantt', color: 'border-blue-500/30 bg-blue-500/5' },
+        risk_pulse: { icon: '🔴', label: 'Pulso de Riesgos', color: 'border-orange-500/30 bg-orange-500/5' },
+        workload_balance: { icon: '📊', label: 'Balance de Carga', color: 'border-violet-500/30 bg-violet-500/5' },
+        deadline_watch: { icon: '⏰', label: 'Vigilancia de Fechas', color: 'border-amber-500/30 bg-amber-500/5' },
+    };
+
+    return (
+        <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50">
+            <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center justify-between p-5">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-emerald-500/20 rounded-lg"><ClipboardList className="w-5 h-5 text-emerald-400" /></div>
+                    <div className="text-left">
+                        <h3 className="text-sm font-black text-white uppercase tracking-wider">Tareas de Revisión</h3>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Resultados de las revisiones automáticas de ARIA</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    {lastRun && <span className="text-[10px] text-slate-600">Última: {new Date(lastRun).toLocaleString()}</span>}
+                    {expanded ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+                </div>
+            </button>
+
+            {expanded && (
+                <div className="px-5 pb-5 space-y-3 border-t border-slate-700/30 pt-4">
+                    {loading ? (
+                        <div className="text-center py-6"><Loader2 className="w-5 h-5 animate-spin text-emerald-400 mx-auto" /></div>
+                    ) : !reviews || reviews.length === 0 ? (
+                        <div className="text-center py-8">
+                            <ClipboardList className="w-8 h-8 text-slate-700 mx-auto mb-2" />
+                            <p className="text-xs text-slate-600">ARIA aún no ha ejecutado revisiones.</p>
+                            <p className="text-[10px] text-slate-700 mt-1">Las revisiones se ejecutan automáticamente durante el horario operativo.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {reviews.map((r, i) => {
+                                const meta = REVIEW_ICONS[r.type] || { icon: '📋', label: r.type, color: 'border-slate-500/30' };
+                                const isOk = r.findings === 0;
+                                return (
+                                    <div key={i} className={`p-4 rounded-xl border ${meta.color} transition-all hover:border-opacity-60`}>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-base">{meta.icon}</span>
+                                                <span className="text-xs font-bold text-slate-300">{meta.label}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isOk
+                                                    ? 'bg-emerald-500/20 text-emerald-400'
+                                                    : 'bg-amber-500/20 text-amber-400'}`}>
+                                                    {isOk ? '✅ Sin hallazgos' : `⚠️ ${r.findings} hallazgo${r.findings !== 1 ? 's' : ''}`}
+                                                </span>
+                                                {r.timestamp && <span className="text-[9px] text-slate-600">{new Date(r.timestamp).toLocaleTimeString()}</span>}
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-slate-400 leading-relaxed">{r.summary}</p>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* Review schedule info */}
+                    <div className="bg-slate-900/40 rounded-lg p-3 border border-slate-700/20">
+                        <p className="text-[10px] text-slate-600 font-bold uppercase mb-1.5">Calendario de Revisiones</p>
+                        <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-500">
+                            <span>📅 Gantt Review — 7:00 AM</span>
+                            <span>🔴 Risk Pulse — 8:00 AM y 2:00 PM</span>
+                            <span>📊 Workload Balance — 8:00 AM</span>
+                            <span>⏰ Deadline Watch — 9:00 AM</span>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
