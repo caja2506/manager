@@ -681,7 +681,16 @@ export default function TaskDetailModal({
     // ── Render ──
 
     return createPortal(
-        <div className="fixed inset-0 z-[300] w-full h-full bg-slate-900 overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div
+            className="fixed inset-0 z-[300] flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-300"
+            onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+        >
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+
+            {/* Modal Panel */}
+            <div className="relative w-full max-w-[1200px] max-h-[92vh] bg-slate-900 rounded-2xl border border-slate-700/50 shadow-2xl shadow-black/50 overflow-hidden flex flex-col animate-in zoom-in-95 slide-in-from-bottom-4 duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]">
+
             <div className="flex-1 w-full h-full flex flex-col overflow-hidden relative">
 
                 {/* Header */}
@@ -711,7 +720,7 @@ export default function TaskDetailModal({
                 {/* Third Row: 5 states Stepper & Health Score */}
                 {!isNew && (
                     <div className="flex flex-col lg:flex-row bg-slate-900 border-b border-slate-800 relative z-20">
-                        <div className="flex-1 lg:w-1/2 overflow-hidden lg:border-r border-slate-800 flex items-center">
+                        <div className="lg:w-2/3 overflow-hidden lg:border-r border-slate-800 flex items-center">
                             <TaskStatusStepper
                                 currentStatus={form.status}
                                 onStatusChange={handleStatusChange}
@@ -719,7 +728,7 @@ export default function TaskDetailModal({
                                 variant="inline"
                             />
                         </div>
-                        <div className="hidden lg:flex flex-1 lg:w-1/2 p-1.5 items-center justify-center bg-slate-900">
+                        <div className="hidden lg:flex lg:w-1/3 p-1.5 items-center justify-center bg-slate-900">
                             <TaskHealthScore
                                 form={form}
                                 subtaskCount={(subtasks || []).length}
@@ -1017,6 +1026,7 @@ export default function TaskDetailModal({
                 teamMembers={teamMembers}
                 viewOnly={prViewMode}
             />
+        </div>
         </div>,
         document.body
     );

@@ -39,7 +39,7 @@ function KanbanColumn({ status, children, taskCount, isPlacementTarget, onPlacem
     });
 
     return (
-        <div className="min-w-[250px] flex-1 flex flex-col">
+        <div className="min-w-[250px] flex-1 flex flex-col" role="region" aria-label={`Columna ${cfg.label}`}>
             {/* Column Header */}
             <div className="flex items-center gap-2.5 mb-4 px-1">
                 <span
@@ -58,6 +58,8 @@ function KanbanColumn({ status, children, taskCount, isPlacementTarget, onPlacem
             <div
                 ref={setNodeRef}
                 onClick={onPlacementClick}
+                role="list"
+                aria-label={`Tareas en ${cfg.label}`}
                 className={`flex-1 space-y-3 overflow-y-auto pr-1 rounded-2xl transition-all duration-200 min-h-[120px] ${isOver
                     ? 'bg-indigo-500/10 ring-2 ring-indigo-500/40 ring-dashed p-2.5'
                     : isPlacementTarget
@@ -490,8 +492,11 @@ export default function TaskManager() {
                                         strategy={verticalListSortingStrategy}
                                     >
                                         {columnTasks.length === 0 ? (
-                                            <div className="border-2 border-dashed border-slate-700/50 rounded-2xl p-8 text-center min-h-[100px] flex items-center justify-center">
-                                                <p className="text-[12px] text-slate-600 font-medium">Sin tareas</p>
+                                            <div className="border-2 border-dashed border-slate-700/50 rounded-2xl p-8 text-center min-h-[100px] flex flex-col items-center justify-center gap-2">
+                                                <span className="text-2xl opacity-40">{status === 'blocked' ? '🛡️' : status === 'completed' ? '🎉' : '📋'}</span>
+                                                <p className="text-[12px] text-slate-500 font-medium">
+                                                    {status === 'blocked' ? '¡Sin bloqueos! Todo fluye.' : status === 'completed' ? 'Sin tareas completadas aún' : 'Sin tareas'}
+                                                </p>
                                             </div>
                                         ) : (
                                             columnTasks.map(task => (

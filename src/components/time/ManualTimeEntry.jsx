@@ -11,10 +11,17 @@ export default function ManualTimeEntry({
 }) {
     const isEditMode = !!editLog;
 
+    const getLocalDateString = (d = new Date()) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    };
+
     const [form, setForm] = useState({
         taskId: '',
         projectId: '',
-        date: new Date().toISOString().split('T')[0],
+        date: getLocalDateString(),
         startHour: '09:00',
         endHour: '10:00',
         notes: '',
@@ -31,7 +38,7 @@ export default function ManualTimeEntry({
             setForm({
                 taskId: editLog.taskId || '',
                 projectId: editLog.projectId || '',
-                date: start ? start.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                date: start ? getLocalDateString(start) : getLocalDateString(),
                 startHour: start ? start.toTimeString().slice(0, 5) : '09:00',
                 endHour: end ? end.toTimeString().slice(0, 5) : '10:00',
                 notes: editLog.notes || '',
@@ -40,7 +47,7 @@ export default function ManualTimeEntry({
         } else if (isOpen && !editLog) {
             setForm({
                 taskId: '', projectId: '',
-                date: new Date().toISOString().split('T')[0],
+                date: getLocalDateString(),
                 startHour: '09:00', endHour: '10:00', notes: '', overtime: false,
             });
         }
@@ -63,8 +70,20 @@ export default function ManualTimeEntry({
         setIsSaving(true);
         setError('');
         try {
-            const startTime = `${form.date}T${form.startHour}:00`;
-            const endTime = `${form.date}T${form.endHour}:00`;
+            // Parse the date and time explicitly to avoid browser quirks with ISO strings
+            const [y, m, d] = form.date.split('-').map(Number);
+            const [sh, sm] = form.startHour.split(':').map(Number);
+            const [eh, em] = form.endHour.split(':').map(Number);
+            
+            const startDate = new Date(y, m - 1, d, sh, sm, 0);
+            const endDate = new Date(y, m - 1, d, eh, em, 0);
+
+            // Output as fully-qualified UTC ISO strings
+            const startTime = startDate.toISOString();
+            const endTime = endDate.toISOString();
+
+            console.log("DEBUG TZ -> Local Start:", startDate.toString());
+            console.log("DEBUG TZ -> ISO Start:", startTime);
 
             if (isEditMode) {
                 await updateTimeLog(editLog.id, {

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Loader2, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Mail, Lock, User, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '../../firebase';
 import AnalyzeOpsLogo from '../brand/AnalyzeOpsLogo';
 
 // Firebase error code → user-friendly message
@@ -26,6 +28,7 @@ export default function LoginPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [successMsg, setSuccessMsg] = useState(null);
 
     // Form state
     const [mode, setMode] = useState('login'); // 'login' | 'register'
@@ -33,6 +36,24 @@ export default function LoginPage() {
     const [password, setPassword] = useState('');
     const [displayName, setDisplayName] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [resetLoading, setResetLoading] = useState(false);
+
+    const handleForgotPassword = async () => {
+        if (!email.trim()) {
+            setError('Ingresa tu correo electrónico primero.');
+            return;
+        }
+        setResetLoading(true);
+        setError(null);
+        setSuccessMsg(null);
+        try {
+            await sendPasswordResetEmail(auth, email.trim());
+            setSuccessMsg('Se envió un correo para restablecer tu contraseña.');
+        } catch (err) {
+            setError(getErrorMessage(err));
+        }
+        setResetLoading(false);
+    };
 
     const handleGoogleLogin = async () => {
         setGoogleLoading(true);
@@ -121,8 +142,15 @@ export default function LoginPage() {
 
                     {/* Error */}
                     {error && (
-                        <div className="mb-5 rounded-xl p-3 text-sm text-center" style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', color: '#fca5a5' }}>
+                        <div className="mb-5 rounded-xl p-3 text-sm text-center" role="alert" style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', color: '#fca5a5' }}>
                             {error}
+                        </div>
+                    )}
+
+                    {/* Success */}
+                    {successMsg && (
+                        <div className="mb-5 rounded-xl p-3 text-sm text-center" role="status" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', color: '#86efac' }}>
+                            {successMsg}
                         </div>
                     )}
 
@@ -138,6 +166,7 @@ export default function LoginPage() {
                                     onChange={e => setDisplayName(e.target.value)}
                                     placeholder="Nombre completo"
                                     required
+                                    aria-label="Nombre completo"
                                     className="w-full pl-10 pr-4 py-3 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-purple-500/40 transition-all placeholder-slate-600"
                                     style={inputStyle}
                                 />
@@ -153,6 +182,7 @@ export default function LoginPage() {
                                 onChange={e => setEmail(e.target.value)}
                                 placeholder="Correo electrónico"
                                 required
+                                aria-label="Correo electrónico"
                                 autoComplete="email"
                                 className="w-full pl-10 pr-4 py-3 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-purple-500/40 transition-all placeholder-slate-600"
                                 style={inputStyle}
@@ -169,6 +199,7 @@ export default function LoginPage() {
                                 placeholder="Contraseña"
                                 required
                                 minLength={6}
+                                aria-label="Contraseña"
                                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                                 className="w-full pl-10 pr-10 py-3 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-purple-500/40 transition-all placeholder-slate-600"
                                 style={inputStyle}
@@ -178,6 +209,7 @@ export default function LoginPage() {
                                 onClick={() => setShowPassword(s => !s)}
                                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
                                 tabIndex={-1}
+                                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                             >
                                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                             </button>
@@ -207,11 +239,11 @@ export default function LoginPage() {
                         </button>
                     </form>
 
-                    {/* Toggle mode */}
-                    <div className="text-center mb-5">
+                    {/* Toggle mode + Forgot password */}
+                    <div className="text-center mb-5 space-y-2">
                         <button
                             onClick={toggleMode}
-                            className="text-xs font-medium transition-colors hover:underline"
+                            className="text-xs font-medium transition-colors hover:underline block mx-auto"
                             style={{ color: '#a78bfa' }}
                         >
                             {mode === 'login'
@@ -219,6 +251,17 @@ export default function LoginPage() {
                                 : '¿Ya tienes cuenta? Inicia sesión'
                             }
                         </button>
+                        {mode === 'login' && (
+                            <button
+                                onClick={handleForgotPassword}
+                                disabled={resetLoading}
+                                className="text-[11px] font-medium transition-colors hover:underline flex items-center justify-center gap-1 mx-auto"
+                                style={{ color: '#94a3b8' }}
+                            >
+                                {resetLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <KeyRound className="w-3 h-3" />}
+                                ¿Olvidaste tu contraseña?
+                            </button>
+                        )}
                     </div>
 
                     {/* OR Divider */}
@@ -258,8 +301,8 @@ export default function LoginPage() {
                 </div>
 
                 {/* Footer */}
-                <p className="text-[10px] text-center mt-6" style={{ color: 'rgba(107,63,160,0.5)' }}>
-                    © 2025 AnalyzeOps — Powered by Firebase
+                <p className="text-[11px] text-center mt-6" style={{ color: 'rgba(148,163,184,0.7)' }}>
+                    © {new Date().getFullYear()} AnalyzeOps — Powered by Firebase
                 </p>
             </div>
         </div>

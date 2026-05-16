@@ -14,15 +14,19 @@ export default function SplashScreen({ onComplete }) {
 
     useEffect(() => {
         const timers = [];
-        timers.push(setTimeout(() => setPhase('show'), 200));      // logo entrance
-        timers.push(setTimeout(() => setPhase('quote'), 1500));    // show quote
-        timers.push(setTimeout(() => setPhase('exit'), 6000));     // start fade out
+        const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const base = isDev ? 0.3 : 1; // 30% speed in dev
+
+        timers.push(setTimeout(() => setPhase('show'), 200 * base));      // logo entrance
+        timers.push(setTimeout(() => setPhase('quote'), 1000 * base));    // show quote
+        timers.push(setTimeout(() => setPhase('exit'), 2500 * base));     // start fade out
         timers.push(setTimeout(() => {
             setPhase('done');
             onComplete?.();
-        }, 7000)); // fully done
+        }, 3000 * base)); // fully done
         return () => timers.forEach(clearTimeout);
     }, [onComplete]);
+
 
     if (phase === 'done') return null;
 

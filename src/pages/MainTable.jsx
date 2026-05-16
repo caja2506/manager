@@ -20,8 +20,23 @@ import {
 import { onProjectStations, hasMultipleIndexers } from '../services/stationService';
 import {
     Search, Filter, X, ChevronDown, ChevronRight, User, Calendar,
-    Check, Plus, Maximize2, Download, Sparkles, Loader2
+    Check, Plus, Maximize2, Download, Sparkles, Loader2, MessageSquare
 } from 'lucide-react';
+import { supabase } from '../supabase';
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+/** Generate a consistent HSL color from a project name */
+function generateProjectColor(name) {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = Math.abs(hash % 360);
+    return `hsl(${hue}, 70%, 55%)`;
+}
 
 // ============================================================
 // CONSTANTS
@@ -37,8 +52,8 @@ const STATUS_GROUPS = [
     { status: TASK_STATUS.CANCELLED,   label: 'Cancelado',   color: '#6b7280' },
 ];
 
-// 13-column grid: ☐ | Task | Owner | Project | STN | Status | Área | Tipo | Avance | Timeline | Hours | Priority | Asig.
-const GRID_COLS = '28px minmax(200px, 1fr) 36px 68px 55px 86px 68px 68px 56px minmax(105px,150px) minmax(65px,95px) 76px 36px';
+// 12-column grid: ☐ | Task | Owner | STN | Status | Área | Tipo | Avance | Timeline | Hours | Priority | Asig.
+const GRID_COLS = '28px minmax(200px, 1fr) 36px 55px 86px 68px 68px 56px minmax(105px,150px) minmax(65px,95px) 76px 36px';
 
 // ============================================================
 // SAVE FEEDBACK HOOK
@@ -57,7 +72,7 @@ function useSaveFeedback() {
 // INLINE EDIT: TEXT
 // ============================================================
 
-function InlineEditText({ value, onSave, className = '', placeholder = '' }) {
+function InlineEditText({ value, onSave, className = '', placeholder = '', ariaLabel = '' }) {
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState(value);
     const inputRef = useRef(null);
@@ -72,7 +87,14 @@ function InlineEditText({ value, onSave, className = '', placeholder = '' }) {
 
     if (!editing) {
         return (
-            <div onClick={(e) => { e.stopPropagation(); setEditing(true); }} className={`cursor-text hover:bg-slate-800/60 rounded px-1 py-0.5 -mx-1 transition-colors ${className}`}>
+            <div
+                onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+                role="button"
+                tabIndex={0}
+                aria-label={ariaLabel || `Editar ${placeholder || 'campo'}`}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setEditing(true); } }}
+                className={`cursor-text hover:bg-slate-800/60 rounded px-1 py-0.5 -mx-1 transition-colors ${className}`}
+            >
                 {value || <span className="text-slate-600 italic">{placeholder}</span>}
             </div>
         );
@@ -88,6 +110,7 @@ function InlineEditText({ value, onSave, className = '', placeholder = '' }) {
             onClick={e => e.stopPropagation()}
             className="w-full bg-slate-800 border border-indigo-500/50 rounded px-1.5 py-0.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-indigo-500/50"
             placeholder={placeholder}
+            aria-label={ariaLabel || placeholder}
         />
     );
 }
@@ -544,7 +567,7 @@ function StationCell({ task, canEdit, onSave }) {
 // TASK ROW
 // ============================================================
 
-function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDates, onOpenModal, groupColor, isLast, savedField, onSaved, taskTypes, workAreaTypes, isSelected, onToggleSelect }) {
+function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDates, onOpenModal, groupColor, isLast, savedField, onSaved, taskTypes, workAreaTypes, isSelected, onToggleSelect, commentCount }) {
     const { refetch } = useEngineeringData();
     const [popover, setPopover] = useState(null); // 'health' | 'score' | null
     const healthRef = useRef(null);
@@ -616,9 +639,13 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
         const elapsed = Math.max(0, (now - startDate) / (1000 * 60 * 60 * 24));
         timelinePct = Math.min(100, Math.max(0, (elapsed / total) * 100));
         daysLeft = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
-        if (daysLeft < 0 && task.status !== 'completed') timelineColor = '#ef4444';
+        if (daysLeft < 0 && task.status !== 'completed' && task.status !== 'cancelled') timelineColor = '#ef4444';
         else if (timelinePct > 80) timelineColor = '#f59e0b';
     }
+
+    const isCritical = task.priority === 'critical';
+    const isOverdue = daysLeft !== null && daysLeft < 0 && task.status !== 'completed' && task.status !== 'cancelled';
+
 
     // Hours
     const actual = task.actualHours || 0;
@@ -687,9 +714,17 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
         <>
             <div
                 onDoubleClick={() => onOpenModal(task)}
-                className={`grid items-stretch px-2 py-1.5 transition-all duration-150 hover:bg-indigo-500/6 group/row ${!isLast ? 'border-b border-slate-800/30' : ''}`}
-                style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${groupColor}` }}
+                className={`grid items-stretch px-2 py-1.5 transition-all duration-150 group/row 
+                    ${!isLast ? 'border-b border-slate-800/30' : ''} 
+                    ${isCritical ? 'bg-rose-500/5 hover:bg-rose-500/10' : 'hover:bg-indigo-500/6'}
+                    ${isOverdue ? 'ring-1 ring-inset ring-rose-500/20' : ''}
+                `}
+                style={{ 
+                    gridTemplateColumns: GRID_COLS, 
+                    borderLeft: `3px solid ${isCritical ? '#ef4444' : groupColor}` 
+                }}
             >
+
                 {/* Checkbox / Select */}
                 <div className="flex items-center justify-center" onClick={e => e.stopPropagation()}>
                     <input
@@ -736,7 +771,28 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                                 {doneSubs}/{totalSubs}
                             </span>
                         )}
+
+                        {/* Overdue Badge */}
+                        {isOverdue && (
+                            <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-rose-500 text-white animate-pulse shrink-0 flex items-center gap-1">
+                                <Calendar className="w-2.5 h-2.5" />
+                                {Math.abs(daysLeft)}d atraso
+                            </span>
+                        )}
                     </div>
+
+                    {/* Comment indicator */}
+                    {commentCount > 0 && (
+                        <span
+                            className="flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 shrink-0 cursor-pointer hover:bg-blue-500/25 transition-colors"
+                            title={`${commentCount} comentario${commentCount > 1 ? 's' : ''}`}
+                            onClick={e => { e.stopPropagation(); onOpenModal(task); }}
+                        >
+                            <MessageSquare className="w-2.5 h-2.5" />
+                            {commentCount}
+                        </span>
+                    )}
+
                     {/* Quick action icons on hover */}
                     <div className="hidden group-hover/row:flex items-center gap-0.5 shrink-0">
                         <button onClick={e => { e.stopPropagation(); onOpenModal(task); }} className="p-0.5 text-slate-600 hover:text-indigo-400 transition-colors" title="Agregar subtarea">
@@ -760,22 +816,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                     )}
                 </div>
 
-                {/* Project */}
-                <div className="flex items-center justify-center min-w-0">
-                    {canEdit ? (
-                        <InlineDropdown
-                            value={task.projectId || ''}
-                            options={projectOptions}
-                            onSelect={v => saveField('projectId', v || null)}
-                            renderValue={(val) => {
-                                const p = engProjects.find(pr => pr.id === val);
-                                return <span className="text-[11px] truncate block max-w-[100px] text-slate-400 italic text-center">{p?.name || '—'}</span>;
-                            }}
-                        />
-                    ) : (
-                        <span className="text-[11px] text-slate-400 italic truncate block text-center">{project?.name || '—'}</span>
-                    )}
-                </div>
+
 
                 {/* Station (STN) */}
                 <StationCell task={task} canEdit={canEdit} onSave={v => saveField('stationId', v)} />
@@ -898,13 +939,8 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                         ) : (
                             <span className="text-slate-400 truncate whitespace-nowrap">{fmtDate(startDate)} → {fmtDate(endDate)}</span>
                         )}
-                        {daysLeft !== null && (
-                            <span className={`text-[11px] font-bold shrink-0 px-1 rounded ${
-                                daysLeft < 0 && task.status !== 'completed' ? 'text-rose-400 bg-rose-500/15' :
-                                daysLeft <= 3 ? 'text-amber-400' : 'text-slate-500'
-                            }`}>
-                                {task.status === 'completed' ? '✓' : daysLeft < 0 ? `${Math.abs(daysLeft)}d late` : `${daysLeft}d`}
-                            </span>
+                        {daysLeft !== null && task.status === 'completed' && (
+                            <span className="text-[11px] font-bold shrink-0 px-1 rounded text-slate-500">✓</span>
                         )}
                     </div>
                     {startDate && endDate && (
@@ -1201,7 +1237,7 @@ function MobileTaskCard({ task, engProjects, teamMembers, subtasks, canEdit, onO
 // TABLE GROUP (responsive: grid on desktop, cards on mobile)
 // ============================================================
 
-function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers, canEdit, canEditDates, onOpenModal, isExpanded, onToggle, savedField, onSaved, taskTypes, workAreaTypes, groupStatus, user, selectedTaskIds, onToggleSelect, onTaskCreated, activeFilterProject, activeFilterAssignee }) {
+function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers, canEdit, canEditDates, onOpenModal, isExpanded, onToggle, savedField, onSaved, taskTypes, workAreaTypes, groupStatus, groupProjectId, user, selectedTaskIds, onToggleSelect, onTaskCreated, activeFilterProject, activeFilterAssignee, commentCounts }) {
     const [addingTask, setAddingTask] = useState(false);
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const addInputRef = useRef(null);
@@ -1210,8 +1246,9 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
         if (!newTaskTitle.trim()) return;
         try {
             const taskData = { title: newTaskTitle.trim(), status: groupStatus || 'pending' };
-            // Auto-assign filter values so the task matches current view
-            if (activeFilterProject) taskData.projectId = activeFilterProject;
+            // When grouped by project, auto-assign projectId from the group
+            if (groupProjectId) taskData.projectId = groupProjectId;
+            else if (activeFilterProject) taskData.projectId = activeFilterProject;
             if (activeFilterAssignee && activeFilterAssignee !== 'my-team' && activeFilterAssignee !== '') {
                 taskData.assignedTo = activeFilterAssignee;
             }
@@ -1269,10 +1306,10 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
             {isExpanded && (
                 <>
                     {/* Desktop: grid table (hidden on mobile) */}
-                    <div className="mt-1 rounded-xl overflow-hidden border border-slate-800/50 bg-slate-800/20 hidden md:block">
+                    <div className="mt-1 rounded-xl border border-slate-800/50 bg-slate-800/20 hidden md:block max-h-[70vh] overflow-y-auto">
                         {/* Header */}
                         <div
-                            className="grid items-center px-2 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-800/40 text-center"
+                            className="grid items-center px-2 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-800/90 text-center sticky top-0 z-10 backdrop-blur-sm"
                             style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${color}` }}
                         >
                             <div className="flex items-center justify-center">
@@ -1286,7 +1323,6 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                             </div>
                             <div className="text-left">Tarea</div>
                             <div>Resp</div>
-                            <div>Proyecto</div>
                             <div>STN</div>
                             <div>Estado</div>
                             <div>Área</div>
@@ -1322,6 +1358,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                     workAreaTypes={workAreaTypes}
                                     isSelected={selectedTaskIds?.has(task.id)}
                                     onToggleSelect={onToggleSelect}
+                                    commentCount={commentCounts?.[task.id] || 0}
                                 />
                             ))
                         )}
@@ -1359,7 +1396,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                     )}
                                 </div>
                                 {/* Rest of columns empty */}
-                                <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+                                <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
                             </div>
                         )}
 
@@ -1372,8 +1409,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                 <div></div> {/* 1. Checkbox */}
                                 <div></div> {/* 2. Task */}
                                 <div></div> {/* 3. Owner */}
-                                <div></div> {/* 4. Project placeholder */}
-                                <div></div> {/* 5. STN placeholder */}
+                                <div></div> {/* 4. STN placeholder */}
                                 
                                 {/* 6. Status distribution mini bars */}
                                 <div className="flex h-5 rounded overflow-hidden mx-1" title="Distribución de estados">
@@ -1482,11 +1518,23 @@ export default function MainTable() {
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
-    const [collapsedGroups, setCollapsedGroups] = useState(() => {
-        const init = {};
-        STATUS_GROUPS.forEach(g => { init[g.status] = true; });
-        return init;
-    });
+    const [collapsedGroups, setCollapsedGroups] = useState({});
+
+    // --- Comment counts per task (global query, single fetch) ---
+    const [commentCounts, setCommentCounts] = useState({});
+    useEffect(() => {
+        supabase
+            .from('task_comments')
+            .select('task_id')
+            .then(({ data }) => {
+                if (!data) return;
+                const counts = {};
+                data.forEach(row => {
+                    counts[row.task_id] = (counts[row.task_id] || 0) + 1;
+                });
+                setCommentCounts(counts);
+            });
+    }, [engTasks.length]); // re-fetch when tasks change
 
     // --- Resource Assignments (team relationships) ---
     const [resourceAssignments, setResourceAssignments] = useState([]);
@@ -1582,35 +1630,57 @@ export default function MainTable() {
         });
     }, [engTasks, taskSearch, taskFilterProject, taskFilterAssignee, taskFilterPriority, myTeamUids, user, recentlyCreatedIds]);
 
-    const tasksByStatus = useMemo(() => {
-        const map = {};
-        Object.values(TASK_STATUS).forEach(s => { map[s] = []; });
+    // ── Group tasks by project ──
+    const projectGroups = useMemo(() => {
+        const map = {}; // projectId -> tasks[]
         filteredTasks.forEach(t => {
-            if (map[t.status]) map[t.status].push(t);
-            else map[TASK_STATUS.BACKLOG].push(t);
+            const pid = t.projectId || '__none__';
+            if (!map[pid]) map[pid] = [];
+            map[pid].push(t);
         });
+        // Sort tasks: first by status (active first, completed/cancelled last), then by priority
+        const statusOrder = { in_progress: 0, pending: 1, backlog: 2, validation: 3, blocked: 4, completed: 5, cancelled: 6 };
         const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
         Object.keys(map).forEach(key => {
-            map[key].sort((a, b) => (priorityOrder[a.priority] || 2) - (priorityOrder[b.priority] || 2));
+            map[key].sort((a, b) => {
+                const sa = statusOrder[a.status] ?? 3;
+                const sb = statusOrder[b.status] ?? 3;
+                if (sa !== sb) return sa - sb;
+                return (priorityOrder[a.priority] || 2) - (priorityOrder[b.priority] || 2);
+            });
         });
-        return map;
-    }, [filteredTasks]);
+        // Build ordered array of groups, sorted by project name ("Sin Proyecto" last)
+        const groups = Object.keys(map).map(pid => {
+            const project = engProjects.find(p => p.id === pid);
+            return {
+                projectId: pid,
+                label: project?.name || 'Sin Proyecto',
+                color: pid === '__none__' ? '#64748b' : (project?.color || generateProjectColor(project?.name || '')),
+                tasks: map[pid],
+            };
+        });
+        groups.sort((a, b) => {
+            if (a.projectId === '__none__') return 1;
+            if (b.projectId === '__none__') return -1;
+            return a.label.localeCompare(b.label);
+        });
+        return groups;
+    }, [filteredTasks, engProjects]);
 
-    // Auto-expand groups with tasks, collapse empty ones — reactive to filter changes
+    // Auto-expand groups with tasks, collapse empty ones
     const dataLoadedRef = useRef(false);
     useEffect(() => {
         if (engTasks.length === 0) return;
         dataLoadedRef.current = true;
         const ns = {};
-        STATUS_GROUPS.forEach(g => {
-            const count = (tasksByStatus[g.status] || []).length;
-            ns[g.status] = count === 0; // collapsed=true only if empty
+        projectGroups.forEach(g => {
+            ns[g.projectId] = g.tasks.length === 0; // collapsed=true only if empty
         });
         const timer = setTimeout(() => setCollapsedGroups(ns), 0);
         return () => clearTimeout(timer);
-    }, [tasksByStatus]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [projectGroups]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const toggleGroup = (status) => setCollapsedGroups(prev => ({ ...prev, [status]: !prev[status] }));
+    const toggleGroup = (key) => setCollapsedGroups(prev => ({ ...prev, [key]: !prev[key] }));
     const activeFilterCount = [taskSearch, taskFilterProject, taskFilterAssignee !== 'my-team' ? taskFilterAssignee : '', taskFilterPriority].filter(Boolean).length;
 
     const [isExporting, setIsExporting] = useState(false);
@@ -1789,34 +1859,34 @@ export default function MainTable() {
                     </div>
                 )}
 
-                {STATUS_GROUPS.map(group => {
-                    const tasks = tasksByStatus[group.status] || [];
-                    if (tasks.length === 0 && (group.status === TASK_STATUS.COMPLETED || group.status === TASK_STATUS.CANCELLED)) return null;
+                {projectGroups.map(group => {
                     return (
                         <TableGroup
-                            key={group.status}
+                            key={group.projectId}
                             label={group.label}
                             color={group.color}
-                            tasks={tasks}
+                            tasks={group.tasks}
                             engProjects={engProjects}
                             engSubtasks={engSubtasks}
                             teamMembers={teamMembers}
                             canEdit={canEdit}
                             canEditDates={canEditDates}
                             onOpenModal={openTask}
-                            isExpanded={!collapsedGroups[group.status]}
-                            onToggle={() => toggleGroup(group.status)}
+                            isExpanded={!collapsedGroups[group.projectId]}
+                            onToggle={() => toggleGroup(group.projectId)}
                             savedField={savedField}
                             onSaved={showSaved}
                             taskTypes={taskTypes}
                             workAreaTypes={workAreaTypes}
-                            groupStatus={group.status}
+                            groupStatus={'pending'}
+                            groupProjectId={group.projectId !== '__none__' ? group.projectId : null}
                             user={user}
                             selectedTaskIds={selectedTaskIds}
                             onToggleSelect={toggleSelectTask}
                             onTaskCreated={handleTaskCreated}
                             activeFilterProject={taskFilterProject}
                             activeFilterAssignee={taskFilterAssignee}
+                            commentCounts={commentCounts}
                         />
                     );
                 })}

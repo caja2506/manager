@@ -5,11 +5,13 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { requireAdmin } = require("../middleware/authGuard");
 
+const TEAM_SECRETS = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"];
+
 function createTeamExports(adminDb) {
     const teamMgmt = require("../handlers/teamManagementHandler");
 
     const getTeamMembers = onCall(
-        { timeoutSeconds: 15 },
+        { timeoutSeconds: 15, secrets: TEAM_SECRETS },
         async (request) => {
             if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
             await requireAdmin(adminDb, request);
@@ -19,7 +21,7 @@ function createTeamExports(adminDb) {
     );
 
     const generateTelegramLinkCode = onCall(
-        { timeoutSeconds: 15 },
+        { timeoutSeconds: 15, secrets: TEAM_SECRETS },
         async (request) => {
             if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
             await requireAdmin(adminDb, request);
@@ -31,7 +33,7 @@ function createTeamExports(adminDb) {
     );
 
     const unlinkTelegramMember = onCall(
-        { timeoutSeconds: 15 },
+        { timeoutSeconds: 15, secrets: TEAM_SECRETS },
         async (request) => {
             if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
             await requireAdmin(adminDb, request);
@@ -43,7 +45,7 @@ function createTeamExports(adminDb) {
     );
 
     const updateTeamMember = onCall(
-        { timeoutSeconds: 15 },
+        { timeoutSeconds: 15, secrets: TEAM_SECRETS },
         async (request) => {
             if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
             await requireAdmin(adminDb, request);

@@ -19,6 +19,10 @@ async function ariaHeartbeatHandler({ telegramToken, nvidiaKey, adminDb }) {
     const tag = "[ariaHeartbeatHandler]";
     console.log(`${tag} Starting ARIA proactive heartbeat...`);
 
+    // TEMPORARY DISABLE: Desactivado temporalmente a petición del usuario por estar fuera de horario laboral.
+    console.log(`${tag} Heartbeat TEMPORARILY DISABLED.`);
+    return { success: true, sent: 0, skipped: 0, errors: 0 };
+
     try {
         const { evaluate } = require("../agent/proactiveEngine");
         const result = await evaluate({ telegramToken, nvidiaKey, adminDb });

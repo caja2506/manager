@@ -22,6 +22,8 @@ import {
     format, startOfWeek, addDays, addWeeks, subWeeks, isToday, isSameDay, parseISO
 } from 'date-fns';
 import { es } from 'date-fns/locale';
+import PlannerSkeleton from '../components/planner/PlannerSkeleton';
+
 
 // Priority colors for the block visual palette
 const PROJECT_COLOR_KEYS = ['indigo', 'violet', 'emerald', 'amber', 'rose', 'cyan', 'teal'];
@@ -505,11 +507,10 @@ export default function WeeklyPlanner() {
                 {/* Grid area */}
                 <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
                     {loading ? (
-                        <div className="flex-1 flex items-center justify-center text-slate-400 font-bold text-sm">
-                            Cargando planificación...
-                        </div>
+                        <PlannerSkeleton weekDays={weekDays} />
                     ) : (
                         <>
+
                             <div className="flex-1 h-full min-h-0">
                                 <PlannerGrid
                                     weekDays={weekDays}

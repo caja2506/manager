@@ -21,24 +21,33 @@ const TZ = "America/Costa_Rica";
 let _bands = DEFAULTS;
 
 /**
- * Load break bands from Firestore once (call at the start of a function).
+ * Load break bands from Supabase (or Firestore fallback) once.
  * @param {FirebaseFirestore.Firestore} adminDb
  */
 async function loadBreakBands(adminDb) {
     try {
-        const snap = await adminDb.doc("settings/daySchedule").get();
-        if (snap.exists) {
-            const data = snap.data();
-            if (data.breakBands?.length) {
-                _bands = data.breakBands.map(b => ({
-                    id: b.id,
-                    start: timeStringToDecimal(b.start),
-                    end: timeStringToDecimal(b.end),
-                }));
-            }
+        let data = null;
+        try {
+            const { loadSetting } = require("../db/coreDataReader");
+            data = await loadSetting("daySchedule");
+        } catch (e) {
+            console.warn("Error loading setting from Supabase:", e.message);
+        }
+
+        if (!data) {
+            const snap = await adminDb.doc("settings/daySchedule").get();
+            if (snap.exists) data = snap.data();
+        }
+
+        if (data && data.breakBands?.length) {
+            _bands = data.breakBands.map(b => ({
+                id: b.id,
+                start: timeStringToDecimal(b.start),
+                end: timeStringToDecimal(b.end),
+            }));
         }
     } catch (err) {
-        console.warn("Could not load break bands from Firestore, using defaults:", err.message);
+        console.warn("Could not load break bands, using defaults:", err.message);
     }
 }
 

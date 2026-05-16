@@ -68,7 +68,12 @@ function KpiCard({ label, value, suffix, icon: KpiIcon, color, children, badge, 
     const c = colorMap[color] || colorMap.indigo;
 
     return (
-        <div className={`bg-slate-900/70 backdrop-blur-sm rounded-2xl border border-slate-800 shadow-lg transition-all ${hasChildren ? `cursor-pointer ${c.hoverBorder}` : ''} ${expanded ? c.border : ''}`}>
+        <div className={`bg-slate-900/70 backdrop-blur-sm rounded-2xl border border-slate-800 shadow-lg transition-all ${hasChildren ? `cursor-pointer ${c.hoverBorder}` : ''} ${expanded ? c.border : ''}`}
+             role={hasChildren ? 'button' : undefined}
+             aria-expanded={hasChildren ? expanded : undefined}
+             tabIndex={hasChildren ? 0 : undefined}
+             onKeyDown={hasChildren ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(!expanded); } } : undefined}
+        >
             <div
                 className="p-5"
                 onClick={() => {
@@ -292,7 +297,7 @@ function TeamWorkloadPanel({ workload, timeLogs, engTasks, engProjects, onTaskCl
 
                             {/* Name */}
                             <h4 className="text-sm font-black text-slate-200 truncate">{name}</h4>
-                            <p className={`text-[10px] font-black uppercase tracking-wider ${rc.text} mb-2`}>{roleLabels[role] || 'Ingeniero'}</p>
+                            <p className={`text-[11px] font-black uppercase tracking-wider ${rc.text} mb-2`}>{roleLabels[role] || 'Ingeniero'}</p>
 
                             {/* IPS Badge */}
                             {scoreMap?.[user.uid] && (() => {
@@ -300,11 +305,11 @@ function TeamWorkloadPanel({ workload, timeLogs, engTasks, engProjects, onTaskCl
                                 const badgeColor = ips.score >= 90 ? '#10b981' : ips.score >= 75 ? '#6366f1' : ips.score >= 60 ? '#f59e0b' : '#ef4444';
                                 return (
                                     <div className="flex items-center gap-1.5 mb-2">
-                                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black text-white"
+                                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black text-white"
                                             style={{ background: `${badgeColor}30`, border: `1.5px solid ${badgeColor}`, color: badgeColor }}>
                                             {Math.round(ips.score)}
                                         </div>
-                                        <span className="text-[9px] font-bold" style={{ color: badgeColor }}>IPS</span>
+                                        <span className="text-[11px] font-bold" style={{ color: badgeColor }}>IPS</span>
                                     </div>
                                 );
                             })()}

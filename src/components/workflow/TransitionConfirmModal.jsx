@@ -233,10 +233,12 @@ export default function TransitionConfirmModal({
     };
 
     return createPortal(
-        <div className="fixed inset-0 z-400 flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-400 flex items-center justify-center p-4 animate-in fade-in duration-300 ease-out">
+
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCancel} />
 
-            <div className="relative bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl shadow-black/50 w-full max-w-md overflow-hidden">
+            <div className="relative bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl shadow-black/50 w-full max-w-md overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-2 duration-400 ease-[cubic-bezier(0.16,1,0.3,1)]">
+
                 {/* Header */}
                 <div className="p-5 border-b border-slate-800 flex items-center justify-between">
                     <div className="flex items-center gap-3">

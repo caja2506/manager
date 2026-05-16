@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import {
-    Zap, Settings, Activity, AlertTriangle, BarChart3,
+    Zap, Settings, Activity, BarChart3,
     Radio, ToggleLeft, ToggleRight, Bug, FlaskConical,
-    Play, Send, Brain, LineChart, Sparkles, Users
+    Brain, LineChart, Sparkles, Users, LayoutDashboard, Bot
 } from 'lucide-react';
 import RoutineListCard from './RoutineListCard';
 import AutomationRunLogCard from './AutomationRunLogCard';
@@ -33,18 +33,15 @@ import OptimizationInsightsCard from './OptimizationInsightsCard';
 import TeamManagementPanel from './TeamManagementPanel';
 import DayScheduleSettings from '../settings/DayScheduleSettings.jsx';
 import EmailReportSettings from '../settings/EmailReportSettings.jsx';
+// ARIA Agent Panel
+import AriaControlPanel from './AriaControlPanel';
 
 const TABS = [
-    { key: 'control', label: 'Control', icon: Settings },
-    { key: 'actions', label: 'Acciones', icon: Play },
-    { key: 'analytics', label: 'Analítica', icon: LineChart },
-    { key: 'optimization', label: 'Optimización', icon: Sparkles },
+    { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { key: 'aria', label: 'ARIA', icon: Bot },
     { key: 'intelligence', label: 'Inteligencia', icon: Brain },
     { key: 'routines', label: 'Rutinas', icon: Activity },
-    { key: 'activity', label: 'Actividad', icon: Zap },
-    { key: 'incidents', label: 'Incidentes', icon: AlertTriangle },
-    { key: 'metrics', label: 'Métricas', icon: BarChart3 },
-    { key: 'channels', label: 'Canales', icon: Radio },
+    { key: 'analytics', label: 'Analítica', icon: LineChart },
     { key: 'team', label: 'Equipo', icon: Users },
 ];
 
@@ -52,8 +49,13 @@ const TABS = [
  * AutomationControlShell
  * 
  * Main layout shell for the Automation Control Center.
- * Contains tabbed navigation and renders appropriate content
- * for each section.
+ * Consolidated from 11 tabs to 6:
+ *   - Dashboard (Control + Actions + Metrics + Channels + Activity)
+ *   - ARIA (Agent status, soul editor, memory viewer, kill switch)
+ *   - Intelligence (AI summary, executions, manual AI)
+ *   - Routines (Routine list, day schedule, email reports)
+ *   - Analytics (Analytics + Optimization combined)
+ *   - Team (Team management)
  */
 export default function AutomationControlShell({
     coreConfig,
@@ -82,7 +84,7 @@ export default function AutomationControlShell({
     onOptimizationScan,
     onSimulate,
 }) {
-    const [activeTab, setActiveTab] = useState('control');
+    const [activeTab, setActiveTab] = useState('dashboard');
 
     const isGlobalEnabled = coreConfig?.enabled ?? false;
 
@@ -139,7 +141,9 @@ export default function AutomationControlShell({
                             key={tab.key}
                             onClick={() => setActiveTab(tab.key)}
                             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${isActive
-                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/30'
+                                ? tab.key === 'aria'
+                                    ? 'bg-violet-600 text-white shadow-md shadow-violet-900/30'
+                                    : 'bg-indigo-600 text-white shadow-md shadow-indigo-900/30'
                                 : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                                 }`}
                         >
@@ -152,22 +156,44 @@ export default function AutomationControlShell({
 
             {/* Tab content */}
             <div className="min-h-[400px]">
-                {activeTab === 'control' && (
-                    <ControlPanel
-                        coreConfig={coreConfig}
-                        telegramConfig={telegramConfig}
-                        onToggleDryRun={onToggleDryRun}
-                        onToggleDebugMode={onToggleDebugMode}
-                    />
+                {/* DASHBOARD — merged Control + Actions + Metrics + Channels + Activity */}
+                {activeTab === 'dashboard' && (
+                    <div className="space-y-4">
+                        <ControlPanel
+                            coreConfig={coreConfig}
+                            telegramConfig={telegramConfig}
+                            onToggleDryRun={onToggleDryRun}
+                            onToggleDebugMode={onToggleDebugMode}
+                        />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <MetricsSummaryCard metrics={todayMetrics} />
+                            <ChannelHealthCard
+                                coreConfig={coreConfig}
+                                telegramConfig={telegramConfig}
+                            />
+                        </div>
+                        <ManualActionPanel
+                            routines={routines}
+                            teamMembers={teamMembers}
+                            onExecuteRoutine={onExecuteRoutine}
+                            onSendTestMessage={onSendTestMessage}
+                        />
+                        <div className="space-y-4">
+                            <AutomationRunLogCard runs={recentRuns} />
+                            <ActivityFeedCard
+                                recentRuns={recentRuns}
+                                recentDeliveries={recentDeliveries}
+                            />
+                        </div>
+                    </div>
                 )}
-                {activeTab === 'actions' && (
-                    <ManualActionPanel
-                        routines={routines}
-                        teamMembers={teamMembers}
-                        onExecuteRoutine={onExecuteRoutine}
-                        onSendTestMessage={onSendTestMessage}
-                    />
+
+                {/* ARIA — Agent control panel */}
+                {activeTab === 'aria' && (
+                    <AriaControlPanel />
                 )}
+
+                {/* INTELLIGENCE — AI summary + executions */}
                 {activeTab === 'intelligence' && (
                     <div className="space-y-4">
                         <AutomationAISummaryCard aiConfig={aiConfig} />
@@ -175,6 +201,8 @@ export default function AutomationControlShell({
                         <ManualAIActionPanel />
                     </div>
                 )}
+
+                {/* ROUTINES — Routine list + schedule + email */}
                 {activeTab === 'routines' && (
                     <div className="space-y-4">
                         <RoutineListCard
@@ -186,18 +214,8 @@ export default function AutomationControlShell({
                         <EmailReportSettings />
                     </div>
                 )}
-                {activeTab === 'activity' && (
-                    <div className="space-y-4">
-                        <AutomationRunLogCard runs={recentRuns} />
-                        <ActivityFeedCard
-                            recentRuns={recentRuns}
-                            recentDeliveries={recentDeliveries}
-                        />
-                    </div>
-                )}
-                {activeTab === 'incidents' && (
-                    <IncidentsPlaceholder />
-                )}
+
+                {/* ANALYTICS — Analytics + Optimization merged */}
                 {activeTab === 'analytics' && (
                     <div className="space-y-4">
                         <AnalyticsFiltersBar
@@ -224,48 +242,32 @@ export default function AutomationControlShell({
                             <RoutineHealthCard routineScores={analyticsData?.routineScores} />
                             <AIAnalyticsCard globalKpis={analyticsData?.globalKpis} />
                         </div>
+                        {/* Optimization section */}
+                        <div className="border-t border-slate-700/30 pt-4 mt-4">
+                            <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                <Sparkles className="w-4 h-4 text-amber-400" /> Optimización
+                            </h3>
+                            <OptimizationFiltersBar
+                                onScan={onOptimizationScan}
+                                scanning={optimizationLoading}
+                            />
+                            <div className="space-y-4 mt-4">
+                                <OptimizationInsightsCard insightSummary={optimizationData?.insightSummary} />
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                    <OptimizationOpportunitiesCard opportunities={optimizationData?.opportunities} onSimulate={onSimulate} />
+                                    <InterventionAlertsCard interventions={optimizationData?.interventions} />
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                    <OperationalPlanCard plans={optimizationData?.plans} />
+                                    <ImpactTrackingCard applied={optimizationData?.applied} />
+                                </div>
+                                <SimulationPanel routines={routines} />
+                            </div>
+                        </div>
                     </div>
                 )}
-                {activeTab === 'optimization' && (
-                    <div className="space-y-4">
-                        <OptimizationFiltersBar
-                            onScan={onOptimizationScan}
-                            scanning={optimizationLoading}
-                        />
-                        <OptimizationInsightsCard
-                            insightSummary={optimizationData?.insightSummary}
-                        />
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                            <OptimizationOpportunitiesCard
-                                opportunities={optimizationData?.opportunities}
-                                onSimulate={onSimulate}
-                            />
-                            <InterventionAlertsCard
-                                interventions={optimizationData?.interventions}
-                            />
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                            <OperationalPlanCard
-                                plans={optimizationData?.plans}
-                            />
-                            <ImpactTrackingCard
-                                applied={optimizationData?.applied}
-                            />
-                        </div>
-                        <SimulationPanel
-                            routines={routines}
-                        />
-                    </div>
-                )}
-                {activeTab === 'metrics' && (
-                    <MetricsSummaryCard metrics={todayMetrics} />
-                )}
-                {activeTab === 'channels' && (
-                    <ChannelHealthCard
-                        coreConfig={coreConfig}
-                        telegramConfig={telegramConfig}
-                    />
-                )}
+
+                {/* TEAM */}
                 {activeTab === 'team' && (
                     <TeamManagementPanel />
                 )}
@@ -370,23 +372,6 @@ function InfoBadge({ label, value }) {
         <div className="bg-slate-900/40 rounded-lg px-3 py-2">
             <p className="text-[10px] text-slate-500 uppercase">{label}</p>
             <p className="text-xs font-bold text-slate-300 mt-0.5">{String(value)}</p>
-        </div>
-    );
-}
-
-function IncidentsPlaceholder() {
-    return (
-        <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50 p-6">
-            <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4">
-                Incidentes
-            </h3>
-            <div className="text-center py-12">
-                <AlertTriangle className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-                <p className="text-sm text-slate-500">Centro de incidentes disponible en Fase 2</p>
-                <p className="text-[10px] text-slate-600 mt-1">
-                    Bloqueos, escalaciones, y fallos operativos se mostrarán aquí.
-                </p>
-            </div>
         </div>
     );
 }

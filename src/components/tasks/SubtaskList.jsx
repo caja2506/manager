@@ -24,9 +24,12 @@ export default function SubtaskList({ subtasks = [], taskId, readOnly = false, o
     const [dragOverId, setDragOverId] = useState(null);
     const inputRef = useRef(null);
     const editInputRef = useRef(null);
+    const [deletingIds, setDeletingIds] = useState(new Set());
 
-    // Sort alphabetically + numerically (natural sort)
-    const sorted = [...subtasks].sort((a, b) => {
+    // Sort alphabetically + numerically (natural sort), excluding items being deleted
+    const sorted = [...subtasks]
+        .filter(s => !deletingIds.has(s.id))
+        .sort((a, b) => {
         const ta = (a.title || '').toLowerCase();
         const tb = (b.title || '').toLowerCase();
         // Natural sort: split into text and number segments
@@ -116,25 +119,40 @@ export default function SubtaskList({ subtasks = [], taskId, readOnly = false, o
         });
     };
 
-    // ── Delete ──
+    // ── Delete (optimistic) ──
+
     const handleDelete = async (subtaskId) => {
         const st = subtasks.find(s => s.id === subtaskId);
-        await deleteSubtask(subtaskId);
+        
+        // Optimistic: hide immediately
+        setDeletingIds(prev => new Set(prev).add(subtaskId));
+        
+        try {
+            await deleteSubtask(subtaskId);
 
-        // Calculate new percentComplete after deletion
-        const wasCompleted = st?.completed;
-        const newTotal = subtasks.length - 1;
-        const newCompletedCount = completed - (wasCompleted ? 1 : 0);
-        const newPercent = newTotal > 0 ? Math.round((newCompletedCount / newTotal) * 100) : 0;
+            // Calculate new percentComplete after deletion
+            const wasCompleted = st?.completed;
+            const newTotal = subtasks.length - 1;
+            const newCompletedCount = completed - (wasCompleted ? 1 : 0);
+            const newPercent = newTotal > 0 ? Math.round((newCompletedCount / newTotal) * 100) : 0;
 
-        // Log subtask deletion with progress info
-        logActivity(taskId, {
-            type: ACTIVITY_TYPES.SUBTASK_DELETED,
-            description: `Subtarea eliminada: ${st?.title || ''}`,
-            userId,
-            userName,
-            meta: { subtaskTitle: st?.title || '', percentComplete: newPercent, totalSubtasks: newTotal, completedSubtasks: newCompletedCount },
-        });
+            // Log subtask deletion with progress info
+            logActivity(taskId, {
+                type: ACTIVITY_TYPES.SUBTASK_DELETED,
+                description: `Subtarea eliminada: ${st?.title || ''}`,
+                userId,
+                userName,
+                meta: { subtaskTitle: st?.title || '', percentComplete: newPercent, totalSubtasks: newTotal, completedSubtasks: newCompletedCount },
+            });
+        } catch (err) {
+            console.error('[SubtaskList] Delete failed:', err);
+            // Rollback optimistic delete
+            setDeletingIds(prev => {
+                const next = new Set(prev);
+                next.delete(subtaskId);
+                return next;
+            });
+        }
     };
 
     // ── Inline Edit ──

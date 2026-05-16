@@ -216,6 +216,21 @@ async function loadTaskSubtasks(taskId) {
 }
 
 /**
+ * Load a setting from the Supabase settings table.
+ * @param {string} key
+ * @returns {Promise<any|null>}
+ */
+async function loadSetting(key) {
+    const sb = getSupabase();
+    const { data, error } = await sb.from("settings")
+        .select("value")
+        .eq("key", key)
+        .single();
+    if (error) { console.warn(`[coreDataReader] loadSetting(${key}):`, error.message); return null; }
+    return data?.value || null;
+}
+
+/**
  * Load active (running) timer for a user — endTime IS NULL.
  * @param {string} userId
  * @returns {Promise<Object|null>}
@@ -421,6 +436,86 @@ async function recalculateTaskHours(taskId) {
     return totalHours;
 }
 
+// ── ARIA Intelligence Readers ──
+
+/**
+ * Load tasks with Gantt data (planned dates, percent complete).
+ * Only returns tasks that have plannedStartDate or plannedEndDate set.
+ * @returns {Promise<Array>}
+ */
+async function loadGanttTasks() {
+    const sb = getSupabase();
+    const { data, error } = await sb.from("tasks")
+        .select("id, title, status, assigned_to, project_id, priority, due_date, planned_start_date, planned_end_date, percent_complete, show_in_gantt, milestone, parent_task_id, estimated_hours, actual_hours")
+        .not("planned_start_date", "is", null);
+    if (error) { console.error("[coreDataReader] loadGanttTasks:", error.message); return []; }
+    return mapRows(data);
+}
+
+/**
+ * Load task dependencies for a project.
+ * @param {string} [projectId] - Optional. If omitted, loads all dependencies.
+ * @returns {Promise<Array>}
+ */
+async function loadTaskDependencies(projectId) {
+    const sb = getSupabase();
+    let query = sb.from("task_dependencies").select("*");
+    if (projectId) query = query.eq("project_id", projectId);
+    const { data, error } = await query;
+    if (error) { console.error("[coreDataReader] loadTaskDependencies:", error.message); return []; }
+    return mapRows(data);
+}
+
+/**
+ * Load tasks with upcoming deadlines within N days.
+ * Excludes completed/cancelled tasks.
+ * @param {number} [days=7] - Number of days ahead to look
+ * @returns {Promise<Array>}
+ */
+async function loadUpcomingDeadlines(days = 7) {
+    const sb = getSupabase();
+    const today = new Date().toISOString().split("T")[0];
+    const future = new Date(Date.now() + days * 86400000).toISOString().split("T")[0];
+    const { data, error } = await sb.from("tasks")
+        .select("id, title, status, assigned_to, project_id, priority, due_date, estimated_hours, actual_hours")
+        .gte("due_date", today)
+        .lte("due_date", future)
+        .not("status", "in", "(completed,cancelled)");
+    if (error) { console.error("[coreDataReader] loadUpcomingDeadlines:", error.message); return []; }
+    return mapRows(data);
+}
+
+/**
+ * Load proactive agent config from settings.
+ * @returns {Promise<Object|null>}
+ */
+async function loadProactiveAgentConfig() {
+    return loadSetting("proactiveAgent");
+}
+
+/**
+ * Calculate team workload: active tasks per user vs capacity.
+ * @returns {Promise<Array<{userId, name, role, activeTasks, estimatedHours, capacity}>>}
+ */
+async function calculateTeamWorkload() {
+    const [users, tasks] = await Promise.all([loadAllUsers(), loadAllTasks()]);
+    const activeStatuses = ["backlog", "pending", "in_progress", "blocked", "validation"];
+    return users
+        .filter(u => u.active !== false)
+        .map(u => {
+            const userTasks = tasks.filter(t => t.assignedTo === u.id && activeStatuses.includes(t.status));
+            const estimatedHours = userTasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
+            return {
+                userId: u.id,
+                name: u.displayName || u.name || u.email,
+                role: u.operationalRole || u.teamRole,
+                activeTasks: userTasks.length,
+                estimatedHours,
+                capacity: u.capacity || 40, // weekly hours default
+            };
+        });
+}
+
 module.exports = {
     // Reads
     loadAllTasks,
@@ -442,6 +537,13 @@ module.exports = {
     loadAllSubtasks,
     loadTaskSubtasks,
 
+    // ARIA Intelligence Reads
+    loadGanttTasks,
+    loadTaskDependencies,
+    loadUpcomingDeadlines,
+    loadProactiveAgentConfig,
+    calculateTeamWorkload,
+
     // Writes
     updateTimeLog,
     insertTimeLog,
@@ -453,4 +555,7 @@ module.exports = {
 
     // Computed
     recalculateTaskHours,
+
+    // Settings
+    loadSetting,
 };

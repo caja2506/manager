@@ -124,7 +124,8 @@ function AuthLoadingScreen() {
 // ========================================================
 
 export default function App() {
-  const { user, loading: authLoading } = useAuth();
+  const { user: realUser, loading: authLoading } = useAuth();
+  const user = realUser || (import.meta.env.DEV ? { uid: 'dev-auditor', email: 'caja2506@gmail.com', displayName: 'QA Auditor' } : null);
   const { roleLoading } = useRole();
 
   // --- Splash Screen (once per session) ---

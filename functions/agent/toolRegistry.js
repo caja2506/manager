@@ -184,6 +184,98 @@ const TOOL_REGISTRY = {
                 }));
         },
     },
+
+    // ─── ARIA Intelligence Tools (Phase 3) ───
+
+    getGanttStatus: {
+        name: "getGanttStatus",
+        description: "Obtiene el estado de las tareas con cronograma Gantt: fechas planificadas, % avance, desviaciones.",
+        parameters: "none",
+        execute: async () => {
+            const ganttTasks = await coreReader.loadGanttTasks();
+            const today = new Date().toISOString().split("T")[0];
+            return ganttTasks.map(t => {
+                const drift = t.plannedEndDate && t.dueDate
+                    ? Math.floor((new Date(t.dueDate).getTime() - new Date(t.plannedEndDate).getTime()) / 86400000)
+                    : null;
+                const isOverdue = t.plannedEndDate && t.plannedEndDate < today && t.status !== "completed";
+                return {
+                    title: t.title,
+                    status: t.status,
+                    plannedStart: t.plannedStartDate,
+                    plannedEnd: t.plannedEndDate,
+                    percentComplete: t.percentComplete || 0,
+                    driftDays: drift,
+                    isOverdue,
+                    assignedTo: t.assignedTo,
+                    projectId: t.projectId,
+                };
+            });
+        },
+    },
+
+    getTaskDependencies: {
+        name: "getTaskDependencies",
+        description: "Obtiene las dependencias entre tareas — qué tarea bloquea a cuál.",
+        parameters: "projectId (string, optional)",
+        execute: async (projectId) => {
+            const deps = await coreReader.loadTaskDependencies(projectId || undefined);
+            return deps.map(d => ({
+                from: d.predecessorId || d.fromTaskId,
+                to: d.successorId || d.toTaskId,
+                type: d.dependencyType || "FS",
+                projectId: d.projectId,
+            }));
+        },
+    },
+
+    getTeamWorkload: {
+        name: "getTeamWorkload",
+        description: "Obtiene la carga de trabajo del equipo: tareas activas y horas estimadas por persona vs su capacidad.",
+        parameters: "none",
+        execute: async () => {
+            return await coreReader.calculateTeamWorkload();
+        },
+    },
+
+    getUpcomingDeadlines: {
+        name: "getUpcomingDeadlines",
+        description: "Obtiene las tareas con fecha de entrega en los próximos 7 días.",
+        parameters: "days (number, default 7)",
+        execute: async (days) => {
+            const tasks = await coreReader.loadUpcomingDeadlines(days || 7);
+            return tasks.map(t => ({
+                title: t.title,
+                dueDate: t.dueDate,
+                status: t.status,
+                priority: t.priority,
+                assignedTo: t.assignedTo,
+                projectId: t.projectId,
+                daysRemaining: Math.ceil((new Date(t.dueDate).getTime() - Date.now()) / 86400000),
+            }));
+        },
+    },
+
+    getProjectRisks: {
+        name: "getProjectRisks",
+        description: "Obtiene los riesgos de todos los proyectos activos: score, nivel, y factores de riesgo.",
+        parameters: "none",
+        execute: async () => {
+            const projects = await coreReader.loadAllProjects();
+            return projects
+                .filter(p => p.status !== "cancelled" && p.status !== "completed")
+                .map(p => ({
+                    name: p.name,
+                    projectId: p.id,
+                    riskScore: p.riskScore || 0,
+                    riskLevel: p.riskLevel || "low",
+                    riskFactors: p.riskFactors || [],
+                    progress: p.progress || 0,
+                    dueDate: p.dueDate,
+                }))
+                .sort((a, b) => (b.riskScore || 0) - (a.riskScore || 0));
+        },
+    },
 };
 
 /**

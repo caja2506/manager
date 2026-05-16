@@ -105,13 +105,20 @@ function createAutomationExports(adminDb, secrets) {
 
                 // ── Day Schedule: close_day_report + open_day ──
                 try {
-                    const dayScheduleSnap = await adminDb
-                        .collection(routinePaths.SETTINGS)
-                        .doc(routinePaths.SETTINGS_DOCS.DAY_SCHEDULE)
-                        .get();
+                    const { loadSetting } = require("../db/coreDataReader");
+                    let ds = await loadSetting("daySchedule");
 
-                    if (dayScheduleSnap.exists) {
-                        const ds = dayScheduleSnap.data();
+                    if (!ds) {
+                        const dayScheduleSnap = await adminDb
+                            .collection(routinePaths.SETTINGS)
+                            .doc(routinePaths.SETTINGS_DOCS.DAY_SCHEDULE)
+                            .get();
+                        if (dayScheduleSnap.exists) {
+                            ds = dayScheduleSnap.data();
+                        }
+                    }
+
+                    if (ds) {
                         if (ds.enabled) {
                             const dsTz = ds.timezone || "America/Costa_Rica";
                             const nowDs = new Date(now.toLocaleString("en-US", { timeZone: dsTz }));
