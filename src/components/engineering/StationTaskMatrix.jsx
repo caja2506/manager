@@ -7,7 +7,7 @@ import TaskDetailModal from '../tasks/TaskDetailModal';
 import { Check, AlertTriangle, Plus, X, Search, ChevronRight, Filter } from 'lucide-react';
 
 export default function StationTaskMatrix({ projectId, canEdit, userId }) {
-    const { engTasks, workAreaTypes, taskTypes, engProjects, teamMembers } = useEngineeringData();
+    const { engTasks, engSubtasks, workAreaTypes, taskTypes, engProjects, teamMembers } = useEngineeringData();
     const [stations, setStations] = useState([]);
     
     const [popoverState, setPopoverState] = useState(null); // { cellRef, tasks, area, type, station }
@@ -275,9 +275,11 @@ export default function StationTaskMatrix({ projectId, canEdit, userId }) {
                     projectId={projectId}
                     userId={userId}
                     canEdit={canEdit}
+                    canDelete={canEdit}
                     projects={engProjects}
                     teamMembers={teamMembers}
                     taskTypes={taskTypes}
+                    subtasks={engSubtasks?.filter(s => s.taskId === modalTask.id) || []}
                 />
             )}
 

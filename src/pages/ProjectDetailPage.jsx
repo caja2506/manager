@@ -15,7 +15,7 @@ import { useEngineeringData } from '../hooks/useEngineeringData';
 import {
     ArrowLeft, Target, ListTodo, Clock, Calendar, AlertTriangle,
     ChevronRight, Plus, BarChart3, Settings, FolderGit2,
-    CheckCircle2, Activity, Edit3, Trash2, AlertCircle, Loader2, Table2, GanttChartSquare
+    CheckCircle2, Activity, Edit3, Trash2, AlertCircle, Loader2, Table2, GanttChartSquare, Grid3X3
 } from 'lucide-react';
 import { PROJECT_STATUS_CONFIG, TASK_PRIORITY_CONFIG, MILESTONE_TYPE } from '../models/schemas';
 import ProjectModal from '../components/tasks/ProjectModal';
@@ -47,7 +47,7 @@ export default function ProjectDetailPage() {
     const [loadingMs, setLoadingMs] = useState(true);
     const [deleteTarget, setDeleteTarget] = useState(null); // { id, name }
     const [deleting, setDeleting] = useState(false);
-    const [activeTab, setActiveTab] = useState('milestones'); // 'milestones' | 'stations' | 'table'
+    const [activeTab, setActiveTab] = useState('obeya'); // 'obeya' | 'milestones' | 'stations' | 'table' | 'gantt'
 
     const project = useMemo(
         () => engProjects.find(p => p.id === projectId),
@@ -94,6 +94,27 @@ export default function ProjectDetailPage() {
         }
         setDeleting(false);
     };
+
+    // ── Milestone Hierarchy ──
+    const milestoneTreeList = useMemo(() => {
+        if (!milestones || milestones.length === 0) return [];
+        const allMs = [...milestones].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+        const roots = allMs.filter(m => !m.parentMilestoneId);
+        const childrenOf = (parentId) => allMs.filter(m => m.parentMilestoneId === parentId);
+        
+        const buildList = (nodes, depth) => {
+            let result = [];
+            nodes.forEach(node => {
+                result.push({ ...node, depth });
+                const kids = childrenOf(node.id);
+                if (kids.length > 0) {
+                    result.push(...buildList(kids, depth + 1));
+                }
+            });
+            return result;
+        };
+        return buildList(roots, 0);
+    }, [milestones]);
 
     // ── Task stats ──
     const stats = useMemo(() => {
@@ -184,102 +205,28 @@ export default function ProjectDetailPage() {
                 </div>
             )}
 
-            {/* ══════════════ HEADER ══════════════ */}
-            <div className="bg-slate-900/70 backdrop-blur-sm rounded-2xl border border-slate-800 shadow-lg overflow-hidden">
-                <div className="h-1.5" style={{ backgroundColor: statusCfg.color || '#e2e8f0' }} />
-                <div className="p-5">
-                    <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-3">
-                            <button onClick={() => navigate('/projects')}
-                                className="text-indigo-400 hover:text-indigo-300 transition mt-0.5 cursor-pointer">
-                                <ArrowLeft className="w-5 h-5" />
-                            </button>
-                            <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg"
-                                        style={{ backgroundColor: `${statusCfg.color}15`, color: statusCfg.color }}>
-                                        {statusCfg.icon} {statusCfg.label}
-                                    </span>
-                                    <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full text-${priorityCfg.color}-600 bg-${priorityCfg.color}-50 flex items-center gap-0.5`}>
-                                        <AlertTriangle className="w-3 h-3" /> {priorityCfg.label}
-                                    </span>
-                                </div>
-                                <h2 className="font-black text-xl text-white tracking-tight">{project.name}</h2>
-                                {project.description && (
-                                    <p className="text-sm text-slate-400 mt-1 max-w-xl">{project.description}</p>
-                                )}
-                            </div>
-                        </div>
-                        {canEdit && (
-                            <button onClick={() => setShowEditModal(true)}
-                                className="flex items-center gap-1.5 px-4 py-2 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-xl text-xs font-bold hover:bg-amber-500/20 transition cursor-pointer">
-                                <Edit3 className="w-3.5 h-3.5" /> Editar
-                            </button>
-                        )}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-4 mt-4 text-xs text-slate-400">
-                        {owner && (
-                            <span className="flex items-center gap-1.5">
-                                <div className="w-5 h-5 rounded-full bg-indigo-500/20 flex items-center justify-center text-[9px] font-bold text-indigo-400">
-                                    {(owner.displayName || owner.email || '?')[0].toUpperCase()}
-                                </div>
-                                {owner.displayName || owner.email}
-                            </span>
-                        )}
-                        {project.targetStartDate && (
-                            <span className="flex items-center gap-1">
-                                <Calendar className="w-3 h-3" />
-                                {new Date(project.targetStartDate).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}
-                            </span>
-                        )}
-                        {project.targetEndDate && (
-                            <span className="flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {new Date(project.targetEndDate).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                {daysLeft !== null && (
-                                    <span className={`font-bold ${daysLeft < 0 ? 'text-red-400' : daysLeft < 7 ? 'text-amber-400' : 'text-slate-400'}`}>
-                                        ({daysLeft < 0 ? `${Math.abs(daysLeft)}d vencido` : `${daysLeft}d`})
-                                    </span>
-                                )}
-                            </span>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* ══════════════ STATS KPIs ══════════════ */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
-                <StatCard label="Tareas" value={stats.total} icon={<ListTodo className="w-5 h-5" />} color="indigo" />
-                <StatCard label="Completadas" value={stats.completed} icon={<CheckCircle2 className="w-5 h-5" />} color="emerald" />
-                <StatCard label="En Progreso" value={stats.inProgress} icon={<Activity className="w-5 h-5" />} color="blue" />
-                <StatCard label="Pendientes" value={stats.pending} icon={<Clock className="w-5 h-5" />} color="slate" />
-                <StatCard label="Bloqueadas" value={stats.blocked} icon={<AlertTriangle className="w-5 h-5" />} color="red" />
-                <StatCard label="Vencidas" value={stats.overdue} icon={<AlertTriangle className="w-5 h-5" />} color="amber" />
-            </div>
-
-            {/* Progress bar */}
-            <div className="bg-slate-900/70 p-5 rounded-2xl border border-slate-800 shadow-lg mb-6">
-                <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="font-bold text-slate-300">Avance General</span>
-                    <span className="font-black text-white">{stats.progress}%</span>
-                </div>
-                <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
-                    <div
-                        className={`h-full rounded-full transition-all duration-700 ${stats.progress === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`}
-                        style={{ width: `${stats.progress}%` }}
-                    />
-                </div>
-            </div>
-
-            {/* ══════════════ STATION TASK MATRIX (always visible) ══════════════ */}
-            <StationTaskMatrix
-                projectId={projectId}
-                canEdit={canEdit}
-                userId={user?.uid}
-            />
-
             {/* ══════════════ VIEW TABS ══════════════ */}
-            <div className="flex gap-1 bg-slate-900/70 p-1 rounded-xl border border-slate-800 w-fit">
+            <div className="flex flex-wrap gap-1 bg-slate-900/70 p-1 rounded-xl border border-slate-800 w-fit mb-6">
+                <button
+                    onClick={() => setActiveTab('resumen')}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        activeTab === 'resumen'
+                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    }`}
+                >
+                    <BarChart3 className="w-3.5 h-3.5" /> Resumen
+                </button>
+                <button
+                    onClick={() => setActiveTab('obeya')}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        activeTab === 'obeya'
+                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    }`}
+                >
+                    <Grid3X3 className="w-3.5 h-3.5" /> Matriz Obeya
+                </button>
                 <button
                     onClick={() => setActiveTab('milestones')}
                     className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
@@ -322,7 +269,97 @@ export default function ProjectDetailPage() {
                 </button>
             </div>
 
+            {activeTab === 'resumen' && (
+                <div className="space-y-4">
+                    {/* ══════════════ HEADER ══════════════ */}
+                    <div className="bg-slate-900/70 backdrop-blur-sm rounded-2xl border border-slate-800 shadow-lg overflow-hidden">
+                        <div className="h-1.5" style={{ backgroundColor: statusCfg.color || '#e2e8f0' }} />
+                        <div className="p-5">
+                            <div className="flex items-start justify-between">
+                                <div className="flex items-start gap-3">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full text-${priorityCfg.color}-600 bg-${priorityCfg.color}-50 flex items-center gap-0.5`}>
+                                                <AlertTriangle className="w-3 h-3" /> {priorityCfg.label}
+                                            </span>
+                                        </div>
+                                        <h2 className="font-black text-xl text-white tracking-tight">{project.name}</h2>
+                                        {project.description && (
+                                            <p className="text-sm text-slate-400 mt-1 max-w-xl">{project.description}</p>
+                                        )}
+                                    </div>
+                                </div>
+                                {canEdit && (
+                                    <button onClick={() => setShowEditModal(true)}
+                                        className="flex items-center gap-1.5 px-4 py-2 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-xl text-xs font-bold hover:bg-amber-500/20 transition cursor-pointer">
+                                        <Edit3 className="w-3.5 h-3.5" /> Editar
+                                    </button>
+                                )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-4 mt-4 text-xs text-slate-400">
+                                {owner && (
+                                    <span className="flex items-center gap-1.5">
+                                        <div className="w-5 h-5 rounded-full bg-indigo-500/20 flex items-center justify-center text-[9px] font-bold text-indigo-400">
+                                            {(owner.displayName || owner.email || '?')[0].toUpperCase()}
+                                        </div>
+                                        {owner.displayName || owner.email}
+                                    </span>
+                                )}
+                                {project.targetStartDate && (
+                                    <span className="flex items-center gap-1">
+                                        <Calendar className="w-3 h-3" />
+                                        {new Date(project.targetStartDate).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                    </span>
+                                )}
+                                {project.targetEndDate && (
+                                    <span className="flex items-center gap-1">
+                                        <Clock className="w-3 h-3" />
+                                        {new Date(project.targetEndDate).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                        {daysLeft !== null && (
+                                            <span className={`font-bold ${daysLeft < 0 ? 'text-red-400' : daysLeft < 7 ? 'text-amber-400' : 'text-slate-400'}`}>
+                                                ({daysLeft < 0 ? `${Math.abs(daysLeft)}d vencido` : `${daysLeft}d`})
+                                            </span>
+                                        )}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ══════════════ STATS KPIs ══════════════ */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                        <StatCard label="Tareas" value={stats.total} icon={<ListTodo className="w-5 h-5" />} color="indigo" />
+                        <StatCard label="Completadas" value={stats.completed} icon={<CheckCircle2 className="w-5 h-5" />} color="emerald" />
+                        <StatCard label="En Progreso" value={stats.inProgress} icon={<Activity className="w-5 h-5" />} color="blue" />
+                        <StatCard label="Pendientes" value={stats.pending} icon={<Clock className="w-5 h-5" />} color="slate" />
+                        <StatCard label="Bloqueadas" value={stats.blocked} icon={<AlertTriangle className="w-5 h-5" />} color="red" />
+                        <StatCard label="Vencidas" value={stats.overdue} icon={<AlertTriangle className="w-5 h-5" />} color="amber" />
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="bg-slate-900/70 p-5 rounded-2xl border border-slate-800 shadow-lg">
+                        <div className="flex items-center justify-between text-sm mb-2">
+                            <span className="font-bold text-slate-300">Avance General</span>
+                            <span className="font-black text-white">{stats.progress}%</span>
+                        </div>
+                        <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
+                            <div
+                                className={`h-full rounded-full transition-all duration-700 ${stats.progress === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`}
+                                style={{ width: `${stats.progress}%` }}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* ══════════════ TAB CONTENT ══════════════ */}
+            {activeTab === 'obeya' && (
+                <StationTaskMatrix
+                    projectId={projectId}
+                    canEdit={canEdit}
+                    userId={user?.uid}
+                />
+            )}
             {activeTab === 'table' && (
                 <div className="bg-slate-900/70 rounded-2xl border border-slate-800 shadow-lg overflow-hidden">
                     <MainTable forceProjectId={projectId} />
@@ -383,12 +420,13 @@ export default function ProjectDetailPage() {
                     </div>
                 ) : (
                     <div className="space-y-2">
-                        {milestones.map(ms => {
+                        {milestoneTreeList.map(ms => {
                             const typeInfo = TYPE_LABELS[ms.type] || TYPE_LABELS.custom;
                             return (
                                 <div
                                     key={ms.id}
-                                    className="flex items-center justify-between p-4 bg-slate-800/40 rounded-xl border border-slate-700/40 hover:border-purple-500/40 transition-all group"
+                                    className={`flex items-center justify-between p-4 bg-slate-800/40 rounded-xl border border-slate-700/40 hover:border-purple-500/40 transition-all group ${ms.depth > 0 ? 'border-l-2 border-l-purple-500/30' : ''}`}
+                                    style={{ marginLeft: ms.depth ? `${ms.depth * 2}rem` : 0 }}
                                 >
                                     <div
                                         className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"

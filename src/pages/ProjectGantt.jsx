@@ -15,6 +15,7 @@ import {
 import GanttGrid from '../components/gantt/GanttGrid';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
 import TaskModuleBanner from '../components/layout/TaskModuleBanner';
+import MilestoneModal from '../components/milestones/MilestoneModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
 import { useEngineeringData } from '../hooks/useEngineeringData';
@@ -79,6 +80,7 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
     // View state
     const [viewMode, setViewMode] = useState('weekly');
     const [viewStart, setViewStart] = useState(() => getMondayOfWeek());
+    const [zoomLevel, setZoomLevel] = useState(1);
 
     // Data
     const [tasks, setTasks] = useState([]);
@@ -104,9 +106,10 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
     // Modal (same pattern as TaskManager)
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
+    const [taskModalInitialData, setTaskModalInitialData] = useState({});
 
-    const openNew = () => { setSelectedTask(null); setIsModalOpen(true); };
-    const openTask = (task) => { setSelectedTask(task); setIsModalOpen(true); };
+    const openNew = () => { setSelectedTask(null); setTaskModalInitialData({}); setIsModalOpen(true); };
+    const openTask = (task) => { setSelectedTask(task); setTaskModalInitialData({}); setIsModalOpen(true); };
 
     // ---- Load data ----
     const loadData = useCallback(async () => {
@@ -144,25 +147,10 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
     const [milestoneParentName, setMilestoneParentName] = useState('');
 
     const handleCreateMilestone = useCallback(async (parentId, parentName) => {
-        if (renderMilestoneModal) {
-            setMilestoneParentId(parentId);
-            setMilestoneParentName(parentName || '');
-            setIsMilestoneModalOpen(true);
-        } else {
-            const name = prompt(`Nombre del ${parentId ? 'sub-' : ''}milestone:`);
-            if (!name?.trim()) return;
-            const projectId = forceProjectId || filterProject;
-            if (!projectId) { alert('Selecciona un proyecto primero.'); return; }
-            try {
-                const { createMilestone } = await import('../services/milestoneService');
-                await createMilestone(projectId, { name: name.trim(), type: name.trim(), parentMilestoneId: parentId || null }, user?.uid);
-                await loadData();
-            } catch (err) {
-                console.error('Error creating milestone:', err);
-                alert('Error: ' + err.message);
-            }
-        }
-    }, [renderMilestoneModal, forceProjectId, filterProject, user, loadData]);
+        setMilestoneParentId(parentId);
+        setMilestoneParentName(parentName || '');
+        setIsMilestoneModalOpen(true);
+    }, []);
 
     const handleSaveMilestone = useCallback(async (data) => {
         const projectId = forceProjectId || filterProject;
@@ -175,6 +163,24 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
         setIsMilestoneModalOpen(false);
         await loadData();
     }, [forceProjectId, filterProject, user, loadData]);
+
+    const handleCreateTaskInMilestone = useCallback((milestoneId) => {
+        setSelectedTask(null);
+        setTaskModalInitialData({ milestoneId, projectId: forceProjectId || filterProject });
+        setIsModalOpen(true);
+    }, [forceProjectId, filterProject]);
+
+    const handleDeleteMilestone = useCallback(async (milestoneId, milestoneName) => {
+        if (!window.confirm(`¿Estás seguro de que deseas eliminar el milestone "${milestoneName}"?`)) return;
+        try {
+            const { deleteMilestone } = await import('../services/milestoneService');
+            await deleteMilestone(milestoneId);
+            await loadData();
+        } catch (err) {
+            console.error('Error deleting milestone:', err);
+            alert('Error: ' + err.message);
+        }
+    }, [loadData]);
 
     // ---- Sync viewStart on mode change ----
     useEffect(() => {
@@ -461,36 +467,15 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                         className={`flex items-center gap-1 px-2.5 h-full rounded-md text-[10px] font-bold transition-all ${viewMode === 'weekly' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
                     >
                         <Calendar className="w-3 h-3" />
-                        Semanal
+                        Días
                     </button>
                     <button
                         onClick={() => setViewMode('monthly')}
                         className={`flex items-center gap-1 px-2.5 h-full rounded-md text-[10px] font-bold transition-all ${viewMode === 'monthly' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
                     >
                         <BarChart2 className="w-3 h-3" />
-                        Mensual
+                        Semanas
                     </button>
-                </div>
-
-                {/* Navigation */}
-                <div className="flex items-center gap-0.5 bg-slate-800 rounded-lg border border-slate-700 p-0.5 h-8">
-                    <button onClick={() => navigate(-1)} className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-all">
-                        <ChevronLeft className="w-3.5 h-3.5" />
-                    </button>
-                    <button onClick={goToday} className="px-2 rounded-md text-[10px] font-bold text-slate-300 hover:text-white hover:bg-slate-700 transition-all h-full">
-                        Hoy
-                    </button>
-                    <button onClick={() => navigate(1)} className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-all">
-                        <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                </div>
-
-                {/* Range label */}
-                <div className="flex items-center gap-1 px-2.5 bg-slate-800/60 rounded-lg border border-slate-700/50 h-8">
-                    <CalendarRange className="w-3 h-3 text-indigo-400" />
-                    <span className="text-[10px] font-semibold text-slate-200">
-                        {formatRangeLabel(viewStart, viewMode)}
-                    </span>
                 </div>
 
                 {!isEmbedded && (
@@ -538,6 +523,28 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                     </button>
                 )}
 
+                <div className="hidden md:flex items-center gap-2 px-3 border-l border-slate-700/50">
+                    <StatChip label="Tareas" value={stats.total} color="indigo" />
+                    <StatChip label="Con fechas" value={stats.withDates} color="green" />
+                    <StatChip label="Hitos" value={stats.milestones} color="amber" />
+                    {stats.delayedTasks > 0 && (
+                        <StatChip label="Atrasadas" value={stats.delayedTasks} color="red" icon={<AlertCircle className="w-3 h-3" />} />
+                    )}
+                </div>
+
+                <div className="flex items-center gap-2 px-2 bg-slate-800/40 border border-slate-700/50 rounded-lg h-8 ml-auto">
+                    <span className="text-[10px] text-slate-400 font-bold">Zoom</span>
+                    <input
+                        type="range"
+                        min="0.5"
+                        max="2"
+                        step="0.1"
+                        value={zoomLevel}
+                        onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
+                        className="w-20 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                    />
+                </div>
+
                 <button
                     onClick={loadData}
                     className="p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 transition-all"
@@ -557,25 +564,14 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                             onClick={() => setViewMode('weekly')}
                             className={`flex items-center gap-1 px-2.5 h-full rounded-md text-[10px] font-bold transition-all cursor-pointer ${viewMode === 'weekly' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
                         >
-                            <Calendar className="w-3 h-3" /> Semanal
+                            <Calendar className="w-3 h-3" /> Días
                         </button>
                         <button
                             onClick={() => setViewMode('monthly')}
                             className={`flex items-center gap-1 px-2.5 h-full rounded-md text-[10px] font-bold transition-all cursor-pointer ${viewMode === 'monthly' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
                         >
-                            <BarChart2 className="w-3 h-3" /> Mensual
+                            <BarChart2 className="w-3 h-3" /> Semanas
                         </button>
-                    </div>
-                    {/* Navigation */}
-                    <div className="flex items-center gap-0.5 bg-slate-800 rounded-lg border border-slate-700 p-0.5 h-8">
-                        <button onClick={() => navigate(-1)} className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-all cursor-pointer"><ChevronLeft className="w-3.5 h-3.5" /></button>
-                        <button onClick={goToday} className="px-2 rounded-md text-[10px] font-bold text-slate-300 hover:text-white hover:bg-slate-700 transition-all h-full cursor-pointer">Hoy</button>
-                        <button onClick={() => navigate(1)} className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-all cursor-pointer"><ChevronRight className="w-3.5 h-3.5" /></button>
-                    </div>
-                    {/* Range label */}
-                    <div className="flex items-center gap-1 px-2.5 bg-slate-800/60 rounded-lg border border-slate-700/50 h-8">
-                        <CalendarRange className="w-3 h-3 text-indigo-400" />
-                        <span className="text-[10px] font-semibold text-slate-200">{formatRangeLabel(viewStart, viewMode)}</span>
                     </div>
                     {/* Assignee + Status filters */}
                     <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}
@@ -592,23 +588,33 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                         <option value="completed">Completado</option>
                         <option value="blocked">Bloqueado</option>
                     </select>
+
+                    <div className="hidden md:flex items-center gap-2 px-3 border-l border-slate-700/50">
+                        <StatChip label="Tareas" value={stats.total} color="indigo" />
+                        <StatChip label="Con fechas" value={stats.withDates} color="green" />
+                        <StatChip label="Hitos" value={stats.milestones} color="amber" />
+                        {stats.delayedTasks > 0 && (
+                            <StatChip label="Atrasadas" value={stats.delayedTasks} color="red" icon={<AlertCircle className="w-3 h-3" />} />
+                        )}
+                    </div>
+
+                    <div className="flex items-center gap-2 px-2 bg-slate-800/40 border border-slate-700/50 rounded-lg h-8 ml-auto">
+                        <span className="text-[10px] text-slate-400 font-bold">Zoom</span>
+                        <input
+                            type="range"
+                            min="0.5"
+                            max="2"
+                            step="0.1"
+                            value={zoomLevel}
+                            onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
+                            className="w-20 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                        />
+                    </div>
                     <button onClick={loadData} className="p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 transition-all cursor-pointer" title="Actualizar">
                         <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                     </button>
                 </div>
             )}
-
-            {/* ======== STATS BAR ======== */}
-            <div className="flex-shrink-0 flex items-center gap-3 md:gap-6 px-3 md:px-6 py-2 bg-slate-900/30 border-b border-slate-800/50 overflow-x-auto scrollbar-none">
-                <StatChip label="Tareas" value={stats.total} color="indigo" />
-                <StatChip label="Con fechas" value={stats.withDates} color="green" />
-
-                <StatChip label="Hitos" value={stats.milestones} color="amber" />
-                {stats.delayedTasks > 0 && (
-                    <StatChip label="Atrasadas" value={stats.delayedTasks} color="red" icon={<AlertCircle className="w-3 h-3" />} />
-                )}
-                <span className="text-xs text-slate-600 ml-auto">Haz click en una barra para editar fechas</span>
-            </div>
 
 
 
@@ -655,6 +661,8 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                         groupBy={groupBy}
                         onGroupByChange={setGroupBy}
                         onCreateMilestone={handleCreateMilestone}
+                        onCreateTaskInMilestone={handleCreateTaskInMilestone}
+                        onDeleteMilestone={handleDeleteMilestone}
                         placingTask={placingTask}
                         onPlacementComplete={handlePlacementComplete}
                         onStartPlacement={handleStartPlacement}
@@ -664,6 +672,7 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                         onBarDragEnd={handleBarDragEnd}
                         onLinkCreated={handleLinkCreated}
                         onDeleteDependency={handleDeleteDependency}
+                        zoomLevel={zoomLevel}
                     />
                 )}
             </div>
@@ -673,6 +682,7 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                 isOpen={isModalOpen}
                 onClose={closeModal}
                 task={selectedTask}
+                initialData={taskModalInitialData}
                 projects={engProjects}
                 teamMembers={teamMembers}
                 subtasks={selectedTask ? engSubtasks.filter(s => s.taskId === selectedTask.id) : []}
@@ -682,14 +692,14 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                 canDelete={canDelete}
             />
 
-            {/* ======== MILESTONE MODAL (render prop from parent) ======== */}
-            {renderMilestoneModal && renderMilestoneModal({
-                isOpen: isMilestoneModalOpen,
-                onClose: () => { setIsMilestoneModalOpen(false); setMilestoneParentId(null); setMilestoneParentName(''); },
-                onSave: handleSaveMilestone,
-                parentMilestoneId: milestoneParentId,
-                parentMilestoneName: milestoneParentName,
-            })}
+            {/* ======== MILESTONE MODAL ======== */}
+            <MilestoneModal
+                isOpen={isMilestoneModalOpen}
+                onClose={() => { setIsMilestoneModalOpen(false); setMilestoneParentId(null); setMilestoneParentName(''); }}
+                onSave={handleSaveMilestone}
+                parentMilestoneId={milestoneParentId}
+                parentMilestoneName={milestoneParentName}
+            />
         </div>
     );
 }

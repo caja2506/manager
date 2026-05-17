@@ -41,7 +41,7 @@ import PeerReviewExecutionModal from './peerReview/PeerReviewExecutionModal';
 import { requestPeerReview, waivePeerReview } from '../../services/peerReviewService';
 
 export default function TaskDetailModal({
-    isOpen, onClose, task, projects = [], teamMembers = [], subtasks = [],
+    isOpen, onClose, task, initialData = {}, projects = [], teamMembers = [], subtasks = [],
     taskTypes = [], userId, canEdit, canDelete
 }) {
     const {
@@ -60,14 +60,14 @@ export default function TaskDetailModal({
     const [form, setForm] = useState({
         title: '',
         description: '',
-        projectId: '',
+        projectId: initialData.projectId || '',
         assignedBy: userId || '',
         assignedTo: '',
         priority: TASK_PRIORITY.MEDIUM,
         status: TASK_STATUS.BACKLOG,
         taskTypeId: '',
         areaId: '',
-        milestoneId: '',
+        milestoneId: initialData.milestoneId || '',
         stationId: '',
         dueDate: '',
         plannedStartDate: '',
@@ -193,16 +193,16 @@ export default function TaskDetailModal({
             });
         } else {
             setForm({
-                title: '', description: '', projectId: '', assignedBy: userId || '',
+                title: '', description: '', projectId: initialData.projectId || '', assignedBy: userId || '',
                 assignedTo: '', priority: TASK_PRIORITY.MEDIUM,
-                status: TASK_STATUS.BACKLOG, taskTypeId: '', areaId: '', milestoneId: '', stationId: '',
+                status: TASK_STATUS.BACKLOG, taskTypeId: '', areaId: '', milestoneId: initialData.milestoneId || '', stationId: '',
                 dueDate: '',
                 plannedStartDate: '', plannedEndDate: '',
                 estimatedHours: '', blockedReason: '', percentComplete: 0,
                 networkPath: '',
             });
         }
-    }, [task]);
+    }, [task, userId, initialData.projectId, initialData.milestoneId]);
 
     // Auto-resolve areaId if task has a taskTypeId but no areaId 
     // (runs when workAreaTypes finish loading or when task loads)

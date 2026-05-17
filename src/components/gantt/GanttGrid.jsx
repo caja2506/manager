@@ -9,13 +9,13 @@
  *   onTaskClick, onBarDragEnd, onLinkCreated, onDeleteDependency
  */
 
-import React, { useRef, useMemo, useState, useCallback } from 'react';
+import React, { useRef, useMemo, useState, useCallback, useEffect } from 'react';
 import GanttBar from './GanttBar';
 import DependencyArrows from './DependencyArrows';
 import {
     ChevronDown, ChevronRight, Plus, Ban, Circle, Play, CheckCircle2,
     Clock, PanelLeftOpen, PanelLeftClose, CheckCircle, AlertTriangle, Link2,
-    Target, ListTodo,
+    Target, ListTodo, MoreVertical,
 } from 'lucide-react';
 
 // ---- Layout constants ----
@@ -55,13 +55,52 @@ function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n)
 function daysBetween(a, b) { return Math.round((toMidnight(b) - toMidnight(a)) / (24 * 60 * 60 * 1000)); }
 
 export default function GanttGrid({
-    tasks, dependencies, viewMode, viewStart, taskTypes, milestones = [], users,
+    tasks, dependencies, viewMode, viewStart: viewStartProp, taskTypes, milestones = [], users,
     groupBy = 'type', onGroupByChange, onCreateMilestone,
+    onCreateTaskInMilestone, onDeleteMilestone,
     placingTask, onPlacementComplete, onStartPlacement, onAssignMilestone,
     onTaskClick, onBarDragEnd, onLinkCreated, onDeleteDependency,
+    zoomLevel = 1,
 }) {
     const timelineRef = useRef(null);
-    const dayWidth = viewMode === 'weekly' ? DAY_WIDTH_WEEKLY : DAY_WIDTH_MONTHLY;
+    const baseDayWidth = viewMode === 'weekly' ? DAY_WIDTH_WEEKLY : DAY_WIDTH_MONTHLY;
+    const dayWidth = baseDayWidth * zoomLevel;
+
+    // Hover sync
+    const [hoveredTaskId, setHoveredTaskId] = useState(null);
+    const [openMenuId, setOpenMenuId] = useState(null);
+
+    // Click outside listener for menu
+    useEffect(() => {
+        if (!openMenuId) return;
+        const closeMenu = () => setOpenMenuId(null);
+        window.addEventListener('click', closeMenu);
+        return () => window.removeEventListener('click', closeMenu);
+    }, [openMenuId]);
+
+    // Panning (drag-to-scroll)
+    const [isPanning, setIsPanning] = useState(false);
+    const [startX, setStartX] = useState(0);
+    const [scrollLeft, setScrollLeft] = useState(0);
+
+    const handleMouseDown = (e) => {
+        if (!timelineRef.current) return;
+        setIsPanning(true);
+        setStartX(e.pageX - timelineRef.current.offsetLeft);
+        setScrollLeft(timelineRef.current.scrollLeft);
+    };
+
+    const handleMouseMove = (e) => {
+        if (!isPanning || !timelineRef.current) return;
+        e.preventDefault();
+        const x = e.pageX - timelineRef.current.offsetLeft;
+        const walk = (x - startX) * 1.5;
+        timelineRef.current.scrollLeft = scrollLeft - walk;
+    };
+
+    const handleMouseUpOrLeave = () => {
+        setIsPanning(false);
+    };
 
     // Collapsed groups
     const [collapsedGroups, setCollapsedGroups] = useState(new Set());
@@ -94,8 +133,40 @@ export default function GanttGrid({
     // Placement hover preview
     const [hoverDayIndex, setHoverDayIndex] = useState(-1);
 
-    // Date columns
-    const numDays = viewMode === 'weekly' ? 7 : 35;
+    // Date columns (Dynamic timeline bounds)
+    const { computedStart, computedNumDays } = useMemo(() => {
+        let minD = new Date();
+        let maxD = new Date();
+        
+        let hasDates = false;
+        (tasks || []).forEach(t => {
+            if (t.plannedStartDate) {
+                const start = toMidnight(t.plannedStartDate);
+                const end = t.plannedEndDate ? toMidnight(t.plannedEndDate) : start;
+                if (!hasDates) { minD = start; maxD = end; hasDates = true; }
+                else {
+                    if (start < minD) minD = start;
+                    if (end > maxD) maxD = end;
+                }
+            }
+        });
+
+        // Add padding: 14 days before, 30 days after
+        minD = addDays(minD, -14);
+        maxD = addDays(maxD, 30);
+
+        // Ensure "Today" is included in the timeline
+        const today = toMidnight(new Date());
+        if (today < minD) minD = addDays(today, -14);
+        if (today > maxD) maxD = addDays(today, 30);
+
+        const diffDays = Math.max(daysBetween(minD, maxD), 35); // minimum 35 days width
+        return { computedStart: minD, computedNumDays: diffDays };
+    }, [tasks]);
+
+    const viewStart = computedStart;
+    const numDays = computedNumDays;
+
     const dateCols = useMemo(() => {
         const cols = [];
         for (let i = 0; i < numDays; i++) cols.push(addDays(viewStart, i));
@@ -119,6 +190,29 @@ export default function GanttGrid({
         const m = new Map();
         (milestones || []).forEach(ms => m.set(ms.id, ms));
         return m;
+    }, [milestones]);
+
+    const milestoneOptionsTree = useMemo(() => {
+        if (!milestones || milestones.length === 0) return [];
+        const allMs = [...milestones].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+        const roots = allMs.filter(m => !m.parentMilestoneId);
+        const childrenOf = (parentId) => allMs.filter(m => m.parentMilestoneId === parentId);
+        
+        const buildOptions = (nodes, depth) => {
+            let result = [];
+            nodes.forEach(node => {
+                const prefix = depth > 0 ? '\u00A0\u00A0\u00A0\u00A0'.repeat(depth - 1) + '└─ ' : '';
+                result.push(
+                    <option key={node.id} value={node.id}>{prefix}{node.name}</option>
+                );
+                const kids = childrenOf(node.id);
+                if (kids.length > 0) {
+                    result.push(...buildOptions(kids, depth + 1));
+                }
+            });
+            return result;
+        };
+        return buildOptions(roots, 0);
     }, [milestones]);
 
     function getTaskColor(task) {
@@ -244,6 +338,36 @@ export default function GanttGrid({
         };
     }
 
+    // Group geometry (Milestone roof)
+    function getGroupGeometry(group) {
+        if (!group.tasks) return null;
+        const gatherTasks = (g) => {
+            let t = [...(g.tasks || [])];
+            if (g.children) {
+                g.children.forEach(c => t.push(...gatherTasks(c)));
+            }
+            return t;
+        };
+        const allTasks = gatherTasks(group);
+        const scheduledTasks = allTasks.filter(t => t.plannedStartDate);
+        if (scheduledTasks.length === 0) return null;
+        
+        let minStart = new Date('2100-01-01');
+        let maxEnd = new Date('1900-01-01');
+        
+        scheduledTasks.forEach(task => {
+            const start = toMidnight(task.plannedStartDate);
+            const end = task.plannedEndDate ? toMidnight(task.plannedEndDate) : start;
+            if (start < minStart) minStart = start;
+            if (end > maxEnd) maxEnd = end;
+        });
+        
+        return {
+            left: daysBetween(viewStart, minStart) * dayWidth,
+            width: Math.max(daysBetween(minStart, maxEnd) + 1, 1) * dayWidth,
+        };
+    }
+
     // TaskRowMap for arrows
     const taskRowMap = useMemo(() => {
         const map = new Map();
@@ -262,6 +386,18 @@ export default function GanttGrid({
     const todayOffset = daysBetween(viewStart, new Date()) * dayWidth;
     const showToday = todayOffset >= 0 && todayOffset <= totalTimelineWidth;
 
+    // Auto-scroll to today
+    useEffect(() => {
+        if (timelineRef.current && showToday) {
+            setTimeout(() => {
+                if (timelineRef.current) {
+                    const centerOffset = timelineRef.current.clientWidth / 2;
+                    timelineRef.current.scrollLeft = Math.max(0, todayOffset - centerOffset);
+                }
+            }, 50);
+        }
+    }, [todayOffset, showToday]);
+
     // Monthly week groups
     const weekGroups = useMemo(() => {
         if (viewMode !== 'monthly') return [];
@@ -274,7 +410,24 @@ export default function GanttGrid({
         return grps;
     }, [dateCols, viewMode]);
 
-    const headerHeight = viewMode === 'monthly' ? 64 : 48;
+    // Daily month groups
+    const monthGroups = useMemo(() => {
+        const grps = []; let cur = null;
+        dateCols.forEach((d, i) => {
+            const mn = d.getMonth();
+            const year = d.getFullYear();
+            const label = d.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+            if (!cur || cur.month !== mn || cur.year !== year) {
+                cur = { month: mn, year, start: i, count: 1, label: label };
+                grps.push(cur);
+            } else {
+                cur.count++;
+            }
+        });
+        return grps;
+    }, [dateCols]);
+
+    const headerHeight = viewMode === 'monthly' ? 88 : 64;
 
     // Handle click on a bar to link (when in link mode)
     const handleBarClickForLink = useCallback((targetTaskId) => {
@@ -370,14 +523,35 @@ export default function GanttGrid({
                                 }
                                 <span className={`text-[11px] font-black uppercase tracking-wider flex-1 truncate ${g.isMilestone ? (depthColors[depth] || 'text-slate-300') : 'text-slate-300'}`}>{g.name}</span>
                                 <span className="text-[10px] font-bold text-slate-500 mr-1">{totalCount || g.count}</span>
-                                {g.isMilestone && onCreateMilestone && depth < 3 && (
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); onCreateMilestone(g.id, g.name); }}
-                                        className="w-5 h-5 flex items-center justify-center rounded-md text-slate-500 hover:text-purple-300 hover:bg-purple-500/15 transition-all"
-                                        title={`Agregar sub-milestone a ${g.name}`}
-                                    >
-                                        <Plus className="w-3 h-3" />
-                                    </button>
+                                {g.isMilestone && (
+                                    <div className="relative mr-1">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === g.id ? null : g.id); }}
+                                            className="w-5 h-5 flex items-center justify-center rounded-md text-slate-500 hover:text-slate-300 hover:bg-slate-700 transition-all"
+                                            title="Opciones de milestone"
+                                        >
+                                            <MoreVertical className="w-3.5 h-3.5" />
+                                        </button>
+                                        {openMenuId === g.id && (
+                                            <div className="absolute right-0 top-full mt-1 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 py-1 flex flex-col">
+                                                {onCreateMilestone && depth < 3 && (
+                                                    <button onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); onCreateMilestone(g.id, g.name); }} className="w-full text-left px-3 py-2 text-[11px] font-semibold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">
+                                                        Crear Sub-Milestone
+                                                    </button>
+                                                )}
+                                                {onCreateTaskInMilestone && (
+                                                    <button onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); onCreateTaskInMilestone(g.id); }} className="w-full text-left px-3 py-2 text-[11px] font-semibold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">
+                                                        Crear Tarea
+                                                    </button>
+                                                )}
+                                                {onDeleteMilestone && (
+                                                    <button onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); onDeleteMilestone(g.id, g.name); }} className="w-full text-left px-3 py-2 text-[11px] font-semibold text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors border-t border-slate-700/50">
+                                                        Eliminar Milestone
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         );
@@ -388,37 +562,37 @@ export default function GanttGrid({
                     const statusIcon = STATUS_ICONS[task.status] || STATUS_ICONS.pending;
                     return (
                         <div key={task.id}
-                            className={`group flex items-center gap-2 border-b border-slate-800/60 cursor-pointer hover:bg-slate-800/40 transition-colors ${!hasDates ? 'opacity-50' : ''}`}
+                            className={`group flex items-center gap-2 border-b cursor-pointer transition-colors ${!hasDates ? 'opacity-50' : ''} ${hoveredTaskId === task.id ? 'bg-slate-700/50 border-slate-600/60' : 'border-slate-800/60 hover:bg-slate-800/40'}`}
                             style={{ height: ROW_HEIGHT, paddingLeft: 12 + (row.indent || 16) }}
+                            onMouseEnter={() => setHoveredTaskId(task.id)}
+                            onMouseLeave={() => setHoveredTaskId(null)}
                             onClick={() => {
                                 if (linkSource) { handleBarClickForLink(task.id); return; }
                                 onTaskClick?.(task);
                             }}>
                             <div className={`w-1 rounded-full h-5 bg-${row.groupColor}-500`} />
                             <div className="flex-shrink-0">{statusIcon}</div>
-                            <div className="flex-1 min-w-0 flex items-center justify-between pr-2">
-                                <div className="min-w-0 pr-2">
-                                    <p className={`text-xs font-semibold truncate ${task.milestone ? 'text-amber-300' : 'text-slate-200'}`}>
-                                        {task.milestone ? '◆ ' : ''}{task.title}
-                                    </p>
-                                    {assignee && <p className="text-[10px] text-slate-500 truncate">{assignee.name || assignee.email}</p>}
+                            <div className="flex-1 min-w-0 flex flex-col justify-center pr-2">
+                                <p className={`text-xs font-semibold truncate ${task.milestone ? 'text-amber-300' : 'text-slate-200'}`} title={task.title}>
+                                    {task.milestone ? '◆ ' : ''}{task.title}
+                                </p>
+                                <div className="flex items-center gap-2 mt-0.5 min-w-0">
+                                    {assignee && <p className="text-[10px] text-slate-500 truncate flex-shrink-0 max-w-[50%]" title={assignee.displayName || assignee.name || assignee.email}>{assignee.displayName || assignee.name || assignee.email}</p>}
+                                    {!task.milestone && milestones.length > 0 && onAssignMilestone && (
+                                        <select
+                                            className="opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 border border-slate-700 text-[9px] text-slate-300 rounded outline-none cursor-pointer w-auto h-4 py-0 pl-1 pr-4 truncate"
+                                            onClick={e => e.stopPropagation()}
+                                            onChange={e => {
+                                                e.stopPropagation();
+                                                if (e.target.value) onAssignMilestone(task.id, e.target.value);
+                                            }}
+                                            value=""
+                                        >
+                                            <option value="" disabled>+ Milestone</option>
+                                            {milestoneOptionsTree}
+                                        </select>
+                                    )}
                                 </div>
-                                {!task.milestone && milestones.length > 0 && onAssignMilestone && (
-                                    <select
-                                        className="opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 border border-slate-700 text-[9px] text-slate-300 rounded outline-none cursor-pointer max-w-[80px]"
-                                        onClick={e => e.stopPropagation()}
-                                        onChange={e => {
-                                            e.stopPropagation();
-                                            if (e.target.value) onAssignMilestone(task.id, e.target.value);
-                                        }}
-                                        value=""
-                                    >
-                                        <option value="" disabled>+ Milestone</option>
-                                        {milestones.map(m => (
-                                            <option key={m.id} value={m.id}>{m.name}</option>
-                                        ))}
-                                    </select>
-                                )}
                             </div>
                             {hasDates ? (
                                 <span className="text-[10px] font-bold text-slate-400">{task.percentComplete || 0}%</span>
@@ -440,35 +614,68 @@ export default function GanttGrid({
             </div>
 
             {/* ---- RIGHT PANEL (timeline) ---- */}
-            <div className={`flex-1 overflow-x-auto overflow-y-auto bg-slate-900/50 ${linkSource ? 'cursor-crosshair' : ''} ${placingTask ? 'cursor-crosshair ring-2 ring-amber-400/30 ring-inset' : ''}`}
+            <div
                 ref={timelineRef}
-                onMouseMove={handleTimelineMouseMove}
-                onMouseUp={handleTimelineMouseUp}>
+                className={`flex-1 overflow-x-auto overflow-y-auto bg-slate-900 ${isPanning ? 'cursor-grabbing' : 'cursor-grab'} ${linkSource ? 'cursor-crosshair' : ''} ${placingTask ? 'cursor-crosshair ring-2 ring-amber-400/30 ring-inset' : ''}`}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUpOrLeave}
+                onMouseLeave={handleMouseUpOrLeave}
+            >
                 <div style={{ width: totalTimelineWidth, minWidth: '100%' }}>
                     {/* Date Header */}
-                    <div className="sticky top-0 z-20 bg-slate-800 border-b border-slate-700/50 flex" style={{ height: headerHeight }}>
+                    <div className="sticky top-0 z-20 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700/50 flex" style={{ height: headerHeight }}>
                         {viewMode === 'weekly' ? (
-                            dateCols.map((d, i) => {
-                                const isToday = daysBetween(d, new Date()) === 0;
-                                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                                return (
-                                    <div key={i}
-                                        className={`flex-shrink-0 flex flex-col items-center justify-center border-r border-slate-700/30 ${isToday ? 'bg-indigo-900/40' : ''}`}
-                                        style={{ width: dayWidth }}>
-                                        <span className={`text-[9px] font-bold uppercase tracking-wider ${isWeekend ? 'text-slate-500' : 'text-slate-400'}`}>
-                                            {d.toLocaleDateString('es-MX', { weekday: 'short' })}
-                                        </span>
-                                        <span className={`text-lg font-black ${isToday ? 'text-indigo-300' : isWeekend ? 'text-slate-600' : 'text-slate-200'}`}>
-                                            {d.getDate()}
-                                        </span>
-                                    </div>
-                                );
-                            })
+                            <div className="flex flex-col w-full">
+                                <div className="flex border-b border-slate-200 dark:border-slate-700/30" style={{ height: 24 }}>
+                                    {monthGroups.map((mg, i) => (
+                                        <div key={i} className={`border-r border-slate-200 dark:border-slate-700/20 text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider ${i % 2 === 0 ? 'bg-slate-100 dark:bg-slate-800' : 'bg-slate-50 dark:bg-slate-900/50'}`}
+                                            style={{ width: mg.count * dayWidth }}>
+                                            <div className="sticky left-0 flex items-center h-full px-3" style={{ width: 'max-content' }}>
+                                                {mg.label}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex" style={{ height: 40 }}>
+                                    {dateCols.map((d, i) => {
+                                        const isToday = daysBetween(d, new Date()) === 0;
+                                        const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                                        const isEvenMonth = d.getMonth() % 2 === 0;
+                                        
+                                        let bgClass = isEvenMonth ? 'bg-slate-100/50 dark:bg-slate-800/30' : 'bg-transparent dark:bg-slate-900/30';
+                                        if (isToday) bgClass = 'bg-indigo-50 dark:bg-indigo-900/40';
+
+                                        return (
+                                            <div key={i}
+                                                className={`flex-shrink-0 flex flex-col items-center justify-center border-r border-slate-200 dark:border-slate-700/30 ${bgClass}`}
+                                                style={{ width: dayWidth }}>
+                                                <span className={`text-[9px] font-bold uppercase tracking-wider ${isWeekend ? 'text-slate-400 dark:text-slate-500' : 'text-slate-500 dark:text-slate-400'}`}>
+                                                    {d.toLocaleDateString('es-MX', { weekday: 'short' })}
+                                                </span>
+                                                <span className={`text-lg font-black ${isToday ? 'text-indigo-600 dark:text-indigo-300' : isWeekend ? 'text-slate-400 dark:text-slate-600' : 'text-slate-700 dark:text-slate-200'}`}>
+                                                    {d.getDate()}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
                         ) : (
                             <div className="flex flex-col w-full">
-                                <div className="flex border-b border-slate-700/30" style={{ height: 24 }}>
+                                <div className="flex border-b border-slate-200 dark:border-slate-700/30" style={{ height: 24 }}>
+                                    {monthGroups.map((mg, i) => (
+                                        <div key={i} className={`border-r border-slate-200 dark:border-slate-700/20 text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider ${i % 2 === 0 ? 'bg-slate-100 dark:bg-slate-800' : 'bg-slate-50 dark:bg-slate-900/50'}`}
+                                            style={{ width: mg.count * dayWidth }}>
+                                            <div className="sticky left-0 flex items-center h-full px-3" style={{ width: 'max-content' }}>
+                                                {mg.label}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex border-b border-slate-200 dark:border-slate-700/30" style={{ height: 24 }}>
                                     {weekGroups.map((wg, i) => (
-                                        <div key={i} className="flex items-center justify-center border-r border-slate-700/20 text-[9px] font-black text-slate-500 uppercase tracking-wider"
+                                        <div key={i} className="flex items-center justify-center border-r border-slate-200 dark:border-slate-700/20 text-[9px] font-black text-slate-500 uppercase tracking-wider bg-slate-50 dark:bg-slate-800/50"
                                             style={{ width: wg.count * dayWidth }}>{wg.label}</div>
                                     ))}
                                 </div>
@@ -476,11 +683,16 @@ export default function GanttGrid({
                                     {dateCols.map((d, i) => {
                                         const isToday = daysBetween(d, new Date()) === 0;
                                         const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                                        const isEvenMonth = d.getMonth() % 2 === 0;
+                                        
+                                        let bgClass = isEvenMonth ? 'bg-slate-100/50 dark:bg-slate-800/30' : 'bg-transparent dark:bg-slate-900/30';
+                                        if (isToday) bgClass = 'bg-indigo-50 dark:bg-indigo-900/40';
+
                                         return (
                                             <div key={i}
-                                                className={`flex-shrink-0 flex items-center justify-center border-r border-slate-700/20 ${isToday ? 'bg-indigo-900/30' : ''}`}
+                                                className={`flex-shrink-0 flex items-center justify-center border-r border-slate-200 dark:border-slate-700/20 ${bgClass}`}
                                                 style={{ width: dayWidth }}>
-                                                <span className={`text-[9px] font-bold ${isToday ? 'text-indigo-300' : isWeekend ? 'text-slate-600' : 'text-slate-500'}`}>
+                                                <span className={`text-[9px] font-bold ${isToday ? 'text-indigo-600 dark:text-indigo-300' : isWeekend ? 'text-slate-400 dark:text-slate-600' : 'text-slate-500 dark:text-slate-500'}`}>
                                                     {d.getDate()}
                                                 </span>
                                             </div>
@@ -529,8 +741,8 @@ export default function GanttGrid({
 
                         {/* Today line */}
                         {showToday && (
-                            <div className="absolute top-0 bottom-0 w-px bg-indigo-400/70 z-10" style={{ left: todayOffset }}>
-                                <div className="absolute -top-1 -left-1 w-2.5 h-2.5 rounded-full bg-indigo-400" />
+                            <div className="absolute top-0 bottom-0 w-px bg-red-500/80 z-20 pointer-events-none" style={{ left: todayOffset }}>
+                                <div className="absolute top-0 -left-1 w-2.5 h-2.5 rounded-full bg-red-500" />
                             </div>
                         )}
 
@@ -565,19 +777,32 @@ export default function GanttGrid({
                             let y = 0;
                             return rows.map((row) => {
                                 if (row.type === 'group') {
-                                    const el = <div key={`gh-${row.group.id}`}
-                                        className="absolute left-0 right-0 bg-slate-800/30 border-b border-slate-700/40"
-                                        style={{ top: y, height: GROUP_HEADER_HEIGHT }} />;
+                                    const geo = getGroupGeometry(row.group);
+                                    const el = (
+                                        <div key={`gh-${row.group.id}`}>
+                                            <div className="absolute left-0 right-0 bg-slate-800/30 border-b border-slate-700/40" style={{ top: y, height: GROUP_HEADER_HEIGHT }} />
+                                            {geo && (
+                                                <div className="absolute pointer-events-none" style={{ top: y + GROUP_HEADER_HEIGHT / 2 - 4, left: geo.left, width: geo.width, height: 8 }}>
+                                                    <div className={`w-full h-full bg-slate-500/50 border-t-2 border-l-2 border-r-2 rounded-t-sm ${row.group.depth > 0 ? 'border-purple-500/50' : 'border-slate-400'}`} />
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
                                     y += GROUP_HEADER_HEIGHT;
                                     return el;
                                 }
-                                const task = row.task;
-                                const geo = getBarGeometry(task);
+
                                 const curY = y;
                                 y += ROW_HEIGHT;
+                                const task = row.task;
+                                const geo = getBarGeometry(task);
+
                                 return (
-                                    <div key={task.id}>
-                                        <div className="absolute left-0 right-0 border-b border-slate-800/40" style={{ top: curY, height: ROW_HEIGHT }} />
+                                    <div key={task.id}
+                                        onMouseEnter={() => setHoveredTaskId(task.id)}
+                                        onMouseLeave={() => setHoveredTaskId(null)}
+                                    >
+                                        <div className={`absolute left-0 right-0 border-b border-slate-800/40 transition-colors ${hoveredTaskId === task.id ? 'bg-slate-700/50' : ''}`} style={{ top: curY, height: ROW_HEIGHT }} />
                                         {geo && (
                                             <div className="absolute" style={{ top: curY, left: 0, right: 0, height: ROW_HEIGHT }}
                                                 onClick={() => {
