@@ -250,6 +250,18 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
         }
     }, [placingTask, user]);
 
+    const handleAssignMilestone = useCallback(async (taskId, milestoneId) => {
+        try {
+            await updateTaskGanttFields(taskId, { milestone: milestoneId });
+            setTasks(prev => prev.map(t =>
+                t.id === taskId ? { ...t, milestone: milestoneId } : t
+            ));
+        } catch (e) {
+            console.error('Error assigning milestone:', e);
+            alert('Error al asignar el milestone: ' + e.message);
+        }
+    }, []);
+
     // ---- Schedule ALL unscheduled tasks (batch — uses today as default) ----
     const handleScheduleAll = useCallback(async () => {
         setSchedulingTaskId('__all__');
@@ -646,6 +658,7 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                         placingTask={placingTask}
                         onPlacementComplete={handlePlacementComplete}
                         onStartPlacement={handleStartPlacement}
+                        onAssignMilestone={handleAssignMilestone}
                         users={users}
                         onTaskClick={openTask}
                         onBarDragEnd={handleBarDragEnd}

@@ -1,24 +1,21 @@
 /**
- * Milestone Service — Proxy
- * ===========================
+ * milestoneService — Proxy
+ * ============================
  * Routes to Firebase or Supabase implementation based on VITE_DB_BACKEND.
+ * Note: Refactored to remove top-level await to fix production deadlocks.
  */
 
 import { USE_SUPABASE } from './_backend';
+import * as supabaseImpl from './milestoneService.supabase.js';
+import * as firebaseImpl from './milestoneService.firebase.js';
 
-const impl = USE_SUPABASE
-    ? await import('./milestoneService.supabase.js')
-    : await import('./milestoneService.firebase.js');
-
-export const createMilestone = impl.createMilestone;
-export const updateMilestone = impl.updateMilestone;
-export const deleteMilestone = impl.deleteMilestone;
-export const getMilestonesByProject = impl.getMilestonesByProject;
-export const getAllMilestones = impl.getAllMilestones;
-export const createProjectMilestones = impl.createProjectMilestones;
-export const computeFullScore = impl.computeFullScore;
-export const applyTrafficLightOverride = impl.applyTrafficLightOverride;
-export const captureScoreSnapshot = impl.captureScoreSnapshot;
-export const getScoreSnapshots = impl.getScoreSnapshots;
-export { explainScore } from '../core/scoring/scoreEngine';
-export { computeTrend, computeAreaTrends } from '../core/scoring/trendCalculator';
+export const createMilestone = (...args) => (USE_SUPABASE ? supabaseImpl : firebaseImpl).createMilestone(...args);
+export const updateMilestone = (...args) => (USE_SUPABASE ? supabaseImpl : firebaseImpl).updateMilestone(...args);
+export const deleteMilestone = (...args) => (USE_SUPABASE ? supabaseImpl : firebaseImpl).deleteMilestone(...args);
+export const getMilestonesByProject = (...args) => (USE_SUPABASE ? supabaseImpl : firebaseImpl).getMilestonesByProject(...args);
+export const getAllMilestones = (...args) => (USE_SUPABASE ? supabaseImpl : firebaseImpl).getAllMilestones(...args);
+export const createProjectMilestones = (...args) => (USE_SUPABASE ? supabaseImpl : firebaseImpl).createProjectMilestones(...args);
+export const computeFullScore = (...args) => (USE_SUPABASE ? supabaseImpl : firebaseImpl).computeFullScore(...args);
+export const applyTrafficLightOverride = (...args) => (USE_SUPABASE ? supabaseImpl : firebaseImpl).applyTrafficLightOverride(...args);
+export const captureScoreSnapshot = (...args) => (USE_SUPABASE ? supabaseImpl : firebaseImpl).captureScoreSnapshot(...args);
+export const getScoreSnapshots = (...args) => (USE_SUPABASE ? supabaseImpl : firebaseImpl).getScoreSnapshots(...args);

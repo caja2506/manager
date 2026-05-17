@@ -31,7 +31,7 @@ import WeeklyReports from './pages/WeeklyReports';
 import EngineeringAnalytics from './pages/EngineeringAnalytics';
 import TaskActivityPage from './pages/TaskActivityPage';
 import WeeklyPlanner from './pages/WeeklyPlanner';
-import ProjectGantt from './pages/ProjectGantt';
+const ProjectGantt = React.lazy(() => import('./pages/ProjectGantt'));
 import Team from './pages/Team';
 import Notifications from './pages/Notifications';
 import SettingsPage from './pages/Settings';
@@ -50,7 +50,7 @@ import DailyBriefing from './pages/DailyBriefing';
 import TeamScoresPage from './pages/TeamScoresPage';
 import DataFlowPage from './pages/DataFlowPage';
 import DailyTeamBoard from './pages/DailyTeamBoard';
-import ProjectRoadmap from './pages/ProjectRoadmap';
+const ProjectRoadmap = React.lazy(() => import('./pages/ProjectRoadmap'));
 
 // ========================================================
 // AUTH LOADING SCREEN
@@ -197,8 +197,8 @@ export default function App() {
           <Route path="/control-tower" element={<ErrorBoundary module="Control Tower"><ControlTower /></ErrorBoundary>} />
           <Route path="/planner" element={<ErrorBoundary module="Planner Semanal"><WeeklyPlanner /></ErrorBoundary>} />
           <Route path="/daily-board" element={<ErrorBoundary module="Daily Board"><DailyTeamBoard /></ErrorBoundary>} />
-          <Route path="/gantt" element={<ErrorBoundary module="Gantt"><ProjectGantt /></ErrorBoundary>} />
-          <Route path="/roadmap" element={<ErrorBoundary module="Roadmap"><ProjectRoadmap /></ErrorBoundary>} />
+          <Route path="/gantt" element={<ErrorBoundary module="Gantt"><React.Suspense fallback={<div className="flex-1 flex items-center justify-center"><div className="text-slate-400 text-sm">Cargando Gantt...</div></div>}><ProjectGantt /></React.Suspense></ErrorBoundary>} />
+          <Route path="/roadmap" element={<ErrorBoundary module="Roadmap"><React.Suspense fallback={<div className="flex-1 flex items-center justify-center"><div className="text-slate-400 text-sm">Cargando Roadmap...</div></div>}><ProjectRoadmap /></React.Suspense></ErrorBoundary>} />
           <Route path="/daily-scrum" element={<ErrorBoundary module="Equipo Hoy"><DailyScrumPage /></ErrorBoundary>} />
 
           {/* Team */}

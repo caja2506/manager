@@ -57,7 +57,7 @@ function daysBetween(a, b) { return Math.round((toMidnight(b) - toMidnight(a)) /
 export default function GanttGrid({
     tasks, dependencies, viewMode, viewStart, taskTypes, milestones = [], users,
     groupBy = 'type', onGroupByChange, onCreateMilestone,
-    placingTask, onPlacementComplete, onStartPlacement,
+    placingTask, onPlacementComplete, onStartPlacement, onAssignMilestone,
     onTaskClick, onBarDragEnd, onLinkCreated, onDeleteDependency,
 }) {
     const timelineRef = useRef(null);
@@ -388,7 +388,7 @@ export default function GanttGrid({
                     const statusIcon = STATUS_ICONS[task.status] || STATUS_ICONS.pending;
                     return (
                         <div key={task.id}
-                            className={`flex items-center gap-2 border-b border-slate-800/60 cursor-pointer hover:bg-slate-800/40 transition-colors ${!hasDates ? 'opacity-50' : ''}`}
+                            className={`group flex items-center gap-2 border-b border-slate-800/60 cursor-pointer hover:bg-slate-800/40 transition-colors ${!hasDates ? 'opacity-50' : ''}`}
                             style={{ height: ROW_HEIGHT, paddingLeft: 12 + (row.indent || 16) }}
                             onClick={() => {
                                 if (linkSource) { handleBarClickForLink(task.id); return; }
@@ -396,11 +396,29 @@ export default function GanttGrid({
                             }}>
                             <div className={`w-1 rounded-full h-5 bg-${row.groupColor}-500`} />
                             <div className="flex-shrink-0">{statusIcon}</div>
-                            <div className="flex-1 min-w-0">
-                                <p className={`text-xs font-semibold truncate ${task.milestone ? 'text-amber-300' : 'text-slate-200'}`}>
-                                    {task.milestone ? '◆ ' : ''}{task.title}
-                                </p>
-                                {assignee && <p className="text-[10px] text-slate-500 truncate">{assignee.name || assignee.email}</p>}
+                            <div className="flex-1 min-w-0 flex items-center justify-between pr-2">
+                                <div className="min-w-0 pr-2">
+                                    <p className={`text-xs font-semibold truncate ${task.milestone ? 'text-amber-300' : 'text-slate-200'}`}>
+                                        {task.milestone ? '◆ ' : ''}{task.title}
+                                    </p>
+                                    {assignee && <p className="text-[10px] text-slate-500 truncate">{assignee.name || assignee.email}</p>}
+                                </div>
+                                {!task.milestone && milestones.length > 0 && onAssignMilestone && (
+                                    <select
+                                        className="opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 border border-slate-700 text-[9px] text-slate-300 rounded outline-none cursor-pointer max-w-[80px]"
+                                        onClick={e => e.stopPropagation()}
+                                        onChange={e => {
+                                            e.stopPropagation();
+                                            if (e.target.value) onAssignMilestone(task.id, e.target.value);
+                                        }}
+                                        value=""
+                                    >
+                                        <option value="" disabled>+ Milestone</option>
+                                        {milestones.map(m => (
+                                            <option key={m.id} value={m.id}>{m.name}</option>
+                                        ))}
+                                    </select>
+                                )}
                             </div>
                             {hasDates ? (
                                 <span className="text-[10px] font-bold text-slate-400">{task.percentComplete || 0}%</span>
