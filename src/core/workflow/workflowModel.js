@@ -13,7 +13,13 @@
  * All canonical definitions live in shared/taskWorkflow.js.
  */
 
-import sharedWorkflow from '../../../shared/taskWorkflow.cjs';
+import {
+    STATUS, STATUS_LABELS, CATEGORY, STATUS_TO_CATEGORY as _STATUS_TO_CATEGORY,
+    TRANSITIONS as _TRANSITIONS, REQUIRED_FIELDS as _REQUIRED_FIELDS, SEQUENCE as _SEQUENCE,
+    isValidTransition as _isValidTransition, getAvailableTransitions as _getAvailableTransitions,
+    getStatusLabel as _getStatusLabel, getStatusCategory as _getStatusCategory,
+    isActiveStatus as _isActiveStatus, isTerminalStatus as _isTerminalStatus,
+} from '../../../shared/taskWorkflow.js';
 
 // ============================================================
 // RE-EXPORT canonical contract with backward-compatible names
@@ -24,34 +30,34 @@ import sharedWorkflow from '../../../shared/taskWorkflow.cjs';
  * Keys like PLANNED and REVIEW map to DB values 'pending' and 'validation'.
  */
 export const WORKFLOW_STATUS = {
-    BACKLOG: sharedWorkflow.STATUS.BACKLOG,
-    PLANNED: sharedWorkflow.STATUS.PENDING,        // Alias: 'pending' in DB
-    IN_PROGRESS: sharedWorkflow.STATUS.IN_PROGRESS,
-    BLOCKED: sharedWorkflow.STATUS.BLOCKED,
-    REVIEW: sharedWorkflow.STATUS.VALIDATION,      // Alias: 'validation' in DB
-    COMPLETED: sharedWorkflow.STATUS.COMPLETED,
-    CANCELLED: sharedWorkflow.STATUS.CANCELLED,
+    BACKLOG: STATUS.BACKLOG,
+    PLANNED: STATUS.PENDING,        // Alias: 'pending' in DB
+    IN_PROGRESS: STATUS.IN_PROGRESS,
+    BLOCKED: STATUS.BLOCKED,
+    REVIEW: STATUS.VALIDATION,      // Alias: 'validation' in DB
+    COMPLETED: STATUS.COMPLETED,
+    CANCELLED: STATUS.CANCELLED,
 };
 
 /**
  * Display labels — derived from shared contract.
  */
-export const WORKFLOW_STATUS_LABELS = sharedWorkflow.STATUS_LABELS;
+export const WORKFLOW_STATUS_LABELS = STATUS_LABELS;
 
 /**
  * Status categories.
  */
-export const STATUS_CATEGORY = sharedWorkflow.CATEGORY;
+export { CATEGORY as STATUS_CATEGORY };
 
 /**
  * Status → category mapping.
  */
-export const STATUS_TO_CATEGORY = sharedWorkflow.STATUS_TO_CATEGORY;
+export { _STATUS_TO_CATEGORY as STATUS_TO_CATEGORY };
 
 /**
  * Valid transitions map.
  */
-export const VALID_TRANSITIONS = sharedWorkflow.TRANSITIONS;
+export { _TRANSITIONS as VALID_TRANSITIONS };
 
 /**
  * Required fields per status.
@@ -59,7 +65,7 @@ export const VALID_TRANSITIONS = sharedWorkflow.TRANSITIONS;
  * expects `validate(task)`. We map `check` → `validate` here for compatibility.
  */
 export const REQUIRED_FIELDS_BY_STATUS = Object.fromEntries(
-    Object.entries(sharedWorkflow.REQUIRED_FIELDS).map(([status, fields]) => [
+    Object.entries(_REQUIRED_FIELDS).map(([status, fields]) => [
         status,
         fields.map(f => ({
             field: f.field,
@@ -73,12 +79,12 @@ export const REQUIRED_FIELDS_BY_STATUS = Object.fromEntries(
 // FUNCTIONS — re-export from shared contract
 // ============================================================
 
-export const isValidTransition = sharedWorkflow.isValidTransition;
-export const getAvailableTransitions = sharedWorkflow.getAvailableTransitions;
-export const getStatusLabel = sharedWorkflow.getStatusLabel;
-export const getStatusCategory = sharedWorkflow.getStatusCategory;
-export const isActiveStatus = sharedWorkflow.isActiveStatus;
-export const isTerminalStatus = sharedWorkflow.isTerminalStatus;
+export { _isValidTransition as isValidTransition };
+export { _getAvailableTransitions as getAvailableTransitions };
+export { _getStatusLabel as getStatusLabel };
+export { _getStatusCategory as getStatusCategory };
+export { _isActiveStatus as isActiveStatus };
+export { _isTerminalStatus as isTerminalStatus };
 
 /**
  * Get required fields for a status (with `validate` function for frontend).
@@ -91,5 +97,5 @@ export function getRequiredFields(status) {
  * Get the official workflow sequence (happy path, for display).
  */
 export function getWorkflowSequence() {
-    return [...sharedWorkflow.SEQUENCE];
+    return [..._SEQUENCE];
 }

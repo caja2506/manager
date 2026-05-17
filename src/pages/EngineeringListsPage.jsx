@@ -4,6 +4,7 @@ import { useEngineeringData } from '../hooks/useEngineeringData';
 import ManagedListCard from '../components/ui/ManagedListCard';
 import WorkAreasCard from '../components/ui/WorkAreasCard';
 import AreaTaskKanban from '../components/engineering/AreaTaskKanban';
+import MilestoneAreaKanban from '../components/engineering/MilestoneAreaKanban';
 import { createDelayCause, updateDelayCause, deleteDelayCause } from '../services/delayService';
 import { 
     AlertOctagon, ListTodo, Compass, Target, Plus, Trash2, Search, Settings2
@@ -170,7 +171,16 @@ export default function EngineeringListsPage() {
                 </div>
             </div>
 
-            {/* Kanban section for mapping tasks to areas (Moved to top) */}
+            {/* Kanban: Milestone → Work Areas */}
+            <div className="pb-6">
+                <MilestoneAreaKanban
+                    milestoneTypes={milestoneTypes || []}
+                    workAreaTypes={workAreaTypes || []}
+                    taskTypes={taskTypes || []}
+                />
+            </div>
+
+            {/* Kanban: Work Area → Task Types */}
             <div className="pb-6">
                 <AreaTaskKanban 
                     workAreaTypes={workAreaTypes || []} 

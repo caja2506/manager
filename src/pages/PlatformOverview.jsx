@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useEngineeringData } from '../hooks/useEngineeringData';
 import {
     BrainCircuit, LayoutDashboard, ListTodo, Clock, BarChart3, Users,
     FolderGit2, CalendarDays, GanttChartSquare, Shield, Radar, FileText,
@@ -202,6 +203,7 @@ const colorMap = {
 
 export default function PlatformOverview() {
     const navigate = useNavigate();
+    const { milestoneTypes, workAreaTypes, taskTypes } = useEngineeringData();
     const [activeMethod, setActiveMethod] = useState(null);
     const [expandedModule, setExpandedModule] = useState(null);
     const [activeWorkflowStep, setActiveWorkflowStep] = useState(-1);
@@ -210,6 +212,7 @@ export default function PlatformOverview() {
     const [heroRef, heroVisible] = useScrollReveal();
     const [methRef, methVisible] = useScrollReveal();
     const [flowRef, flowVisible] = useScrollReveal();
+    const [archRef, archVisible] = useScrollReveal();
     const [modRef, modVisible] = useScrollReveal();
     const [tgRef, tgVisible] = useScrollReveal();
     const [benRef, benVisible] = useScrollReveal();
@@ -491,6 +494,212 @@ export default function PlatformOverview() {
                                 </div>
                             );
                         })}
+                    </div>
+                </div>
+            </section>
+
+
+            {/* ═══════════════════════════════════════════════════
+                SECCIÓN 3.5: ARQUITECTURA DE DATOS
+            ═══════════════════════════════════════════════════ */}
+            <section ref={archRef} className="py-20 px-6 relative">
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-purple-900/5 to-transparent pointer-events-none" />
+                <div className="max-w-6xl mx-auto relative">
+                    <div className={`text-center mb-14 transition-all duration-700 ${archVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
+                        <span className="text-xs font-black uppercase tracking-[0.2em] text-purple-400 block mb-3">Arquitectura</span>
+                        <h2 className="text-3xl md:text-4xl font-black text-white mb-4">Modelo de Datos del Proyecto</h2>
+                        <p className="text-slate-400 text-lg max-w-2xl mx-auto">Cómo se organiza la información desde el proyecto hasta cada tarea individual</p>
+                    </div>
+
+                    {/* ── Interactive Hierarchy Tree ── */}
+                    <div className={`bg-slate-900/70 backdrop-blur-sm rounded-3xl border border-slate-800 p-6 md:p-10 shadow-2xl transition-all duration-700 delay-200 ${archVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+
+                        {/* Level 1: Project */}
+                        <div className="flex flex-col items-center">
+                            <div className="flex items-center gap-3 px-6 py-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-xl shadow-indigo-600/30 border border-indigo-400/30">
+                                <FolderGit2 className="w-7 h-7" />
+                                <div>
+                                    <div className="text-lg font-black">Proyecto</div>
+                                    <div className="text-[11px] text-indigo-200 font-medium">El contenedor principal de toda la operación</div>
+                                </div>
+                            </div>
+
+                            {/* Connector */}
+                            <div className="w-0.5 h-8 bg-gradient-to-b from-indigo-500 to-purple-500" />
+
+                            {/* Level 2: Milestones */}
+                            <div className="w-full max-w-4xl">
+                                <div className="flex items-center gap-2 mb-4 justify-center">
+                                    <div className="h-px flex-1 bg-gradient-to-r from-transparent to-purple-500/50" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-purple-400 px-3">Milestones (Fases)</span>
+                                    <div className="h-px flex-1 bg-gradient-to-l from-transparent to-purple-500/50" />
+                                </div>
+
+                                <div className={`grid gap-4 mb-2`} style={{ gridTemplateColumns: `repeat(${Math.min(milestoneTypes?.length || 3, 4)}, 1fr)` }}>
+                                    {(milestoneTypes || []).map((ms, i) => {
+                                        // Resolve work areas assigned to this milestone
+                                        const rawAreaIds = ms.defaultWorkAreas || ms.default_work_areas || [];
+                                        const resolvedAreas = rawAreaIds.map(val => {
+                                            return (workAreaTypes || []).find(a => a.id === val) || (workAreaTypes || []).find(a => a.name === val);
+                                        }).filter(Boolean);
+
+                                        return (
+                                        <div key={ms.id || ms.name} className={`relative flex flex-col items-center transition-all duration-500 ${archVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+                                            style={{ transitionDelay: `${400 + i * 150}ms` }}>
+                                            <div className="w-full px-4 py-3 rounded-xl bg-purple-500/10 border border-purple-500/25 text-center group hover:bg-purple-500/20 hover:border-purple-500/40 transition-all cursor-default">
+                                                <Target className="w-5 h-5 text-purple-400 mx-auto mb-1.5" />
+                                                <div className="text-sm font-black text-white">{ms.name}</div>
+                                                <div className="text-[10px] text-purple-300/70 font-medium">Milestone</div>
+                                            </div>
+
+                                            {/* Connector */}
+                                            {resolvedAreas.length > 0 && (
+                                                <div className="w-0.5 h-6 bg-gradient-to-b from-purple-500/50 to-amber-500/50" />
+                                            )}
+
+                                            {/* Level 3: Work Areas */}
+                                            <div className="w-full space-y-2">
+                                                {resolvedAreas.map((area, j) => {
+                                                    // Resolve task types for this area
+                                                    const areaTaskTypeIds = area.taskTypeIds || area.defaultTaskTypes || area.default_task_types || [];
+                                                    const resolvedTT = areaTaskTypeIds.map(val => {
+                                                        const t = (taskTypes || []).find(tt => tt.id === val) || (taskTypes || []).find(tt => tt.name === val);
+                                                        return t ? t.name : null;
+                                                    }).filter(Boolean);
+
+                                                    return (
+                                                    <div key={area.id} className={`transition-all duration-500 ${archVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+                                                        style={{ transitionDelay: `${700 + i * 150 + j * 100}ms` }}>
+                                                        <div className="px-3 py-2 rounded-lg bg-amber-500/8 border border-amber-500/20 hover:bg-amber-500/15 hover:border-amber-500/35 transition-all cursor-default">
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <Layers className="w-3.5 h-3.5 text-amber-400" />
+                                                                <span className="text-xs font-bold text-white">{area.name}</span>
+                                                                <span className="text-[9px] text-amber-400/60 ml-auto font-bold">ÁREA</span>
+                                                            </div>
+                                                            {resolvedTT.length > 0 && (
+                                                                <div className="flex flex-wrap gap-1 mt-1.5">
+                                                                    {resolvedTT.map(tt => (
+                                                                        <span key={tt} className="px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-bold text-emerald-400">
+                                                                            {tt}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    );
+                                                })}
+                                                {resolvedAreas.length === 0 && (
+                                                    <div className="px-3 py-2 rounded-lg border border-dashed border-slate-700 text-center">
+                                                        <span className="text-[10px] text-slate-500">Sin áreas asignadas</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        );
+                                    })}
+                                    {(!milestoneTypes || milestoneTypes.length === 0) && (
+                                        <div className="col-span-full text-center py-8">
+                                            <Target className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                                            <p className="text-sm text-slate-500">Configura Tipos de Milestone en Clasificadores para ver la estructura</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Final connector to Tasks */}
+                            <div className="mt-4 flex flex-col items-center">
+                                <div className="w-0.5 h-6 bg-gradient-to-b from-amber-500/50 to-emerald-500/50" />
+                                <div className="flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 shadow-lg shadow-emerald-900/20">
+                                    <ListTodo className="w-5 h-5 text-emerald-400" />
+                                    <div>
+                                        <div className="text-sm font-black text-white">Tareas Individuales</div>
+                                        <div className="text-[10px] text-emerald-300/70 font-medium">Se vinculan al área vía su Tipo de Tarea</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ── Explanation Cards ── */}
+                    <div className={`grid md:grid-cols-3 gap-5 mt-8 transition-all duration-700 delay-500 ${archVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
+                        {/* Card 1: How mapping works */}
+                        <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur-sm hover:border-slate-700 transition-all">
+                            <div className="w-11 h-11 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center mb-4">
+                                <Workflow className="w-5 h-5 text-indigo-400" />
+                            </div>
+                            <h3 className="font-black text-white text-base mb-2">¿Cómo se relacionan?</h3>
+                            <p className="text-sm text-slate-400 leading-relaxed">
+                                Cada <strong className="text-indigo-300">Área de Trabajo</strong> contiene una lista de <strong className="text-emerald-300">Tipos de Tarea</strong> asignados.
+                                Cuando creas una tarea, su tipo determina automáticamente a qué área pertenece dentro del milestone.
+                            </p>
+                        </div>
+
+                        {/* Card 2: Scoring */}
+                        <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur-sm hover:border-slate-700 transition-all">
+                            <div className="w-11 h-11 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center mb-4">
+                                <TrendingUp className="w-5 h-5 text-amber-400" />
+                            </div>
+                            <h3 className="font-black text-white text-base mb-2">Score & Semáforo</h3>
+                            <p className="text-sm text-slate-400 leading-relaxed">
+                                El sistema calcula un <strong className="text-amber-300">score por área</strong> basado en el progreso de sus tareas.
+                                Los scores de todas las áreas se promedian para calcular el <strong className="text-purple-300">score del milestone</strong>.
+                            </p>
+                            <div className="flex gap-2 mt-3">
+                                <span className="px-2 py-1 rounded-lg bg-emerald-500/15 text-[10px] font-bold text-emerald-400 border border-emerald-500/20">🟢 Bien</span>
+                                <span className="px-2 py-1 rounded-lg bg-amber-500/15 text-[10px] font-bold text-amber-400 border border-amber-500/20">🟡 Riesgo</span>
+                                <span className="px-2 py-1 rounded-lg bg-rose-500/15 text-[10px] font-bold text-rose-400 border border-rose-500/20">🔴 Crítico</span>
+                            </div>
+                        </div>
+
+                        {/* Card 3: Obeya Matrix */}
+                        <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur-sm hover:border-slate-700 transition-all">
+                            <div className="w-11 h-11 rounded-xl bg-violet-500/15 border border-violet-500/30 flex items-center justify-center mb-4">
+                                <LayoutDashboard className="w-5 h-5 text-violet-400" />
+                            </div>
+                            <h3 className="font-black text-white text-base mb-2">Matriz Obeya</h3>
+                            <p className="text-sm text-slate-400 leading-relaxed">
+                                La <strong className="text-violet-300">Matriz Obeya</strong> en cada proyecto cruza
+                                <strong className="text-amber-300"> Áreas</strong> vs <strong className="text-emerald-300">Tipos de Tarea</strong>,
+                                mostrando cuántas tareas hay en cada celda y su estado de avance.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* ── Flow Summary ── */}
+                    <div className={`mt-8 p-6 rounded-2xl bg-gradient-to-r from-indigo-900/20 via-purple-900/20 to-emerald-900/20 border border-slate-800 transition-all duration-700 delay-700 ${archVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                        <h3 className="font-black text-white text-lg mb-4 flex items-center gap-2">
+                            <Zap className="w-5 h-5 text-amber-400" /> Resumen del Flujo de Datos
+                        </h3>
+                        <div className="flex flex-col md:flex-row items-center justify-center gap-2 md:gap-0">
+                            {[
+                                { label: 'Proyecto', icon: FolderGit2, color: 'indigo' },
+                                { label: 'Milestone', icon: Target, color: 'purple' },
+                                { label: 'Área', icon: Layers, color: 'amber' },
+                                { label: 'Tipo Tarea', icon: ListTodo, color: 'emerald' },
+                                { label: 'Tarea', icon: CheckCircle, color: 'cyan' },
+                            ].map((step, i) => {
+                                const c = colorMap[step.color];
+                                const Icon = step.icon;
+                                return (
+                                    <React.Fragment key={i}>
+                                        <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl ${c.bg} border ${c.border}`}>
+                                            <Icon className={`w-4 h-4 ${c.text}`} />
+                                            <span className={`text-xs font-black ${c.text}`}>{step.label}</span>
+                                        </div>
+                                        {i < 4 && (
+                                            <>
+                                                <ArrowRight className="w-4 h-4 text-slate-600 hidden md:block mx-1" />
+                                                <ArrowDown className="w-4 h-4 text-slate-600 md:hidden my-1" />
+                                            </>
+                                        )}
+                                    </React.Fragment>
+                                );
+                            })}
+                        </div>
+                        <p className="text-xs text-slate-500 text-center mt-4">
+                            Cada tarea se asocia a un área a través de su <strong className="text-slate-300">Tipo de Tarea</strong> — no requiere asignación manual de área
+                        </p>
                     </div>
                 </div>
             </section>

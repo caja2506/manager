@@ -15,6 +15,7 @@ import DependencyArrows from './DependencyArrows';
 import {
     ChevronDown, ChevronRight, Plus, Ban, Circle, Play, CheckCircle2,
     Clock, PanelLeftOpen, PanelLeftClose, CheckCircle, AlertTriangle, Link2,
+    Target, ListTodo,
 } from 'lucide-react';
 
 // ---- Layout constants ----
@@ -54,7 +55,8 @@ function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n)
 function daysBetween(a, b) { return Math.round((toMidnight(b) - toMidnight(a)) / (24 * 60 * 60 * 1000)); }
 
 export default function GanttGrid({
-    tasks, dependencies, viewMode, viewStart, taskTypes, users,
+    tasks, dependencies, viewMode, viewStart, taskTypes, milestones = [], users,
+    groupBy = 'type', onGroupByChange, onCreateMilestone,
     placingTask, onPlacementComplete, onStartPlacement,
     onTaskClick, onBarDragEnd, onLinkCreated, onDeleteDependency,
 }) {
@@ -112,13 +114,19 @@ export default function GanttGrid({
         (users || []).forEach(u => m.set(u.id, u));
         return m;
     }, [users]);
+    // Milestone map
+    const milestoneMap = useMemo(() => {
+        const m = new Map();
+        (milestones || []).forEach(ms => m.set(ms.id, ms));
+        return m;
+    }, [milestones]);
+
     function getTaskColor(task) {
-        return taskTypeMap.get(task.taskTypeId)?.color || 'indigo';
+        return taskTypeMap.get(task.taskTypeId || task.taskType)?.color || 'indigo';
     }
 
-    // Group tasks by type
+    // Group tasks by type OR by milestone (hierarchical tree up to 4 levels)
     const groups = useMemo(() => {
-        const grouped = new Map();
         const sorted = [...tasks].sort((a, b) => {
             const aD = a.plannedStartDate ? 0 : 1;
             const bD = b.plannedStartDate ? 0 : 1;
@@ -126,8 +134,59 @@ export default function GanttGrid({
             if (a.plannedStartDate && b.plannedStartDate) return new Date(a.plannedStartDate) - new Date(b.plannedStartDate);
             return (a.title || '').localeCompare(b.title || '');
         });
+
+        if (groupBy === 'milestone') {
+            // Build milestone tree (parent→children)
+            const allMs = [...milestoneMap.values()];
+            const rootMs = allMs.filter(ms => !ms.parentMilestoneId).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+            const childrenOf = (parentId) => allMs.filter(ms => ms.parentMilestoneId === parentId).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+            
+            // Map tasks to their milestone
+            const tasksByMs = new Map();
+            sorted.forEach(task => {
+                const msId = task.milestoneId || '__no_milestone__';
+                if (!tasksByMs.has(msId)) tasksByMs.set(msId, []);
+                tasksByMs.get(msId).push(task);
+            });
+
+            // Build recursive tree nodes (max depth 4)
+            const buildNode = (ms, depth, colorIdx) => {
+                const children = depth < 3 ? childrenOf(ms.id) : []; // depth 0-3 = 4 levels
+                return {
+                    id: ms.id,
+                    name: ms.name || 'Sin nombre',
+                    color: GROUP_COLORS[colorIdx % GROUP_COLORS.length],
+                    tasks: tasksByMs.get(ms.id) || [],
+                    count: (tasksByMs.get(ms.id) || []).length,
+                    isMilestone: true,
+                    depth,
+                    children: children.map((c, ci) => buildNode(c, depth + 1, colorIdx * 8 + ci)),
+                };
+            };
+
+            const tree = rootMs.map((ms, i) => buildNode(ms, 0, i));
+
+            // Add "Sin Milestone" if there are unassigned tasks
+            const unassigned = tasksByMs.get('__no_milestone__') || [];
+            if (unassigned.length > 0) {
+                tree.push({
+                    id: '__no_milestone__',
+                    name: 'Sin Milestone',
+                    color: 'slate',
+                    tasks: unassigned,
+                    count: unassigned.length,
+                    isMilestone: true,
+                    depth: 0,
+                    children: [],
+                });
+            }
+            return tree;
+        }
+
+        // Default: group by task type (flat)
+        const grouped = new Map();
         sorted.forEach(task => {
-            const typeId = task.taskTypeId || '__general__';
+            const typeId = task.taskTypeId || task.taskType || '__general__';
             if (!grouped.has(typeId)) grouped.set(typeId, []);
             grouped.get(typeId).push(task);
         });
@@ -145,19 +204,30 @@ export default function GanttGrid({
                     color: info?.color || GROUP_COLORS[i % GROUP_COLORS.length],
                     tasks: typeTasks,
                     count: typeTasks.length,
+                    depth: 0,
+                    children: [],
                 };
             });
-    }, [tasks, taskTypeMap]);
+    }, [tasks, taskTypeMap, milestoneMap, groupBy, milestones]);
 
-    // Flat rows
+    // Flat rows — recursive for milestone tree
     const rows = useMemo(() => {
         const list = [];
-        groups.forEach(g => {
-            list.push({ type: 'group', group: g });
+        const INDENT_PER_LEVEL = 16; // px per depth level
+
+        const addGroup = (g) => {
+            list.push({ type: 'group', group: g, indent: (g.depth || 0) * INDENT_PER_LEVEL });
             if (!collapsedGroups.has(g.id)) {
-                g.tasks.forEach(t => list.push({ type: 'task', task: t, groupColor: g.color }));
+                // Add child milestones first (sub-groups)
+                if (g.children) {
+                    g.children.forEach(child => addGroup(child));
+                }
+                // Then add tasks
+                g.tasks.forEach(t => list.push({ type: 'task', task: t, groupColor: g.color, indent: ((g.depth || 0) + 1) * INDENT_PER_LEVEL }));
             }
-        });
+        };
+
+        groups.forEach(g => addGroup(g));
         return list;
     }, [groups, collapsedGroups]);
 
@@ -250,20 +320,65 @@ export default function GanttGrid({
             {/* ---- LEFT PANEL ---- */}
             <div className={`${leftPanelOpen ? 'translate-x-0' : '-translate-x-full'
                 } md:translate-x-0 fixed md:relative z-40 md:z-auto h-full transition-transform duration-200 ease-in-out flex-shrink-0 bg-slate-900 border-r border-slate-700/50 overflow-y-auto`} style={{ width: LEFT_PANEL_W }}>
-                <div className="sticky top-0 z-20 bg-slate-800 border-b border-slate-700/50 px-4 flex items-center" style={{ height: headerHeight }}>
-                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Tarea por tipo</span>
+                <div className="sticky top-0 z-20 bg-slate-800 border-b border-slate-700/50 px-4 flex items-center gap-3" style={{ height: headerHeight }}>
+                    {onGroupByChange ? (
+                        <div className="flex items-center gap-1 bg-slate-700/50 rounded-lg p-0.5">
+                            <button
+                                onClick={() => onGroupByChange('milestone')}
+                                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold transition-colors ${groupBy === 'milestone' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' : 'text-slate-400 hover:text-slate-300'}`}
+                            >
+                                <Target className="w-3 h-3" />
+                                Milestone
+                            </button>
+                            <button
+                                onClick={() => onGroupByChange('type')}
+                                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold transition-colors ${groupBy === 'type' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40' : 'text-slate-400 hover:text-slate-300'}`}
+                            >
+                                <ListTodo className="w-3 h-3" />
+                                Tipo
+                            </button>
+                        </div>
+                    ) : (
+                        <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Tarea por tipo</span>
+                    )}
+                    {groupBy === 'milestone' && onCreateMilestone && (
+                        <button
+                            onClick={() => onCreateMilestone(null, null)}
+                            className="ml-auto flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-purple-300 bg-purple-500/10 border border-purple-500/30 hover:bg-purple-500/20 transition-all"
+                            title="Nuevo Milestone"
+                        >
+                            <Plus className="w-3 h-3" />
+                            Nuevo
+                        </button>
+                    )}
                 </div>
                 {rows.map((row) => {
                     if (row.type === 'group') {
                         const g = row.group;
                         const collapsed = collapsedGroups.has(g.id);
+                        const depth = g.depth || 0;
+                        const depthColors = ['text-purple-300', 'text-blue-300', 'text-teal-300', 'text-amber-300'];
+                        const depthIconColors = ['text-purple-400', 'text-blue-400', 'text-teal-400', 'text-amber-400'];
+                        const totalCount = g.count + (g.children || []).reduce((sum, c) => sum + c.count, 0);
                         return (
-                            <div key={`g-${g.id}`} className="flex items-center gap-2 px-3 border-b border-slate-700/40 cursor-pointer hover:bg-slate-800/60 transition-colors select-none"
-                                style={{ height: GROUP_HEADER_HEIGHT }} onClick={() => toggleGroup(g.id)}>
+                            <div key={`g-${g.id}`} className="flex items-center gap-2 border-b border-slate-700/40 cursor-pointer hover:bg-slate-800/60 transition-colors select-none"
+                                style={{ height: GROUP_HEADER_HEIGHT, paddingLeft: 12 + (row.indent || 0) }} onClick={() => toggleGroup(g.id)}>
                                 {collapsed ? <ChevronRight className="w-3.5 h-3.5 text-slate-500" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-500" />}
-                                <div className={`w-2 h-2 rounded-full bg-${g.color}-500`} />
-                                <span className="text-[11px] font-black text-slate-300 uppercase tracking-wider flex-1 truncate">{g.name}</span>
-                                <span className="text-[10px] font-bold text-slate-500">{g.count}</span>
+                                {g.isMilestone
+                                    ? <Target className={`w-3 h-3 ${depthIconColors[depth] || 'text-purple-400'}`} />
+                                    : <div className={`w-2 h-2 rounded-full bg-${g.color}-500`} />
+                                }
+                                <span className={`text-[11px] font-black uppercase tracking-wider flex-1 truncate ${g.isMilestone ? (depthColors[depth] || 'text-slate-300') : 'text-slate-300'}`}>{g.name}</span>
+                                <span className="text-[10px] font-bold text-slate-500 mr-1">{totalCount || g.count}</span>
+                                {g.isMilestone && onCreateMilestone && depth < 3 && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onCreateMilestone(g.id, g.name); }}
+                                        className="w-5 h-5 flex items-center justify-center rounded-md text-slate-500 hover:text-purple-300 hover:bg-purple-500/15 transition-all"
+                                        title={`Agregar sub-milestone a ${g.name}`}
+                                    >
+                                        <Plus className="w-3 h-3" />
+                                    </button>
+                                )}
                             </div>
                         );
                     }
@@ -273,8 +388,8 @@ export default function GanttGrid({
                     const statusIcon = STATUS_ICONS[task.status] || STATUS_ICONS.pending;
                     return (
                         <div key={task.id}
-                            className={`flex items-center px-3 pl-8 gap-2 border-b border-slate-800/60 cursor-pointer hover:bg-slate-800/40 transition-colors ${!hasDates ? 'opacity-50' : ''}`}
-                            style={{ height: ROW_HEIGHT }}
+                            className={`flex items-center gap-2 border-b border-slate-800/60 cursor-pointer hover:bg-slate-800/40 transition-colors ${!hasDates ? 'opacity-50' : ''}`}
+                            style={{ height: ROW_HEIGHT, paddingLeft: 12 + (row.indent || 16) }}
                             onClick={() => {
                                 if (linkSource) { handleBarClickForLink(task.id); return; }
                                 onTaskClick?.(task);

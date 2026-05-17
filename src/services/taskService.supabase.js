@@ -53,6 +53,27 @@ export async function createProject(data, userId) {
         .single();
 
     if (error) throw new Error(`[taskService.sb] createProject: ${error.message}`);
+
+    // Auto-create milestones from all milestone types
+    try {
+        const { data: mTypes } = await supabase.from('milestone_types').select('name').order('name');
+        if (mTypes && mTypes.length > 0) {
+            const rows = mTypes.map((mt, i) => ({
+                project_id: result.id,
+                name: mt.name,
+                milestone_type: mt.name,
+                description: '',
+                status: 'planning',
+                sort_order: i,
+                created_by: userId, updated_by: userId,
+            }));
+            await supabase.from('milestones').insert(rows);
+            console.log(`[taskService.sb] Auto-created ${rows.length} milestones for project ${result.id}`);
+        }
+    } catch (e) {
+        console.warn('[taskService.sb] Auto-milestone creation failed (non-blocking):', e.message);
+    }
+
     return result.id;
 }
 

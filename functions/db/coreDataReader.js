@@ -516,6 +516,99 @@ async function calculateTeamWorkload() {
         });
 }
 
+// ── ARIA Roadmap Readers ──
+
+/**
+ * Load milestones for a project.
+ * @param {string} projectId
+ * @returns {Promise<Array>}
+ */
+async function loadProjectMilestones(projectId) {
+    const sb = getSupabase();
+    const { data, error } = await sb.from("milestones")
+        .select("id, project_id, name, description, status, start_date, due_date, completed_date, score, traffic_light, sort_order")
+        .eq("project_id", projectId)
+        .order("start_date", { ascending: true });
+    if (error) { console.error("[coreDataReader] loadProjectMilestones:", error.message); return []; }
+    return mapRows(data);
+}
+
+/**
+ * Load all milestones across all projects.
+ * @returns {Promise<Array>}
+ */
+async function loadAllMilestones() {
+    const sb = getSupabase();
+    const { data, error } = await sb.from("milestones")
+        .select("id, project_id, name, status, start_date, due_date, completed_date, score, traffic_light, sort_order")
+        .order("due_date", { ascending: true });
+    if (error) { console.error("[coreDataReader] loadAllMilestones:", error.message); return []; }
+    return mapRows(data);
+}
+
+/**
+ * Load documented risks for a project.
+ * @param {string} projectId
+ * @returns {Promise<Array>}
+ */
+async function loadProjectRisks(projectId) {
+    const sb = getSupabase();
+    const { data, error } = await sb.from("risks")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false });
+    if (error) { console.error("[coreDataReader] loadProjectRisks:", error.message); return []; }
+    return mapRows(data);
+}
+
+/**
+ * Load daily planner tasks for a user on a given date.
+ * @param {string} userId
+ * @param {string} date - YYYY-MM-DD
+ * @returns {Promise<Array>}
+ */
+async function loadDailyPlan(userId, date) {
+    const sb = getSupabase();
+    const { data, error } = await sb.from("planner_daily_tasks")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("date", date)
+        .order("order", { ascending: true });
+    if (error) { console.error("[coreDataReader] loadDailyPlan:", error.message); return []; }
+    return mapRows(data);
+}
+
+/**
+ * Load recent comments for a project (last 20).
+ * @param {string} projectId
+ * @returns {Promise<Array>}
+ */
+async function loadRecentComments(projectId) {
+    const sb = getSupabase();
+    const { data, error } = await sb.from("comments")
+        .select("id, task_id, user_id, content, created_at")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false })
+        .limit(20);
+    if (error) { console.error("[coreDataReader] loadRecentComments:", error.message); return []; }
+    return mapRows(data);
+}
+
+/**
+ * Load delays for a project with cause.
+ * @param {string} projectId
+ * @returns {Promise<Array>}
+ */
+async function loadDelaysByProject(projectId) {
+    const sb = getSupabase();
+    const { data, error } = await sb.from("delays")
+        .select("*, delay_causes(*)")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false });
+    if (error) { console.error("[coreDataReader] loadDelaysByProject:", error.message); return []; }
+    return mapRows(data);
+}
+
 module.exports = {
     // Reads
     loadAllTasks,
@@ -544,6 +637,14 @@ module.exports = {
     loadProactiveAgentConfig,
     calculateTeamWorkload,
 
+    // ARIA Roadmap Reads
+    loadProjectMilestones,
+    loadAllMilestones,
+    loadProjectRisks,
+    loadDailyPlan,
+    loadRecentComments,
+    loadDelaysByProject,
+
     // Writes
     updateTimeLog,
     insertTimeLog,
@@ -559,3 +660,4 @@ module.exports = {
     // Settings
     loadSetting,
 };
+

@@ -1505,7 +1505,8 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
 // MAIN COMPONENT
 // ============================================================
 
-export default function MainTable() {
+export default function MainTable({ forceProjectId = null }) {
+    const isEmbedded = !!forceProjectId;
     const { user } = useAuth();
     const { canEdit, canEditDates, canDelete } = useRole();
     const { 
@@ -1612,7 +1613,8 @@ export default function MainTable() {
 
             const s = taskSearch.toLowerCase();
             const matchSearch = !s || (task.title || '').toLowerCase().includes(s) || (task.description || '').toLowerCase().includes(s);
-            const matchProject = !taskFilterProject || task.projectId === taskFilterProject;
+            const effectiveProjectFilter = forceProjectId || taskFilterProject;
+            const matchProject = !effectiveProjectFilter || task.projectId === effectiveProjectFilter;
 
             let matchAssignee = true;
             if (taskFilterAssignee === 'my-team') {
@@ -1758,7 +1760,7 @@ export default function MainTable() {
     }, [refetch]);
 
     return (
-        <div className="-m-4 md:-m-8 flex flex-col" style={{ background: 'var(--bg-app)', color: 'var(--text-primary)', minHeight: '100vh' }}>
+        <div className={isEmbedded ? 'flex flex-col' : '-m-4 md:-m-8 flex flex-col'} style={{ background: isEmbedded ? 'transparent' : 'var(--bg-app)', color: 'var(--text-primary)', minHeight: isEmbedded ? 'auto' : '100vh' }}>
             <TaskDetailModal isOpen={isModalOpen} onClose={closeModal} task={selectedTask} projects={engProjects} teamMembers={teamMembers}
                 subtasks={selectedTask ? engSubtasks.filter(s => s.taskId === selectedTask.id) : []} taskTypes={taskTypes} userId={user?.uid} canEdit={canEdit} canDelete={canDelete} />
             <TransitionConfirmModal isOpen={!!pendingTransition} pending={pendingTransition} isTransitioning={isTransitioning} onConfirm={confirmTransition} onCancel={cancelTransition} delayCauses={delayCauses} teamMembers={teamMembers} />
@@ -1776,7 +1778,7 @@ export default function MainTable() {
                 </div>
             )}
 
-            <TaskModuleBanner onNewTask={canEdit ? openNew : null} canEdit={canEdit} />
+            {!isEmbedded && <TaskModuleBanner onNewTask={canEdit ? openNew : null} canEdit={canEdit} />}
 
 
             {/* Filters — always visible */}
@@ -1786,11 +1788,13 @@ export default function MainTable() {
                     <input value={taskSearch} onChange={e => setTaskSearch(e.target.value)} placeholder="Buscar..."
                         className="pl-8 pr-3 py-1.5 w-full border border-slate-700/60 rounded-lg text-xs text-white outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 placeholder:text-slate-600" />
                 </div>
-                <select value={taskFilterProject} onChange={e => setTaskFilterProject(e.target.value)}
-                    className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer">
-                    <option value="">Todos los proyectos</option>
-                    {engProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+                {!isEmbedded && (
+                    <select value={taskFilterProject} onChange={e => setTaskFilterProject(e.target.value)}
+                        className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer">
+                        <option value="">Todos los proyectos</option>
+                        {engProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                )}
                 <select value={taskFilterAssignee} onChange={e => setTaskFilterAssignee(e.target.value)}
                     className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer">
                     <option value="my-team">Mis tareas y equipo</option>

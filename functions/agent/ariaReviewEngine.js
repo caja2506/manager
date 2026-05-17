@@ -33,6 +33,11 @@ async function runScheduledReviews({ currentHour }) {
             const result = await ganttReview();
             reviews.push(result);
             console.log(`${tag} Gantt review: ${result.findings} findings`);
+
+            // Milestone Review — 7 AM
+            const msResult = await milestoneReview();
+            reviews.push(msResult);
+            console.log(`${tag} Milestone review: ${msResult.findings} findings`);
         }
 
         // Risk Pulse — 8 AM and 2 PM
@@ -166,6 +171,52 @@ async function deadlineWatch() {
             ? "✅ No hay entregas en los próximos 7 días."
             : `📅 ${upcoming.length} tarea${upcoming.length !== 1 ? "s" : ""} con entrega en 7 días${critical.length > 0 ? ` (${critical.length} en ≤3 días ⚠️)` : ""}.`,
         details: { total: upcoming.length, critical: critical.length, tasks: upcoming.slice(0, 10).map(t => ({ title: t.title, dueDate: t.dueDate, status: t.status })) },
+        timestamp: new Date().toISOString(),
+    };
+}
+
+/**
+ * Milestone Review: Scan all milestones for overdue and approaching deadlines.
+ */
+async function milestoneReview() {
+    const allMilestones = await coreReader.loadAllMilestones();
+    const today = new Date();
+    const overdue = [];
+    const approaching = [];
+
+    for (const m of allMilestones) {
+        if (["completed", "cancelled"].includes(m.status)) continue;
+        if (!m.dueDate) continue;
+
+        const dueDate = new Date(m.dueDate);
+        const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / 86400000);
+
+        if (daysUntilDue < 0) {
+            overdue.push({
+                id: m.id,
+                name: m.name,
+                projectId: m.projectId,
+                daysOverdue: Math.abs(daysUntilDue),
+                trafficLight: m.trafficLight,
+            });
+        } else if (daysUntilDue <= 7) {
+            approaching.push({
+                id: m.id,
+                name: m.name,
+                projectId: m.projectId,
+                daysLeft: daysUntilDue,
+                trafficLight: m.trafficLight,
+            });
+        }
+    }
+
+    return {
+        type: "milestone_review",
+        findings: overdue.length + approaching.length,
+        summary: overdue.length === 0 && approaching.length === 0
+            ? "✅ Todos los milestones están al día."
+            : `${overdue.length > 0 ? `🚩 ${overdue.length} milestone${overdue.length !== 1 ? "s" : ""} vencido${overdue.length !== 1 ? "s" : ""}. ` : ""}${approaching.length > 0 ? `🏁 ${approaching.length} milestone${approaching.length !== 1 ? "s" : ""} en los próximos 7 días.` : ""}`,
+        details: { overdue, approaching },
         timestamp: new Date().toISOString(),
     };
 }

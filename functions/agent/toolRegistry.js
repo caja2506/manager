@@ -276,6 +276,99 @@ const TOOL_REGISTRY = {
                 .sort((a, b) => (b.riskScore || 0) - (a.riskScore || 0));
         },
     },
+
+    // ─── ARIA Roadmap Tools (Fase A) ───
+
+    getProjectMilestones: {
+        name: "getProjectMilestones",
+        description: "Obtiene los milestones (hitos/fases) de un proyecto con fechas, estado, score y semáforo.",
+        parameters: "projectId (string)",
+        execute: async (projectId) => {
+            const milestones = await coreReader.loadProjectMilestones(projectId);
+            return milestones.map(m => ({
+                id: m.id,
+                name: m.name,
+                status: m.status,
+                startDate: m.startDate,
+                dueDate: m.dueDate,
+                completedDate: m.completedDate,
+                score: m.score,
+                trafficLight: m.trafficLight,
+                description: m.description,
+            }));
+        },
+    },
+
+    getProjectRisksDetail: {
+        name: "getProjectRisksDetail",
+        description: "Obtiene los riesgos documentados de un proyecto: descripción, impacto, mitigación, responsable.",
+        parameters: "projectId (string)",
+        execute: async (projectId) => {
+            const risks = await coreReader.loadProjectRisks(projectId);
+            return risks.map(r => ({
+                id: r.id,
+                title: r.title || r.description,
+                category: r.category,
+                probability: r.probability,
+                impact: r.impact,
+                riskLevel: r.riskLevel,
+                mitigation: r.mitigation,
+                owner: r.ownerId || r.owner,
+                status: r.status,
+                createdAt: r.createdAt,
+            }));
+        },
+    },
+
+    getDailyPlan: {
+        name: "getDailyPlan",
+        description: "Obtiene el plan diario de un ingeniero: qué tareas debería estar trabajando hoy.",
+        parameters: "userId (string), date (string YYYY-MM-DD)",
+        execute: async (userId, date) => {
+            const today = date || new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
+            const plan = await coreReader.loadDailyPlan(userId, today);
+            return plan.map(p => ({
+                taskId: p.taskId,
+                taskTitle: p.taskTitle || p.title,
+                plannedHours: p.plannedHours,
+                status: p.status,
+                order: p.order,
+                notes: p.notes,
+            }));
+        },
+    },
+
+    getProjectComments: {
+        name: "getProjectComments",
+        description: "Obtiene los últimos 20 comentarios de un proyecto — discusiones del equipo sobre tareas.",
+        parameters: "projectId (string)",
+        execute: async (projectId) => {
+            const comments = await coreReader.loadRecentComments(projectId);
+            return comments.map(c => ({
+                taskId: c.taskId,
+                userId: c.userId,
+                content: (c.content || "").substring(0, 200),
+                createdAt: c.createdAt,
+            }));
+        },
+    },
+
+    getProjectDelays: {
+        name: "getProjectDelays",
+        description: "Obtiene los retrasos registrados en un proyecto con causa y duración.",
+        parameters: "projectId (string)",
+        execute: async (projectId) => {
+            const delays = await coreReader.loadDelaysByProject(projectId);
+            return delays.map(d => ({
+                id: d.id,
+                taskId: d.taskId,
+                cause: d.delayCauses?.name || d.cause || d.reason,
+                durationHours: d.durationHours || d.hours,
+                description: d.description,
+                createdAt: d.createdAt,
+            }));
+        },
+    },
 };
 
 /**

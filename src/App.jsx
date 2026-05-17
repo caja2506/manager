@@ -50,6 +50,7 @@ import DailyBriefing from './pages/DailyBriefing';
 import TeamScoresPage from './pages/TeamScoresPage';
 import DataFlowPage from './pages/DataFlowPage';
 import DailyTeamBoard from './pages/DailyTeamBoard';
+import ProjectRoadmap from './pages/ProjectRoadmap';
 
 // ========================================================
 // AUTH LOADING SCREEN
@@ -128,42 +129,22 @@ export default function App() {
   const user = realUser || (import.meta.env.DEV ? { uid: 'dev-auditor', email: 'caja2506@gmail.com', displayName: 'QA Auditor' } : null);
   const { roleLoading } = useRole();
 
-  // --- Splash Screen (once per session) ---
-  const [splashDone, setSplashDone] = useState(() => {
-    return sessionStorage.getItem('analyzeops-splash-done') === 'true';
-  });
-  const handleSplashComplete = useCallback(() => {
-    sessionStorage.setItem('analyzeops-splash-done', 'true');
-    setSplashDone(true);
-  }, []);
+  // --- Splash Screen DISABLED — go straight to app ---
+  const splashDone = true;
 
   const isLoading = authLoading || (user && roleLoading);
-
-  // --- Minimum loading display time (5 seconds) ---
-  const [minDelayDone, setMinDelayDone] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setMinDelayDone(true), 5000);
-    return () => clearTimeout(t);
-  }, []);
-  const showLoading = isLoading || !minDelayDone;
+  const showLoading = isLoading;
 
   // If not authenticated and done loading → show login
   if (!showLoading && !user) {
-    return (
-      <>
-        {!splashDone && <SplashScreen onComplete={handleSplashComplete} />}
-        <LoginPage />
-      </>
-    );
+    return <LoginPage />;
   }
 
-  // If still loading (auth or minimum delay)
+  // If still loading (auth)
   if (showLoading) {
     return (
       <>
-        {!splashDone && <SplashScreen onComplete={handleSplashComplete} />}
-        {splashDone && <AuthLoadingScreen />}
-        {/* Dark background underneath */}
+        <AuthLoadingScreen />
         <div className="h-screen" style={{ background: '#0c0a1a' }} />
       </>
     );
@@ -217,6 +198,7 @@ export default function App() {
           <Route path="/planner" element={<ErrorBoundary module="Planner Semanal"><WeeklyPlanner /></ErrorBoundary>} />
           <Route path="/daily-board" element={<ErrorBoundary module="Daily Board"><DailyTeamBoard /></ErrorBoundary>} />
           <Route path="/gantt" element={<ErrorBoundary module="Gantt"><ProjectGantt /></ErrorBoundary>} />
+          <Route path="/roadmap" element={<ErrorBoundary module="Roadmap"><ProjectRoadmap /></ErrorBoundary>} />
           <Route path="/daily-scrum" element={<ErrorBoundary module="Equipo Hoy"><DailyScrumPage /></ErrorBoundary>} />
 
           {/* Team */}

@@ -15,6 +15,7 @@ export const getDependencies = impl.getDependencies;
 export const getProjectsForGantt = impl.getProjectsForGantt;
 export const getTaskTypesForGantt = impl.getTaskTypesForGantt;
 export const getUsersForGantt = impl.getUsersForGantt;
+export const getMilestonesForGantt = impl.getMilestonesForGantt;
 export const updateTaskGanttFields = impl.updateTaskGanttFields;
 export const createDependency = impl.createDependency;
 export const deleteDependency = impl.deleteDependency;

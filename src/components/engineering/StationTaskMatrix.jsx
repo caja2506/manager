@@ -49,17 +49,29 @@ export default function StationTaskMatrix({ projectId, canEdit, userId }) {
         return engTasks.filter(t => t.projectId === projectId && t.status !== 'cancelled');
     }, [engTasks, projectId]);
 
-    // Data computation
-    // Data computation
+    // Data computation — use configured Area → TaskType mapping
     const columnsData = useMemo(() => {
         if (!workAreaTypes || !taskTypes || !prjTasks) return [];
         return workAreaTypes
             .filter(area => !hiddenAreas.includes(area.id))
             .map(area => {
-                const areaTasks = prjTasks.filter(t => t.workAreaTypeId === area.id && t.taskTypeId);
-                const usedTypeIds = new Set(areaTasks.map(t => t.taskTypeId));
-                
-                const types = taskTypes.filter(t => usedTypeIds.has(t.id));
+                // Use the configured relationship (supports IDs, names, firestoreIds)
+                const rawTypes = area.taskTypeIds || area.defaultTaskTypes || [];
+                let types;
+                if (rawTypes.length > 0) {
+                    // Resolve using same logic as AreaTaskKanban
+                    types = rawTypes.map(val => {
+                        let t = taskTypes.find(t => t.id === val);
+                        if (!t) t = taskTypes.find(t => t.name === val);
+                        if (!t) t = taskTypes.find(t => t.firestoreId === val);
+                        return t;
+                    }).filter(Boolean);
+                } else {
+                    // No mapping configured — show task types that have actual tasks in this area
+                    const areaTasks = prjTasks.filter(t => t.workAreaTypeId === area.id && t.taskTypeId);
+                    const usedTypeIds = new Set(areaTasks.map(t => t.taskTypeId));
+                    types = taskTypes.filter(t => usedTypeIds.has(t.id));
+                }
                 return { area, types };
             }).filter(c => c.types.length > 0);
     }, [workAreaTypes, taskTypes, hiddenAreas, prjTasks]);
@@ -140,15 +152,26 @@ export default function StationTaskMatrix({ projectId, canEdit, userId }) {
                                 <th 
                                     key={group.area.id} 
                                     colSpan={group.types.length} 
-                                    className="border-r border-b border-slate-200 dark:border-slate-700 p-1 text-center text-[10px] font-black uppercase overflow-hidden text-ellipsis whitespace-nowrap max-w-0"
+                                    className="border-r border-b border-slate-200 dark:border-slate-700 p-0 text-center align-bottom"
                                     style={{ 
-                                        backgroundColor: group.area.color ? `${group.area.color}20` : '#f1f5f9', // 20 represents 12% opacity roughly in hex
-                                        color: group.area.color || '#334155',
+                                        backgroundColor: group.area.color ? `${group.area.color}15` : '#f1f5f920',
                                         borderTop: `4px solid ${group.area.color || '#6366f1'}` 
                                     }}
                                     title={group.area.name}
                                 >
-                                    {group.area.name}
+                                    <div 
+                                        className="text-[9px] font-black uppercase tracking-wider whitespace-nowrap pb-1 px-1 text-slate-200"
+                                        style={{ 
+                                            writingMode: 'vertical-rl',
+                                            transform: 'rotate(180deg)',
+                                            display: 'inline-block',
+                                            maxHeight: '80px',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                        }}
+                                    >
+                                        {group.area.name}
+                                    </div>
                                 </th>
                             ))}
                             <th rowSpan={2} className="sticky right-0 z-30 bg-slate-100 dark:bg-slate-800 border-l border-b border-slate-300 dark:border-slate-600 p-2 text-center text-[10px] font-black uppercase text-slate-700 dark:text-slate-300 shadow-[-4px_0_10px_rgba(0,0,0,0.05)]">

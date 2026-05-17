@@ -29,6 +29,32 @@ export async function getTasksForGantt(projectId = null) {
 }
 
 /**
+ * Get milestones for the Gantt grouping.
+ * Optionally filter by projectId.
+ */
+export async function getMilestonesForGantt(projectId = null) {
+    let query = supabase.from('milestones').select('*');
+    if (projectId) {
+        query = query.eq('project_id', projectId);
+    }
+    query = query.order('sort_order', { ascending: true });
+    const { data, error } = await query;
+    if (error) throw new Error(`[ganttService.sb] getMilestonesForGantt: ${error.message}`);
+
+    return (data || []).map(row => ({
+        id: row.id,
+        name: row.name,
+        projectId: row.project_id,
+        milestoneType: row.milestone_type,
+        status: row.status,
+        startDate: row.start_date,
+        dueDate: row.due_date,
+        sortOrder: row.sort_order,
+        parentMilestoneId: row.parent_milestone_id,
+    }));
+}
+
+/**
  * Get all task dependencies for a project.
  */
 export async function getDependencies(projectId = null) {
@@ -194,6 +220,7 @@ function mapTaskRow(row) {
         summaryTask: row.summary_task,
         parentTaskId: row.parent_task_id,
         stationId: row.station_id,
+        milestoneId: row.milestone_id,
         blockedReason: row.blocked_reason,
         createdAt: row.created_at,
         updatedAt: row.updated_at,

@@ -10,7 +10,7 @@ import { X, Target, Calendar, Save, Loader2, Plus, Trash2 } from 'lucide-react';
 import { useAppData } from '../../contexts/AppDataContext';
 import { useEngineeringData } from '../../hooks/useEngineeringData';
 
-export default function MilestoneModal({ isOpen, onClose, onSave, teamMembers = [], milestone = null }) {
+export default function MilestoneModal({ isOpen, onClose, onSave, teamMembers = [], milestone = null, parentMilestoneId = null, parentMilestoneName = '' }) {
     const { handleSaveManagedList } = useAppData();
     const { milestoneTypes } = useEngineeringData();
 
@@ -21,8 +21,8 @@ export default function MilestoneModal({ isOpen, onClose, onSave, teamMembers = 
 
     const [form, setForm] = useState({
         name: '',
-        description: '',
         type: defaultType,
+        description: '',
         startDate: '',
         dueDate: '',
         ownerId: '',
@@ -63,9 +63,9 @@ export default function MilestoneModal({ isOpen, onClose, onSave, teamMembers = 
     useEffect(() => {
         if (milestone) {
             setForm({
-                name: milestone.name || '',
+                name: milestone.name || milestone.type || '',
+                type: milestone.type || milestone.name || defaultType,
                 description: milestone.description || '',
-                type: milestone.type || defaultType,
                 startDate: milestone.startDate ? milestone.startDate.split('T')[0] : '',
                 dueDate: milestone.dueDate ? milestone.dueDate.split('T')[0] : '',
                 ownerId: milestone.ownerId || '',
@@ -73,8 +73,8 @@ export default function MilestoneModal({ isOpen, onClose, onSave, teamMembers = 
         } else {
             setForm({
                 name: '',
-                description: '',
                 type: defaultType,
+                description: '',
                 startDate: '',
                 dueDate: '',
                 ownerId: '',
@@ -83,16 +83,18 @@ export default function MilestoneModal({ isOpen, onClose, onSave, teamMembers = 
     }, [milestone, isOpen, defaultType]);
 
     const handleSave = async () => {
-        if (!form.name.trim()) return;
+        const finalName = form.name.trim() || form.type;
+        if (!finalName) return;
         setSaving(true);
         try {
             await onSave({
-                name: form.name.trim(),
+                name: finalName,
+                type: form.type || finalName,
                 description: form.description.trim(),
-                type: form.type,
                 startDate: form.startDate || null,
                 dueDate: form.dueDate || null,
                 ownerId: form.ownerId || null,
+                parentMilestoneId: parentMilestoneId || null,
             });
             onClose();
         } catch (err) {
@@ -113,7 +115,7 @@ export default function MilestoneModal({ isOpen, onClose, onSave, teamMembers = 
                         <div className="w-9 h-9 bg-purple-600/20 border border-purple-500/30 rounded-xl flex items-center justify-center">
                             <Target className="w-4 h-4 text-purple-400" />
                         </div>
-                        <h3 className="font-bold text-lg text-white">{milestone ? 'Editar Milestone' : 'Nuevo Milestone'}</h3>
+                        <h3 className="font-bold text-lg text-white">{milestone ? 'Editar Milestone' : parentMilestoneId ? 'Nuevo Sub-Milestone' : 'Nuevo Milestone'}</h3>
                     </div>
                     <button onClick={onClose} className="text-slate-400 hover:text-white transition cursor-pointer">
                         <X className="w-5 h-5" />
@@ -122,29 +124,38 @@ export default function MilestoneModal({ isOpen, onClose, onSave, teamMembers = 
 
                 {/* Body */}
                 <div className="p-5 space-y-4 max-h-[65vh] overflow-y-auto">
-                    {/* Name */}
+                    {/* Parent info */}
+                    {parentMilestoneName && (
+                        <div className="flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/20 rounded-xl">
+                            <Target className="w-3.5 h-3.5 text-purple-400" />
+                            <span className="text-xs text-purple-300">Padre: <strong>{parentMilestoneName}</strong></span>
+                        </div>
+                    )}
+
+                    {/* Name — free text */}
                     <div>
                         <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Nombre *</label>
                         <input
                             type="text"
                             value={form.name}
                             onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                            placeholder="Ej: Setup inicial, Commissioning FAT..."
+                            placeholder="Nombre del milestone..."
                             className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500 transition"
                             autoFocus
                         />
                     </div>
 
-                    {/* Type — dynamic from milestoneTypes */}
+                    {/* Type — dynamic from milestoneTypes (THIS IS THE IDENTITY) */}
                     <div>
-                        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Tipo</label>
+                        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Tipo de Fase *</label>
                         <div className="flex gap-2 items-center">
                             <select
                                 value={form.type}
                                 onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
                                 className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500 transition cursor-pointer"
+                                autoFocus
                             >
-                                <option value="">Seleccionar tipo...</option>
+                                <option value="">Seleccionar fase...</option>
                                 {typeOptions.map(name => (
                                     <option key={name} value={name}>{name}</option>
                                 ))}
@@ -160,7 +171,7 @@ export default function MilestoneModal({ isOpen, onClose, onSave, teamMembers = 
                         </div>
                         {typeOptions.length === 0 && (
                             <p className="text-[10px] text-slate-500 mt-2 italic">
-                                💡 Presiona + para agregar tipos de milestone.
+                                💡 Presiona + para agregar tipos de fase.
                             </p>
                         )}
                     </div>
@@ -282,9 +293,9 @@ export default function MilestoneModal({ isOpen, onClose, onSave, teamMembers = 
                     </button>
                     <button
                         onClick={handleSave}
-                        disabled={!form.name.trim() || saving}
+                        disabled={!(form.name?.trim() || form.type) || saving}
                         className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition cursor-pointer ${
-                            form.name.trim() && !saving
+                            form.type && !saving
                                 ? 'bg-purple-600 text-white hover:bg-purple-700 shadow-lg shadow-purple-900/30'
                                 : 'bg-slate-700 text-slate-400 cursor-not-allowed'
                         }`}

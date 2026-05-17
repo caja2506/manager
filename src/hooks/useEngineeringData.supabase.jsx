@@ -76,7 +76,7 @@ export function EngineeringDataProvider({ children }) {
             subtasks:       { query: 'subtasks',         setter: setEngSubtasks,   mapper: mapSubtask },
             task_types:     { query: 'task_types',       setter: setTaskTypes,     mapper: mapTaskType,    sort: (a, b) => safeLocaleCompare(a, b, 'name') },
             work_area_types:{ query: 'work_area_types',  setter: setWorkAreaTypes, mapper: r => ({ ...r, defaultTaskTypes: r.default_task_types || [] }),sort: (a, b) => safeLocaleCompare(a, b, 'name') },
-            milestone_types:{ query: 'milestone_types',  setter: setMilestoneTypes,mapper: r => ({ ...r }),sort: (a, b) => safeLocaleCompare(a, b, 'name') },
+            milestone_types:{ query: 'milestone_types',  setter: setMilestoneTypes,mapper: r => ({ ...r, defaultWorkAreas: r.default_work_areas || [] }),sort: (a, b) => safeLocaleCompare(a, b, 'name') },
             users:          { query: 'users',            setter: setTeamMembers,   mapper: mapUser },
             time_logs:      { query: 'time_logs',        setter: setTimeLogs,      mapper: mapTimeLog,     sort: (a, b) => new Date(b.startTime || 0) - new Date(a.startTime || 0) },
             delay_causes:   { query: 'delay_causes',     setter: setDelayCauses,   mapper: mapDelayCause,  sort: (a, b) => (a.order || 0) - (b.order || 0) },
@@ -122,7 +122,7 @@ export function EngineeringDataProvider({ children }) {
             markLoaded();
             setWorkAreaTypes((wa || []).map(r => ({ ...r, defaultTaskTypes: r.default_task_types || [] })).sort((a, b) => safeLocaleCompare(a, b, 'name')));
             markLoaded();
-            setMilestoneTypes((mt || []).map(r => ({ ...r })).sort((a, b) => safeLocaleCompare(a, b, 'name')));
+            setMilestoneTypes((mt || []).map(r => ({ ...r, defaultWorkAreas: r.default_work_areas || [] })).sort((a, b) => safeLocaleCompare(a, b, 'name')));
             markLoaded();
             setTeamMembers((users || []).map(mapUser));
             markLoaded();
@@ -160,7 +160,7 @@ export function EngineeringDataProvider({ children }) {
             'subtasks': { setter: setEngSubtasks, mapper: mapSubtask },
             'task_types': { setter: setTaskTypes, mapper: mapTaskType },
             'work_area_types': { setter: setWorkAreaTypes, mapper: r => ({ ...r, defaultTaskTypes: r.default_task_types || [] }) },
-            'milestone_types': { setter: setMilestoneTypes, mapper: r => ({ ...r }) },
+            'milestone_types': { setter: setMilestoneTypes, mapper: r => ({ ...r, defaultWorkAreas: r.default_work_areas || [] }) },
             'users': { setter: setTeamMembers, mapper: mapUser },
             'time_logs': { setter: setTimeLogs, mapper: mapTimeLog },
             'delay_causes': { setter: setDelayCauses, mapper: mapDelayCause },

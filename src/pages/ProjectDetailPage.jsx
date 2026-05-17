@@ -15,14 +15,17 @@ import { useEngineeringData } from '../hooks/useEngineeringData';
 import {
     ArrowLeft, Target, ListTodo, Clock, Calendar, AlertTriangle,
     ChevronRight, Plus, BarChart3, Settings, FolderGit2,
-    CheckCircle2, Activity, Edit3, Trash2, AlertCircle, Loader2
+    CheckCircle2, Activity, Edit3, Trash2, AlertCircle, Loader2, Table2, GanttChartSquare
 } from 'lucide-react';
 import { PROJECT_STATUS_CONFIG, TASK_PRIORITY_CONFIG, MILESTONE_TYPE } from '../models/schemas';
 import ProjectModal from '../components/tasks/ProjectModal';
 import MilestoneModal from '../components/milestones/MilestoneModal';
 import StationManager from '../components/projects/StationManager';
 import StationTaskMatrix from '../components/engineering/StationTaskMatrix';
+import MainTable from './MainTable';
 import { createMilestone, deleteMilestone, getMilestonesByProject } from '../services/milestoneService';
+
+const ProjectGantt = React.lazy(() => import('./ProjectGantt'));
 
 const TYPE_LABELS = {
     [MILESTONE_TYPE.SETUP]: { icon: '⚙️', label: 'Setup' },
@@ -44,6 +47,7 @@ export default function ProjectDetailPage() {
     const [loadingMs, setLoadingMs] = useState(true);
     const [deleteTarget, setDeleteTarget] = useState(null); // { id, name }
     const [deleting, setDeleting] = useState(false);
+    const [activeTab, setActiveTab] = useState('milestones'); // 'milestones' | 'stations' | 'table'
 
     const project = useMemo(
         () => engProjects.find(p => p.id === projectId),
@@ -267,14 +271,82 @@ export default function ProjectDetailPage() {
                 </div>
             </div>
 
-            {/* ══════════════ STATION TASK MATRIX ══════════════ */}
+            {/* ══════════════ STATION TASK MATRIX (always visible) ══════════════ */}
             <StationTaskMatrix
                 projectId={projectId}
                 canEdit={canEdit}
                 userId={user?.uid}
             />
 
-            {/* ══════════════ MILESTONES & SETUP ══════════════ */}
+            {/* ══════════════ VIEW TABS ══════════════ */}
+            <div className="flex gap-1 bg-slate-900/70 p-1 rounded-xl border border-slate-800 w-fit">
+                <button
+                    onClick={() => setActiveTab('milestones')}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        activeTab === 'milestones'
+                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    }`}
+                >
+                    <Target className="w-3.5 h-3.5" /> Milestones
+                </button>
+                <button
+                    onClick={() => setActiveTab('stations')}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        activeTab === 'stations'
+                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    }`}
+                >
+                    <Settings className="w-3.5 h-3.5" /> Estaciones
+                </button>
+                <button
+                    onClick={() => setActiveTab('table')}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        activeTab === 'table'
+                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    }`}
+                >
+                    <Table2 className="w-3.5 h-3.5" /> Tabla
+                </button>
+                <button
+                    onClick={() => setActiveTab('gantt')}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        activeTab === 'gantt'
+                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    }`}
+                >
+                    <GanttChartSquare className="w-3.5 h-3.5" /> Gantt
+                </button>
+            </div>
+
+            {/* ══════════════ TAB CONTENT ══════════════ */}
+            {activeTab === 'table' && (
+                <div className="bg-slate-900/70 rounded-2xl border border-slate-800 shadow-lg overflow-hidden">
+                    <MainTable forceProjectId={projectId} />
+                </div>
+            )}
+
+            {activeTab === 'gantt' && (
+                <div className="bg-slate-900/70 rounded-2xl border border-slate-800 shadow-lg overflow-hidden">
+                    <React.Suspense fallback={<div className="flex items-center justify-center p-12 text-slate-400"><Loader2 className="w-6 h-6 animate-spin mr-2" /> Cargando Gantt…</div>}>
+                        <ProjectGantt forceProjectId={projectId} />
+                    </React.Suspense>
+                </div>
+            )}
+
+            {activeTab === 'stations' && (
+                <StationManager
+                    projectId={projectId}
+                    canEdit={canEdit}
+                    userId={user?.uid}
+                />
+            )}
+
+            {activeTab === 'milestones' && (
+            <>
             <div className="bg-slate-900/70 p-6 rounded-2xl border border-slate-800 shadow-lg">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
@@ -374,36 +446,8 @@ export default function ProjectDetailPage() {
                     </div>
                 )}
             </div>
-
-            {/* ══════════════ STATIONS ══════════════ */}
-            <StationManager
-                projectId={projectId}
-                canEdit={canEdit}
-                userId={user?.uid}
-            />
-
-
-            {/* ══════════════ QUICK NAVIGATION ══════════════ */}
-            <div className="grid md:grid-cols-3 gap-3">
-                <QuickNavCard
-                    icon={<ListTodo className="w-5 h-5 text-indigo-400" />}
-                    label="Ver Tareas"
-                    desc="Gestión y seguimiento de tareas"
-                    onClick={() => navigate(`/tasks?project=${projectId}`)}
-                />
-                <QuickNavCard
-                    icon={<BarChart3 className="w-5 h-5 text-emerald-400" />}
-                    label="Analítica"
-                    desc="Métricas y gráficas del proyecto"
-                    onClick={() => navigate('/analytics')}
-                />
-                <QuickNavCard
-                    icon={<Settings className="w-5 h-5 text-amber-400" />}
-                    label="Configuración"
-                    desc="Parámetros y ajustes del proyecto"
-                    onClick={() => setShowEditModal(true)}
-                />
-            </div>
+            </>
+            )}
         </div>
     );
 }

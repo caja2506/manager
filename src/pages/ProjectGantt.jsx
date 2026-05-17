@@ -24,6 +24,7 @@ import {
     getProjectsForGantt,
     getTaskTypesForGantt,
     getUsersForGantt,
+    getMilestonesForGantt,
     updateTaskGanttFields,
     createDependency,
     deleteDependency,
@@ -69,7 +70,8 @@ function formatRangeLabel(viewStart, viewMode) {
 }
 
 // ---- Main Page ----
-export default function ProjectGantt() {
+export default function ProjectGantt({ forceProjectId = null, renderMilestoneModal = null }) {
+    const isEmbedded = !!forceProjectId;
     const { user } = useAuth();
     const { canEdit, canEditDates, canDelete } = useRole();
     const { engProjects, engSubtasks, teamMembers, taskTypes: appTaskTypes } = useEngineeringData();
@@ -84,11 +86,13 @@ export default function ProjectGantt() {
     const [projects, setProjects] = useState([]);
     const [taskTypes, setTaskTypes] = useState([]);
     const [users, setUsers] = useState([]);
+    const [milestones, setMilestones] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [groupBy, setGroupBy] = useState('milestone'); // 'type' | 'milestone'
 
     // Filters
-    const [filterProject, setFilterProject] = useState('');
+    const [filterProject, setFilterProject] = useState(forceProjectId || '');
     const [filterAssignee, setFilterAssignee] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
 
@@ -103,33 +107,74 @@ export default function ProjectGantt() {
 
     const openNew = () => { setSelectedTask(null); setIsModalOpen(true); };
     const openTask = (task) => { setSelectedTask(task); setIsModalOpen(true); };
-    const closeModal = () => { setIsModalOpen(false); setSelectedTask(null); loadData(); };
 
     // ---- Load data ----
     const loadData = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
-            const [tasksData, depsData, projectsData, typesData, usersData] = await Promise.all([
-                getTasksForGantt(filterProject || null),
+            const [tasksData, depsData, projectsData, typesData, usersData, milestonesData] = await Promise.all([
+                getTasksForGantt(forceProjectId || filterProject || null),
                 getDependencies(filterProject || null),
                 getProjectsForGantt(),
                 getTaskTypesForGantt(),
                 getUsersForGantt(),
+                getMilestonesForGantt(forceProjectId || filterProject || null),
             ]);
             setTasks(tasksData);
             setDependencies(depsData);
             setProjects(projectsData);
             setTaskTypes(typesData);
             setUsers(usersData);
+            setMilestones(milestonesData);
         } catch (e) {
             setError(e.message || 'Error al cargar datos del Gantt.');
         } finally {
             setLoading(false);
         }
-    }, [filterProject]);
+    }, [filterProject, forceProjectId]);
 
     useEffect(() => { loadData(); }, [loadData]);
+
+    const closeModal = () => { setIsModalOpen(false); setSelectedTask(null); loadData(); };
+
+    // Milestone creation (defined AFTER loadData to avoid TDZ)
+    const [isMilestoneModalOpen, setIsMilestoneModalOpen] = useState(false);
+    const [milestoneParentId, setMilestoneParentId] = useState(null);
+    const [milestoneParentName, setMilestoneParentName] = useState('');
+
+    const handleCreateMilestone = useCallback(async (parentId, parentName) => {
+        if (renderMilestoneModal) {
+            setMilestoneParentId(parentId);
+            setMilestoneParentName(parentName || '');
+            setIsMilestoneModalOpen(true);
+        } else {
+            const name = prompt(`Nombre del ${parentId ? 'sub-' : ''}milestone:`);
+            if (!name?.trim()) return;
+            const projectId = forceProjectId || filterProject;
+            if (!projectId) { alert('Selecciona un proyecto primero.'); return; }
+            try {
+                const { createMilestone } = await import('../services/milestoneService');
+                await createMilestone(projectId, { name: name.trim(), type: name.trim(), parentMilestoneId: parentId || null }, user?.uid);
+                await loadData();
+            } catch (err) {
+                console.error('Error creating milestone:', err);
+                alert('Error: ' + err.message);
+            }
+        }
+    }, [renderMilestoneModal, forceProjectId, filterProject, user, loadData]);
+
+    const handleSaveMilestone = useCallback(async (data) => {
+        const projectId = forceProjectId || filterProject;
+        if (!projectId) {
+            alert('Selecciona un proyecto primero para crear un milestone.');
+            return;
+        }
+        const { createMilestone } = await import('../services/milestoneService');
+        await createMilestone(projectId, data, user?.uid);
+        setIsMilestoneModalOpen(false);
+        await loadData();
+    }, [forceProjectId, filterProject, user, loadData]);
 
     // ---- Sync viewStart on mode change ----
     useEffect(() => {
@@ -392,9 +437,10 @@ export default function ProjectGantt() {
     }, []);
 
     return (
-        <div className="-m-4 md:-m-8 flex flex-col bg-slate-950 text-white" style={{ minHeight: '100vh' }}>
+        <div className={isEmbedded ? 'flex flex-col text-white' : '-m-4 md:-m-8 flex flex-col bg-slate-950 text-white'} style={{ minHeight: isEmbedded ? 'auto' : '100vh' }}>
 
             {/* ══════ SHARED BANNER ══════ */}
+            {!isEmbedded && (
             <TaskModuleBanner onNewTask={canEdit ? openNew : null} canEdit={canEdit}>
                 {/* View toggle */}
                 <div className="flex items-center bg-slate-800 rounded-lg p-0.5 gap-0.5 border border-slate-700 h-8">
@@ -435,7 +481,7 @@ export default function ProjectGantt() {
                     </span>
                 </div>
 
-                {/* Filters */}
+                {!isEmbedded && (
                 <select
                     value={filterProject}
                     onChange={e => setFilterProject(e.target.value)}
@@ -446,6 +492,7 @@ export default function ProjectGantt() {
                         <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
                 </select>
+                )}
                 <select
                     value={filterAssignee}
                     onChange={e => setFilterAssignee(e.target.value)}
@@ -487,6 +534,57 @@ export default function ProjectGantt() {
                     <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                 </button>
             </TaskModuleBanner>
+            )}
+
+            {/* ══════ EMBEDDED TOOLBAR ══════ */}
+            {isEmbedded && (
+                <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-slate-800/50 bg-slate-900/50">
+                    {/* View toggle */}
+                    <div className="flex items-center bg-slate-800 rounded-lg p-0.5 gap-0.5 border border-slate-700 h-8">
+                        <button
+                            onClick={() => setViewMode('weekly')}
+                            className={`flex items-center gap-1 px-2.5 h-full rounded-md text-[10px] font-bold transition-all cursor-pointer ${viewMode === 'weekly' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                        >
+                            <Calendar className="w-3 h-3" /> Semanal
+                        </button>
+                        <button
+                            onClick={() => setViewMode('monthly')}
+                            className={`flex items-center gap-1 px-2.5 h-full rounded-md text-[10px] font-bold transition-all cursor-pointer ${viewMode === 'monthly' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                        >
+                            <BarChart2 className="w-3 h-3" /> Mensual
+                        </button>
+                    </div>
+                    {/* Navigation */}
+                    <div className="flex items-center gap-0.5 bg-slate-800 rounded-lg border border-slate-700 p-0.5 h-8">
+                        <button onClick={() => navigate(-1)} className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-all cursor-pointer"><ChevronLeft className="w-3.5 h-3.5" /></button>
+                        <button onClick={goToday} className="px-2 rounded-md text-[10px] font-bold text-slate-300 hover:text-white hover:bg-slate-700 transition-all h-full cursor-pointer">Hoy</button>
+                        <button onClick={() => navigate(1)} className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-all cursor-pointer"><ChevronRight className="w-3.5 h-3.5" /></button>
+                    </div>
+                    {/* Range label */}
+                    <div className="flex items-center gap-1 px-2.5 bg-slate-800/60 rounded-lg border border-slate-700/50 h-8">
+                        <CalendarRange className="w-3 h-3 text-indigo-400" />
+                        <span className="text-[10px] font-semibold text-slate-200">{formatRangeLabel(viewStart, viewMode)}</span>
+                    </div>
+                    {/* Assignee + Status filters */}
+                    <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}
+                        className="bg-slate-800 border border-slate-700 rounded-lg px-2 text-[10px] font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[130px] h-8 cursor-pointer">
+                        <option value="">Miembros</option>
+                        {users.map(u => <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
+                    </select>
+                    <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+                        className="bg-slate-800 border border-slate-700 rounded-lg px-2 text-[10px] font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[110px] h-8 cursor-pointer">
+                        <option value="">Estado</option>
+                        <option value="backlog">Backlog</option>
+                        <option value="pending">Pendiente</option>
+                        <option value="in_progress">En Progreso</option>
+                        <option value="completed">Completado</option>
+                        <option value="blocked">Bloqueado</option>
+                    </select>
+                    <button onClick={loadData} className="p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 transition-all cursor-pointer" title="Actualizar">
+                        <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
+                </div>
+            )}
 
             {/* ======== STATS BAR ======== */}
             <div className="flex-shrink-0 flex items-center gap-3 md:gap-6 px-3 md:px-6 py-2 bg-slate-900/30 border-b border-slate-800/50 overflow-x-auto scrollbar-none">
@@ -541,6 +639,10 @@ export default function ProjectGantt() {
                         viewMode={viewMode}
                         viewStart={viewStart}
                         taskTypes={taskTypes}
+                        milestones={milestones}
+                        groupBy={groupBy}
+                        onGroupByChange={setGroupBy}
+                        onCreateMilestone={handleCreateMilestone}
                         placingTask={placingTask}
                         onPlacementComplete={handlePlacementComplete}
                         onStartPlacement={handleStartPlacement}
@@ -566,6 +668,15 @@ export default function ProjectGantt() {
                 canEdit={canEdit}
                 canDelete={canDelete}
             />
+
+            {/* ======== MILESTONE MODAL (render prop from parent) ======== */}
+            {renderMilestoneModal && renderMilestoneModal({
+                isOpen: isMilestoneModalOpen,
+                onClose: () => { setIsMilestoneModalOpen(false); setMilestoneParentId(null); setMilestoneParentName(''); },
+                onSave: handleSaveMilestone,
+                parentMilestoneId: milestoneParentId,
+                parentMilestoneName: milestoneParentName,
+            })}
         </div>
     );
 }

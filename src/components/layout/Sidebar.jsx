@@ -49,6 +49,7 @@ const SECTIONS = [
             { to: '/planner', label: 'Weekly Planner', icon: CalendarDays },
             { to: '/daily-board', label: 'Daily Board', icon: LayoutGrid },
             { to: '/gantt', label: 'Project Gantt', icon: GanttChartSquare },
+            { to: '/roadmap', label: 'Roadmap', icon: Map },
         ],
     },
     {
