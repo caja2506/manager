@@ -15,6 +15,7 @@ const paths = require("../automation/firestorePaths");
 const {
     loadAllUsers, loadUser, loadUserTasks, loadTaskSubtasks,
     loadTaskUserTimeLogs, updateTask, updateSubtask, insertTimeLog, insertTask,
+    transitionTaskStatus,
 } = require("../db/coreDataReader");
 
 /**
@@ -155,6 +156,23 @@ async function submitQuickReport(adminDb, reportData) {
         }
 
         await updateTask(report.taskId, taskUpdate);
+
+        // Transition to blocked via RPC if reported as blocked
+        if (report.blocked) {
+            try {
+                await transitionTaskStatus(
+                    report.taskId,
+                    "blocked",
+                    userId,
+                    userData.userName || "",
+                    false,
+                    report.blockerNote || null
+                );
+                console.log(`[quickReport] Transited task ${report.taskId} to blocked via RPC`);
+            } catch (err) {
+                console.error(`[quickReport] Error transiting task ${report.taskId} to blocked:`, err.message);
+            }
+        }
 
         // Update subtasks in Supabase if provided
         if (report.subtasks && report.subtasks.length > 0) {

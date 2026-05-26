@@ -11,6 +11,7 @@ import {
     RefreshCw, GanttChartSquare, Calendar, BarChart2,
     AlertCircle, Loader2, Plus, CalendarPlus, ListPlus,
     ChevronDown, ChevronUp, Clock, User, FolderGit2,
+    Workflow,
 } from 'lucide-react';
 import GanttGrid from '../components/gantt/GanttGrid';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
@@ -75,12 +76,13 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
     const isEmbedded = !!forceProjectId;
     const { user } = useAuth();
     const { canEdit, canEditDates, canDelete } = useRole();
-    const { engProjects, engSubtasks, teamMembers, taskTypes: appTaskTypes } = useEngineeringData();
+    const { engProjects, engTasks: globalTasks, engSubtasks, teamMembers, taskTypes: appTaskTypes } = useEngineeringData();
 
     // View state
-    const [viewMode, setViewMode] = useState('weekly');
+    const [viewMode, setViewMode] = useState('weeks');
     const [viewStart, setViewStart] = useState(() => getMondayOfWeek());
     const [zoomLevel, setZoomLevel] = useState(1);
+    const [showCriticalPath, setShowCriticalPath] = useState(false);
 
     // Data
     const [tasks, setTasks] = useState([]);
@@ -138,6 +140,19 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
     }, [filterProject, forceProjectId]);
 
     useEffect(() => { loadData(); }, [loadData]);
+    
+    // Sync tasks reactively with Supabase real-time updates from hook
+    useEffect(() => {
+        if (globalTasks && globalTasks.length > 0) {
+            const pid = forceProjectId || filterProject;
+            const filtered = pid ? globalTasks.filter(t => t.projectId === pid) : globalTasks;
+            const mappedTasks = filtered.map(t => ({
+                ...t,
+                taskType: t.taskTypeId || t.taskType, // bridge property names
+            }));
+            setTasks(mappedTasks);
+        }
+    }, [globalTasks, filterProject, forceProjectId]);
 
     const closeModal = () => { setIsModalOpen(false); setSelectedTask(null); loadData(); };
 
@@ -184,7 +199,7 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
 
     // ---- Sync viewStart on mode change ----
     useEffect(() => {
-        if (viewMode === 'weekly') {
+        if (viewMode === 'weekly' || viewMode === 'weeks') {
             setViewStart(getMondayOfWeek());
         } else {
             setViewStart(getMonthStart());
@@ -193,7 +208,7 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
 
     // ---- Navigation ----
     function navigate(dir) {
-        if (viewMode === 'weekly') {
+        if (viewMode === 'weekly' || viewMode === 'weeks') {
             setViewStart(prev => addWeeks(prev, dir));
         } else {
             setViewStart(prev => addMonths(prev, dir));
@@ -201,7 +216,7 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
     }
 
     function goToday() {
-        if (viewMode === 'weekly') setViewStart(getMondayOfWeek());
+        if (viewMode === 'weekly' || viewMode === 'weeks') setViewStart(getMondayOfWeek());
         else setViewStart(getMonthStart());
     }
 
@@ -257,14 +272,33 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
     }, [placingTask, user]);
 
     const handleAssignMilestone = useCallback(async (taskId, milestoneId) => {
+        const val = milestoneId || null;
         try {
-            await updateTaskGanttFields(taskId, { milestone: milestoneId });
+            await updateTaskGanttFields(taskId, { milestone: val });
             setTasks(prev => prev.map(t =>
-                t.id === taskId ? { ...t, milestone: milestoneId } : t
+                t.id === taskId ? { ...t, milestone: val, milestoneId: val } : t
             ));
         } catch (e) {
             console.error('Error assigning milestone:', e);
             alert('Error al asignar el milestone: ' + e.message);
+        }
+    }, []);
+
+    const handleRemoveFromGantt = useCallback(async (task) => {
+        if (!window.confirm(`¿Estás seguro de que deseas quitar la tarea "${task.title}" del Gantt?`)) return;
+        try {
+            await updateTaskGanttFields(task.id, {
+                plannedStartDate: null,
+                plannedEndDate: null,
+                showInGantt: false,
+            });
+            // Update local state
+            setTasks(prev => prev.map(t =>
+                t.id === task.id ? { ...t, plannedStartDate: null, plannedEndDate: null, showInGantt: false } : t
+            ));
+        } catch (e) {
+            console.error('Error removing task from Gantt:', e);
+            alert('Error al quitar la tarea del Gantt: ' + e.message);
         }
     }, []);
 
@@ -455,168 +489,258 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
     }, []);
 
     return (
-        <div className={isEmbedded ? 'flex flex-col text-white' : '-m-4 md:-m-8 flex flex-col bg-slate-950 text-white'} style={{ minHeight: isEmbedded ? 'auto' : '100vh' }}>
+        <div 
+            className={isEmbedded ? 'flex flex-col text-white' : '-m-4 md:-m-8 flex flex-col bg-slate-950 text-white overflow-hidden'} 
+            style={{ 
+                minHeight: isEmbedded ? 'auto' : 'auto',
+                height: isEmbedded ? '100%' : 'calc(100vh - 64px)'
+            }}
+        >
 
             {/* ══════ SHARED BANNER ══════ */}
             {!isEmbedded && (
-            <TaskModuleBanner onNewTask={canEdit ? openNew : null} canEdit={canEdit}>
-                {/* View toggle */}
-                <div className="flex items-center bg-slate-800 rounded-lg p-0.5 gap-0.5 border border-slate-700 h-8">
-                    <button
-                        onClick={() => setViewMode('weekly')}
-                        className={`flex items-center gap-1 px-2.5 h-full rounded-md text-[10px] font-bold transition-all ${viewMode === 'weekly' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
-                    >
-                        <Calendar className="w-3 h-3" />
-                        Días
-                    </button>
-                    <button
-                        onClick={() => setViewMode('monthly')}
-                        className={`flex items-center gap-1 px-2.5 h-full rounded-md text-[10px] font-bold transition-all ${viewMode === 'monthly' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
-                    >
-                        <BarChart2 className="w-3 h-3" />
-                        Semanas
-                    </button>
-                </div>
-
-                {!isEmbedded && (
-                <select
-                    value={filterProject}
-                    onChange={e => setFilterProject(e.target.value)}
-                    className="bg-slate-800 border border-slate-700 rounded-lg px-2 text-[10px] font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[130px] h-8"
-                >
-                    <option value="">Proyectos</option>
-                    {projects.map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                </select>
-                )}
-                <select
-                    value={filterAssignee}
-                    onChange={e => setFilterAssignee(e.target.value)}
-                    className="bg-slate-800 border border-slate-700 rounded-lg px-2 text-[10px] font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[130px] h-8"
-                >
-                    <option value="">Miembros</option>
-                    {users.map(u => (
-                        <option key={u.id} value={u.id}>{u.name || u.email}</option>
-                    ))}
-                </select>
-                <select
-                    value={filterStatus}
-                    onChange={e => setFilterStatus(e.target.value)}
-                    className="bg-slate-800 border border-slate-700 rounded-lg px-2 text-[10px] font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[110px] h-8"
-                >
-                    <option value="">Estado</option>
-                    <option value="backlog">Backlog</option>
-                    <option value="pending">Pendiente</option>
-                    <option value="in_progress">En Progreso</option>
-                    <option value="validation">Validación</option>
-                    <option value="completed">Completado</option>
-                    <option value="blocked">Bloqueado</option>
-                </select>
-
-                {(filterProject || filterAssignee || filterStatus) && (
-                    <button
-                        onClick={() => { setFilterProject(''); setFilterAssignee(''); setFilterStatus(''); }}
-                        className="text-[9px] text-slate-400 hover:text-white underline"
-                    >
-                        Limpiar
-                    </button>
-                )}
-
-                <div className="hidden md:flex items-center gap-2 px-3 border-l border-slate-700/50">
-                    <StatChip label="Tareas" value={stats.total} color="indigo" />
-                    <StatChip label="Con fechas" value={stats.withDates} color="green" />
-                    <StatChip label="Hitos" value={stats.milestones} color="amber" />
-                    {stats.delayedTasks > 0 && (
-                        <StatChip label="Atrasadas" value={stats.delayedTasks} color="red" icon={<AlertCircle className="w-3 h-3" />} />
-                    )}
-                </div>
-
-                <div className="flex items-center gap-2 px-2 bg-slate-800/40 border border-slate-700/50 rounded-lg h-8 ml-auto">
-                    <span className="text-[10px] text-slate-400 font-bold">Zoom</span>
-                    <input
-                        type="range"
-                        min="0.5"
-                        max="2"
-                        step="0.1"
-                        value={zoomLevel}
-                        onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
-                        className="w-20 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                    />
-                </div>
-
-                <button
-                    onClick={loadData}
-                    className="p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 transition-all"
-                    title="Actualizar"
-                >
-                    <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                </button>
-            </TaskModuleBanner>
+                <TaskModuleBanner onNewTask={canEdit ? openNew : null} canEdit={canEdit} />
             )}
 
-            {/* ══════ EMBEDDED TOOLBAR ══════ */}
+            {/* ══════ GANTT TOOLBAR (VISTA COMPLETA) ══════ */}
+            {!isEmbedded && (
+                <div className="flex flex-wrap items-center justify-between gap-3 py-1.5 px-4 bg-slate-900/40 border-b border-slate-800/50 shrink-0">
+                    {/* Sección izquierda: Filtros y Estadísticas */}
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <select
+                                value={filterProject}
+                                onChange={e => setFilterProject(e.target.value)}
+                                className="bg-slate-800 border border-slate-700 rounded-lg px-2 text-[10px] font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[130px] h-8 cursor-pointer"
+                            >
+                                <option value="">Proyectos</option>
+                                {projects.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                            </select>
+                            <select
+                                value={filterAssignee}
+                                onChange={e => setFilterAssignee(e.target.value)}
+                                className="bg-slate-800 border border-slate-700 rounded-lg px-2 text-[10px] font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[130px] h-8 cursor-pointer"
+                            >
+                                <option value="">Miembros</option>
+                                {users.map(u => (
+                                    <option key={u.id} value={u.id}>{u.displayName || u.email}</option>
+                                ))}
+                            </select>
+                            <select
+                                value={filterStatus}
+                                onChange={e => setFilterStatus(e.target.value)}
+                                className="bg-slate-800 border border-slate-700 rounded-lg px-2 text-[10px] font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[110px] h-8 cursor-pointer"
+                            >
+                                <option value="">Estado</option>
+                                <option value="backlog">Backlog</option>
+                                <option value="pending">Pendiente</option>
+                                <option value="in_progress">En Progreso</option>
+                                <option value="validation">Validación</option>
+                                <option value="completed">Completado</option>
+                                <option value="blocked">Bloqueado</option>
+                            </select>
+
+                            {(filterProject || filterAssignee || filterStatus) && (
+                                <button
+                                    onClick={() => { setFilterProject(''); setFilterAssignee(''); setFilterStatus(''); }}
+                                    className="text-[9px] text-slate-400 hover:text-white underline cursor-pointer"
+                                >
+                                    Limpiar
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 border-l border-slate-800 pl-3">
+                            <StatChip label="Tareas" value={stats.total} color="indigo" />
+                            <StatChip label="Con fechas" value={stats.withDates} color="green" />
+                            <StatChip label="Hitos" value={stats.milestones} color="amber" />
+                            {stats.delayedTasks > 0 && (
+                                <StatChip label="Atrasadas" value={stats.delayedTasks} color="red" icon={<AlertCircle className="w-3 h-3" />} />
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Sección derecha: Herramientas Visuales (Toggle, Zoom, Refresh) */}
+                    <div className="flex flex-wrap items-center gap-3">
+                        {/* View toggle */}
+                        <div className="flex items-center bg-slate-800 rounded-lg p-0.5 gap-0.5 border border-slate-700 h-8">
+                            <button
+                                onClick={() => setViewMode('weekly')}
+                                className={`flex items-center gap-1 px-2.5 h-full rounded-md text-[10px] font-bold transition-all cursor-pointer ${viewMode === 'weekly' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                            >
+                                <Calendar className="w-3 h-3" />
+                                Días
+                            </button>
+                            <button
+                                onClick={() => setViewMode('monthly')}
+                                className={`flex items-center gap-1 px-2.5 h-full rounded-md text-[10px] font-bold transition-all cursor-pointer ${viewMode === 'monthly' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                            >
+                                <BarChart2 className="w-3 h-3" />
+                                Semanas
+                            </button>
+                            <button
+                                onClick={() => setViewMode('weeks')}
+                                className={`flex items-center gap-1 px-2.5 h-full rounded-md text-[10px] font-bold transition-all cursor-pointer ${viewMode === 'weeks' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                            >
+                                <CalendarRange className="w-3 h-3" />
+                                Year by weeks
+                            </button>
+                        </div>
+
+                        {/* Ruta Crítica */}
+                        <button
+                            onClick={() => setShowCriticalPath(prev => !prev)}
+                            className={`flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${showCriticalPath ? 'bg-red-500/20 text-red-400 border-red-500/40 shadow-sm' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700'}`}
+                            title="Mostrar Ruta Crítica"
+                        >
+                            <Workflow className="w-3.5 h-3.5" />
+                            Ruta Crítica
+                        </button>
+
+                        {/* Zoom Slider */}
+                        <div className="flex items-center gap-2 px-3 bg-slate-800/40 border border-slate-700/50 rounded-lg h-8">
+                            <span className="text-[10px] text-slate-400 font-bold">Zoom</span>
+                            <input
+                                type="range"
+                                min="0.5"
+                                max="2"
+                                step="0.1"
+                                value={zoomLevel}
+                                onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
+                                className="w-24 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                            />
+                        </div>
+
+                    </div>
+                </div>
+            )}
+
+            {/* ══════ GANTT TOOLBAR (VISTA EMBEDBIDA) ══════ */}
             {isEmbedded && (
-                <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-slate-800/50 bg-slate-900/50">
-                    {/* View toggle */}
-                    <div className="flex items-center bg-slate-800 rounded-lg p-0.5 gap-0.5 border border-slate-700 h-8">
-                        <button
-                            onClick={() => setViewMode('weekly')}
-                            className={`flex items-center gap-1 px-2.5 h-full rounded-md text-[10px] font-bold transition-all cursor-pointer ${viewMode === 'weekly' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
-                        >
-                            <Calendar className="w-3 h-3" /> Días
-                        </button>
-                        <button
-                            onClick={() => setViewMode('monthly')}
-                            className={`flex items-center gap-1 px-2.5 h-full rounded-md text-[10px] font-bold transition-all cursor-pointer ${viewMode === 'monthly' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
-                        >
-                            <BarChart2 className="w-3 h-3" /> Semanas
-                        </button>
-                    </div>
-                    {/* Assignee + Status filters */}
-                    <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}
-                        className="bg-slate-800 border border-slate-700 rounded-lg px-2 text-[10px] font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[130px] h-8 cursor-pointer">
-                        <option value="">Miembros</option>
-                        {users.map(u => <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
-                    </select>
-                    <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-                        className="bg-slate-800 border border-slate-700 rounded-lg px-2 text-[10px] font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[110px] h-8 cursor-pointer">
-                        <option value="">Estado</option>
-                        <option value="backlog">Backlog</option>
-                        <option value="pending">Pendiente</option>
-                        <option value="in_progress">En Progreso</option>
-                        <option value="completed">Completado</option>
-                        <option value="blocked">Bloqueado</option>
-                    </select>
+                <div className="flex flex-wrap items-center justify-between gap-3 py-1.5 px-3 bg-slate-900/50 border-b border-slate-800/50 shrink-0">
+                    {/* Sección izquierda: Filtros y Estadísticas */}
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <select
+                                value={filterAssignee}
+                                onChange={e => setFilterAssignee(e.target.value)}
+                                className="bg-slate-800 border border-slate-700 rounded-lg px-2 text-[10px] font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[130px] h-8 cursor-pointer"
+                            >
+                                <option value="">Miembros</option>
+                                {users.map(u => (
+                                    <option key={u.id} value={u.id}>{u.displayName || u.email}</option>
+                                ))}
+                            </select>
+                            <select
+                                value={filterStatus}
+                                onChange={e => setFilterStatus(e.target.value)}
+                                className="bg-slate-800 border border-slate-700 rounded-lg px-2 text-[10px] font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[110px] h-8 cursor-pointer"
+                            >
+                                <option value="">Estado</option>
+                                <option value="backlog">Backlog</option>
+                                <option value="pending">Pendiente</option>
+                                <option value="in_progress">En Progreso</option>
+                                <option value="completed">Completado</option>
+                                <option value="blocked">Bloqueado</option>
+                            </select>
 
-                    <div className="hidden md:flex items-center gap-2 px-3 border-l border-slate-700/50">
-                        <StatChip label="Tareas" value={stats.total} color="indigo" />
-                        <StatChip label="Con fechas" value={stats.withDates} color="green" />
-                        <StatChip label="Hitos" value={stats.milestones} color="amber" />
-                        {stats.delayedTasks > 0 && (
-                            <StatChip label="Atrasadas" value={stats.delayedTasks} color="red" icon={<AlertCircle className="w-3 h-3" />} />
-                        )}
+                            {(filterAssignee || filterStatus) && (
+                                <button
+                                    onClick={() => { setFilterAssignee(''); setFilterStatus(''); }}
+                                    className="text-[9px] text-slate-400 hover:text-white underline cursor-pointer"
+                                >
+                                    Limpiar
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 border-l border-slate-800 pl-3">
+                            <StatChip label="Tareas" value={stats.total} color="indigo" />
+                            <StatChip label="Con fechas" value={stats.withDates} color="green" />
+                            <StatChip label="Hitos" value={stats.milestones} color="amber" />
+                            {stats.delayedTasks > 0 && (
+                                <StatChip label="Atrasadas" value={stats.delayedTasks} color="red" icon={<AlertCircle className="w-3 h-3" />} />
+                            )}
+                        </div>
                     </div>
 
-                    <div className="flex items-center gap-2 px-2 bg-slate-800/40 border border-slate-700/50 rounded-lg h-8 ml-auto">
-                        <span className="text-[10px] text-slate-400 font-bold">Zoom</span>
-                        <input
-                            type="range"
-                            min="0.5"
-                            max="2"
-                            step="0.1"
-                            value={zoomLevel}
-                            onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
-                            className="w-20 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                        />
+                    {/* Sección derecha: Herramientas Visuales */}
+                    <div className="flex flex-wrap items-center gap-3">
+                        {/* View toggle */}
+                        <div className="flex items-center bg-slate-800 rounded-lg p-0.5 gap-0.5 border border-slate-700 h-8">
+                            <button
+                                onClick={() => setViewMode('weekly')}
+                                className={`flex items-center gap-1 px-2.5 h-full rounded-md text-[10px] font-bold transition-all cursor-pointer ${viewMode === 'weekly' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                            >
+                                <Calendar className="w-3 h-3" /> Días
+                            </button>
+                            <button
+                                onClick={() => setViewMode('monthly')}
+                                className={`flex items-center gap-1 px-2.5 h-full rounded-md text-[10px] font-bold transition-all cursor-pointer ${viewMode === 'monthly' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                            >
+                                <BarChart2 className="w-3 h-3" /> Semanas
+                            </button>
+                            <button
+                                onClick={() => setViewMode('weeks')}
+                                className={`flex items-center gap-1 px-2.5 h-full rounded-md text-[10px] font-bold transition-all cursor-pointer ${viewMode === 'weeks' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                            >
+                                <CalendarRange className="w-3 h-3" /> Year by weeks
+                            </button>
+                        </div>
+
+                        {/* Ruta Crítica Embebida */}
+                        <button
+                            onClick={() => setShowCriticalPath(prev => !prev)}
+                            className={`flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${showCriticalPath ? 'bg-red-500/20 text-red-400 border-red-500/40 shadow-sm' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700'}`}
+                            title="Mostrar Ruta Crítica"
+                        >
+                            <Workflow className="w-3.5 h-3.5" /> Ruta Crítica
+                        </button>
+
+                        {/* Zoom Slider */}
+                        <div className="flex items-center gap-2 px-3 bg-slate-800/40 border border-slate-700/50 rounded-lg h-8">
+                            <span className="text-[10px] text-slate-400 font-bold">Zoom</span>
+                            <input
+                                type="range"
+                                min="0.5"
+                                max="2"
+                                step="0.1"
+                                value={zoomLevel}
+                                onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
+                                className="w-20 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                            />
+                        </div>
+
                     </div>
-                    <button onClick={loadData} className="p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 transition-all cursor-pointer" title="Actualizar">
-                        <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                    </button>
                 </div>
             )}
 
-
+            {/* ======== LEYENDA DE COLORES (AYUDA VISUAL) ======== */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 py-1.5 px-4 bg-slate-950 border-b border-slate-800/60 text-[10px] text-slate-400 shrink-0 font-medium select-none">
+                <span className="font-bold text-slate-500 uppercase tracking-wider text-[9px]">Ayuda Visual (Colores):</span>
+                <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded bg-emerald-500" />
+                    <span>Completada</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded bg-red-500" />
+                    <span>Vencida / Atraso</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded bg-amber-400" />
+                    <span>En Riesgo (&lt;=3d, &lt;75% avance)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded bg-indigo-500" />
+                    <span>Al día (Color proyecto/tipo)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded bg-slate-500" />
+                    <span>Cancelada</span>
+                </div>
+            </div>
 
             {/* ======== PLACEMENT MODE INDICATOR ======== */}
             {placingTask && (
@@ -630,7 +754,7 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
             )}
 
             {/* ======== BODY ======== */}
-            <div className="flex-1 min-h-0 p-2 md:p-4 flex flex-col">
+            <div className="flex-1 min-h-0 p-0 flex flex-col overflow-hidden">
                 {loading ? (
                     <div className="flex-1 flex items-center justify-center">
                         <div className="text-center space-y-3">
@@ -673,6 +797,9 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                         onLinkCreated={handleLinkCreated}
                         onDeleteDependency={handleDeleteDependency}
                         zoomLevel={zoomLevel}
+                        showCriticalPath={showCriticalPath}
+                        projects={projects}
+                        onRemoveFromGantt={handleRemoveFromGantt}
                     />
                 )}
             </div>

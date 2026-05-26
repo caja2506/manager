@@ -58,12 +58,12 @@ async function execute(adminDb, token, targets, context) {
     // Core data from Supabase, automation/planning data from Firestore
     const {
         loadAllTasks, loadAllTimeLogs, loadAllDelays, loadAllUsers,
-        loadAllSubtasks, loadAllProjects,
+        loadAllSubtasks, loadAllProjects, loadWeeklyPlanItemsForDate,
     } = require("../db/coreDataReader");
 
     const [
         allTasks, allTimeLogs, allDelays, allUsers, allSubtasks, allProjects,
-        planItemsTodaySnap, planItemsTomorrowSnap,
+        planItemsToday, planItemsTomorrow,
         telegramReportsSnap, commentsSnap, yesterdayCommentsSnap,
     ] = await Promise.all([
         loadAllTasks(),
@@ -72,8 +72,8 @@ async function execute(adminDb, token, targets, context) {
         loadAllUsers(),
         loadAllSubtasks(),
         loadAllProjects(),
-        adminDb.collection("weeklyPlanItems").where("date", "==", today).get(),
-        adminDb.collection("weeklyPlanItems").where("date", "==", tomorrow).get(),
+        loadWeeklyPlanItemsForDate(today),
+        loadWeeklyPlanItemsForDate(tomorrow),
         adminDb.collection(paths.TELEGRAM_REPORTS)
             .where("reportDate", "==", today).get(),
         // Fetch today's comments
@@ -87,9 +87,6 @@ async function execute(adminDb, token, targets, context) {
             .where("createdAt", "<=", yesterdayEnd.toISOString())
             .get(),
     ]);
-
-    const planItemsToday = planItemsTodaySnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const planItemsTomorrow = planItemsTomorrowSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const telegramReportsToday = telegramReportsSnap.docs.map(d => d.data());
     const todayComments = commentsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const yesterdayComments = yesterdayCommentsSnap.docs.map(d => {

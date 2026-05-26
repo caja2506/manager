@@ -7,7 +7,7 @@ const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { requireAdmin } = require("../middleware/authGuard");
 
 function createAutomationExports(adminDb, secrets) {
-    const { telegramBotToken, geminiApiKey, resendApiKey, supabaseUrl, supabaseServiceRoleKey, nvidiaApiKey } = secrets;
+    const { telegramBotToken, geminiApiKey, resendApiKey, supabaseUrl, supabaseServiceRoleKey, nvidiaApiKey, deepseekApiKey } = secrets;
 
     /** Initialize Supabase admin client (must be called inside handler when secrets are resolved) */
     function initSupabase() {
@@ -16,7 +16,7 @@ function createAutomationExports(adminDb, secrets) {
     }
 
     const unifiedRoutineScheduler = onSchedule(
-        { schedule: "*/15 * * * *", timeZone: "America/Costa_Rica", timeoutSeconds: 180, secrets: [telegramBotToken, geminiApiKey, resendApiKey, supabaseUrl, supabaseServiceRoleKey, nvidiaApiKey] },
+        { schedule: "*/15 * * * *", timeZone: "America/Costa_Rica", timeoutSeconds: 180, secrets: [telegramBotToken, geminiApiKey, resendApiKey, supabaseUrl, supabaseServiceRoleKey, nvidiaApiKey, deepseekApiKey] },
         async () => {
             initSupabase();
             console.log("[scheduler] Unified scheduler tick...");
@@ -207,6 +207,7 @@ function createAutomationExports(adminDb, secrets) {
                     const heartbeatResult = await ariaHeartbeatHandler({
                         telegramToken: token,
                         nvidiaKey: nvidiaApiKey ? nvidiaApiKey.value() : null,
+                        deepseekKey: deepseekApiKey ? deepseekApiKey.value() : null,
                         adminDb,
                     });
                     console.log(`[scheduler] aria_heartbeat result:`, JSON.stringify(heartbeatResult));

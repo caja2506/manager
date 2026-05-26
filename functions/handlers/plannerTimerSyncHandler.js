@@ -20,7 +20,8 @@ const { loadBreakBands, getBreakHoursInRange } = require("../utils/breakTimeUtil
 const {
     loadActiveTimerForUser, loadActiveTimersForUser,
     insertTimeLog, updateTimeLog, loadTask, updateTask,
-    recalculateTaskHours,
+    recalculateTaskHours, loadWeeklyPlanItemsForDate,
+    transitionTaskStatus,
 } = require("../db/coreDataReader");
 
 const TZ = "America/Costa_Rica";
@@ -111,17 +112,13 @@ async function execute(adminDb, token, targets, context) {
     const today = getTodayDateString();
     console.log(`${tag} Syncing for date: ${today}, hour: ${currentHour.toFixed(2)}`);
 
-    const planSnap = await adminDb.collection(paths.WEEKLY_PLAN_ITEMS)
-        .where("date", "==", today)
-        .get();
-
-    if (planSnap.empty) {
+    const planItems = await loadWeeklyPlanItemsForDate(today);
+    if (planItems.length === 0) {
         console.log(`${tag} No planner items for today.`);
         // Still need to stop any planner_auto timers that shouldn't be running
+    } else {
+        console.log(`${tag} Found ${planItems.length} planner blocks for today.`);
     }
-
-    const planItems = planSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    console.log(`${tag} Found ${planItems.length} planner blocks for today.`);
 
     // ── 5. Group by user ──
     const itemsByUser = {};
@@ -324,12 +321,8 @@ async function startPlannerTimer(adminDb, userId, block, now) {
             if (taskData) {
                 const CAN_AUTO_START = ["backlog", "pending", "blocked"];
                 if (CAN_AUTO_START.includes(taskData.status)) {
-                    await updateTask(block.taskId, {
-                        status: "in_progress",
-                        statusChangedAt: now,
-                        statusChangedBy: "planner_auto",
-                    });
-                    console.log(`[plannerTimerSync] Task ${block.taskId} transitioned: ${taskData.status} → in_progress`);
+                    await transitionTaskStatus(block.taskId, "in_progress", userId, "Planner Timer Sync", true);
+                    console.log(`[plannerTimerSync] Task ${block.taskId} transitioned: ${taskData.status} → in_progress via transitionTaskStatus`);
                 }
             }
         } catch (err) {

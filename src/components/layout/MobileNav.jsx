@@ -8,15 +8,16 @@ import {
     Database, Clock, FileText, BarChart3, Users, Bell, Settings,
     Briefcase, LineChart, CalendarDays, GanttChartSquare, Radar, Zap,
     LayoutList, Activity, Map, Menu, X, ChevronRight, Award, LayoutGrid,
-    Sun, Moon
+    Sun, Moon, Plus
 } from 'lucide-react';
+
+import { useAppData } from '../../contexts/AppDataContext';
 
 // ─── Quick Access (bottom bar — always visible) ───
 const QUICK_NAV = [
     { to: '/', label: 'Inicio', icon: LayoutDashboard },
     { to: '/my-work', label: 'Mi Trabajo', icon: User },
     { to: '/tasks', label: 'Tareas', icon: ListTodo },
-    { to: '/projects', label: 'Proyectos', icon: Briefcase },
 ];
 
 // ─── Full menu sections (matches Sidebar) ───
@@ -89,10 +90,12 @@ const ADMIN_SECTION = {
 
 export default function MobileNav() {
     const [isOpen, setIsOpen] = useState(false);
+    const [quickActionsOpen, setQuickActionsOpen] = useState(false);
     const location = useLocation();
-    const { isAdmin } = useRole();
+    const { isAdmin, canEdit } = useRole();
     const { logout } = useAuth();
     const { toggleTheme, isDark } = useTheme();
+    const { setIsGlobalTaskModalOpen, setIsGlobalTimeLogModalOpen } = useAppData();
 
     useEffect(() => {
         // Debounce to prevent React warning "Calling setState synchronously within an effect"
@@ -189,8 +192,96 @@ export default function MobileNav() {
 
             {/* ════════════ BOTTOM BAR ════════════ */}
             <nav className="md:hidden fixed bottom-0 left-0 right-0 z-[100] bg-slate-900/95 backdrop-blur-md border-t border-slate-800 safe-area-bottom">
-                <div className="flex justify-around items-center px-1 py-1.5">
-                    {QUICK_NAV.map((item) => {
+                {/* Backdrop para cerrar el menú flotante */}
+                {quickActionsOpen && (
+                    <div 
+                        className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-30 animate-in fade-in duration-200"
+                        onClick={() => setQuickActionsOpen(false)}
+                    />
+                )}
+
+                <div className="flex justify-around items-center px-1 py-1.5 relative">
+                    {QUICK_NAV.slice(0, 2).map((item) => {
+                        const Icon = item.icon;
+                        return (
+                            <NavLink
+                                key={item.to}
+                                to={item.to}
+                                end={item.to === '/'}
+                                className={({ isActive }) =>
+                                    `flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all min-w-[56px] ${
+                                        isActive
+                                            ? 'text-indigo-400 bg-indigo-950/80'
+                                            : 'text-slate-500 active:text-slate-300'
+                                    }`
+                                }
+                            >
+                                <Icon className="w-5 h-5" />
+                                <span className="text-[10px] font-bold leading-tight">{item.label}</span>
+                            </NavLink>
+                        );
+                    })}
+
+                    {/* Botón de Acciones Rápidas (Rayo FAB) */}
+                    {canEdit && (
+                        <div className="relative z-40">
+                            {/* Menú de Botones Flotantes */}
+                            <div className={`absolute bottom-16 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 transition-all duration-300 origin-bottom ${
+                                quickActionsOpen 
+                                    ? 'opacity-100 scale-100 translate-y-0 pointer-events-auto' 
+                                    : 'opacity-0 scale-75 translate-y-4 pointer-events-none'
+                            }`}>
+                                {/* Opción 1: Registrar Horas */}
+                                <div className="relative flex items-center justify-center">
+                                    <button
+                                        onClick={() => {
+                                            setIsGlobalTimeLogModalOpen(true);
+                                            setQuickActionsOpen(false);
+                                        }}
+                                        className="w-11 h-11 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center shadow-xl border border-slate-950 active:scale-95 transition-all"
+                                        title="Registrar Horas"
+                                    >
+                                        <Clock className="w-5 h-5" />
+                                    </button>
+                                    <span className="absolute right-14 bg-slate-950/90 border border-slate-800 text-white text-[9px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-lg shadow-md whitespace-nowrap">
+                                        Registrar Horas
+                                    </span>
+                                </div>
+
+                                {/* Opción 2: Nueva Tarea */}
+                                <div className="relative flex items-center justify-center">
+                                    <button
+                                        onClick={() => {
+                                            setIsGlobalTaskModalOpen(true);
+                                            setQuickActionsOpen(false);
+                                        }}
+                                        className="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shadow-xl border border-slate-950 active:scale-95 transition-all"
+                                        title="Nueva Tarea"
+                                    >
+                                        <ListTodo className="w-5 h-5" />
+                                    </button>
+                                    <span className="absolute right-14 bg-slate-950/90 border border-slate-800 text-white text-[9px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-lg shadow-md whitespace-nowrap">
+                                        Nueva Tarea
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Botón Principal (Rayo) */}
+                            <button
+                                onClick={() => setQuickActionsOpen(!quickActionsOpen)}
+                                className={`flex items-center justify-center -mt-5 w-12 h-12 rounded-full text-white shadow-xl border border-slate-950 active:scale-95 transition-all shrink-0 ${
+                                    quickActionsOpen 
+                                        ? 'bg-indigo-700 rotate-90 scale-110 shadow-indigo-500/20' 
+                                        : 'bg-indigo-600 hover:bg-indigo-500'
+                                }`}
+                                title="Acciones Rápidas"
+                            >
+                                <Zap className="w-5 h-5" />
+                            </button>
+                        </div>
+                    )}
+
+                    {QUICK_NAV.slice(2).map((item) => {
                         const Icon = item.icon;
                         return (
                             <NavLink

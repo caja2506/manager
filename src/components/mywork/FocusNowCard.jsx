@@ -108,7 +108,10 @@ export default function FocusNowCard({ task, userId, engTasks, timeLogs, onOpenT
             </div>
 
             {/* Task info */}
-            <div className="mb-5">
+            <div 
+                className="mb-5 cursor-pointer hover:opacity-90 transition-opacity"
+                onClick={() => onOpenTask?.(task)}
+            >
                 <div className="flex flex-wrap items-center gap-2 mb-2">
                     <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
                         <Folder className="w-3 h-3" />

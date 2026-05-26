@@ -68,3 +68,13 @@ test-nim.cjs
 test-realtime*.mjs
 tmp_test_tasks.js
 add_telegram_chat_id.sql
+dump_data.js
+dump_firebase_data.js
+get_secrets.js
+test_anon.mjs
+test-diagnose-programming.cjs
+test-firestore-types.cjs
+test-supabase-types.cjs
+test-supabase-types.js
+update_db_function.sql
+scratch/

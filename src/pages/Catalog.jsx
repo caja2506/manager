@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useRole } from '../contexts/RoleContext';
 import { useAppData } from '../contexts/AppDataContext';
 import { deleteCatalogRecord, deleteCatalogRecordsBatch } from '../services/bomCrudService';
 import FilterPopover from '../components/ui/FilterPopover';
 import {
     Search, Plus, Trash2, Database,
-    SlidersHorizontal, Edit3, Tag, Camera
+    SlidersHorizontal, Edit3, Tag, Camera, RefreshCw
 } from 'lucide-react';
 
 export default function Catalog() {
@@ -17,6 +17,7 @@ export default function Catalog() {
         setIsMasterRecordModalOpen, setEditingMasterRecord,
         setConfirmDelete, setImagePickerItem, setZoomedImageUrl,
         excelInputRef,
+        syncImagesFromFirebase,
     } = useAppData();
 
     const [isCatalogEditMode, setIsCatalogEditMode] = useState(false);
@@ -104,6 +105,14 @@ export default function Catalog() {
                             className="bg-green-600 text-white px-4 py-3 rounded-2xl font-black flex items-center justify-center shadow-lg active:scale-95 transition-all disabled:bg-slate-400 text-sm"
                         >
                             <Database className="w-4 h-4 mr-1.5" /><span className="hidden sm:inline">Importar </span>Excel
+                        </button>
+                    )}
+                    {canEdit && (
+                        <button
+                            onClick={async () => { if (confirm('¿Sincronizar imágenes desde Firebase?')) await syncImagesFromFirebase(); }}
+                            className="bg-amber-600 text-white px-4 py-3 rounded-2xl font-black flex items-center justify-center shadow-lg active:scale-95 transition-all text-sm"
+                        >
+                            <RefreshCw className="w-4 h-4 mr-1.5" />Sync Imgs
                         </button>
                     )}
                 </div>

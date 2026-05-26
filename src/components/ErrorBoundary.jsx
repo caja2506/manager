@@ -37,7 +37,18 @@ export default class ErrorBoundary extends React.Component {
     }
 
     handleRetry = () => {
-        this.setState({ hasError: false, error: null, errorInfo: null });
+        const { error } = this.state;
+        const isChunkError = error && (
+            error.name === 'ChunkLoadError' ||
+            /Failed to fetch/i.test(error.message) ||
+            /dynamically imported module/i.test(error.message) ||
+            /loading chunk/i.test(error.message)
+        );
+        if (isChunkError) {
+            window.location.reload();
+        } else {
+            this.setState({ hasError: false, error: null, errorInfo: null });
+        }
     };
 
     handleGoHome = () => {

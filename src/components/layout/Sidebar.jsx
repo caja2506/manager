@@ -9,7 +9,7 @@ import {
     Activity, LayoutDashboard, User, FolderGit2,
     ListTodo, Database, Clock, FileText, BarChart3, Users,
     Bell, Settings, Shield, LayoutList, Briefcase, LineChart, CalendarDays, GanttChartSquare, Radar, Zap,
-    ChevronRight, X, Target, Map, Award, LayoutGrid, Sun, Moon, DatabaseZap, ListTree
+    ChevronRight, X, Target, Map, Award, LayoutGrid, Sun, Moon, DatabaseZap, ListTree, Plus
 } from 'lucide-react';
 
 // ─── Section Definitions ───
@@ -106,7 +106,7 @@ function sectionContainsRoute(section, pathname) {
 export default function Sidebar() {
     const { isAdmin } = useRole();
     const { toggleTheme, isDark } = useTheme();
-    const { proyectos, catalogo } = useAppData();
+    const { proyectos, catalogo, setIsGlobalTaskModalOpen, setIsGlobalTimeLogModalOpen } = useAppData();
     const { engProjects, engTasks } = useEngineeringData();
     const location = useLocation();
     const panelRef = useRef(null);
@@ -241,7 +241,27 @@ export default function Sidebar() {
 
                     <div className="w-8 h-px bg-slate-800 my-2" />
 
-                    <div className="flex flex-col items-center gap-1 pb-1 w-full px-1">
+                    <div className="flex flex-col items-center gap-2 pb-1 w-full px-1">
+                        {/* Botón de Registrar Horas Manual (Global Escritorio Abajo) */}
+                        <button
+                            onClick={() => setIsGlobalTimeLogModalOpen(true)}
+                            className="group/action w-12 h-12 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white flex flex-col items-center justify-center transition-all duration-200 shadow-lg shadow-emerald-600/25 active:scale-95 hover:scale-105 shrink-0"
+                            title="Registrar Horas"
+                        >
+                            <Clock className="w-5 h-5 transition-transform duration-200" />
+                            <span className="text-[8px] font-black uppercase tracking-tighter mt-0.5 leading-none">Horas</span>
+                        </button>
+
+                        {/* Botón de Nueva Tarea (Global Escritorio Abajo) */}
+                        <button
+                            onClick={() => setIsGlobalTaskModalOpen(true)}
+                            className="group/action w-12 h-12 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white flex flex-col items-center justify-center transition-all duration-200 shadow-lg shadow-indigo-600/25 active:scale-95 hover:scale-105 shrink-0"
+                            title="Nueva Tarea"
+                        >
+                            <Plus className="w-5 h-5 group-hover/action:rotate-90 transition-transform duration-200" />
+                            <span className="text-[8px] font-black uppercase tracking-tighter mt-0.5 leading-none">Tarea</span>
+                        </button>
+
                         <button
                             onClick={toggleTheme}
                             className="group/icon w-full py-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 text-slate-500 hover:text-amber-400 hover:bg-amber-950/30 transition-all duration-200"

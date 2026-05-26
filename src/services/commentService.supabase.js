@@ -59,10 +59,21 @@ export async function addComment(taskId, text, userId, userName) {
 /**
  * Update comment text.
  */
-export async function updateComment(taskId, commentId, newText) {
+export async function updateComment(taskId, commentId, newText, extraFields = {}) {
+    const updatePayload = {
+        text: newText.trim(),
+        edited: true,
+        updated_at: new Date().toISOString()
+    };
+    if (extraFields.userName !== undefined) {
+        updatePayload.user_name = extraFields.userName;
+    }
+    if (extraFields.createdAt !== undefined) {
+        updatePayload.created_at = extraFields.createdAt;
+    }
     const { error } = await supabase
         .from('task_comments')
-        .update({ text: newText.trim(), edited: true, updated_at: new Date().toISOString() })
+        .update(updatePayload)
         .eq('id', commentId);
     if (error) throw new Error(`[commentService.sb] updateComment: ${error.message}`);
 }

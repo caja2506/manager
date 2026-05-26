@@ -16,6 +16,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 const safeLocaleCompare = (a, b, field) =>
     String(a[field] || '').localeCompare(String(b[field] || ''));
@@ -36,6 +37,7 @@ export function useEngineeringData() {
 }
 
 export function EngineeringDataProvider({ children }) {
+    const { user } = useAuth();
     const [engProjects, setEngProjects] = useState([]);
     const [engTasks, setEngTasks] = useState([]);
     const [engSubtasks, setEngSubtasks] = useState([]);
@@ -50,8 +52,9 @@ export function EngineeringDataProvider({ children }) {
     // --- Global Task Filters ---
     const [taskSearch, setTaskSearch] = useState('');
     const [taskFilterProject, setTaskFilterProject] = useState('');
-    const [taskFilterAssignee, setTaskFilterAssignee] = useState('my-team');
+    const [taskFilterAssignee, setTaskFilterAssignee] = useState('');
     const [taskFilterPriority, setTaskFilterPriority] = useState('');
+    const [taskFilterArea, setTaskFilterArea] = useState('');
 
 
 
@@ -143,14 +146,33 @@ export function EngineeringDataProvider({ children }) {
 
         // Helper: apply realtime event to a state array
         function applyEvent(setter, mapper, event) {
-            const mapped = mapper(event.new || event.old);
+            if (event.eventType === 'DELETE') {
+                const deletedId = event.old?.id || event.old?.uid;
+                if (deletedId) {
+                    setter(prev => prev.filter(item => (item.id || item.uid) !== deletedId));
+                }
+                return;
+            }
+
+            const record = event.new;
+            if (!record) return;
+
+            const mapped = mapper(record);
+            const mappedId = mapped.id || mapped.uid;
+            if (!mappedId) return;
+
             if (event.eventType === 'INSERT') {
-                setter(prev => [...prev, mapped]);
+                setter(prev => {
+                    if (prev.some(item => (item.id || item.uid) === mappedId)) {
+                        return prev;
+                    }
+                    return [...prev, mapped];
+                });
             } else if (event.eventType === 'UPDATE') {
-                setter(prev => prev.map(item => item.id === mapped.id ? mapped : item));
-            } else if (event.eventType === 'DELETE') {
-                const deletedId = event.old?.id;
-                if (deletedId) setter(prev => prev.filter(item => item.id !== deletedId));
+                setter(prev => prev.map(item => {
+                    const itemId = item.id || item.uid;
+                    return itemId === mappedId ? mapped : item;
+                }));
             }
         }
 
@@ -187,7 +209,7 @@ export function EngineeringDataProvider({ children }) {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [markLoaded]);
+    }, [markLoaded, user?.uid]);
 
     const value = {
         engProjects, engTasks, engSubtasks,
@@ -200,6 +222,7 @@ export function EngineeringDataProvider({ children }) {
         taskFilterProject, setTaskFilterProject,
         taskFilterAssignee, setTaskFilterAssignee,
         taskFilterPriority, setTaskFilterPriority,
+        taskFilterArea, setTaskFilterArea,
     };
 
     return (

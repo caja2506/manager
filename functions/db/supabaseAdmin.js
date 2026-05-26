@@ -119,6 +119,21 @@ const CAMEL_TO_SNAKE = {
     // delays
     causeName: "cause_name",
     causeId: "cause_id",
+
+    // weekly_plan_items
+    weekStartDate: "week_start_date",
+    dayOfWeek: "day_of_week",
+    startDateTime: "start_date_time",
+    endDateTime: "end_date_time",
+    plannedHours: "planned_hours",
+    projectId: "project_id",
+    taskTitle: "task_title",
+    projectName: "project_name",
+    taskTitleSnapshot: "task_title_snapshot",
+    projectNameSnapshot: "project_name_snapshot",
+    assignedToName: "assigned_to_name",
+    statusSnapshot: "status_snapshot",
+    colorKey: "color_key",
 };
 
 // Build reverse map

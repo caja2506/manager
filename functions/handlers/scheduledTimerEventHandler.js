@@ -18,7 +18,7 @@ const paths = require("../automation/firestorePaths");
 const { loadBreakBands, getBreakHoursInRange } = require("../utils/breakTimeUtils");
 const {
     loadActiveTimerForUser, loadActiveTimerForUserTask,
-    insertTimeLog, updateTimeLog, loadTask, updateTask,
+    insertTimeLog, updateTimeLog, loadTask, transitionTaskStatus,
     recalculateTaskHours,
 } = require("../db/coreDataReader");
 
@@ -174,12 +174,13 @@ async function startPlannerTimer(adminDb, event, now) {
             if (taskData) {
                 const CAN_AUTO_START = ["backlog", "pending", "blocked"];
                 if (CAN_AUTO_START.includes(taskData.status)) {
-                    await updateTask(event.taskId, {
-                        status: "in_progress",
-                        statusChangedAt: now,
-                        statusChangedBy: "planner_auto",
-                    });
-                    console.log(`[scheduledTimerEvent] Task ${event.taskId}: ${taskData.status} → in_progress`);
+                    await transitionTaskStatus(
+                        event.taskId,
+                        "in_progress",
+                        event.userId,
+                        "planner_auto"
+                    );
+                    console.log(`[scheduledTimerEvent] Task ${event.taskId}: ${taskData.status} → in_progress via RPC`);
                 }
             }
         } catch (err) {

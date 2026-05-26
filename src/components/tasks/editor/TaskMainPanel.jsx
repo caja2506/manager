@@ -11,7 +11,7 @@ import TaskComments from '../TaskComments';
 export default function TaskMainPanel({
     form, setForm, isNew, task,
     subtasks, canEdit, onSubtaskProgressChange,
-    userId, userName,
+    userId, userName, teamMembers = [],
 }) {
     const navigate = useNavigate();
     const textareaRef = React.useRef(null);
@@ -32,7 +32,7 @@ export default function TaskMainPanel({
     }, [form.description]);
 
     return (
-        <div className="w-full p-4 lg:p-5 overflow-y-auto space-y-3 lg:space-y-4">
+        <div className="w-full p-4 lg:p-5 space-y-3 lg:space-y-4">
             {/* Description */}
             <div>
                 <div className="flex items-center gap-1.5 mb-1.5">
@@ -113,6 +113,7 @@ export default function TaskMainPanel({
                         readOnly={!canEdit}
                         userId={userId}
                         userName={userName}
+                        teamMembers={teamMembers}
                     />
                 </div>
             )}

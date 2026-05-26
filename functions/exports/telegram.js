@@ -9,7 +9,7 @@ const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { getUserRbacRole, requireAdmin } = require("../middleware/authGuard");
 
 function createTelegramExports(adminDb, secrets) {
-    const { telegramBotToken, geminiApiKey, supabaseUrl, supabaseServiceRoleKey, nvidiaApiKey } = secrets;
+    const { telegramBotToken, geminiApiKey, supabaseUrl, supabaseServiceRoleKey, nvidiaApiKey, deepseekApiKey } = secrets;
 
     /** Initialize Supabase admin client */
     function initSupabase() {
@@ -18,14 +18,14 @@ function createTelegramExports(adminDb, secrets) {
     }
 
     const telegramWebhookEndpoint = onRequest(
-        { secrets: [telegramBotToken, geminiApiKey, supabaseUrl, supabaseServiceRoleKey, nvidiaApiKey], cors: false, maxInstances: 10 },
+        { secrets: [telegramBotToken, geminiApiKey, supabaseUrl, supabaseServiceRoleKey, nvidiaApiKey, deepseekApiKey], cors: false, maxInstances: 10, timeoutSeconds: 120 },
         async (req, res) => {
             if (req.method !== "POST") { res.status(405).send("Method Not Allowed"); return; }
             try {
                 initSupabase();
                 const { handleWebhook } = require("../telegram/telegramWebhook");
                 const token = telegramBotToken.value();
-                const body = { ...req.body, _apiKey: geminiApiKey.value(), _nvidiaKey: nvidiaApiKey.value() };
+                const body = { ...req.body, _apiKey: geminiApiKey.value(), _nvidiaKey: nvidiaApiKey.value(), _deepseekKey: deepseekApiKey.value() };
                 const result = await handleWebhook(adminDb, token, body);
                 if (result.processed) { res.status(200).json({ ok: true }); } else { console.warn("[webhook] Not processed:", result.error); res.status(200).json({ ok: true, skipped: result.error }); }
             } catch (err) {

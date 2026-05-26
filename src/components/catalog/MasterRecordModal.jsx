@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Database, X, Plus, Loader2, Clock, Image as ImageIcon } from 'lucide-react';
+import { Database, X, Plus, Loader2, Clock, Image as ImageIcon, Tag, DollarSign, Truck, Hash, FileText } from 'lucide-react';
 import SearchableDropdown from '../ui/SearchableDropdown';
 
 // ========================================================
 // COMPONENTE: MODAL DE REGISTRO MAESTRO (CREAR/EDITAR)
+// Layout: Descripción full-width + 3 columnas
 // ========================================================
 const MasterRecordModal = ({ isOpen, onClose, onSave, initialData, managedLists, onOpenManager }) => {
     const [formData, setFormData] = useState({ name: '', partNumber: '', lastPrice: '', defaultProvider: '', category: '', brand: '', leadTimeWeeks: '', imageUrl: '' });
     const [isSaving, setIsSaving] = useState(false);
 
-    // Opciones para filtros dentro del modal
     const brandOptions = [{ value: '', label: 'Sin Marca' }, ...managedLists.brands.map(b => ({ value: b.id, label: b.name }))];
     const categoryOptions = [{ value: '', label: 'Sin Categoría' }, ...managedLists.categories.map(c => ({ value: c.id, label: c.name }))];
     const providerOptions = [{ value: '', label: 'Sin Proveedor' }, ...managedLists.providers.map(p => ({ value: p.id, label: p.name }))];
@@ -42,46 +42,161 @@ const MasterRecordModal = ({ isOpen, onClose, onSave, initialData, managedLists,
 
     if (!isOpen) return null;
 
+    const imagePreview = formData.imageUrl && (formData.imageUrl.startsWith('http') || formData.imageUrl.startsWith('data:'));
+
     return (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[300] flex items-center justify-center p-4">
-            <div className="bg-slate-900 rounded-2xl shadow-2xl border border-slate-800 w-full max-w-md p-6 animate-in zoom-in duration-200 max-h-[90vh] overflow-y-auto flex flex-col">
-                <div className="flex justify-between items-center mb-6 shrink-0">
-                    <h2 className="font-black text-xl flex items-center text-white uppercase tracking-tighter">
-                        <Database className="mr-2 text-indigo-400 w-6 h-6" />
-                        {initialData ? 'Editar Maestro' : 'Nuevo Registro Maestro'}
+        <div
+            className="fixed inset-0 z-[300] flex items-center justify-center p-4 md:p-6 animate-in fade-in duration-300"
+            onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+        >
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+
+            <div className="relative w-full max-w-[1050px] max-h-[92vh] bg-slate-900 rounded-2xl border border-slate-700/50 shadow-2xl shadow-black/50 overflow-hidden flex flex-col animate-in zoom-in-95 slide-in-from-bottom-4 duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]">
+
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800 bg-slate-900 shrink-0">
+                    <h2 className="font-black text-sm flex items-center text-white uppercase tracking-tight">
+                        <Database className="mr-2 text-indigo-400 w-4 h-4" />
+                        {initialData ? 'Editar Maestro' : 'Nuevo Registro'}
                     </h2>
-                    <button onClick={onClose} className="p-2 text-slate-400 hover:bg-slate-800 rounded-full"><X className="w-5 h-5" /></button>
+                    <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all">
+                        <X className="w-4 h-4" />
+                    </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Descripción del repuesto..." className="w-full p-4 border rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all bg-slate-800 font-bold" required />
-                    <input value={formData.partNumber} onChange={e => setFormData({ ...formData, partNumber: e.target.value })} placeholder="P/N Referencia..." className="w-full p-4 border rounded-2xl font-mono uppercase focus:ring-2 focus:ring-indigo-500 outline-none transition-all bg-slate-800 font-bold" required />
-                    <div className="flex items-center gap-2">
-                        <div className="flex-grow"><SearchableDropdown options={brandOptions} value={formData.brand} onChange={val => setFormData({ ...formData, brand: val })} placeholder="🏭 Marca..." /></div>
-                        <button type="button" onClick={() => onOpenManager('brand')} className="p-3.5 bg-slate-800 text-slate-600 rounded-xl hover:bg-slate-200 transition-all"><Plus className="w-5 h-5" /></button>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="flex-grow"><SearchableDropdown options={categoryOptions} value={formData.category} onChange={val => setFormData({ ...formData, category: val })} placeholder="🏷️ Categoría..." /></div>
-                        <button type="button" onClick={() => onOpenManager('category')} className="p-3.5 bg-slate-800 text-slate-600 rounded-xl hover:bg-slate-200 transition-all"><Plus className="w-5 h-5" /></button>
-                    </div>
-                    <div className="border-t pt-4 border-slate-50 space-y-4">
-                        <input type="number" step="0.01" value={formData.lastPrice} onChange={e => setFormData({ ...formData, lastPrice: e.target.value })} placeholder="Precio Estimado $" className="w-full p-3.5 border border-green-100 rounded-xl bg-slate-800 outline-none focus:ring-2 focus:ring-green-500" />
-                        <div className="flex items-center gap-2">
-                            <div className="flex-grow"><SearchableDropdown options={providerOptions} value={formData.defaultProvider} onChange={val => setFormData({ ...formData, defaultProvider: val })} placeholder="🚚 Proveedor..." /></div>
-                            <button type="button" onClick={() => onOpenManager('provider')} className="p-3.5 bg-slate-800 text-slate-600 rounded-xl hover:bg-slate-200 transition-all"><Plus className="w-5 h-5" /></button>
+                {/* Body */}
+                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+                    <div className="p-5 space-y-4">
+
+                        {/* Row 1: Descripción — full width */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                            <div className="lg:col-span-2">
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center ml-0.5">
+                                    <FileText className="w-2.5 h-2.5 mr-1" /> Descripción
+                                </label>
+                                <input
+                                    value={formData.name}
+                                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                    placeholder="Nombre del repuesto..."
+                                    className="w-full px-3 py-2 border border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 transition-all bg-slate-800 text-white font-bold placeholder-slate-500 text-xs"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center ml-0.5">
+                                    <Hash className="w-2.5 h-2.5 mr-1" /> Part Number
+                                </label>
+                                <input
+                                    value={formData.partNumber}
+                                    onChange={e => setFormData({ ...formData, partNumber: e.target.value })}
+                                    placeholder="Ej: 5069RTB64SCREW"
+                                    className="w-full px-3 py-2 border border-slate-700 rounded-lg font-mono uppercase focus:ring-2 focus:ring-indigo-500 outline-none transition-all bg-slate-800 text-white font-bold placeholder-slate-500 text-xs"
+                                    required
+                                />
+                            </div>
                         </div>
+
+                        {/* Row 2: 3 columns — Marca, Categoría, Proveedor */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center ml-0.5">
+                                    <Tag className="w-2.5 h-2.5 mr-1" /> Marca
+                                </label>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="flex-grow"><SearchableDropdown compact options={brandOptions} value={formData.brand} onChange={val => setFormData({ ...formData, brand: val })} placeholder="Marca..." /></div>
+                                    <button type="button" onClick={() => onOpenManager('brand')} className="p-2 bg-slate-800 text-slate-400 rounded-lg hover:bg-slate-700 transition-all border border-slate-700 shrink-0"><Plus className="w-3.5 h-3.5" /></button>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center ml-0.5">
+                                    <Tag className="w-2.5 h-2.5 mr-1" /> Categoría
+                                </label>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="flex-grow"><SearchableDropdown compact options={categoryOptions} value={formData.category} onChange={val => setFormData({ ...formData, category: val })} placeholder="Categoría..." /></div>
+                                    <button type="button" onClick={() => onOpenManager('category')} className="p-2 bg-slate-800 text-slate-400 rounded-lg hover:bg-slate-700 transition-all border border-slate-700 shrink-0"><Plus className="w-3.5 h-3.5" /></button>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center ml-0.5">
+                                    <Truck className="w-2.5 h-2.5 mr-1" /> Proveedor
+                                </label>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="flex-grow"><SearchableDropdown compact options={providerOptions} value={formData.defaultProvider} onChange={val => setFormData({ ...formData, defaultProvider: val })} placeholder="Proveedor..." /></div>
+                                    <button type="button" onClick={() => onOpenManager('provider')} className="p-2 bg-slate-800 text-slate-400 rounded-lg hover:bg-slate-700 transition-all border border-slate-700 shrink-0"><Plus className="w-3.5 h-3.5" /></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Row 3: 3 columns — Precio, Lead Time, Imagen preview */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center ml-0.5">
+                                    <DollarSign className="w-2.5 h-2.5 mr-1" /> Precio Base
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.lastPrice}
+                                    onChange={e => setFormData({ ...formData, lastPrice: e.target.value })}
+                                    placeholder="$0.00"
+                                    className="w-full px-3 py-2 border border-slate-700 rounded-lg bg-slate-800 text-white text-sm font-black outline-none focus:ring-2 focus:ring-green-500 placeholder-slate-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center ml-0.5">
+                                    <Clock className="w-2.5 h-2.5 mr-1" /> Lead Time (semanas)
+                                </label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    step="1"
+                                    value={formData.leadTimeWeeks}
+                                    onChange={e => setFormData({ ...formData, leadTimeWeeks: e.target.value })}
+                                    placeholder="Ej: 4"
+                                    className="w-full px-3 py-2 border border-slate-700 rounded-lg bg-slate-800 text-white outline-none focus:ring-2 focus:ring-teal-500 placeholder-slate-500 text-xs"
+                                />
+                            </div>
+                            <div className="flex items-end">
+                                {/* Image mini preview */}
+                                <div className="w-full h-[38px] rounded-lg border border-slate-700 bg-slate-800/50 flex items-center justify-center overflow-hidden">
+                                    {imagePreview ? (
+                                        <img src={formData.imageUrl} alt="" className="h-full object-contain p-0.5" onError={e => { e.target.style.display = 'none'; }} />
+                                    ) : (
+                                        <span className="text-[10px] text-slate-500 flex items-center gap-1"><ImageIcon className="w-3 h-3" /> Sin imagen</span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Row 4: URL de imagen — full width */}
                         <div>
-                            <label className="text-xs font-bold text-slate-400 uppercase ml-1 mb-1 flex items-center"><Clock className="w-3.5 h-3.5 mr-1" /> Lead Time (semanas)</label>
-                            <input type="number" min="1" step="1" value={formData.leadTimeWeeks} onChange={e => setFormData({ ...formData, leadTimeWeeks: e.target.value })} placeholder="Ej: 4" className="w-full p-3.5 border border-teal-100 rounded-xl bg-slate-800 outline-none focus:ring-2 focus:ring-teal-500" />
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-slate-400 uppercase ml-1 mb-1 flex items-center"><ImageIcon className="w-3.5 h-3.5 mr-1" /> URL de Imagen</label>
-                            <input type="url" value={formData.imageUrl} onChange={e => setFormData({ ...formData, imageUrl: e.target.value })} placeholder="https://ejemplo.com/imagen.jpg" className="w-full p-3.5 border border-indigo-100 rounded-xl bg-slate-800 outline-none focus:ring-2 focus:ring-indigo-500" />
+                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center ml-0.5">
+                                <ImageIcon className="w-2.5 h-2.5 mr-1" /> URL de Imagen
+                            </label>
+                            <input
+                                type="url"
+                                value={formData.imageUrl}
+                                onChange={e => setFormData({ ...formData, imageUrl: e.target.value })}
+                                placeholder="https://ejemplo.com/imagen.jpg"
+                                className="w-full px-3 py-2 border border-slate-700 rounded-lg bg-slate-800 text-white outline-none focus:ring-2 focus:ring-indigo-500 placeholder-slate-500 text-xs"
+                            />
                         </div>
                     </div>
-                    <button type="submit" disabled={isSaving} className={`w-full p-4 text-white rounded-2xl font-black shadow-lg transition-all ${initialData ? 'bg-amber-500 hover:bg-amber-600' : 'bg-slate-900 hover:bg-black'}`}>
-                        {isSaving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : (initialData ? 'Actualizar Registro' : 'Guardar Registro')}
-                    </button>
+
+                    {/* Footer */}
+                    <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-800 bg-slate-900 shrink-0">
+                        <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition-all">
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={isSaving}
+                            className={`px-5 py-2 text-white rounded-lg font-black shadow-lg transition-all text-xs flex items-center gap-1.5 active:scale-95 ${initialData ? 'bg-amber-500 hover:bg-amber-600' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                        >
+                            {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Database className="w-3.5 h-3.5" />}
+                            {initialData ? 'Actualizar' : 'Guardar'}
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>

@@ -158,7 +158,7 @@ export default function ProjectDetailPage() {
         : null;
 
     return (
-        <div className="space-y-5 animate-in fade-in duration-300">
+        <div className="-m-4 md:-m-8 flex flex-col h-[calc(100vh-64px)] overflow-hidden animate-in fade-in duration-300">
             {/* Modals */}
             <ProjectModal
                 isOpen={showEditModal}
@@ -206,71 +206,89 @@ export default function ProjectDetailPage() {
             )}
 
             {/* ══════════════ VIEW TABS ══════════════ */}
-            <div className="flex flex-wrap gap-1 bg-slate-900/70 p-1 rounded-xl border border-slate-800 w-fit mb-6">
+            <div className="shrink-0 flex items-center gap-0 px-3 md:px-6 bg-slate-100 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800/50 overflow-x-auto scrollbar-none">
                 <button
                     onClick={() => setActiveTab('resumen')}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    className={`relative flex items-center gap-1.5 px-2.5 md:px-4 py-2.5 md:py-3 text-[11px] md:text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                         activeTab === 'resumen'
-                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                            ? 'text-slate-900 dark:text-white'
+                            : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                     }`}
                 >
                     <BarChart3 className="w-3.5 h-3.5" /> Resumen
+                    {activeTab === 'resumen' && (
+                        <span className="absolute bottom-0 left-1 right-1 h-0.5 bg-indigo-500 rounded-t-full" />
+                    )}
                 </button>
                 <button
                     onClick={() => setActiveTab('obeya')}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    className={`relative flex items-center gap-1.5 px-2.5 md:px-4 py-2.5 md:py-3 text-[11px] md:text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                         activeTab === 'obeya'
-                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                            ? 'text-slate-900 dark:text-white'
+                            : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                     }`}
                 >
                     <Grid3X3 className="w-3.5 h-3.5" /> Matriz Obeya
+                    {activeTab === 'obeya' && (
+                        <span className="absolute bottom-0 left-1 right-1 h-0.5 bg-indigo-500 rounded-t-full" />
+                    )}
                 </button>
                 <button
                     onClick={() => setActiveTab('milestones')}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    className={`relative flex items-center gap-1.5 px-2.5 md:px-4 py-2.5 md:py-3 text-[11px] md:text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                         activeTab === 'milestones'
-                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                            ? 'text-slate-900 dark:text-white'
+                            : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                     }`}
                 >
                     <Target className="w-3.5 h-3.5" /> Milestones
+                    {activeTab === 'milestones' && (
+                        <span className="absolute bottom-0 left-1 right-1 h-0.5 bg-indigo-500 rounded-t-full" />
+                    )}
                 </button>
                 <button
                     onClick={() => setActiveTab('stations')}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    className={`relative flex items-center gap-1.5 px-2.5 md:px-4 py-2.5 md:py-3 text-[11px] md:text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                         activeTab === 'stations'
-                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                            ? 'text-slate-900 dark:text-white'
+                            : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                     }`}
                 >
                     <Settings className="w-3.5 h-3.5" /> Estaciones
+                    {activeTab === 'stations' && (
+                        <span className="absolute bottom-0 left-1 right-1 h-0.5 bg-indigo-500 rounded-t-full" />
+                    )}
                 </button>
                 <button
                     onClick={() => setActiveTab('table')}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    className={`relative flex items-center gap-1.5 px-2.5 md:px-4 py-2.5 md:py-3 text-[11px] md:text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                         activeTab === 'table'
-                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                            ? 'text-slate-900 dark:text-white'
+                            : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                     }`}
                 >
                     <Table2 className="w-3.5 h-3.5" /> Tabla
+                    {activeTab === 'table' && (
+                        <span className="absolute bottom-0 left-1 right-1 h-0.5 bg-indigo-500 rounded-t-full" />
+                    )}
                 </button>
                 <button
                     onClick={() => setActiveTab('gantt')}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    className={`relative flex items-center gap-1.5 px-2.5 md:px-4 py-2.5 md:py-3 text-[11px] md:text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                         activeTab === 'gantt'
-                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                            ? 'text-slate-900 dark:text-white'
+                            : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                     }`}
                 >
                     <GanttChartSquare className="w-3.5 h-3.5" /> Gantt
+                    {activeTab === 'gantt' && (
+                        <span className="absolute bottom-0 left-1 right-1 h-0.5 bg-indigo-500 rounded-t-full" />
+                    )}
                 </button>
             </div>
 
             {activeTab === 'resumen' && (
-                <div className="space-y-4">
+                <div className="flex-1 overflow-y-auto space-y-4 px-3 md:px-6 pb-4">
                     {/* ══════════════ HEADER ══════════════ */}
                     <div className="bg-slate-900/70 backdrop-blur-sm rounded-2xl border border-slate-800 shadow-lg overflow-hidden">
                         <div className="h-1.5" style={{ backgroundColor: statusCfg.color || '#e2e8f0' }} />
@@ -354,20 +372,22 @@ export default function ProjectDetailPage() {
 
             {/* ══════════════ TAB CONTENT ══════════════ */}
             {activeTab === 'obeya' && (
-                <StationTaskMatrix
-                    projectId={projectId}
-                    canEdit={canEdit}
-                    userId={user?.uid}
-                />
+                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                    <StationTaskMatrix
+                        projectId={projectId}
+                        canEdit={canEdit}
+                        userId={user?.uid}
+                    />
+                </div>
             )}
             {activeTab === 'table' && (
-                <div className="bg-slate-900/70 rounded-2xl border border-slate-800 shadow-lg overflow-hidden">
+                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                     <MainTable forceProjectId={projectId} />
                 </div>
             )}
 
             {activeTab === 'gantt' && (
-                <div className="bg-slate-900/70 rounded-2xl border border-slate-800 shadow-lg overflow-hidden">
+                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                     <React.Suspense fallback={<div className="flex items-center justify-center p-12 text-slate-400"><Loader2 className="w-6 h-6 animate-spin mr-2" /> Cargando Gantt…</div>}>
                         <ProjectGantt forceProjectId={projectId} />
                     </React.Suspense>
@@ -375,16 +395,19 @@ export default function ProjectDetailPage() {
             )}
 
             {activeTab === 'stations' && (
-                <StationManager
-                    projectId={projectId}
-                    canEdit={canEdit}
-                    userId={user?.uid}
-                />
+                <div className="flex-1 overflow-y-auto px-3 md:px-6 pb-4">
+                    <StationManager
+                        projectId={projectId}
+                        canEdit={canEdit}
+                        userId={user?.uid}
+                    />
+                </div>
             )}
 
             {activeTab === 'milestones' && (
             <>
-            <div className="bg-slate-900/70 p-6 rounded-2xl border border-slate-800 shadow-lg">
+            <div className="flex-1 overflow-y-auto px-3 md:px-6 pb-4">
+                <div className="bg-slate-900/70 p-6 rounded-2xl border border-slate-800 shadow-lg">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                         <Target className="w-5 h-5 text-purple-400" />
@@ -483,6 +506,7 @@ export default function ProjectDetailPage() {
                         })}
                     </div>
                 )}
+            </div>
             </div>
             </>
             )}

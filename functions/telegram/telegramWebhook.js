@@ -117,6 +117,7 @@ async function handleWebhook(adminDb, token, body) {
             await routeInboundMessage(adminDb, token, chatId, text, message, {
                 apiKey: body._apiKey,
                 nvidiaKey: body._nvidiaKey,
+                deepseekKey: body._deepseekKey,
             });
             return { processed: true };
         }
@@ -126,6 +127,7 @@ async function handleWebhook(adminDb, token, body) {
                 inputType: "audio",
                 apiKey: body._apiKey,
                 nvidiaKey: body._nvidiaKey,
+                deepseekKey: body._deepseekKey,
             });
             return { processed: true };
         }

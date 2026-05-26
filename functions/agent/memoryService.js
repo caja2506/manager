@@ -152,7 +152,7 @@ async function appendToConversation(chatId, userId, newMessages) {
  * @returns {Promise<Array<{type, content, category, importance}>>}
  */
 async function extractMemoriesFromConversation(keys, userId, messages) {
-    const { callWithFallback, parseJsonFromResponse } = require("../ai/nvidiaClient");
+    const { callWithFallback, parseJsonFromResponse } = require("../ai/deepseekClient");
 
     if (messages.length < 3) return []; // Too short to extract anything
 

@@ -19,7 +19,91 @@
 const { buildSystemPrompt } = require("./agentPersona");
 const { loadUserMemory, getRecentConversation, appendToConversation, extractMemoriesFromConversation } = require("./memoryService");
 const { getToolDescriptionsForPrompt, executeTool, listTools } = require("./toolRegistry");
-const { callWithFallback, parseJsonFromResponse } = require("../ai/nvidiaClient");
+const { callWithFallback, parseJsonFromResponse, DEEPSEEK_MODEL } = require("../ai/deepseekClient");
+const { detectWriteIntent } = require("./intentDetector");
+const { getConfirmMessage } = require("./writeTools");
+
+let _mcpClient = null;
+
+/**
+ * Initialize and retrieve the local MCP client connection.
+ * Falls back to local tools if the MCP connection cannot be established.
+ * @returns {Promise<Object|null>}
+ */
+async function getMcpClient() {
+    if (_mcpClient) return _mcpClient;
+
+    const path = require("path");
+    const mcpServerPath = path.resolve(__dirname, "../../scripts/mcp-server/index.js");
+
+    try {
+        const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+        const { StdioClientTransport } = await import("@modelcontextprotocol/sdk/client/stdio.js");
+
+        const transport = new StdioClientTransport({
+            command: "node",
+            args: [mcpServerPath],
+        });
+
+        const client = new Client(
+            {
+                name: "autobom-agent-client",
+                version: "1.0.0",
+            },
+            {
+                capabilities: {},
+            }
+        );
+
+        await client.connect(transport);
+        console.log("[mcpClient] Connected successfully to autobom-mcp-server");
+        _mcpClient = client;
+        return _mcpClient;
+    } catch (err) {
+        console.warn("[mcpClient] Could not initialize MCP client (using local fallback):", err.message);
+        return null;
+    }
+}
+
+/**
+ * Helper to call a tool via MCP if available, falling back to local JS tools.
+ * @param {string} toolName - camelCase tool name
+ * @param {Object} args - Arguments passed to the tool
+ */
+async function callToolViaMcpOrLocal(toolName, args = {}) {
+    const mcpClient = await getMcpClient();
+    if (mcpClient) {
+        // Map camelCase toolName to snake_case (e.g. getMyTasks -> get_my_tasks)
+        const mcpToolName = toolName.replace(/([A-Z])/g, "_$1").toLowerCase();
+        try {
+            console.log(`[conversationEngine] Calling MCP tool: ${mcpToolName} with args:`, args);
+            const mcpResult = await mcpClient.callTool({
+                name: mcpToolName,
+                arguments: args,
+            });
+            if (mcpResult && mcpResult.content && mcpResult.content[0]) {
+                return JSON.parse(mcpResult.content[0].text);
+            }
+        } catch (mcpErr) {
+            console.warn(`[conversationEngine] MCP call for ${mcpToolName} failed, falling back to local:`, mcpErr.message);
+        }
+    }
+    
+    // Fallback: local execution with positional arguments mapping
+    let positionalArgs = [];
+    if (toolName === "getMyTasks" || toolName === "getMyHoursToday") {
+        positionalArgs = [args.userId];
+    } else if (toolName === "getTaskDetails") {
+        positionalArgs = [args.taskId];
+    } else if (toolName === "getProjectMetrics" || toolName === "getProjectMilestones" || toolName === "getProjectComments" || toolName === "getProjectDelays") {
+        positionalArgs = [args.projectId];
+    } else if (toolName === "getUpcomingDeadlines") {
+        positionalArgs = [args.days];
+    }
+    
+    return await executeTool(toolName, ...positionalArgs);
+}
+
 
 /**
  * Process an inbound user message and generate ARIA's response.
@@ -37,6 +121,41 @@ async function processMessage(params) {
     const { userId, chatId, userMessage, userName, userRole, keys } = params;
     const tag = "[conversationEngine]";
     const startTime = Date.now();
+
+    // ── 0. Check for write intent FIRST ──
+    try {
+        const writeIntent = await detectWriteIntent(userMessage, userId);
+        if (writeIntent.type === "write" && writeIntent.action) {
+            console.log(`${tag} Write intent detected: ${writeIntent.action}`);
+            const extractedParams = { ...writeIntent.extractedParams, userId, userName };
+
+            // Validate minimum required params — if missing, FALL THROUGH
+            // to the normal conversation engine so ARIA can use chat context.
+            const hasMinParams =
+                (writeIntent.action === "createTask" && extractedParams.title) ||
+                (writeIntent.action === "addTaskComment" && extractedParams.taskId && extractedParams.text);
+
+            if (hasMinParams) {
+                const confirmMessage = getConfirmMessage(writeIntent.action, extractedParams);
+                return {
+                    response: confirmMessage,
+                    provider: "system",
+                    toolsUsed: [],
+                    latencyMs: Date.now() - startTime,
+                    pendingWrite: {
+                        toolName: writeIntent.action,
+                        params: extractedParams,
+                        confirmMessage,
+                    },
+                };
+            } else {
+                // Insufficient params — let the LLM handle it with full conversation context
+                console.log(`${tag} Write intent detected but insufficient params, falling through to LLM`);
+            }
+        }
+    } catch (writeErr) {
+        console.warn(`${tag} Write intent detection error (non-blocking):`, writeErr.message);
+    }
 
     // ── 1. Load context ──
     const [memories, conversation] = await Promise.all([
@@ -64,9 +183,13 @@ async function processMessage(params) {
         });
     }
 
-    // Add recent messages (context window)
+    // Add recent messages (context window) and clean legacy formatting
     for (const msg of conversation.messages) {
-        messages.push(msg);
+        let content = msg.content;
+        if (typeof content === "string") {
+            content = cleanBulletsAndSignatures(content);
+        }
+        messages.push({ ...msg, content });
     }
 
     // Add the new user message
@@ -96,9 +219,10 @@ async function processMessage(params) {
     }
 
     const result = await callWithFallback(keys, messages, {
+        model: DEEPSEEK_MODEL,
         maxTokens: 600,
         temperature: 0.2,
-        timeoutMs: 30000,
+        timeoutMs: 90000,
     });
 
     const latencyMs = Date.now() - startTime;
@@ -113,16 +237,9 @@ async function processMessage(params) {
         };
     }
 
-    let response = result.text;
+    let response = cleanBulletsAndSignatures(result.text);
     
-    // Append signature for cost tracking
-    const signature = result.provider === "nvidia" 
-        ? "\n\n<i>🧠 Procesado por NVIDIA NIM (Sin Costo)</i>" 
-        : "\n\n<i>🧠 Procesado por Gemini (Fallback - Costo API)</i>";
-    
-    response += signature;
-
-    // ── 6. Save conversation history ──
+    // ── 6. Save conversation history (save raw response WITHOUT signature) ──
     await appendToConversation(chatId, userId, [
         { role: "user", content: userMessage },
         { role: "assistant", content: response },
@@ -138,10 +255,42 @@ async function processMessage(params) {
         console.warn(`${tag} Memory extraction failed:`, err.message);
     });
 
+    // Append signature for cost tracking ONLY to the final returned message sent to Telegram
+    let signature = "";
+    if (result.provider === "deepseek") {
+        const usage = result.usage;
+        if (usage) {
+            const promptTokens = usage.prompt_tokens || 0;
+            const completionTokens = usage.completion_tokens || 0;
+            // DeepSeek V3 pricing:
+            // Input: $0.14 / 1,000,000 tokens
+            // Output: $0.28 / 1,000,000 tokens
+            const cost = (promptTokens * 0.14 / 1000000) + (completionTokens * 0.28 / 1000000);
+            signature = `\n\n${cost.toFixed(6)} $`;
+        } else {
+            signature = `\n\n0.000000 $`;
+        }
+    } else if (result.provider === "gemini") {
+        const usage = result.rawResponse?.usageMetadata;
+        if (usage) {
+            const promptTokens = usage.promptTokenCount || 0;
+            const candidatesTokens = usage.candidatesTokenCount || 0;
+            // Gemini 2.5 Flash prices:
+            // Input: $0.075 / 1,000,000 tokens
+            // Output: $0.30 / 1,000,000 tokens
+            const cost = (promptTokens * 0.075 / 1000000) + (candidatesTokens * 0.30 / 1000000);
+            signature = `\n\n${cost.toFixed(6)} $`;
+        } else {
+            signature = `\n\n0.000000 $`;
+        }
+    }
+    
+    const finalResponse = response + signature;
+
     console.log(`${tag} Response generated for ${userName} (${latencyMs}ms, provider=${result.provider}, tools=[${toolsUsed.join(",")}])`);
 
     return {
-        response,
+        response: finalResponse,
         provider: result.provider,
         toolsUsed,
         latencyMs,
@@ -180,49 +329,92 @@ async function executeToolsForMessage(keys, userId, message, systemPrompt) {
     const data = {};
 
     try {
-        // My tasks (broad matching — anything about tasks, pending, what I have)
-        if (lower.includes("mis tarea") || lower.includes("my task") ||
-            lower.includes("qué tengo") || lower.includes("que tengo") ||
-            lower.includes("pendiente") || lower.includes("mis pendiente") ||
-            lower.includes("tengo asignad") || lower.includes("qué me falta") ||
-            lower.includes("que me falta")) {
-            data.myTasks = await executeTool("getMyTasks", userId);
-            toolsUsed.push("getMyTasks");
-            console.log(`[conversationEngine] getMyTasks returned ${data.myTasks?.length || 0} tasks for user ${userId}`);
-        }
+        const coreReader = require("../db/coreDataReader");
+        const allUsers = await coreReader.loadAllUsers();
 
-        // Team status
-        if (lower.includes("equipo") || lower.includes("team") || lower.includes("todos") || lower.includes("quién")) {
-            data.teamStatus = await executeTool("getTeamStatus");
-            toolsUsed.push("getTeamStatus");
-        }
+        // Detect if the query refers to a specific team member
+        const mentionedUser = allUsers.find(u => {
+            const name = (u.name || u.displayName || u.email || "").toLowerCase();
+            const firstName = name.split(" ")[0]; // e.g. "eduardo"
+            return firstName && firstName.length > 2 && lower.includes(firstName);
+        });
 
-        // Overdue tasks
-        if (lower.includes("vencid") || lower.includes("overdue") || lower.includes("atrasad")) {
-            data.overdueTasks = await executeTool("getOverdueTasks");
-            toolsUsed.push("getOverdueTasks");
-        }
+        if (mentionedUser) {
+            const targetUserId = mentionedUser.id;
+            const targetName = mentionedUser.name || mentionedUser.displayName || mentionedUser.email;
 
-        // My hours today
-        if (lower.includes("hora") || lower.includes("timer") || lower.includes("tiempo") || lower.includes("cuánto llevo")) {
-            data.myHoursToday = await executeTool("getMyHoursToday", userId);
-            toolsUsed.push("getMyHoursToday");
-        }
+            // Tasks for mentioned user
+            if (lower.includes("tarea") || lower.includes("task") || lower.includes("pendiente") || lower.includes("hace") || lower.includes("haciendo") || lower.includes("tiene")) {
+                data.tasksForUser = {
+                    userName: targetName,
+                    tasks: await callToolViaMcpOrLocal("getMyTasks", { userId: targetUserId })
+                };
+                toolsUsed.push("getMyTasks");
+                console.log(`[conversationEngine] getMyTasks returned ${data.tasksForUser.tasks?.length || 0} tasks for teammate ${targetName}`);
+            }
 
-        // Projects
-        if (lower.includes("proyecto") || lower.includes("project")) {
-            data.projects = await executeTool("getAllProjects");
-            toolsUsed.push("getAllProjects");
-        }
+            // Hours for mentioned user
+            if (lower.includes("hora") || lower.includes("timer") || lower.includes("tiempo") || lower.includes("cuánto lleva") || lower.includes("cuanto lleva")) {
+                data.hoursForUser = {
+                    userName: targetName,
+                    hoursToday: await callToolViaMcpOrLocal("getMyHoursToday", { userId: targetUserId })
+                };
+                toolsUsed.push("getMyHoursToday");
+            }
 
-        // Generic status — fetch tasks + hours if nothing specific matched
-        if (toolsUsed.length === 0 && (lower.includes("status") || lower.includes("estado") ||
-            lower.includes("cómo va") || lower.includes("como va") ||
-            lower.includes("tarea") || lower.includes("task"))) {
-            data.myTasks = await executeTool("getMyTasks", userId);
-            data.myHoursToday = await executeTool("getMyHoursToday", userId);
-            toolsUsed.push("getMyTasks", "getMyHoursToday");
-            console.log(`[conversationEngine] Generic status: ${data.myTasks?.length || 0} tasks, hours=${JSON.stringify(data.myHoursToday)}`);
+            // Default to tasks if no specific tool was matched for the teammate
+            if (toolsUsed.length === 0) {
+                data.tasksForUser = {
+                    userName: targetName,
+                    tasks: await callToolViaMcpOrLocal("getMyTasks", { userId: targetUserId })
+                };
+                toolsUsed.push("getMyTasks");
+            }
+        } else {
+            // My tasks (broad matching — anything about tasks, pending, what I have)
+            if (lower.includes("mis tarea") || lower.includes("my task") ||
+                lower.includes("qué tengo") || lower.includes("que tengo") ||
+                lower.includes("pendiente") || lower.includes("mis pendiente") ||
+                lower.includes("tengo asignad") || lower.includes("qué me falta") ||
+                lower.includes("que me falta")) {
+                data.myTasks = await callToolViaMcpOrLocal("getMyTasks", { userId });
+                toolsUsed.push("getMyTasks");
+                console.log(`[conversationEngine] getMyTasks returned ${data.myTasks?.length || 0} tasks for user ${userId}`);
+            }
+
+            // Team status
+            if (lower.includes("equipo") || lower.includes("team") || lower.includes("todos") || lower.includes("quién")) {
+                data.teamStatus = await callToolViaMcpOrLocal("getTeamStatus");
+                toolsUsed.push("getTeamStatus");
+            }
+
+            // Overdue tasks
+            if (lower.includes("vencid") || lower.includes("overdue") || lower.includes("atrasad")) {
+                data.overdueTasks = await callToolViaMcpOrLocal("getOverdueTasks");
+                toolsUsed.push("getOverdueTasks");
+            }
+
+            // My hours today
+            if (lower.includes("hora") || lower.includes("timer") || lower.includes("tiempo") || lower.includes("cuánto llevo")) {
+                data.myHoursToday = await callToolViaMcpOrLocal("getMyHoursToday", { userId });
+                toolsUsed.push("getMyHoursToday");
+            }
+
+            // Projects
+            if (lower.includes("proyecto") || lower.includes("project")) {
+                data.projects = await callToolViaMcpOrLocal("getAllProjects");
+                toolsUsed.push("getAllProjects");
+            }
+
+            // Generic status — fetch tasks + hours if nothing specific matched
+            if (toolsUsed.length === 0 && (lower.includes("status") || lower.includes("estado") ||
+                lower.includes("cómo va") || lower.includes("como va") ||
+                lower.includes("tarea") || lower.includes("task"))) {
+                data.myTasks = await callToolViaMcpOrLocal("getMyTasks", { userId });
+                data.myHoursToday = await callToolViaMcpOrLocal("getMyHoursToday", { userId });
+                toolsUsed.push("getMyTasks", "getMyHoursToday");
+                console.log(`[conversationEngine] Generic status: ${data.myTasks?.length || 0} tasks, hours=${JSON.stringify(data.myHoursToday)}`);
+            }
         }
     } catch (err) {
         console.warn("[conversationEngine] Tool execution error:", err.message);
@@ -232,7 +424,22 @@ async function executeToolsForMessage(keys, userId, message, systemPrompt) {
     return { data: toolsUsed.length > 0 ? data : null, toolsUsed };
 }
 
+function cleanBulletsAndSignatures(text) {
+    if (typeof text !== "string") return text;
+    return text
+        // Clean legacy signatures
+        .replace(/\n\n<i>🧠 Procesado por NVIDIA NIM \(Sin Costo\)<\/i>/g, "")
+        .replace(/\n\n<i>🧠 Procesado por Gemini \(Fallback - Costo API\)<\/i>/g, "")
+        .replace(/\n\n(?:<i>)?\d+(?:\.\d+)?\s?\$(?:<\/i>)?/g, "")
+        // Convert dry parent bullets (* or ▪) to beautiful emoji bullets
+        .replace(/^\s*[\*\▪]\s*/gm, "🔹 ")
+        // Convert dry sub-bullets (+ or -) to nested dot bullets (•)
+        .replace(/^\s*[\+\-]\s*/gm, "  • ");
+}
+
 module.exports = {
     processMessage,
     detectToolNeed,
+    callToolViaMcpOrLocal,
+    executeToolsForMessage,
 };

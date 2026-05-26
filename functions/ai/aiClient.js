@@ -39,6 +39,7 @@ async function callGemini(apiKey, options = {}) {
         maxOutputTokens = 2048,
         temperature = 0.3,
         timeoutMs = 30000,
+        responseMimeType,
     } = options;
 
     const url = `${BASE_URL}/${model}:generateContent?key=${apiKey}`;
@@ -49,6 +50,7 @@ async function callGemini(apiKey, options = {}) {
         generationConfig: {
             maxOutputTokens,
             temperature,
+            ...(responseMimeType ? { responseMimeType } : {}),
         },
     };
 
@@ -141,6 +143,7 @@ async function callGeminiMultimodal(apiKey, audioData, mimeType, textPrompt, opt
         maxOutputTokens: options.maxOutputTokens || 2048,
         temperature: options.temperature || 0.2,
         timeoutMs: options.timeoutMs || 45000, // Audio needs more time
+        responseMimeType: options.responseMimeType,
     });
 }
 

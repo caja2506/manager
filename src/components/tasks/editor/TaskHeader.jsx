@@ -10,6 +10,8 @@ import {
 import { hasMultipleIndexers } from '../../../services/stationService';
 import TaskStatusStepper from './TaskStatusStepper';
 import TaskHealthScore from './TaskHealthScore';
+import SearchableInlineSelect from '../../ui/SearchableInlineSelect';
+import { registerOrphanUser } from '../../../services/userAdminService';
 
 /**
  * TaskHeader — top zone of the task editor.
@@ -29,15 +31,52 @@ export default function TaskHeader({
     const currentStatusCfg = TASK_STATUS_CONFIG[form.status] || {};
     const multiIdx = hasMultipleIndexers(stations);
 
+    const handleCreateExternal = async (name) => {
+        const normalized = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').trim();
+        const customId = `ext_${normalized}_${Date.now()}`;
+        try {
+            await registerOrphanUser(customId, {
+                displayName: name,
+                email: `${normalized}@external.com`,
+            }, 'viewer');
+            setForm(f => ({ ...f, assignedTo: customId }));
+        } catch (err) {
+            console.error('Error creating external assignee:', err);
+            alert('Error al agregar el responsable externo: ' + err.message);
+        }
+    };
+
     // Filter task types by selected area exactly like MainTable
     let filteredTaskTypes = taskTypes;
     if (form.areaId) {
         const selectedArea = workAreas.find(a => a.id === form.areaId);
         if (selectedArea) {
-            const allowedValues = selectedArea.taskTypeIds || selectedArea.defaultTaskTypes || [];
+            const allowedValues = (selectedArea.taskTypeIds && selectedArea.taskTypeIds.length > 0)
+                ? selectedArea.taskTypeIds
+                : (selectedArea.defaultTaskTypes || []);
+
+            console.log('[TaskHeader] Diagnóstico de Filtrado:', {
+                areaId: form.areaId,
+                areaName: selectedArea.name,
+                allowedValuesLength: allowedValues.length,
+                allowedValues,
+                taskTypesLength: taskTypes.length,
+            });
+
             if (allowedValues.length > 0) {
-                filteredTaskTypes = taskTypes.filter(t => allowedValues.includes(t.id) || allowedValues.includes(t.name));
+                filteredTaskTypes = taskTypes.filter(t => 
+                    allowedValues.includes(t.id) || 
+                    allowedValues.includes(t.name) || 
+                    (t.firestoreId && allowedValues.includes(t.firestoreId)) ||
+                    allowedValues.some(val => 
+                        (t.name && val?.toString().toLowerCase() === t.name.toLowerCase()) ||
+                        (t.firestoreId && val?.toString().toLowerCase() === t.firestoreId.toLowerCase())
+                    )
+                );
             }
+            console.log('[TaskHeader] Diagnóstico - filteredTaskTypes:', filteredTaskTypes.map(t => ({ id: t.id, name: t.name })));
+        } else {
+            console.warn('[TaskHeader] No se encontró el área seleccionada en la lista global para ID:', form.areaId);
         }
     }
 
@@ -63,13 +102,24 @@ export default function TaskHeader({
                     </span>
                 )}
 
-                <input
+                <textarea
                     value={form.title}
                     onChange={e => setForm({ ...form, title: e.target.value })}
                     placeholder="Título de la tarea..."
-                    className="flex-1 min-w-0 text-lg lg:text-xl font-black tracking-tight outline-none bg-transparent text-white placeholder-slate-600 border-b border-transparent focus:border-slate-600 transition-colors py-1"
+                    className="flex-1 min-w-0 text-lg lg:text-xl font-black tracking-tight outline-none bg-transparent text-white placeholder-slate-600 border-b border-transparent focus:border-slate-600 transition-colors py-1 resize-none h-auto overflow-hidden"
+                    rows={1}
                     disabled={!canEdit}
                     autoFocus={isNew}
+                    ref={(el) => {
+                        if (el) {
+                            el.style.height = 'auto';
+                            el.style.height = el.scrollHeight + 'px';
+                        }
+                    }}
+                    onInput={(e) => {
+                        e.target.style.height = 'auto';
+                        e.target.style.height = e.target.scrollHeight + 'px';
+                    }}
                 />
 
                 <div className="flex items-center gap-1 flex-shrink-0">
@@ -91,96 +141,74 @@ export default function TaskHeader({
                 </div>
             </div>
 
-            {/* Row 2: Compact inline selects — scrollable on mobile */}
-            <div className="flex gap-1.5 lg:gap-2 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1 lg:flex-wrap lg:overflow-visible lg:pb-0 lg:mx-0 lg:px-0">
+            {/* Row 2: Compact inline selects — Desktop only (moved to scroll on mobile) */}
+            <div className="hidden lg:flex flex-wrap gap-1.5 lg:gap-2 pb-1 -mx-1 px-1">
                 {/* Proyecto */}
-                <div className="flex items-center gap-1 bg-slate-800 rounded-lg px-2 py-2 lg:py-1.5 border border-slate-700 hover:border-slate-600 transition-colors flex-shrink-0 min-w-0">
-                    <FolderGit2 className="w-3 h-3 text-white flex-shrink-0" />
-                    <select
-                        value={form.projectId}
-                        onChange={e => setForm({ ...form, projectId: e.target.value, stationId: '' })}
-                        className="bg-slate-800 text-xs font-bold text-slate-200 outline-none cursor-pointer min-w-0 max-w-[120px] lg:max-w-none"
-                        disabled={!canEdit}
-                    >
-                        <option value="">Sin proyecto</option>
-                        {projects.map(p => (
-                            <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                    </select>
-                </div>
+                <SearchableInlineSelect
+                    icon={<FolderGit2 className="w-3 h-3 text-white shrink-0" />}
+                    options={projects.map(p => ({ value: p.id, label: p.name }))}
+                    value={form.projectId}
+                    onChange={val => setForm({ ...form, projectId: val, stationId: '' })}
+                    placeholder="Sin proyecto"
+                    disabled={!canEdit}
+                />
 
                 {/* Estación (Station) — only shows when project is selected and has stations */}
                 {form.projectId && stations.length > 0 && (
-                    <div className="flex items-center gap-1 bg-slate-800 rounded-lg px-2 py-2 lg:py-1.5 border border-slate-700 hover:border-slate-600 transition-colors flex-shrink-0 min-w-0">
-                        <MapPin className="w-3 h-3 text-white shrink-0" />
-                        <select
-                            value={form.stationId || ''}
-                            onChange={e => setForm({ ...form, stationId: e.target.value || null })}
-                            className="bg-slate-800 text-xs font-bold text-slate-200 outline-none cursor-pointer min-w-0 max-w-[120px] lg:max-w-none"
-                            disabled={!canEdit}
-                        >
-                            <option value="">Estación</option>
-                            {stations.filter(s => s.active !== false).map(s => (
-                                <option key={s.id} value={s.id}>
-                                    {s.description || s.abbreviation
-                                        ? `${formatStationLabel(s, multiIdx)} — ${s.description || s.abbreviation}`
-                                        : formatStationLabel(s, multiIdx)}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                    <SearchableInlineSelect
+                        icon={<MapPin className="w-3 h-3 text-white shrink-0" />}
+                        options={stations.filter(s => s.active !== false).map(s => ({
+                            value: s.id,
+                            label: s.description || s.abbreviation
+                                ? `${formatStationLabel(s, multiIdx)} — ${s.description || s.abbreviation}`
+                                : formatStationLabel(s, multiIdx)
+                        }))}
+                        value={form.stationId || ''}
+                        onChange={val => setForm({ ...form, stationId: val || null })}
+                        placeholder="Estación"
+                        disabled={!canEdit}
+                    />
                 )}
 
                 {/* Responsable */}
-                <div className="flex items-center gap-1 bg-slate-800 rounded-lg px-2 py-2 lg:py-1.5 border border-slate-700 hover:border-slate-600 transition-colors flex-shrink-0 min-w-0">
-                    <User className="w-3 h-3 text-white flex-shrink-0" />
-                    <select
-                        value={form.assignedTo}
-                        onChange={e => setForm({ ...form, assignedTo: e.target.value })}
-                        className="bg-slate-800 text-xs font-bold text-slate-200 outline-none cursor-pointer min-w-0 max-w-[110px] lg:max-w-none"
-                        disabled={!canEdit}
-                    >
-                        <option value="">Sin asignar</option>
-                        {teamMembers.map(u => (
-                            <option key={u.uid} value={u.uid}>{u.displayName || u.email}</option>
-                        ))}
-                    </select>
-                </div>
+                <SearchableInlineSelect
+                    icon={<User className="w-3 h-3 text-white shrink-0" />}
+                    options={teamMembers.map(u => ({ value: u.uid, label: u.displayName || u.email }))}
+                    value={form.assignedTo}
+                    onChange={val => setForm({ ...form, assignedTo: val })}
+                    placeholder="Sin asignar"
+                    disabled={!canEdit}
+                    allowAddExternal={canEdit}
+                    onAddExternal={handleCreateExternal}
+                />
 
                 {/* Prioridad */}
-                <div className="flex items-center gap-1 bg-slate-800 rounded-lg px-2 py-2 lg:py-1.5 border border-slate-700 hover:border-slate-600 transition-colors flex-shrink-0 min-w-0">
-                    <Flag className="w-3 h-3 text-white flex-shrink-0" />
-                    <select
-                        value={form.priority}
-                        onChange={e => setForm({ ...form, priority: e.target.value })}
-                        className="bg-slate-800 text-xs font-bold text-slate-200 outline-none cursor-pointer min-w-0"
-                        disabled={!canEdit}
-                    >
-                        {Object.entries(TASK_PRIORITY_CONFIG).map(([key, cfg]) => (
-                            <option key={key} value={key}>{cfg.label}</option>
-                        ))}
-                    </select>
-                </div>
+                <SearchableInlineSelect
+                    icon={<Flag className="w-3 h-3 text-white shrink-0" />}
+                    options={Object.entries(TASK_PRIORITY_CONFIG).map(([key, cfg]) => ({ value: key, label: cfg.label }))}
+                    value={form.priority}
+                    onChange={val => setForm({ ...form, priority: val })}
+                    placeholder="Prioridad"
+                    disabled={!canEdit}
+                    alignRight={true}
+                />
 
                 {/* Área */}
-                <div className="flex items-center gap-1 bg-slate-800 rounded-lg px-2 py-2 lg:py-1.5 border border-slate-700 hover:border-slate-600 transition-colors flex-shrink-0 min-w-0">
-                    <Layers className="w-3 h-3 text-white flex-shrink-0" />
-                    <select
+                <div className="flex items-center gap-1 flex-shrink-0 min-w-0">
+                    <SearchableInlineSelect
+                        icon={<Layers className="w-3 h-3 text-white shrink-0" />}
+                        options={workAreas.map(a => ({ value: a.id, label: a.name }))}
                         value={form.areaId || ''}
-                        onChange={e => onAreaChange ? onAreaChange(e.target.value) : setForm({ ...form, areaId: e.target.value })}
-                        className="bg-slate-800 text-xs font-bold text-slate-200 outline-none cursor-pointer min-w-0 max-w-[100px] lg:max-w-none"
+                        onChange={val => onAreaChange ? onAreaChange(val) : setForm({ ...form, areaId: val })}
+                        placeholder="Área"
                         disabled={!canEdit}
-                    >
-                        <option value="">Área</option>
-                        {workAreas.map(a => (
-                            <option key={a.id} value={a.id}>{a.name}</option>
-                        ))}
-                    </select>
+                    />
                     {canEdit && onOpenListManager && (
                         <button
                             type="button"
                             onClick={() => onOpenListManager({ isOpen: true, type: 'workAreaType', title: 'Gestionar Áreas' })}
-                            className="text-[8px] font-bold text-indigo-500 hover:text-indigo-400 transition-colors whitespace-nowrap ml-0.5"
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800 border border-slate-700 hover:border-slate-600 hover:text-indigo-400 text-indigo-500 transition-colors cursor-pointer text-xs shrink-0"
+                            title="Gestionar Áreas"
                         >
                             ⚙
                         </button>
@@ -188,24 +216,22 @@ export default function TaskHeader({
                 </div>
 
                 {/* Tipo de tarea */}
-                <div className="flex items-center gap-1 bg-slate-800 rounded-lg px-2 py-2 lg:py-1.5 border border-slate-700 hover:border-slate-600 transition-colors flex-shrink-0 min-w-0">
-                    <Wrench className="w-3 h-3 text-white flex-shrink-0" />
-                    <select
+                <div className="flex items-center gap-1 flex-shrink-0 min-w-0">
+                    <SearchableInlineSelect
+                        icon={<Wrench className="w-3 h-3 text-white shrink-0" />}
+                        options={filteredTaskTypes.map(t => ({ value: t.id, label: t.name }))}
                         value={form.taskTypeId}
-                        onChange={e => onTaskTypeChange ? onTaskTypeChange(e.target.value) : setForm({ ...form, taskTypeId: e.target.value })}
-                        className="bg-slate-800 text-xs font-bold text-slate-200 outline-none cursor-pointer min-w-0 max-w-[120px] lg:max-w-none"
+                        onChange={val => onTaskTypeChange ? onTaskTypeChange(val) : setForm({ ...form, taskTypeId: val })}
+                        placeholder="Clasificación"
                         disabled={!canEdit}
-                    >
-                        <option value="">Clasificación</option>
-                        {filteredTaskTypes.map(t => (
-                            <option key={t.id} value={t.id}>{t.name}</option>
-                        ))}
-                    </select>
+                        alignRight={true}
+                    />
                     {canEdit && onOpenListManager && (
                         <button
                             type="button"
                             onClick={() => onOpenListManager({ isOpen: true, type: 'taskType', title: 'Gestionar Tipos de Tarea' })}
-                            className="text-[8px] font-bold text-indigo-500 hover:text-indigo-400 transition-colors whitespace-nowrap ml-0.5"
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800 border border-slate-700 hover:border-slate-600 hover:text-indigo-400 text-indigo-500 transition-colors cursor-pointer text-xs shrink-0"
+                            title="Gestionar Tipos de Tarea"
                         >
                             ⚙
                         </button>

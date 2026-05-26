@@ -105,7 +105,10 @@ export default function MyWork() {
         }
         try {
             await updateTaskStatus(task.id, newStatus, task.projectId);
-        } catch (e) { console.error('Error updating status:', e); }
+        } catch (e) {
+            console.error('Error updating status:', e);
+            alert('No se pudo cambiar el estado: ' + (e.message || 'Error desconocido'));
+        }
     }, [engTasks, user?.uid]);
 
     const handleWipConfirm = useCallback(async (blockData) => {
@@ -133,6 +136,7 @@ export default function MyWork() {
             setWipPendingStatus(null);
         } catch (err) {
             console.error('WIP switch error:', err);
+            alert('Error en cambio WIP: ' + (err.message || 'Error desconocido'));
         }
         setWipSwitching(false);
     }, [wipCurrentTask, wipPendingTask, wipPendingStatus]);

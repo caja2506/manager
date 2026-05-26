@@ -69,18 +69,18 @@ async function recordNudge(userId, ruleKey, targetId, messagePreview, extra = {}
     });
 
     if (error) {
-        // If new columns don't exist yet, try without them (graceful fallback)
-        if (error.message.includes("does not exist")) {
-            const { error: err2 } = await sb.from("agent_nudges").insert({
-                user_id: userId,
-                rule_key: ruleKey,
-                target_id: targetId || null,
-                sent_at: new Date().toISOString(),
-                message_preview: (messagePreview || "").substring(0, 120),
-            });
-            if (err2) console.warn(`[nudgeTracker] recordNudge fallback error:`, err2.message);
+        console.warn(`[nudgeTracker] First insert failed (error: ${error.message}), trying simplified fallback insert...`);
+        const { error: err2 } = await sb.from("agent_nudges").insert({
+            user_id: userId,
+            rule_key: ruleKey,
+            target_id: targetId || null,
+            sent_at: new Date().toISOString(),
+            message_preview: (messagePreview || "").substring(0, 120),
+        });
+        if (err2) {
+            console.error(`[nudgeTracker] recordNudge fallback error:`, err2.message);
         } else {
-            console.warn(`[nudgeTracker] recordNudge error (${ruleKey}):`, error.message);
+            console.log(`[nudgeTracker] recordNudge fallback insert succeeded for user ${userId}`);
         }
     }
 }

@@ -13,6 +13,7 @@
 
 import { supabase } from '../supabase';
 import { validatePlanItem, validatePlanItemFull } from '../utils/plannerUtils';
+import { auth as firebaseAuth } from '../firebase';
 
 export const plannerService = {
     /**
@@ -35,6 +36,8 @@ export const plannerService = {
             throw err;
         }
 
+        const calculatedDate = data.date || (data.startDateTime ? data.startDateTime.split('T')[0] : null);
+
         try {
             const { data: result, error } = await supabase
                 .from('weekly_plan_items')
@@ -52,11 +55,24 @@ export const plannerService = {
                     task_title: data.taskTitle || '',
                     project_name: data.projectName || '',
                     created_by: data.createdBy || data.assignedTo || null,
+                    date: calculatedDate,
+                    task_title_snapshot: data.taskTitleSnapshot || data.taskTitle || 'Planificación libre',
+                    project_name_snapshot: data.projectNameSnapshot || data.projectName || '',
+                    assigned_to_name: data.assignedToName || '',
+                    status_snapshot: data.statusSnapshot || data.status || 'planned',
+                    priority: data.priority || 'medium',
+                    color_key: data.colorKey || 'indigo',
                 })
                 .select('id')
                 .single();
 
             if (error) throw error;
+
+            // Sync timer immediately
+            const itemId = result.id;
+            const fullData = { id: itemId, ...data };
+            syncActivePlannerTimer(itemId, fullData);
+
             return { id: result.id, warnings: validation.warnings || [] };
         } catch (error) {
             console.error("[plannerService.sb] Error creating plan item:", error);
@@ -92,6 +108,17 @@ export const plannerService = {
             if (updates.assignedTo !== undefined) mapped.assigned_to = updates.assignedTo;
             if (updates.taskTitle !== undefined) mapped.task_title = updates.taskTitle;
             if (updates.projectName !== undefined) mapped.project_name = updates.projectName;
+            if (updates.date !== undefined) {
+                mapped.date = updates.date;
+            } else if (updates.startDateTime !== undefined) {
+                mapped.date = updates.startDateTime.split('T')[0];
+            }
+            if (updates.taskTitleSnapshot !== undefined) mapped.task_title_snapshot = updates.taskTitleSnapshot;
+            if (updates.projectNameSnapshot !== undefined) mapped.project_name_snapshot = updates.projectNameSnapshot;
+            if (updates.assignedToName !== undefined) mapped.assigned_to_name = updates.assignedToName;
+            if (updates.statusSnapshot !== undefined) mapped.status_snapshot = updates.statusSnapshot;
+            if (updates.priority !== undefined) mapped.priority = updates.priority;
+            if (updates.colorKey !== undefined) mapped.color_key = updates.colorKey;
 
             const { error } = await supabase
                 .from('weekly_plan_items')
@@ -99,6 +126,9 @@ export const plannerService = {
                 .eq('id', itemId);
 
             if (error) throw error;
+
+            // Sync timer immediately
+            syncActivePlannerTimer(itemId, null);
         } catch (error) {
             console.error("[plannerService.sb] Error updating plan item:", error);
             throw error;
@@ -110,6 +140,9 @@ export const plannerService = {
      */
     async deletePlanItem(itemId) {
         try {
+            // Stop active timer if any before deleting
+            await stopActiveTimerForPlanItem(itemId);
+
             const { error } = await supabase
                 .from('weekly_plan_items')
                 .delete()
@@ -180,5 +213,195 @@ function mapRow(row) {
         createdBy: row.created_by,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
+        date: row.date || (row.start_date_time ? row.start_date_time.split('T')[0] : null),
+        taskTitleSnapshot: row.task_title_snapshot,
+        projectNameSnapshot: row.project_name_snapshot,
+        assignedToName: row.assigned_to_name,
+        statusSnapshot: row.status_snapshot,
+        priority: row.priority,
+        colorKey: row.color_key,
     };
+}
+
+// ── Helpers for immediate planner-timer synchronization ──
+
+function isBlockActiveNow(startStr, endStr) {
+    if (!startStr || !endStr) return false;
+    const now = new Date();
+    const start = new Date(startStr);
+    const end = new Date(endStr);
+    return now >= start && now <= end;
+}
+
+async function stopActiveTimerForPlanItem(planItemId) {
+    try {
+        const { data: activeLogs, error } = await supabase
+            .from('time_logs')
+            .select('id')
+            .eq('plan_item_id', planItemId)
+            .is('end_time', null);
+
+        if (error) {
+            console.error('[plannerService.sb] Error checking active timer for plan item:', error.message);
+            return;
+        }
+
+        if (activeLogs && activeLogs.length > 0) {
+            const { stopTimer } = await import('./timeService.supabase');
+            for (const log of activeLogs) {
+                await stopTimer(log.id, { notes: '[Auto-detenido por cambio/eliminación en el planificador]' });
+                console.log(`[plannerService.sb] Stopped active timer ${log.id} for plan item ${planItemId}`);
+            }
+        }
+    } catch (err) {
+        console.error('[plannerService.sb] Error in stopActiveTimerForPlanItem:', err);
+    }
+}
+
+async function syncActivePlannerTimer(itemId, knownData) {
+    try {
+        const currentUser = firebaseAuth.currentUser;
+        const currentUserId = currentUser?.uid;
+        if (!currentUserId) return;
+        const displayName = currentUser?.displayName || currentUser?.email || 'Sistema';
+        const email = currentUser?.email || '';
+
+        let item = knownData;
+        if (!item || !item.assignedTo || !item.startDateTime || !item.endDateTime) {
+            const { data, error } = await supabase
+                .from('weekly_plan_items')
+                .select('*')
+                .eq('id', itemId)
+                .single();
+            if (error || !data) {
+                console.warn('[plannerService.sb] Could not fetch weekly plan item for sync:', error?.message);
+                return;
+            }
+            item = mapRow(data);
+        }
+
+        if (item.assignedTo !== currentUserId) {
+            return;
+        }
+
+        const activeNow = isBlockActiveNow(item.startDateTime, item.endDateTime);
+
+        if (activeNow) {
+            const { data: activeLogs, error } = await supabase
+                .from('time_logs')
+                .select('id, task_id, source, plan_item_id')
+                .eq('user_id', currentUserId)
+                .is('end_time', null);
+
+            if (error) {
+                console.error('[plannerService.sb] Error checking active timers:', error.message);
+                return;
+            }
+
+            const activeTimer = activeLogs && activeLogs.length > 0 ? activeLogs[0] : null;
+
+            if (!activeTimer) {
+                const { startTimer } = await import('./timeService.supabase');
+                const { updateTaskStatus } = await import('./taskService.supabase');
+
+                const result = await startTimer({
+                    taskId: item.taskId,
+                    projectId: item.projectId,
+                    userId: currentUserId,
+                    notes: `Auto-iniciado desde el planificador web`,
+                    source: 'planner_auto',
+                    taskTitle: item.taskTitle,
+                    projectName: item.projectName,
+                    displayName: displayName,
+                });
+
+                if (result?.logId) {
+                    await supabase
+                        .from('time_logs')
+                        .update({ plan_item_id: itemId })
+                        .eq('id', result.logId);
+                }
+
+                console.log(`[plannerService.sb] Started planner timer for plan item ${itemId}`);
+
+                if (item.taskId) {
+                    try {
+                        const { data: taskRow } = await supabase
+                            .from('tasks')
+                            .select('status')
+                            .eq('id', item.taskId)
+                            .single();
+                        if (taskRow && ['backlog', 'pending', 'blocked'].includes(taskRow.status)) {
+                            await updateTaskStatus(item.taskId, 'in_progress', null, false, {
+                                userId: currentUserId,
+                                userName: displayName,
+                            });
+                        }
+                    } catch (e) {
+                        console.warn('[plannerService.sb] Failed to transition task to in_progress:', e.message);
+                    }
+                }
+            } else {
+                if (activeTimer.taskId !== item.taskId) {
+                    if (activeTimer.source === 'planner_auto') {
+                        const { stopTimer, startTimer } = await import('./timeService.supabase');
+                        const { updateTaskStatus } = await import('./taskService.supabase');
+
+                        await stopTimer(activeTimer.id, { notes: '[Auto-detenido por cambio de bloque en el planificador]' });
+
+                        const result = await startTimer({
+                            taskId: item.taskId,
+                            projectId: item.projectId,
+                            userId: currentUserId,
+                            notes: `Auto-iniciado desde el planificador web`,
+                            source: 'planner_auto',
+                            taskTitle: item.taskTitle,
+                            projectName: item.projectName,
+                            displayName: displayName,
+                        });
+
+                        if (result?.logId) {
+                            await supabase
+                                .from('time_logs')
+                                .update({ plan_item_id: itemId })
+                                .eq('id', result.logId);
+                        }
+
+                        console.log(`[plannerService.sb] Switched planner timer for plan item ${itemId}`);
+
+                        if (item.taskId) {
+                            try {
+                                const { data: taskRow } = await supabase
+                                    .from('tasks')
+                                    .select('status')
+                                    .eq('id', item.taskId)
+                                    .single();
+                                if (taskRow && ['backlog', 'pending', 'blocked'].includes(taskRow.status)) {
+                                    await updateTaskStatus(item.taskId, 'in_progress', null, false, {
+                                        userId: currentUserId,
+                                        userName: displayName,
+                                    });
+                                }
+                            } catch (e) {
+                                console.warn('[plannerService.sb] Failed to transition task to in_progress:', e.message);
+                            }
+                        }
+                    } else {
+                        console.log(`[plannerService.sb] User has active manual timer, not overriding.`);
+                    }
+                } else {
+                    if (activeTimer.plan_item_id !== itemId) {
+                        await supabase
+                            .from('time_logs')
+                            .update({ plan_item_id: itemId })
+                            .eq('id', activeTimer.id);
+                    }
+                }
+            }
+        } else {
+            await stopActiveTimerForPlanItem(itemId);
+        }
+    } catch (err) {
+        console.error('[plannerService.sb] Error in syncActivePlannerTimer:', err);
+    }
 }

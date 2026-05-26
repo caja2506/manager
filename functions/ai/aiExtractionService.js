@@ -48,6 +48,7 @@ async function extractFromText(adminDb, apiKey, rawText, context = {}) {
             systemInstruction: REPORT_EXTRACTION.systemInstruction,
             temperature: 0.2,
             maxOutputTokens: 1024,
+            responseMimeType: "application/json",
         });
 
         if (!result.ok) {

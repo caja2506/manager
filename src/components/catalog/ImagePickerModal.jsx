@@ -52,7 +52,16 @@ const ImagePickerModal = ({ isOpen, onClose, onSelect, itemName, partNumber }) =
             }
         } catch (err) {
             console.error('Image search error:', err);
-            setError(`La búsqueda automática no está disponible aún. Usa "Pegar URL" o "Google Images" para buscar manualmente.`);
+            const errMsg = err.message || '';
+            if (errMsg.includes('access to Custom Search') || errMsg.includes('PERMISSION_DENIED')) {
+                setError('La "Custom Search API" no está habilitada en Google Cloud Console para esta API Key. Actívala en tu consola de Google Cloud para habilitar la búsqueda automática.');
+            } else if (errMsg.includes('quota') || errMsg.includes('limit') || errMsg.includes('exhausted')) {
+                setError('Se ha agotado el límite de búsquedas gratuitas de Google Custom Search por hoy (límite de 100 consultas diarias).');
+            } else if (errMsg.includes('API key not valid')) {
+                setError('La API Key configurada para Google Custom Search no es válida.');
+            } else {
+                setError(errMsg || 'Error al realizar la búsqueda de imágenes. Intenta de nuevo más tarde o usa "Pegar URL".');
+            }
         }
         setIsSearching(false);
     };
@@ -71,12 +80,16 @@ const ImagePickerModal = ({ isOpen, onClose, onSelect, itemName, partNumber }) =
         } catch (err) { /* Clipboard API may not be available */ }
     };
 
-    const handleConfirm = () => {
-        const url = mode === 'url' ? customUrl : selectedUrl;
+    const handleConfirmWithUrl = (url) => {
         if (url) {
             onSelect(url);
             onClose();
         }
+    };
+
+    const handleConfirm = () => {
+        const url = mode === 'url' ? customUrl : selectedUrl;
+        handleConfirmWithUrl(url);
     };
 
     if (!isOpen) return null;
@@ -120,7 +133,7 @@ const ImagePickerModal = ({ isOpen, onClose, onSelect, itemName, partNumber }) =
                                         value={searchQuery}
                                         onChange={e => setSearchQuery(e.target.value)}
                                         placeholder="Buscar imagen..."
-                                        className="pl-10 pr-4 py-3 w-full border border-slate-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                                        className="pl-10 pr-4 py-3 w-full border border-slate-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800 text-white placeholder-slate-500"
                                     />
                                 </div>
                                 <button type="submit" disabled={isSearching} className="bg-indigo-600 text-white px-5 py-3 rounded-xl font-bold text-sm hover:bg-indigo-700 disabled:bg-slate-300 transition-all flex items-center">
@@ -136,8 +149,9 @@ const ImagePickerModal = ({ isOpen, onClose, onSelect, itemName, partNumber }) =
                                         <span>{error}</span>
                                     </div>
                                     <button
+                                        type="button"
                                         onClick={openGoogleImages}
-                                        className="w-full bg-slate-900 border border-amber-300 text-amber-800 px-4 py-2.5 rounded-lg font-bold text-sm hover:bg-amber-100 transition-all flex items-center justify-center gap-2"
+                                        className="w-full bg-slate-900 border border-amber-500/50 text-amber-400 px-4 py-2.5 rounded-lg font-bold text-sm hover:bg-amber-500 hover:text-slate-950 transition-all flex items-center justify-center gap-2"
                                     >
                                         <Globe className="w-4 h-4" /> Abrir Google Images
                                     </button>
@@ -155,31 +169,63 @@ const ImagePickerModal = ({ isOpen, onClose, onSelect, itemName, partNumber }) =
 
                             {/* Results Grid */}
                             {!isSearching && images.length > 0 && (
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                                     {images.map((img, idx) => (
-                                        <button
+                                        <div
                                             key={idx}
-                                            onClick={() => setSelectedUrl(img.url)}
-                                            className={`relative rounded-xl overflow-hidden border-2 transition-all aspect-square group ${selectedUrl === img.url ? 'border-indigo-600 ring-2 ring-indigo-200 scale-[1.02]' : 'border-slate-700 hover:border-indigo-300'}`}
+                                            className={`flex flex-col bg-slate-800/40 rounded-2xl p-2.5 border transition-all ${selectedUrl === img.url ? 'border-indigo-500 ring-2 ring-indigo-500/10 bg-slate-800/80' : 'border-slate-800/80 hover:border-slate-700'}`}
                                         >
-                                            <img
-                                                src={img.thumbnail}
-                                                alt={img.title}
-                                                className="w-full h-full object-contain p-1"
-                                                loading="lazy"
-                                                onError={e => { e.target.src = ''; e.target.alt = '⚠️'; }}
-                                            />
-                                            {selectedUrl === img.url && (
-                                                <div className="absolute inset-0 bg-indigo-600/30 flex items-center justify-center">
-                                                    <div className="bg-indigo-600 text-white p-2 rounded-full shadow-lg">
-                                                        <Check className="w-5 h-5" />
+                                            {/* Clickable Image Container */}
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedUrl(img.url)}
+                                                onDoubleClick={() => handleConfirmWithUrl(img.url)}
+                                                className={`relative w-full aspect-square rounded-xl overflow-hidden border-2 bg-white transition-all flex items-center justify-center cursor-pointer ${selectedUrl === img.url ? 'border-indigo-500' : 'border-slate-200 hover:border-indigo-300'}`}
+                                            >
+                                                <img
+                                                    src={img.thumbnail}
+                                                    alt={img.title}
+                                                    className="w-full h-full object-contain p-1.5"
+                                                    loading="lazy"
+                                                    onError={e => { e.target.src = ''; e.target.alt = '⚠️'; }}
+                                                />
+                                                {selectedUrl === img.url && (
+                                                    <div className="absolute inset-0 bg-indigo-600/30 flex items-center justify-center">
+                                                        <div className="bg-indigo-600 text-white p-2 rounded-full shadow-lg">
+                                                            <Check className="w-4 h-4" />
+                                                        </div>
                                                     </div>
+                                                )}
+                                            </button>
+                                            
+                                            {/* Details Section */}
+                                            <div className="mt-2.5 flex flex-col flex-1 min-h-[64px] justify-between">
+                                                {/* Description */}
+                                                <p 
+                                                    className="text-[11px] text-slate-300 font-bold leading-normal line-clamp-2 hover:text-white transition-colors"
+                                                    title={img.title}
+                                                >
+                                                    {img.title}
+                                                </p>
+                                                
+                                                {/* Meta Info & Link */}
+                                                <div className="mt-2 pt-2 border-t border-slate-800/50 flex items-center text-[10px] min-w-0">
+                                                    <a 
+                                                        href={img.pageUrl || img.url} 
+                                                        target="_blank" 
+                                                        rel="noopener noreferrer"
+                                                        className="text-indigo-400 hover:text-indigo-300 font-bold inline-flex items-center gap-1 hover:underline truncate w-full"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        title={img.source || 'Ver página original'}
+                                                    >
+                                                        <span className="truncate uppercase tracking-tighter flex-1">
+                                                            {img.source || 'Ver página'}
+                                                        </span>
+                                                        <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                                                    </a>
                                                 </div>
-                                            )}
-                                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <span className="text-[10px] text-white font-bold truncate block">{img.source}</span>
                                             </div>
-                                        </button>
+                                        </div>
                                     ))}
                                 </div>
                             )}
@@ -198,10 +244,11 @@ const ImagePickerModal = ({ isOpen, onClose, onSelect, itemName, partNumber }) =
                             <div>
                                 <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">① Buscar imagen</div>
                                 <button
+                                    type="button"
                                     onClick={openGoogleImages}
-                                    className="w-full bg-slate-900/70 border border-slate-700 hover:border-indigo-400 hover:bg-indigo-50 text-slate-700 px-4 py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 text-sm"
+                                    className="w-full bg-slate-900/70 border border-slate-700 hover:border-indigo-500 hover:bg-indigo-950/30 text-slate-200 px-4 py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 text-sm"
                                 >
-                                    <Globe className="w-5 h-5 text-indigo-500" /> Abrir Google Images
+                                    <Globe className="w-5 h-5 text-indigo-400" /> Abrir Google Images
                                 </button>
                                 <p className="text-[11px] text-slate-400 mt-2">Click derecho en imagen → <strong>"Copiar dirección de imagen"</strong></p>
                             </div>
@@ -213,9 +260,9 @@ const ImagePickerModal = ({ isOpen, onClose, onSelect, itemName, partNumber }) =
                                         value={customUrl}
                                         onChange={e => { setCustomUrl(e.target.value); setPreviewError(false); }}
                                         placeholder="https://ejemplo.com/imagen.jpg"
-                                        className="flex-1 px-4 py-3 border border-slate-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                                        className="flex-1 px-4 py-3 border border-slate-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-mono bg-slate-800 text-white placeholder-slate-500"
                                     />
-                                    <button onClick={handlePaste} className="px-4 py-3 bg-slate-800 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-sm transition-colors">
+                                    <button onClick={handlePaste} className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl font-bold text-sm transition-colors">
                                         📋 Pegar
                                     </button>
                                 </div>
@@ -241,7 +288,7 @@ const ImagePickerModal = ({ isOpen, onClose, onSelect, itemName, partNumber }) =
 
                 {/* Footer */}
                 <div className="p-4 border-t border-slate-800 flex justify-end gap-3">
-                    <button onClick={onClose} className="px-5 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-800 transition-colors text-sm">
+                    <button onClick={onClose} className="px-5 py-3 rounded-xl font-bold text-slate-400 hover:bg-slate-800 hover:text-white transition-colors text-sm">
                         Cancelar
                     </button>
                     <button

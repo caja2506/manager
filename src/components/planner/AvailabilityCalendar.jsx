@@ -167,8 +167,8 @@ export default function AvailabilityCalendar({
     }
 
     function handleDayClick(cell) {
-        if (cell.isDisabled || cell.isPast) return;
-
+        if (cell.isDisabled) return;
+ 
         if (cell.wk) {
             // Weekend — suggest overtime
             setOvertimePrompt({
@@ -179,7 +179,7 @@ export default function AvailabilityCalendar({
             });
             return;
         }
-
+ 
         if (cell.available < 1) {
             // Full day — suggest overtime
             setOvertimePrompt({
@@ -190,7 +190,7 @@ export default function AvailabilityCalendar({
             });
             return;
         }
-
+ 
         // Normal selection
         onChange(cell.dateStr);
         setOpen(false);
@@ -296,8 +296,8 @@ export default function AvailabilityCalendar({
     // ── Color helpers ──────────────────────────────────────────
     function getCellColor(cell) {
         if (cell.wk) return 'bg-slate-800/40 text-slate-600';
-        if (cell.isPast) return 'bg-slate-800/20 text-slate-700';
         if (cell.isSelected) return 'bg-indigo-600 text-white ring-2 ring-indigo-400';
+        if (cell.isPast) return 'bg-slate-800/20 text-slate-700/60 hover:bg-slate-800/40';
         if (cell.available >= 4) return 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25';
         if (cell.available >= 1) return 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25';
         return 'bg-red-500/15 text-red-300 hover:bg-red-500/25';
@@ -352,7 +352,7 @@ export default function AvailabilityCalendar({
                         return <div key={cell.key} className="h-11" />;
                     }
 
-                    const clickable = !cell.isDisabled && !cell.isPast;
+                    const clickable = !cell.isDisabled;
 
                     return (
                         <button
@@ -367,7 +367,7 @@ export default function AvailabilityCalendar({
                             <span className={`text-xs font-bold leading-none ${cell.isSelected ? 'text-white' : ''}`}>
                                 {cell.day}
                             </span>
-                            {!cell.wk && !cell.isPast && (
+                            {!cell.wk && (
                                 <>
                                     <div className={`w-1.5 h-1.5 rounded-full mt-0.5 ${getDotColor(cell.available, cell.wk)}`} />
                                     <span className={`text-[7px] font-bold leading-none mt-0 ${

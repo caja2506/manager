@@ -30,7 +30,7 @@ const transitionTaskStatusFn = httpsCallable(functions, 'transitionTaskStatus');
 // ── Fields that ONLY the Cloud Function may write ──
 // Defense-in-depth: strip these from any client-side updateTask() call
 const WORKFLOW_PROTECTED_FIELDS = [
-    'status', 'completedDate', 'completedAt',
+    'status',
     'reopenedAt', 'reopenedBy', 'updatedBy',
 ];
 

@@ -58,7 +58,11 @@ export default function UnplannedWorkPanel({ tasks, onOpenTask, onQuickPlan }) {
                     const priorityLabel = PRIORITY_LABELS[task.priority] || task.priority;
 
                     return (
-                        <div key={task.id} className={`group px-5 py-3.5 border-l-2 ${borderStyle} hover:bg-slate-800 transition-colors`}>
+                        <div 
+                            key={task.id} 
+                            onClick={() => onOpenTask?.(task)}
+                            className={`group px-5 py-3.5 border-l-2 ${borderStyle} hover:bg-slate-800 transition-colors cursor-pointer`}
+                        >
                             <div className="flex items-start gap-3">
                                 <div className="flex-1 min-w-0">
                                     <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
@@ -79,7 +83,10 @@ export default function UnplannedWorkPanel({ tasks, onOpenTask, onQuickPlan }) {
                                 </div>
 
                                 {/* Actions */}
-                                <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div 
+                                    className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
                                     <button
                                         onClick={() => onQuickPlan?.(task, 1)}
                                         title="Planificar 1h hoy"

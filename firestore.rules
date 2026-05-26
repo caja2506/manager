@@ -93,11 +93,14 @@ service cloud.firestore {
     // This prevents self-escalation (a viewer promoting themselves to admin).
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.auth.uid == userId
+      allow create: if isAuthenticated() && (request.auth.uid == userId || (isEditor() && userId.matches('^ext_.*')))
         && (!request.resource.data.keys().hasAny(['rbacRole'])
             || request.resource.data.rbacRole == 'viewer');
       allow update: if isAdmin()
         || (isOwner(userId)
+            && !request.resource.data.diff(resource.data).affectedKeys()
+                .hasAny(['rbacRole', 'teamRole', 'active']))
+        || (isEditor() && userId.matches('^ext_.*')
             && !request.resource.data.diff(resource.data).affectedKeys()
                 .hasAny(['rbacRole', 'teamRole', 'active']));
       allow delete: if isAdmin();

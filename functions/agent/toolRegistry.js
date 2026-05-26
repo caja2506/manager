@@ -373,13 +373,25 @@ const TOOL_REGISTRY = {
 
 /**
  * Get tool descriptions formatted for the LLM system prompt.
+ * Includes both read-only and write tools.
  * @returns {string}
  */
 function getToolDescriptionsForPrompt() {
     const tools = Object.values(TOOL_REGISTRY);
-    return tools.map(t =>
+    const readDescriptions = tools.map(t =>
         `- <b>${t.name}</b>(${t.parameters}): ${t.description}`
     ).join("\n");
+
+    // Include write tools if available
+    let writeDescriptions = "";
+    try {
+        const { getWriteToolDescriptionsForPrompt } = require("./writeTools");
+        writeDescriptions = "\n\n<b>Herramientas de escritura (requieren confirmación):</b>\n" + getWriteToolDescriptionsForPrompt();
+    } catch (err) {
+        // writeTools not available — read-only mode
+    }
+
+    return readDescriptions + writeDescriptions;
 }
 
 /**

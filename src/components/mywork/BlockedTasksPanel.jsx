@@ -39,7 +39,11 @@ export default function BlockedTasksPanel({ tasks, onOpenTask, onUnblock }) {
                         : '—';
 
                     return (
-                        <div key={task.id} className="px-5 py-4 hover:bg-red-500/5 transition-colors group">
+                        <div 
+                            key={task.id} 
+                            onClick={() => onOpenTask?.(task)}
+                            className="px-5 py-4 hover:bg-red-500/5 transition-colors group cursor-pointer"
+                        >
                             <div className="flex items-start justify-between gap-3">
                                 <div className="flex-1 min-w-0">
                                     <div className="flex flex-wrap items-center gap-1.5 mb-1">
@@ -56,7 +60,10 @@ export default function BlockedTasksPanel({ tasks, onOpenTask, onUnblock }) {
                                 </div>
 
                                 {/* Actions */}
-                                <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div 
+                                    className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
                                     <button
                                         onClick={() => onUnblock?.(task)}
                                         title="Resolver bloqueo"

@@ -4,7 +4,7 @@ import {
     Search, Bell, AlertTriangle, LogOut, Settings,
     User as UserIcon, Folder, Command, Briefcase, UserCircle, ListTodo,
     LayoutGrid, BarChart3, Calendar, Table2, KanbanSquare, Clock, Shield,
-    Wrench, BookOpen, Users, Gauge, FileText, Zap, ArrowLeft
+    Wrench, BookOpen, Users, Gauge, FileText, Zap, ArrowLeft, Plus
 } from 'lucide-react';
 
 // Contexts
@@ -13,8 +13,8 @@ import { useAuditData } from '../../hooks/useAuditData';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useEngineeringData } from '../../hooks/useEngineeringData';
 import TaskDetailModal from '../tasks/TaskDetailModal';
-
 import { useRole } from '../../contexts/RoleContext';
+import { useAppData } from '../../contexts/AppDataContext';
 
 // ── Route-based page context config ──
 const PAGE_CONTEXT = [
@@ -49,6 +49,7 @@ export default function TopBar() {
     const location = useLocation();
     const { user, signOut } = useAuth();
     const { canEdit, canDelete } = useRole();
+    const { setIsGlobalTaskModalOpen } = useAppData();
 
     // Data Hooks
     const { auditResult, runClientAudit, isReady, isAuditing } = useAuditData();

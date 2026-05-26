@@ -66,7 +66,7 @@ const SearchableDropdown = ({ options, value, onChange, placeholder, dark = fals
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
                 className={`w-full text-left flex items-center justify-between transition-all ${compact
-                    ? 'px-3 py-2.5 text-sm border border-slate-700 rounded-xl bg-slate-800'
+                    ? 'px-3 py-2 text-xs border border-slate-700 rounded-lg bg-slate-800'
                     : `p-4 border rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 ${dark ? 'bg-slate-800 text-white border-slate-700' : 'bg-slate-800 border-slate-700'}`
                     }`}
             >
@@ -82,7 +82,7 @@ const SearchableDropdown = ({ options, value, onChange, placeholder, dark = fals
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
                                 placeholder="Buscar..."
-                                className="w-full pl-8 pr-3 py-2 text-sm border border-slate-800 rounded-lg outline-none focus:ring-1 focus:ring-indigo-400 bg-slate-800"
+                                className="w-full pl-8 pr-3 py-2 text-sm border border-slate-700 rounded-lg outline-none focus:ring-1 focus:ring-indigo-400 bg-slate-800 text-white placeholder-slate-500"
                                 autoFocus
                             />
                         </div>

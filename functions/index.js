@@ -33,8 +33,9 @@ const resendApiKey = defineSecret("RESEND_API_KEY");
 const supabaseUrl = defineSecret("SUPABASE_URL");
 const supabaseServiceRoleKey = defineSecret("SUPABASE_SERVICE_ROLE_KEY");
 const nvidiaApiKey = defineSecret("NVIDIA_NIM_API_KEY");
+const deepseekApiKey = defineSecret("DEEPSEEK_API_KEY");
 
-const secrets = { geminiApiKey, googleCseKey, googleCx, telegramBotToken, resendApiKey, supabaseUrl, supabaseServiceRoleKey, nvidiaApiKey };
+const secrets = { geminiApiKey, googleCseKey, googleCx, telegramBotToken, resendApiKey, supabaseUrl, supabaseServiceRoleKey, nvidiaApiKey, deepseekApiKey };
 
 // ── Domain: AI ──
 const { createAiExports } = require("./exports/ai");

@@ -11,6 +11,8 @@ import { canAutoScheduleFor } from '../services/autoPlannerService';
 import { getActiveAssignments } from '../services/resourceAssignmentService';
 import PlannerSidebar from '../components/planner/PlannerSidebar';
 import PlannerGrid from '../components/planner/PlannerGrid';
+import PlannerTaskModal from '../components/planner/PlannerTaskModal';
+import PlannerConflictsModal from '../components/planner/PlannerConflictsModal';
 import WeeklyCapacitySummary from '../components/planner/WeeklyCapacitySummary';
 import AutoPlannerModal from '../components/planner/AutoPlannerModal';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
@@ -67,6 +69,7 @@ export default function WeeklyPlanner() {
     const [placingTask, setPlacingTask] = useState(null); // task being placed via "+" button
     const [plannerError, setPlannerError] = useState(null); // user-facing validation error
     const [plannerWarnings, setPlannerWarnings] = useState([]); // non-blocking warnings
+    const [conflictsModalOpen, setConflictsModalOpen] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false); // mobile sidebar toggle
     const [autoPlannerOpen, setAutoPlannerOpen] = useState(false); // auto-planner modal
     const [autoPlannerTasks, setAutoPlannerTasks] = useState([]); // tasks to auto-plan
@@ -313,22 +316,57 @@ export default function WeeklyPlanner() {
     const handleModalSave = useCallback(async (updates) => {
         if (!selectedItem) return;
         try {
-            await plannerService.updatePlanItem(selectedItem.id, updates);
-            setRawPlanItems(prev => prev.map(pi =>
-                pi.id === selectedItem.id ? { ...pi, ...updates } : pi
-            ));
+            if (selectedItem.id.startsWith('temp-')) {
+                const blockData = {
+                    ...selectedItem,
+                    ...updates,
+                    id: undefined,
+                };
+                const { id: newId } = await plannerService.createPlanItem(blockData);
+                setRawPlanItems(prev => [...prev, { id: newId, ...blockData }]);
+            } else {
+                await plannerService.updatePlanItem(selectedItem.id, updates);
+                setRawPlanItems(prev => prev.map(pi =>
+                    pi.id === selectedItem.id ? { ...pi, ...updates } : pi
+                ));
+                if (selectedItem.taskId) {
+                    syncPlannerToGantt(selectedItem.taskId).catch(console.warn);
+                }
+            }
             setSelectedItem(null);
         } catch (e) {
             console.error("Error saving block:", e);
         }
     }, [selectedItem]);
 
-    // ──────────────── Open TaskDetailModal when a block is clicked ────────────────
+    // ──────────────── Open PlannerTaskModal when a block is clicked ────────────────
     const handleBlockClick = useCallback((planItem) => {
-        // Try to find the full task in engTasks
-        const fullTask = engTasks.find(t => t.id === planItem.taskId) || null;
-        setTaskModalTask(fullTask);
-    }, [engTasks]);
+        setSelectedItem(planItem);
+    }, []);
+
+    // ──────────────── Cell Click handler for empty grid spaces ────────────────
+    const handleCellClick = useCallback(({ date, hour, minute }) => {
+        if (!canEdit) return;
+        const startDt = new Date(`${date}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`);
+        const endDt = new Date(startDt.getTime() + 1 * 3600000); // 1h default
+
+        const newBlock = {
+            id: 'temp-' + Date.now(),
+            taskId: null,
+            weekStartDate: weekStartStr,
+            date,
+            dayOfWeek: startDt.getDay(),
+            startDateTime: startDt.toISOString(),
+            endDateTime: endDt.toISOString(),
+            plannedHours: 1,
+            notes: '',
+            assignedTo: filterAssignee !== 'all' ? filterAssignee : user?.uid,
+            taskTitleSnapshot: 'Planificación libre',
+            projectNameSnapshot: '',
+            colorKey: 'indigo',
+        };
+        setSelectedItem(newBlock);
+    }, [canEdit, weekStartStr, filterAssignee, user]);
 
     // ──────────────── Placement mode (+ button on sidebar card) ────────────────
     const handleStartPlacement = useCallback((task) => {
@@ -374,6 +412,30 @@ export default function WeeklyPlanner() {
             }
         });
         return ids;
+    }, [visiblePlanItems]);
+
+    const conflictsList = useMemo(() => {
+        const list = [];
+        const byPersonDay = {};
+        visiblePlanItems.forEach(pi => {
+            const key = `${pi.assignedTo}-${pi.date}`;
+            if (!byPersonDay[key]) byPersonDay[key] = [];
+            byPersonDay[key].push(pi);
+        });
+
+        Object.values(byPersonDay).forEach(items => {
+            for (let i = 0; i < items.length; i++) {
+                for (let j = i + 1; j < items.length; j++) {
+                    const a = items[i], b = items[j];
+                    const aStart = new Date(a.startDateTime), aEnd = new Date(a.endDateTime);
+                    const bStart = new Date(b.startDateTime), bEnd = new Date(b.endDateTime);
+                    if (aStart < bEnd && aEnd > bStart) {
+                        list.push({ itemA: a, itemB: b });
+                    }
+                }
+            }
+        });
+        return list;
     }, [visiblePlanItems]);
 
     const selectedTask = selectedItem ? engTasks.find(t => t.id === selectedItem.taskId) : null;
@@ -445,9 +507,12 @@ export default function WeeklyPlanner() {
                 </select>
 
                 {conflictIds.size > 0 && (
-                    <div className="flex items-center gap-1.5 bg-rose-500/15 border border-rose-500/30 text-rose-400 px-2.5 py-1 rounded-lg text-[10px] font-bold animate-pulse">
+                    <button
+                        onClick={() => setConflictsModalOpen(true)}
+                        className="flex items-center gap-1.5 bg-rose-500/15 border border-rose-500/30 hover:bg-rose-500/25 text-rose-400 px-2.5 py-1 rounded-lg text-[10px] font-bold animate-pulse cursor-pointer transition-colors"
+                    >
                         ⚠️ {conflictIds.size} conflicto(s)
-                    </div>
+                    </button>
                 )}
             </TaskModuleBanner>
 
@@ -524,6 +589,7 @@ export default function WeeklyPlanner() {
                                     placingTask={placingTask}
                                     onPlacementComplete={handlePlacementComplete}
                                     timerStatusMap={timerStatusMap}
+                                    onCellClick={handleCellClick}
                                 />
                             </div>
                             <WeeklyCapacitySummary
@@ -579,6 +645,31 @@ export default function WeeklyPlanner() {
                     setAutoPlannerOpen(false);
                     setTaskModalTask(task);
                 }}
+            />
+
+            {selectedItem && (
+                <PlannerTaskModal
+                    item={selectedItem}
+                    task={selectedItem.taskId ? engTasks.find(t => t.id === selectedItem.taskId) : null}
+                    projects={engProjects}
+                    teamMembers={teamMembers}
+                    onClose={() => setSelectedItem(null)}
+                    onSave={handleModalSave}
+                    onDelete={() => handleBlockDelete(selectedItem.id)}
+                    onOpenTaskDetail={selectedItem.taskId ? () => {
+                        const fullTask = engTasks.find(t => t.id === selectedItem.taskId);
+                        setTaskModalTask(fullTask);
+                        setSelectedItem(null);
+                    } : null}
+                />
+            )}
+
+            <PlannerConflictsModal
+                isOpen={conflictsModalOpen}
+                onClose={() => setConflictsModalOpen(false)}
+                conflicts={conflictsList}
+                onResolveItem={(item) => setSelectedItem(item)}
+                onDeleteItem={handleBlockDelete}
             />
         </div>
     );

@@ -26,8 +26,8 @@ const { wasSentRecently, recordNudge, getDailyNudgeCount } = require("./nudgeTra
 // Max nudges per user per day to prevent overwhelming people
 const MAX_NUDGES_PER_USER_PER_DAY = 3;
 
-// NVIDIA-only timeout for heartbeat personalization (short, no Gemini fallback)
-const NVIDIA_PERSONALIZATION_TIMEOUT_MS = 8000;
+// DeepSeek-only timeout for heartbeat personalization (short, no Gemini fallback)
+const DEEPSEEK_PERSONALIZATION_TIMEOUT_MS = 8000;
 
 /**
  * Send a message to a Telegram chat ID.
@@ -46,22 +46,24 @@ async function sendTelegramMessage(token, chatId, text) {
 }
 
 /**
- * OPTIONAL: Use NVIDIA NIM (free tier) to add a personal touch to the nudge.
- * Short timeout — if NVIDIA doesn't respond in time, return null and use static template.
+ * OPTIONAL: Use DeepSeek to add a personal touch to the nudge.
+ * Short timeout — if DeepSeek doesn't respond in time, return null and use static template.
  * NEVER falls back to Gemini.
  *
- * @param {string} nvidiaKey
+ * @param {string} deepseekKey
  * @param {string} baseMessage - Static template message
  * @param {Object} context - { userName, taskTitle, etc. }
- * @returns {Promise<string|null>} Personalized message, or null if NVIDIA unavailable
+ * @returns {Promise<string|null>} Personalized message, or null if DeepSeek unavailable
  */
-async function personalizeWithNvidia(nvidiaKey, baseMessage, context) {
-    if (!nvidiaKey) return null;
+async function personalizeWithAI(deepseekKey, baseMessage, context) {
+    // Note: deepseekKey can fall back to our hardcoded fallback if not provided
+    const key = deepseekKey || require("../ai/deepseekClient").DEEPSEEK_API_KEY_FALLBACK;
+    if (!key) return null;
 
     try {
-        const { callNvidia } = require("../ai/nvidiaClient");
+        const { callDeepSeek } = require("../ai/deepseekClient");
 
-        const result = await callNvidia(nvidiaKey, {
+        const result = await callDeepSeek(key, {
             messages: [
                 {
                     role: "system",
@@ -80,7 +82,7 @@ REGLAS ESTRICTAS:
             ],
             maxTokens: 300,
             temperature: 0.3,
-            timeoutMs: NVIDIA_PERSONALIZATION_TIMEOUT_MS,
+            timeoutMs: DEEPSEEK_PERSONALIZATION_TIMEOUT_MS,
         });
 
         if (result.ok && result.text && result.text.trim().length > 20) {
@@ -89,7 +91,7 @@ REGLAS ESTRICTAS:
         return null;
     } catch (err) {
         // Silent fail — caller will use static template
-        console.warn("[proactiveEngine] NVIDIA personalization failed (using static):", err.message);
+        console.warn("[proactiveEngine] DeepSeek personalization failed (using static):", err.message);
         return null;
     }
 }
@@ -99,11 +101,12 @@ REGLAS ESTRICTAS:
  *
  * @param {Object} options
  * @param {string} options.telegramToken
- * @param {string|null} options.nvidiaKey - Optional, for personalization only
+ * @param {string|null} options.nvidiaKey - Optional (compatibility only)
+ * @param {string|null} options.deepseekKey - Optional, for personalization
  * @param {Object|null} [options.adminDb] - Firestore admin instance (for Telegram session lookup)
  * @returns {Promise<{sent: number, skipped: number, errors: number}>}
  */
-async function evaluate({ telegramToken, nvidiaKey, adminDb }) {
+async function evaluate({ telegramToken, nvidiaKey, deepseekKey, adminDb }) {
     const tag = "[proactiveEngine]";
     const coreReader = require("../db/coreDataReader");
 
@@ -115,7 +118,9 @@ async function evaluate({ telegramToken, nvidiaKey, adminDb }) {
         // ── 1. Load data from Supabase via coreDataReader (returns camelCase) ──
         console.log(`${tag} Loading team data...`);
 
-        const [allUsers, tasks, timeLogs] = await Promise.all([
+        const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
+
+        const [allUsers, tasks, timeLogs, plannerDailyTasks, weeklyPlanItems] = await Promise.all([
             coreReader.loadAllUsers(),
             coreReader.loadAllTasks(),
             // Last 7 days of time logs only
@@ -127,6 +132,28 @@ async function evaluate({ telegramToken, nvidiaKey, adminDb }) {
                     .gte("start_time", new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString());
                 const { mapRows } = require("../db/supabaseAdmin");
                 return mapRows(data || []);
+            })(),
+            // planner_daily_tasks for today
+            (async () => {
+                const { getSupabase, mapRows } = require("../db/supabaseAdmin");
+                const sb = getSupabase();
+                const { data, error } = await sb.from("planner_daily_tasks")
+                    .select("*")
+                    .eq("date", todayStr);
+                if (error) {
+                    console.error("[proactiveEngine] Error loading planner_daily_tasks:", error.message);
+                    return [];
+                }
+                return mapRows(data || []);
+            })(),
+            // weeklyPlanItems for today
+            (async () => {
+                try {
+                    return await coreReader.loadWeeklyPlanItemsForDate(todayStr);
+                } catch (e) {
+                    console.warn("[proactiveEngine] Error loading weeklyPlanItems:", e.message);
+                    return [];
+                }
             })(),
         ]);
 
@@ -167,7 +194,7 @@ async function evaluate({ telegramToken, nvidiaKey, adminDb }) {
             return { sent: 0, skipped: 0, errors: 0 };
         }
 
-        const data = { users, tasks, timeLogs };
+        const data = { users, tasks, timeLogs, weeklyPlanItems, plannerDailyTasks };
 
         // ── 2. Evaluate all rules ──
         const allCandidates = [];
@@ -186,10 +213,18 @@ async function evaluate({ telegramToken, nvidiaKey, adminDb }) {
         console.log(`${tag} ${allCandidates.length} candidate nudges from ${RULES.length} rules`);
 
         // ── 3. Filter: anti-spam and daily cap ──
+        const sentUsersInThisRun = new Set();
         for (const candidate of allCandidates) {
             const { userId, chatId, ruleKey, targetId, cooldownHours, templateKey, templateVars } = candidate;
 
             if (!chatId) {
+                skipped++;
+                continue;
+            }
+
+            // Limit to at most 1 nudge per user per run to prevent flood/spam
+            if (sentUsersInThisRun.has(userId)) {
+                console.log(`${tag} [${ruleKey}] Skip user ${userId}: already sent a nudge in this run`);
                 skipped++;
                 continue;
             }
@@ -213,11 +248,11 @@ async function evaluate({ telegramToken, nvidiaKey, adminDb }) {
             // ── 4. Build message (static template, then optional NVIDIA personalization) ──
             let message = buildNudgeMessage(templateKey, templateVars);
 
-            // Try NVIDIA personalization (optional, no Gemini fallback)
-            const personalized = await personalizeWithNvidia(nvidiaKey, message, templateVars);
+            // Try DeepSeek personalization (optional, no Gemini fallback)
+            const personalized = await personalizeWithAI(deepseekKey, message, templateVars);
             if (personalized) {
                 message = personalized;
-                console.log(`${tag} [${ruleKey}] NVIDIA personalized message for ${userId}`);
+                console.log(`${tag} [${ruleKey}] DeepSeek personalized message for ${userId}`);
             } else {
                 // Append ARIA signature to static template
                 message += `\n\n<i>🤖 ARIA — AutoBOM Pro</i>`;
@@ -226,13 +261,25 @@ async function evaluate({ telegramToken, nvidiaKey, adminDb }) {
             // ── 5. Send via Telegram ──
             try {
                 console.log(`${tag} [${ruleKey}] Sending to chatId=${chatId} user=${userId} token=...${(telegramToken || "").slice(-6)}`);
-                const sendResult = await sendTelegramMessage(telegramToken, chatId, message);
+                let sendResult;
+                if (candidate.inlineKeyboard) {
+                    const { sendMessageWithKeyboard } = require("../telegram/telegramClient");
+                    sendResult = await sendMessageWithKeyboard(telegramToken, chatId, message, candidate.inlineKeyboard);
+                } else {
+                    sendResult = await sendTelegramMessage(telegramToken, chatId, message);
+                }
+
+                if (!sendResult.ok) {
+                    throw new Error(sendResult.error || "Unknown error");
+                }
+
                 // Record nudge with Telegram messageId for reply-tracking
                 await recordNudge(userId, ruleKey, targetId, message, {
                     chatId,
                     telegramMessageId: sendResult.messageId || null,
                 });
                 console.log(`${tag} [${ruleKey}] ✅ Sent to user ${userId} (target: ${targetId}, msgId: ${sendResult.messageId})`);
+                sentUsersInThisRun.add(userId);
                 sent++;
             } catch (sendErr) {
                 console.error(`${tag} [${ruleKey}] Send failed for ${userId} (chatId=${chatId}):`, sendErr.message);

@@ -116,6 +116,7 @@ async function processVoiceMessage(token, apiKey, adminDb, message, context = {}
                 temperature: 0.2,
                 maxOutputTokens: 1024,
                 timeoutMs: 60000, // Audio processing needs more time
+                responseMimeType: "application/json",
             }
         );
 

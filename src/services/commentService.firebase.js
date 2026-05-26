@@ -73,13 +73,20 @@ export async function addComment(taskId, text, userId, userName) {
  * @param {string} commentId
  * @param {string} newText
  */
-export async function updateComment(taskId, commentId, newText) {
+export async function updateComment(taskId, commentId, newText, extraFields = {}) {
     const ref = doc(db, 'tasks', taskId, 'comments', commentId);
-    await updateDoc(ref, {
+    const updatePayload = {
         text: newText.trim(),
         updatedAt: new Date().toISOString(),
         edited: true,
-    });
+    };
+    if (extraFields.userName !== undefined) {
+        updatePayload.userName = extraFields.userName;
+    }
+    if (extraFields.createdAt !== undefined) {
+        updatePayload.createdAt = extraFields.createdAt;
+    }
+    await updateDoc(ref, updatePayload);
 }
 
 /**

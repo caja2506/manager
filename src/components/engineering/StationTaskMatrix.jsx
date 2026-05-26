@@ -80,7 +80,10 @@ export default function StationTaskMatrix({ projectId, canEdit, userId }) {
 
 
     return (
-        <div className="w-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden mt-6 mb-24 relative">
+        <div 
+            className="flex flex-col flex-1 min-h-0 h-full w-full bg-white dark:bg-slate-900 overflow-hidden relative"
+            style={{ height: '100%', background: 'var(--bg-card)' }}
+        >
             <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900/50">
                 <div>
                     <h2 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
@@ -136,40 +139,30 @@ export default function StationTaskMatrix({ projectId, canEdit, userId }) {
                 </div>
             </div>
 
-            <div className="overflow-x-auto w-full custom-scrollbar pb-6 relative">
+            <div className="flex-1 overflow-auto w-full custom-scrollbar pb-6 relative">
                 <table className="w-max min-w-full text-left border-collapse p-1">
                     <thead className="sticky top-0 z-20">
                         {/* AREA ROW */}
                         <tr>
-                            <th rowSpan={2} className="sticky left-0 w-[50px] min-w-[50px] max-w-[50px] z-30 bg-white dark:bg-slate-900 border-b border-r border-slate-200 dark:border-slate-700 p-2 text-[9px] align-bottom">
-                                <div className="font-bold text-slate-800 dark:text-slate-300">STN#</div>
+                            <th rowSpan={2} className="sticky left-0 w-[60px] min-w-[60px] max-w-[60px] z-30 bg-white dark:bg-slate-900 border-b border-r border-slate-200 dark:border-slate-700 p-2 text-[9px] align-bottom">
+                                <div className="font-bold text-slate-800 dark:text-slate-300 text-center">STN#</div>
                             </th>
-                            <th rowSpan={2} className="sticky left-[50px] z-30 bg-white dark:bg-slate-900 border-b border-r border-slate-200 dark:border-slate-700 p-2 pl-3 text-[9px] align-bottom whitespace-nowrap">
-                                <div className="font-bold text-slate-800 dark:text-slate-300">STATION NAME</div>
-                                <div className="text-slate-500">Full Description</div>
+                            <th rowSpan={2} className="sticky left-[60px] z-30 bg-white dark:bg-slate-900 border-b border-r border-slate-200 dark:border-slate-700 p-2 pl-3 text-[9px] align-bottom max-w-[200px] truncate">
+                                <div className="font-bold text-slate-800 dark:text-slate-300 text-left">STATION NAME</div>
+                                <div className="text-slate-500 text-left text-[8px]">Full Description</div>
                             </th>
                             {columnsData.map(group => (
                                 <th 
                                     key={group.area.id} 
                                     colSpan={group.types.length} 
-                                    className="border-r border-b border-slate-200 dark:border-slate-700 p-0 text-center align-bottom"
+                                    className="border-r border-b border-slate-200 dark:border-slate-700 p-1.5 text-center align-middle"
                                     style={{ 
                                         backgroundColor: group.area.color ? `${group.area.color}15` : '#f1f5f920',
                                         borderTop: `4px solid ${group.area.color || '#6366f1'}` 
                                     }}
                                     title={group.area.name}
                                 >
-                                    <div 
-                                        className="text-[9px] font-black uppercase tracking-wider whitespace-nowrap pb-1 px-1 text-slate-200"
-                                        style={{ 
-                                            writingMode: 'vertical-rl',
-                                            transform: 'rotate(180deg)',
-                                            display: 'inline-block',
-                                            maxHeight: '80px',
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                        }}
-                                    >
+                                    <div className="text-[9px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-200 truncate max-w-full px-1">
                                         {group.area.name}
                                     </div>
                                 </th>
@@ -179,16 +172,23 @@ export default function StationTaskMatrix({ projectId, canEdit, userId }) {
                             </th>
                         </tr>
                         {/* TYPE ROW */}
-                        <tr>
+                        <tr className="h-[120px]">
                             {columnsData.map(group => (
                                 group.types.map(type => (
                                     <th 
                                         key={type.id} 
-                                        className="bg-slate-50 dark:bg-slate-800/80 border-r border-b border-slate-200 dark:border-slate-700 text-center align-bottom min-w-[28px] max-w-[28px]"
+                                        className="bg-slate-50 dark:bg-slate-800/80 border-r border-b border-slate-200 dark:border-slate-700 text-center align-bottom min-w-[28px] max-w-[28px] h-[120px] pb-3"
                                     >
                                         <div 
-                                            className="whitespace-nowrap text-[8px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest inline-block align-bottom py-1.5"
-                                            style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+                                            className="text-[8px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest inline-block select-none"
+                                            style={{ 
+                                                writingMode: 'vertical-rl', 
+                                                transform: 'rotate(180deg)',
+                                                whiteSpace: 'nowrap',
+                                                maxHeight: '90px',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis'
+                                            }}
                                             title={type.name}
                                         >
                                             {type.name}
@@ -202,10 +202,13 @@ export default function StationTaskMatrix({ projectId, canEdit, userId }) {
                         {stations.map(stn => (
                             <tr key={stn.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 group">
                                 {/* Station cells */}
-                                <td className="sticky left-0 w-[50px] min-w-[50px] max-w-[50px] z-10 bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 border-b border-r border-slate-200 dark:border-slate-800 p-1 text-center text-[10px] font-bold text-slate-700 dark:text-slate-400 overflow-hidden text-ellipsis whitespace-nowrap">
+                                <td className="sticky left-0 w-[60px] min-w-[60px] max-w-[60px] z-10 bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 border-b border-r border-slate-200 dark:border-slate-800 p-1 text-center text-[10px] font-bold text-slate-700 dark:text-slate-400 overflow-hidden text-ellipsis whitespace-nowrap">
                                     {formatStationLabel(stn, multiIdx)}
                                 </td>
-                                <td className="sticky left-[50px] z-10 bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 border-b border-r border-slate-200 dark:border-slate-800 py-1 px-2.5 text-[10px] font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                                <td 
+                                    className="sticky left-[60px] z-10 bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 border-b border-r border-slate-200 dark:border-slate-800 py-1 px-2.5 text-[10px] font-semibold text-slate-700 dark:text-slate-300 max-w-[200px] truncate"
+                                    title={stn.abbreviation ? `${stn.description} (${stn.abbreviation})` : stn.description || '—'}
+                                >
                                     {stn.abbreviation ? `${stn.description} (${stn.abbreviation})` : stn.description || '—'}
                                 </td>
                                 

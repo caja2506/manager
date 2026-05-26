@@ -80,8 +80,9 @@ export function EngineeringDataProvider({ children }) {
     // --- Global Task Filters ---
     const [taskSearch, setTaskSearch] = useState('');
     const [taskFilterProject, setTaskFilterProject] = useState('');
-    const [taskFilterAssignee, setTaskFilterAssignee] = useState('my-team');
+    const [taskFilterAssignee, setTaskFilterAssignee] = useState('');
     const [taskFilterPriority, setTaskFilterPriority] = useState('');
+    const [taskFilterArea, setTaskFilterArea] = useState('');
 
     // Track readiness: all subscriptions must fire at least once
     const [isReady, setIsReady] = useState(false);
@@ -166,6 +167,7 @@ export function EngineeringDataProvider({ children }) {
         taskFilterProject, setTaskFilterProject,
         taskFilterAssignee, setTaskFilterAssignee,
         taskFilterPriority, setTaskFilterPriority,
+        taskFilterArea, setTaskFilterArea,
     };
 
     return (

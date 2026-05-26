@@ -44,6 +44,7 @@ export async function fetchMilestoneWorkAreas(milestoneId) {
         name: row.name,
         description: row.description,
         status: row.status,
+        taskTypeIds: row.task_type_ids || [],
         ...row,
     }));
 }

@@ -72,7 +72,8 @@ export default function TodayTasksPanel({ tasks, userId, timeLogs, onOpenTask, o
                     return (
                         <div
                             key={task.id}
-                            className={`group flex items-center gap-3 px-5 py-3.5 hover:bg-slate-800 transition-colors ${
+                            onClick={() => onOpenTask?.(task)}
+                            className={`group flex items-center gap-3 px-5 py-3.5 hover:bg-slate-800 transition-colors cursor-pointer ${
                                 task.todaySource === 'overdue' ? 'bg-red-500/5' : ''
                             }`}
                         >
@@ -99,7 +100,10 @@ export default function TodayTasksPanel({ tasks, userId, timeLogs, onOpenTask, o
                             </div>
 
                             {/* Quick actions (visible on hover) */}
-                            <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div 
+                                className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => e.stopPropagation()}
+                            >
                                 {!isTimerActive && task.status !== 'completed' && (
                                     <button
                                         onClick={() => handleStartTimer(task)}

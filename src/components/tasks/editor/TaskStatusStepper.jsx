@@ -109,8 +109,7 @@ export default function TaskStatusStepper({ currentStatus, onStatusChange, canEd
                                 }`}>
                                 {stepNum}
                             </span>
-                            <span className="hidden sm:inline">{cfg.label}</span>
-                            <span className="sm:hidden">{cfg.label.slice(0, 4)}</span>
+                            <span>{cfg.label}</span>
                         </button>
                         {idx < STATUS_FLOW.length - 1 && (
                             <ChevronRight className={`w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0 mx-0.5 ${isPast && !isSpecialState ? 'text-slate-600' : 'text-slate-700'

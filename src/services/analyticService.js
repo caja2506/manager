@@ -18,9 +18,9 @@ import * as XLSX from 'xlsx';
 // Initialize PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
-// Cloud Function references
-const analyzeQuotePdfFn = httpsCallable(functions, 'analyzeQuotePdf');
-const testGeminiConnectionFn = httpsCallable(functions, 'testGeminiConnection');
+// Cloud Function references (with extended client timeouts to match server config)
+const analyzeQuotePdfFn = httpsCallable(functions, 'analyzeQuotePdf', { timeout: 180000 });
+const testGeminiConnectionFn = httpsCallable(functions, 'testGeminiConnection', { timeout: 30000 });
 
 /** Helper to lazily get Firebase modules */
 async function getFirebase() {
@@ -146,7 +146,11 @@ export async function handlePdfUpload(file, activeProject, providers, callbacks)
             let currentCatalog;
             if (USE_SUPABASE) {
                 const { data } = await supabase.from('catalogo_maestro').select('*');
-                currentCatalog = data || [];
+                // Map snake_case → camelCase so buildReviewItems can match on partNumber
+                currentCatalog = (data || []).map(r => ({
+                    ...r,
+                    partNumber: r.part_number || '',
+                }));
             } else {
                 const { collection, getDocs, db } = await getFirebase();
                 const catalogSnapshot = await getDocs(collection(db, 'catalogo_maestro'));

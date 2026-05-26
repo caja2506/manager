@@ -4,6 +4,9 @@ import Sidebar from './Sidebar';
 import MobileNav from './MobileNav';
 import TopBar from './TopBar';
 import { useAppData } from '../../contexts/AppDataContext';
+import { useRole } from '../../contexts/RoleContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { useEngineeringData } from '../../hooks/useEngineeringData';
 import {
     Activity, X
 } from 'lucide-react';
@@ -15,8 +18,14 @@ import MasterRecordModal from '../catalog/MasterRecordModal';
 import PdfReviewModal from '../projects/PdfReviewModal';
 import ImagePickerModal from '../catalog/ImagePickerModal';
 import DelayReportModal from '../delays/DelayReportModal';
+import TaskDetailModal from '../tasks/TaskDetailModal';
+import ManualTimeEntry from '../time/ManualTimeEntry';
 
 export default function AppLayout() {
+    const { user } = useAuth();
+    const { canEdit, canDelete } = useRole();
+    const { engProjects, engTasks, teamMembers } = useEngineeringData();
+
     const {
         // Processing
         isProcessing, setIsProcessing,
@@ -34,6 +43,8 @@ export default function AppLayout() {
         isPdfReviewOpen, setIsPdfReviewOpen,
         pdfReviewData, setPdfReviewData,
         pdfSupplierAnalysis, setPdfSupplierAnalysis,
+        isGlobalTaskModalOpen, setIsGlobalTaskModalOpen,
+        isGlobalTimeLogModalOpen, setIsGlobalTimeLogModalOpen,
 
         // Handlers
         handleSaveManagedList,
@@ -160,6 +171,34 @@ export default function AppLayout() {
                     <Outlet />
                 </main>
             </div>
+
+            {/* ===== GLOBAL TASK CREATION MODAL ===== */}
+            {isGlobalTaskModalOpen && (
+                <TaskDetailModal
+                    isOpen={isGlobalTaskModalOpen}
+                    onClose={() => setIsGlobalTaskModalOpen(false)}
+                    task={null}
+                    projects={engProjects}
+                    teamMembers={teamMembers}
+                    subtasks={[]}
+                    taskTypes={taskTypes}
+                    userId={user?.uid}
+                    canEdit={canEdit}
+                    canDelete={canDelete}
+                />
+            )}
+
+            {/* ===== GLOBAL TIME LOG MODAL ===== */}
+            {isGlobalTimeLogModalOpen && (
+                <ManualTimeEntry
+                    isOpen={isGlobalTimeLogModalOpen}
+                    onClose={() => setIsGlobalTimeLogModalOpen(false)}
+                    tasks={engTasks}
+                    projects={engProjects}
+                    teamMembers={teamMembers}
+                    userId={user?.uid}
+                />
+            )}
         </div>
     );
 }

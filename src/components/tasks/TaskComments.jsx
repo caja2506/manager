@@ -13,12 +13,14 @@ import { es } from 'date-fns/locale';
  * Pattern mirrors SubtaskList: always-visible input, inline editing.
  */
 export default function TaskComments({
-    taskId, readOnly = false, userId = null, userName = null
+    taskId, readOnly = false, userId = null, userName = null, teamMembers = []
 }) {
     const [comments, setComments] = useState([]);
     const [newText, setNewText] = useState('');
     const [editingId, setEditingId] = useState(null);
     const [editText, setEditText] = useState('');
+    const [editUserName, setEditUserName] = useState('');
+    const [editCreatedAt, setEditCreatedAt] = useState('');
     const [isSending, setIsSending] = useState(false);
     const inputRef = useRef(null);
     const editRef = useRef(null);
@@ -69,21 +71,65 @@ export default function TaskComments({
     const startEditing = (comment) => {
         setEditingId(comment.id);
         setEditText(comment.text);
+        setEditUserName(comment.userName || '');
+        if (comment.createdAt) {
+            try {
+                const date = new Date(comment.createdAt);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                setEditCreatedAt(`${year}-${month}-${day}T${hours}:${minutes}`);
+            } catch (e) {
+                setEditCreatedAt('');
+            }
+        } else {
+            setEditCreatedAt('');
+        }
     };
 
     const saveEdit = async () => {
         if (!editingId) return;
         const trimmed = editText.trim();
-        if (trimmed && trimmed !== comments.find(c => c.id === editingId)?.text) {
-            await updateComment(taskId, editingId, trimmed);
+        const trimmedUser = editUserName.trim();
+        
+        const originalComment = comments.find(c => c.id === editingId);
+        if (!originalComment) return;
+
+        const hasTextChange = trimmed !== originalComment.text;
+        const hasUserChange = trimmedUser !== (originalComment.userName || '');
+        
+        let hasDateChange = false;
+        let formattedDate = originalComment.createdAt;
+        if (editCreatedAt) {
+            try {
+                const dateObj = new Date(editCreatedAt);
+                formattedDate = dateObj.toISOString();
+                hasDateChange = formattedDate !== originalComment.createdAt;
+            } catch (e) {
+                console.error('[TaskComments] Invalid date format:', editCreatedAt, e);
+            }
+        }
+
+        if (hasTextChange || hasUserChange || hasDateChange) {
+            const extraFields = {};
+            if (hasUserChange) extraFields.userName = trimmedUser;
+            if (hasDateChange) extraFields.createdAt = formattedDate;
+
+            await updateComment(taskId, editingId, trimmed, extraFields);
         }
         setEditingId(null);
         setEditText('');
+        setEditUserName('');
+        setEditCreatedAt('');
     };
 
     const cancelEdit = () => {
         setEditingId(null);
         setEditText('');
+        setEditUserName('');
+        setEditCreatedAt('');
     };
 
     const handleEditKeyDown = (e) => {
@@ -165,21 +211,68 @@ export default function TaskComments({
                                     </div>
 
                                     {isEditing ? (
-                                        <div className="mt-1 flex items-start gap-1">
-                                            <textarea
-                                                ref={editRef}
-                                                value={editText}
-                                                onChange={e => setEditText(e.target.value)}
-                                                onKeyDown={handleEditKeyDown}
-                                                className="flex-1 px-2 py-1.5 border border-indigo-500 rounded-lg text-xs bg-slate-800 text-slate-200 outline-none resize-none"
-                                                rows={2}
-                                            />
-                                            <button onClick={saveEdit} className="p-1 text-emerald-400 hover:text-emerald-300">
-                                                <Check className="w-3.5 h-3.5" />
-                                            </button>
-                                            <button onClick={cancelEdit} className="p-1 text-slate-500 hover:text-slate-300">
-                                                <X className="w-3.5 h-3.5" />
-                                            </button>
+                                        <div className="mt-1.5 space-y-2 border border-slate-700/50 p-2.5 rounded-lg bg-slate-800/80">
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label className="text-[9px] font-bold text-slate-400 block mb-0.5 uppercase tracking-wider">Usuario</label>
+                                                    <select
+                                                        value={editUserName}
+                                                        onChange={e => setEditUserName(e.target.value)}
+                                                        className="w-full px-2 py-1 border border-slate-700 rounded text-xs bg-slate-900 text-slate-200 outline-none focus:border-indigo-500 transition-colors"
+                                                    >
+                                                        <option value="">Seleccionar usuario...</option>
+                                                        {teamMembers
+                                                            .filter(m => m.uid && !m.uid.startsWith('ext_'))
+                                                            .map((m) => {
+                                                                const name = m.displayName || m.email || '';
+                                                                return (
+                                                                    <option key={m.uid} value={name}>
+                                                                        {name}
+                                                                    </option>
+                                                                );
+                                                            })}
+                                                        {editUserName && !teamMembers.some(m => (m.displayName || m.email) === editUserName) && (
+                                                            <option value={editUserName}>{editUserName}</option>
+                                                        )}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="text-[9px] font-bold text-slate-400 block mb-0.5 uppercase tracking-wider">Fecha</label>
+                                                    <input
+                                                        type="datetime-local"
+                                                        value={editCreatedAt}
+                                                        onChange={e => setEditCreatedAt(e.target.value)}
+                                                        className="w-full px-2 py-1 border border-slate-700 rounded text-xs bg-slate-900 text-slate-200 outline-none focus:border-indigo-500 transition-colors"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-[9px] font-bold text-slate-400 block mb-0.5 uppercase tracking-wider">Comentario</label>
+                                                <textarea
+                                                    ref={editRef}
+                                                    value={editText}
+                                                    onChange={e => setEditText(e.target.value)}
+                                                    onKeyDown={handleEditKeyDown}
+                                                    className="w-full px-2 py-1 border border-slate-700 rounded text-xs bg-slate-900 text-slate-200 outline-none resize-none focus:border-indigo-500 transition-colors"
+                                                    rows={2}
+                                                />
+                                            </div>
+                                            <div className="flex justify-end gap-1.5 pt-0.5">
+                                                <button
+                                                    onClick={cancelEdit}
+                                                    className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-200 border border-slate-700 rounded-md hover:bg-slate-700/50 transition-all flex items-center gap-1"
+                                                >
+                                                    <X className="w-3 h-3" />
+                                                    Cancelar
+                                                </button>
+                                                <button
+                                                    onClick={saveEdit}
+                                                    className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white bg-indigo-600 hover:bg-indigo-500 rounded-md transition-all flex items-center gap-1"
+                                                >
+                                                    <Check className="w-3 h-3" />
+                                                    Guardar
+                                                </button>
+                                            </div>
                                         </div>
                                     ) : (
                                         <p className="text-xs text-slate-300 mt-0.5 whitespace-pre-wrap break-words leading-relaxed">
@@ -188,8 +281,8 @@ export default function TaskComments({
                                     )}
                                 </div>
 
-                                {/* Actions — only for own comments */}
-                                {isOwn && !readOnly && !isEditing && (
+                                {/* Actions — if not readOnly */}
+                                {!readOnly && !isEditing && (
                                     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                                         <button
                                             onClick={() => startEditing(comment)}

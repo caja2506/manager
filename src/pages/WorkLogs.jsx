@@ -148,6 +148,7 @@ export default function WorkLogs() {
                 onClose={() => { setShowManual(false); setEditingLog(null); }}
                 tasks={engTasks}
                 projects={engProjects}
+                teamMembers={teamMembers}
                 userId={user?.uid}
                 editLog={editingLog}
             />

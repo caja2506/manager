@@ -32,11 +32,11 @@ describe('plannerUtils', () => {
             expect(result.errors).toHaveLength(0);
         });
 
-        it('B1: blocks missing taskId', () => {
+        it('B1: allows missing taskId (optional for free blocks)', () => {
             const result = validatePlanItem({ ...VALID_ITEM, taskId: '' });
-            expect(result.valid).toBe(false);
-            expect(result.errors.some(e => e.includes('taskId'))).toBe(true);
+            expect(result.valid).toBe(true);
         });
+
 
         it('B2: blocks missing assignedTo', () => {
             const result = validatePlanItem({ ...VALID_ITEM, assignedTo: '' });

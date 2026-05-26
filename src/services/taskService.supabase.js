@@ -18,7 +18,7 @@ import { logActivity, ACTIVITY_TYPES } from './activityLogService';
 
 // ── Fields that ONLY the stored procedure may write ──
 const WORKFLOW_PROTECTED_FIELDS = [
-    'status', 'completedDate', 'completedAt',
+    'status',
     'reopenedAt', 'reopenedBy', 'updatedBy',
 ];
 
@@ -248,7 +248,7 @@ export async function updateTask(taskId, updates) {
         priority: 'priority', taskTypeId: 'task_type_id',
         assignedTo: 'assigned_to', assignedBy: 'assigned_by',
         estimatedHours: 'estimated_hours', actualHours: 'actual_hours',
-        dueDate: 'due_date', tags: 'tags',
+        dueDate: 'due_date', completedDate: 'completed_date', tags: 'tags',
         stationId: 'station_id', milestoneId: 'milestone_id',
         areaId: 'area_id', countsForScore: 'counts_for_score',
         workAreaTypeId: 'area_id', // legacy alias used by MainTable

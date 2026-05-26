@@ -97,6 +97,7 @@ export default function PlannerGrid({
     placingTask,
     onPlacementComplete,
     timerStatusMap,
+    onCellClick,
 }) {
     const totalHours   = PLANNER_END_HOUR - PLANNER_START_HOUR;
     const scrollBodyRef = useRef(null);
@@ -308,7 +309,15 @@ export default function PlannerGrid({
                                         onMouseMove={e => handlePlacementMouseMove(e, dayDate, dayIndex)}
                                         onMouseLeave={handlePlacementMouseLeave}
                                         onClick={e => {
-                                            if (placingTask) handlePlacementClick(e, dayDate);
+                                            if (placingTask) {
+                                                handlePlacementClick(e, dayDate);
+                                            } else {
+                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                const relY = Math.max(0, e.clientY - rect.top);
+                                                const { hour, minute } = snapToHour(relY);
+                                                const dayStr = format(dayDate, 'yyyy-MM-dd');
+                                                onCellClick?.({ date: dayStr, hour, minute });
+                                            }
                                         }}
                                     >
                                 {/* Hour grid lines */}

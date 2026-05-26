@@ -150,7 +150,10 @@ export async function updateTaskGanttFields(taskId, fields) {
     if (fields.plannedEndDate !== undefined) mapped.planned_end_date = fields.plannedEndDate;
     if (fields.percentComplete !== undefined) mapped.percent_complete = fields.percentComplete;
     if (fields.showInGantt !== undefined) mapped.show_in_gantt = fields.showInGantt;
-    if (fields.milestone !== undefined) mapped.milestone = fields.milestone;
+    // Note: The UI passes `{ milestone: milestoneId }` for backwards compatibility with legacy property names.
+    // The Supabase column is `milestone_id`.
+    if (fields.milestone !== undefined) mapped.milestone_id = fields.milestone;
+    if (fields.milestoneId !== undefined) mapped.milestone_id = fields.milestoneId;
 
     const { error } = await supabase
         .from('tasks')

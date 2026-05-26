@@ -42,8 +42,8 @@ BEGIN
 
   -- 2. Valid transitions map
   v_valid_transitions := '{
-    "backlog": ["pending", "in_progress", "cancelled"],
-    "pending": ["in_progress", "blocked", "cancelled"],
+    "backlog": ["pending", "in_progress", "cancelled", "completed"],
+    "pending": ["in_progress", "blocked", "cancelled", "completed"],
     "in_progress": ["validation", "blocked", "completed", "cancelled"],
     "validation": ["in_progress", "completed", "blocked"],
     "blocked": ["pending", "in_progress"],

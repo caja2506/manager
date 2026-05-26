@@ -48,6 +48,25 @@ const PROGRESS_MAP = {
     fuchsia: 'bg-fuchsia-700',
 };
 
+const HEX_COLOR_MAP = {
+    indigo: '#6366f1',
+    blue: '#3b82f6',
+    green: '#10b981',
+    amber: '#fbbf24',
+    red: '#ef4444',
+    purple: '#a855f7',
+    teal: '#14b8a6',
+    slate: '#64748b',
+    pink: '#ec4899',
+    orange: '#f97316',
+    violet: '#8b5cf6',
+    sky: '#0ea5e9',
+    emerald: '#10b981',
+    rose: '#f43f5e',
+    cyan: '#06b6d4',
+    fuchsia: '#d946ef',
+};
+
 /**
  * @param {{
  *   task: Object,
@@ -64,9 +83,27 @@ const PROGRESS_MAP = {
  *   isLinkSource: boolean,
  * }} props
  */
+function getLocalDateStr(dateOrStr) {
+    if (!dateOrStr) return null;
+    if (typeof dateOrStr === 'string' && dateOrStr.length === 10) {
+        return dateOrStr;
+    }
+    const d = new Date(dateOrStr);
+    if (isNaN(d.getTime())) return null;
+    return d.toLocaleDateString('en-CA');
+}
+
+function daysBetweenStr(str1, str2) {
+    if (!str1 || !str2) return 0;
+    const d1 = new Date(str1 + 'T12:00:00');
+    const d2 = new Date(str2 + 'T12:00:00');
+    return Math.round((d2 - d1) / (24 * 60 * 60 * 1000));
+}
+
 export default function GanttBar({
     task, left, width, color = 'indigo', rowHeight = 42, dayWidth = 96,
     viewStart, onClick, onDragEnd, onLinkStart, onLinkComplete, isLinking, isLinkSource,
+    isCritical = false, dimmed = false,
 }) {
     const [hovered, setHovered] = useState(false);
     const [dragState, setDragState] = useState(null); // { mode: 'move'|'left'|'right', startX, origLeft, origWidth }
@@ -179,18 +216,51 @@ export default function GanttBar({
     const barH = rowHeight * 0.55;
     const barTop = rowHeight * 0.22;
 
+    // --- Delay calculations for visual gradient ---
+    const startStr = task.plannedStartDate ? getLocalDateStr(task.plannedStartDate) : null;
+    const plannedEndStr = task.plannedEndDate ? getLocalDateStr(task.plannedEndDate) : startStr;
+    
+    let totalDays = 1;
+    let plannedDays = 1;
+    let hasDelay = false;
+    
+    if (startStr && plannedEndStr) {
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        let effectiveEndStr = plannedEndStr;
+        
+        if (task.status === 'completed') {
+            if (task.completedDate) {
+                const completedStr = getLocalDateStr(task.completedDate);
+                if (completedStr && completedStr > effectiveEndStr) {
+                    effectiveEndStr = completedStr;
+                    hasDelay = true;
+                }
+            }
+        } else if (task.status !== 'cancelled') {
+            if (todayStr > effectiveEndStr) {
+                effectiveEndStr = todayStr;
+                hasDelay = true;
+            }
+        }
+        
+        totalDays = Math.max(daysBetweenStr(startStr, effectiveEndStr) + 1, 1);
+        plannedDays = Math.max(daysBetweenStr(startStr, plannedEndStr) + 1, 1);
+    }
+
     // --- Milestone ---
     if (task.milestone) {
         const size = 16;
+        const dimClass = dimmed ? 'opacity-20 transition-opacity' : '';
+        const criticalClass = isCritical ? 'shadow-[0_0_15px_rgba(239,68,68,0.65)] ring-2 ring-red-500/20 border-red-500' : '';
         return (
             <div
-                className="absolute flex items-center justify-center cursor-pointer"
+                className={`absolute flex items-center justify-center cursor-pointer ${dimClass}`}
                 style={{ left: left - size / 2, top: (rowHeight - size) / 2, width: size, height: size, zIndex: 10 }}
                 onClick={() => onClick?.(task)}
                 title={task.title}
             >
                 <div
-                    className={`w-3 h-3 rotate-45 ${barClasses} shadow-md`}
+                    className={`w-3 h-3 rotate-45 ${barClasses} ${criticalClass} shadow-md`}
                     style={{ boxShadow: hovered ? '0 0 8px rgba(0,0,0,0.4)' : undefined }}
                     onMouseEnter={() => setHovered(true)}
                     onMouseLeave={() => setHovered(false)}
@@ -200,19 +270,32 @@ export default function GanttBar({
     }
 
     // --- Regular task bar ---
+    const dimClass = dimmed ? 'opacity-20 transition-opacity' : '';
+    const criticalClass = isCritical ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.65)] ring-2 ring-red-500/20 z-20' : '';
+
+    const barStyle = {
+        left: displayLeft,
+        width: Math.max(displayWidth, 8),
+        height: barH,
+        top: barTop,
+        zIndex: isDragging ? 30 : isLinkSource ? 20 : 5,
+        cursor: isDragging ? 'grabbing' : isLinking ? 'crosshair' : 'grab',
+        userSelect: 'none',
+    };
+
+    if (hasDelay && totalDays > plannedDays) {
+        const colorHex = HEX_COLOR_MAP[color] || HEX_COLOR_MAP.indigo;
+        const delayColorHex = HEX_COLOR_MAP.red;
+        const pctSplit = (plannedDays / totalDays) * 100;
+        barStyle.background = `linear-gradient(to right, ${colorHex} ${pctSplit}%, ${delayColorHex} ${pctSplit}%)`;
+        barStyle.borderColor = colorHex;
+    }
+
     return (
         <div
             ref={barRef}
-            className={`absolute rounded-md overflow-visible ${barClasses} shadow-lg transition-shadow ${isDragging ? 'shadow-xl opacity-90 z-30' : 'hover:shadow-md'} ${isLinkSource ? 'ring-2 ring-indigo-400 ring-offset-1 ring-offset-slate-900 animate-pulse z-20' : ''} ${isLinking && !isLinkSource ? 'cursor-crosshair hover:ring-2 hover:ring-emerald-400' : ''}`}
-            style={{
-                left: displayLeft,
-                width: Math.max(displayWidth, 8),
-                height: barH,
-                top: barTop,
-                zIndex: isDragging ? 30 : isLinkSource ? 20 : 5,
-                cursor: isDragging ? 'grabbing' : isLinking ? 'crosshair' : 'grab',
-                userSelect: 'none',
-            }}
+            className={`absolute rounded-md overflow-visible ${barClasses} shadow-lg transition-shadow ${isDragging ? 'shadow-xl opacity-90 z-30' : 'hover:shadow-md'} ${isLinkSource ? 'ring-2 ring-indigo-400 ring-offset-1 ring-offset-slate-900 animate-pulse z-20' : ''} ${isLinking && !isLinkSource ? 'cursor-crosshair hover:ring-2 hover:ring-emerald-400' : ''} ${dimClass} ${criticalClass}`}
+            style={barStyle}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
             onMouseDown={(e) => {
@@ -238,10 +321,19 @@ export default function GanttBar({
                 if (isLinking) return;
                 onClick?.(task);
             }}
+            onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (isLinking && !isLinkSource) {
+                    onLinkComplete?.(task.id);
+                } else if (!isLinking) {
+                    onLinkStart?.(task.id);
+                }
+            }}
             title={isLinking && !isLinkSource ? `Click para enlazar con "${task.title}"` : `${task.title} (${pct}%) — Click para enlazar, doble click para editar`}
         >
             {/* Progress fill */}
-            {pct > 0 && (
+            {pct > 0 && task.status !== 'completed' && (
                 <div className={`absolute inset-y-0 left-0 ${progressClasses} opacity-60`} style={{ width: `${pct}%` }} />
             )}
 

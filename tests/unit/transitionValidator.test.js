@@ -39,12 +39,12 @@ describe('transitionValidator', () => {
         });
     });
 
-    describe('validateTransition — invalid transitions', () => {
-        it('blocks backlog → completed', () => {
+    describe('validateTransition — valid transitions (added backlog → completed)', () => {
+        it('allows backlog → completed', () => {
             const task = makeTask({ status: 'backlog' });
             const result = validateTransition(task, 'completed');
-            expect(result.valid).toBe(false);
-            expect(result.errors[0].code).toBe('INVALID_TRANSITION');
+            expect(result.valid).toBe(true);
+            expect(result.errors).toHaveLength(0);
         });
     });
 
@@ -104,8 +104,12 @@ describe('transitionValidator', () => {
             expect(canTransitionQuick('backlog', 'pending')).toBe(true);
         });
 
+        it('returns true for backlog → completed', () => {
+            expect(canTransitionQuick('backlog', 'completed')).toBe(true);
+        });
+
         it('returns false for invalid transition', () => {
-            expect(canTransitionQuick('backlog', 'completed')).toBe(false);
+            expect(canTransitionQuick('completed', 'validation')).toBe(false);
         });
     });
 });

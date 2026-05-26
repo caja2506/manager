@@ -72,6 +72,7 @@ export default function DailyTeamGrid({
     activeMemberFilter,
     allMemberUids,       // all team member UIDs (not just visible), to distinguish truly unassigned
     timerStatusMap,      // Map: blockId → { status: 'active'|'idle'|'overflow', timerId, elapsedMin }
+    onCellClick,
 }) {
     const totalHours   = PLANNER_END_HOUR - PLANNER_START_HOUR;
     const scrollBodyRef = useRef(null);
@@ -266,7 +267,17 @@ export default function DailyTeamGrid({
                                         onDrop={e => handleDrop(e, member.uid)}
                                         onMouseMove={e => handlePlacementMouseMove(e, member.uid, memberIndex)}
                                         onMouseLeave={() => setHoverSlot(null)}
-                                        onClick={e => { if (placingTask) handlePlacementClick(e, member.uid); }}
+                                        onClick={e => {
+                                            if (placingTask) {
+                                                handlePlacementClick(e, member.uid);
+                                            } else {
+                                                if (member.uid === '__unassigned__') return;
+                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                const relY = Math.max(0, e.clientY - rect.top);
+                                                const { hour, minute } = snapToHour(relY);
+                                                onCellClick?.({ date: dateStr, hour, minute, assignedTo: member.uid });
+                                            }
+                                        }}
                                     >
                                         {/* Hour grid lines */}
                                         {hours.map(h => (

@@ -200,6 +200,104 @@ const RULES = [
         },
     },
 
+    /**
+     * morning_planning: el usuario no tiene planificado el día y no ha registrado horas
+     * Se evalúa de Lunes a Viernes entre las 7:00 AM y las 8:30 AM.
+     * Ofrece las top 3 tareas pendientes ordenadas por prioridad.
+     * Cooldown: 24h por usuario
+     */
+    {
+        key: "morning_planning",
+        cooldownHours: 24,
+        evaluate({ tasks, users, timeLogs, weeklyPlanItems, plannerDailyTasks }) {
+            const nudges = [];
+            const day = new Date().toLocaleString("en-US", { timeZone: "America/Costa_Rica", weekday: "short" });
+
+            // Solo de Lunes a Viernes
+            if (!["Mon", "Tue", "Wed", "Thu", "Fri"].includes(day)) return nudges;
+
+            // Hora decimal en Costa Rica
+            const parts = new Date().toLocaleString("en-US", {
+                timeZone: "America/Costa_Rica", hour: "numeric", minute: "numeric", hour12: false,
+            }).split(":");
+            const decimalHour = parseInt(parts[0]) + parseInt(parts[1]) / 60;
+
+            // Entre 7:00 AM y 8:30 AM
+            if (decimalHour < 7.0 || decimalHour > 8.5) return nudges;
+
+            const today = TODAY_TZ();
+
+            for (const user of users) {
+                if (!user.telegramChatId) continue;
+                if (user.active === false) continue;
+                // Excluir directores/admin
+                if (["manager", "admin"].includes(user.operationalRole)) continue;
+
+                // 1. Verificar si tiene planes semanales en Firestore hoy
+                const userWeeklyPlans = (weeklyPlanItems || []).filter(p => p.assignedTo === user.id);
+                if (userWeeklyPlans.length > 0) continue;
+
+                // 2. Verificar si tiene planes diarios en Supabase hoy
+                const userDailyPlans = (plannerDailyTasks || []).filter(p => p.userId === user.id);
+                if (userDailyPlans.length > 0) continue;
+
+                // 3. Verificar si ya registró horas hoy
+                const userTodayLogs = (timeLogs || []).filter(l => {
+                    if (l.userId !== user.id && l.user_id !== user.id) return false;
+                    if (!l.startTime) return false;
+                    const logDate = new Date(l.startTime).toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
+                    return logDate === today;
+                });
+                if (userTodayLogs.length > 0) continue;
+
+                // 4. Buscar top 3 tareas pendientes
+                const userTasks = tasks.filter(t => 
+                    t.assignedTo === user.id && 
+                    ["backlog", "pending", "blocked"].includes(t.status)
+                );
+
+                if (userTasks.length === 0) continue;
+
+                // Ordenar por prioridad: critical (0), high (1), medium (2), low (3)
+                const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+                const sortedTasks = userTasks.sort((a, b) => {
+                    const pa = priorityOrder[a.priority] !== undefined ? priorityOrder[a.priority] : 99;
+                    const pb = priorityOrder[b.priority] !== undefined ? priorityOrder[b.priority] : 99;
+                    if (pa !== pb) return pa - pb;
+                    // Si tienen la misma prioridad, la que venza antes
+                    if (a.dueDate && b.dueDate) return new Date(a.dueDate) - new Date(b.dueDate);
+                    if (a.dueDate) return -1;
+                    if (b.dueDate) return 1;
+                    return 0;
+                });
+
+                const topTasks = sortedTasks.slice(0, 3);
+
+                // Crear botones inline
+                const inlineKeyboard = topTasks.map(t => {
+                    const label = `[${t.priority.toUpperCase()}] ${t.title.slice(0, 30)}${t.title.length > 30 ? "..." : ""}`;
+                    return [{
+                        text: label,
+                        callback_data: `morning_start_task:${t.id}`,
+                    }];
+                });
+
+                nudges.push({
+                    userId: user.id,
+                    chatId: user.telegramChatId,
+                    targetId: today,
+                    templateKey: "morning_planning",
+                    inlineKeyboard,
+                    templateVars: {
+                        userName: user.name || user.displayName || "Ingeniero",
+                        tasks: topTasks.map(t => ({ id: t.id, title: t.title, priority: t.priority })),
+                    },
+                });
+            }
+            return nudges;
+        },
+    },
+
 ];
 
 // ─── ARIA Intelligence Rules (Phase 4) ───
@@ -486,6 +584,11 @@ RULES.push({
  */
 function buildNudgeMessage(templateKey, vars) {
     const templates = {
+        morning_planning: (v) =>
+            `☀️ Buenos días ${v.userName}.\n\n` +
+            `Veo que aún no tienes tareas planificadas en el planner para el día de hoy y no has iniciado ningún temporizador.\n\n` +
+            `¿En qué vas a trabajar hoy? Aquí tienes tus tareas pendientes prioritarias. Selecciona una para programarla hoy (8 horas) e iniciar su temporizador automáticamente:`,
+
         overdue_reminder: (v) =>
             `⚠️ Hola ${v.userName}, tu tarea <b>${v.taskTitle}</b> lleva <b>${v.daysOverdue} día${v.daysOverdue !== 1 ? "s" : ""} vencida</b>.\n\n` +
             `Por favor actualiza su estado en AutoBOM Pro para que el equipo sepa cómo va. 🙏`,

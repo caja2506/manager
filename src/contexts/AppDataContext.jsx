@@ -68,6 +68,12 @@ export function AppDataProvider({ children }) {
     const [isDelayReportOpen, setIsDelayReportOpen] = useState(false);
     const [delayReportTarget, setDelayReportTarget] = useState(null);
 
+    // Global Task Modal
+    const [isGlobalTaskModalOpen, setIsGlobalTaskModalOpen] = useState(false);
+
+    // Global Time Log Modal
+    const [isGlobalTimeLogModalOpen, setIsGlobalTimeLogModalOpen] = useState(false);
+
     // ============================================================
     // HANDLERS — Predictive Analytics/PDF/Excel (delegated to analyticService)
     // ============================================================
@@ -95,7 +101,7 @@ export function AppDataProvider({ children }) {
     };
 
     const handleConfirmImport = async (reviewedData, activeProject) => {
-        await executePdfImport(reviewedData, activeProject);
+        await executePdfImport(reviewedData, activeProject, processingCallbacks);
         setIsPdfReviewOpen(false);
         setPdfReviewData(null);
         setPdfSupplierAnalysis(null);
@@ -137,6 +143,8 @@ export function AppDataProvider({ children }) {
         pdfSupplierAnalysis, setPdfSupplierAnalysis,
         isDelayReportOpen, setIsDelayReportOpen,
         delayReportTarget, setDelayReportTarget,
+        isGlobalTaskModalOpen, setIsGlobalTaskModalOpen,
+        isGlobalTimeLogModalOpen, setIsGlobalTimeLogModalOpen,
 
         // Handlers (AI/PDF/Excel — delegated)
         testConnection,

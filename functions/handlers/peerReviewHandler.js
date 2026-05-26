@@ -8,7 +8,7 @@
  */
 
 const paths = require("../automation/firestorePaths");
-const { loadTask, updateTask: updateTaskSB } = require("../db/coreDataReader");
+const { loadTask, updateTask: updateTaskSB, transitionTaskStatus } = require("../db/coreDataReader");
 
 // ── Request Peer Review ──
 
@@ -87,8 +87,10 @@ async function requestPeerReview(adminDb, { taskId, reviewerId, requestedBy }) {
         peerReviewCycles: cycle,
         currentPeerReviewId: reviewRef.id,
         peerReviewReviewerId: reviewerId,
-        status: "validation",
     });
+
+    // Transition status to validation via RPC
+    await transitionTaskStatus(taskId, "validation", requestedBy);
 
     // Audit event
     await adminDb.collection("auditEvents").add({
@@ -143,18 +145,17 @@ async function submitPeerReview(adminDb, { reviewId, decision, checklistItems, s
     });
 
     // Update task
-    const taskRef_unused = null; // kept for reference
     const taskUpdates = {
         peerReviewStatus: decision,
         lastPeerReviewerId: userId,
         lastPeerReviewAt: now,
     };
 
-    if (decision === "changes_requested") {
-        taskUpdates.status = "planned";
-    }
-
     await updateTaskSB(review.taskId, taskUpdates);
+
+    if (decision === "changes_requested") {
+        await transitionTaskStatus(review.taskId, "in_progress", userId, "", false, "Cambios solicitados en revisión de pares");
+    }
 
     // Audit event
     await adminDb.collection("auditEvents").add({

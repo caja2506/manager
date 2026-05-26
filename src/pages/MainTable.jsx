@@ -28,6 +28,30 @@ import { supabase } from '../supabase';
 // HELPERS
 // ============================================================
 
+/** Formats ISO date to "DD-Mes-YY" in Spanish */
+function formatCommentDate(dateStr) {
+    if (!dateStr) return '';
+    try {
+        const date = new Date(dateStr);
+        const formatter = new Intl.DateTimeFormat('es-ES', {
+            day: '2-digit',
+            month: 'short',
+            year: '2-digit'
+        });
+        const parts = formatter.formatToParts(date);
+        const day = parts.find(p => p.type === 'day')?.value || '';
+        let month = parts.find(p => p.type === 'month')?.value || '';
+        month = month.replace('.', '');
+        if (month) {
+            month = month.charAt(0).toUpperCase() + month.slice(1);
+        }
+        const year = parts.find(p => p.type === 'year')?.value || '';
+        return `${day}-${month}-${year}`;
+    } catch (e) {
+        return '';
+    }
+}
+
 /** Generate a consistent HSL color from a project name */
 function generateProjectColor(name) {
     let hash = 0;
@@ -52,8 +76,8 @@ const STATUS_GROUPS = [
     { status: TASK_STATUS.CANCELLED,   label: 'Cancelado',   color: '#6b7280' },
 ];
 
-// 12-column grid: ☐ | Task | Owner | STN | Status | Área | Tipo | Avance | Timeline | Hours | Priority | Asig.
-const GRID_COLS = '28px minmax(200px, 1fr) 36px 55px 86px 68px 68px 56px minmax(105px,150px) minmax(65px,95px) 76px 36px';
+// 13-column grid: ☐ | Task | Comments | Owner | STN | Status | Área | Tipo | Avance | Timeline | Hours | Priority | Asig.
+const GRID_COLS = '28px minmax(200px, 1fr) minmax(120px, 200px) 36px 55px 86px 68px 68px 56px minmax(105px,150px) minmax(65px,95px) 76px 36px';
 
 // ============================================================
 // SAVE FEEDBACK HOOK
@@ -567,7 +591,7 @@ function StationCell({ task, canEdit, onSave }) {
 // TASK ROW
 // ============================================================
 
-function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDates, onOpenModal, groupColor, isLast, savedField, onSaved, taskTypes, workAreaTypes, isSelected, onToggleSelect, commentCount }) {
+function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDates, onOpenModal, groupColor, isLast, savedField, onSaved, taskTypes, workAreaTypes, isSelected, onToggleSelect, commentCount, taskComments }) {
     const { refetch } = useEngineeringData();
     const [popover, setPopover] = useState(null); // 'health' | 'score' | null
     const healthRef = useRef(null);
@@ -595,6 +619,11 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
             refetch?.('tasks');
         } catch (err) {
             console.error(`Failed to save ${field}:`, err);
+            if (field === 'status') {
+                alert('No se pudo cambiar el estado: ' + (err.message || 'Error desconocido'));
+            } else {
+                alert('No se pudo guardar el campo: ' + (err.message || 'Error desconocido'));
+            }
         }
     }, [task.id, task.assignedTo, task.assignedBy, teamMembers, onSaved, refetch]);
 
@@ -714,19 +743,18 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
         <>
             <div
                 onDoubleClick={() => onOpenModal(task)}
-                className={`grid items-stretch px-2 py-1.5 transition-all duration-150 group/row 
+                className={`grid items-stretch px-2 py-1.5 transition-all duration-150 group/row min-w-[1100px]
                     ${!isLast ? 'border-b border-slate-800/30' : ''} 
-                    ${isCritical ? 'bg-rose-500/5 hover:bg-rose-500/10' : 'hover:bg-indigo-500/6'}
+                    ${isCritical ? 'bg-[var(--bg-table-row-critical)] hover:bg-[var(--bg-table-row-critical-hover)]' : 'bg-[var(--bg-table-row)] hover:bg-[var(--bg-table-row-hover)]'}
                     ${isOverdue ? 'ring-1 ring-inset ring-rose-500/20' : ''}
                 `}
                 style={{ 
-                    gridTemplateColumns: GRID_COLS, 
-                    borderLeft: `3px solid ${isCritical ? '#ef4444' : groupColor}` 
+                    gridTemplateColumns: GRID_COLS
                 }}
             >
 
                 {/* Checkbox / Select */}
-                <div className="flex items-center justify-center" onClick={e => e.stopPropagation()}>
+                <div className="sticky left-0 z-10 bg-inherit flex items-center justify-center" onClick={e => e.stopPropagation()} style={{ borderLeft: `3px solid ${isCritical ? '#ef4444' : groupColor}` }}>
                     <input
                         type="checkbox"
                         checked={!!isSelected}
@@ -736,7 +764,7 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                 </div>
 
                 {/* Task Name + subtask chevron + subtask count badge */}
-                <div className="pr-1 min-w-0 flex items-center gap-1">
+                <div className="sticky left-[28px] z-10 bg-inherit pr-1 min-w-0 flex items-center gap-1">
                     {/* Chevron — solo si tiene subtareas */}
                     {totalSubs > 0 ? (
                         <button
@@ -757,11 +785,11 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                             <InlineEditText
                                 value={task.title || ''}
                                 onSave={v => saveField('title', v)}
-                                className={`text-sm font-semibold text-slate-200 truncate ${isSaved('title') ? 'bg-emerald-500/10' : ''}`}
+                                className={`text-sm font-semibold text-slate-200 whitespace-normal break-words ${isSaved('title') ? 'bg-emerald-500/10' : ''}`}
                                 placeholder="Sin título"
                             />
                         ) : (
-                            <p className="text-sm font-semibold text-slate-200 truncate">{task.title || 'Sin título'}</p>
+                            <p className="text-sm font-semibold text-slate-200 whitespace-normal break-words">{task.title || 'Sin título'}</p>
                         )}
                         {/* Subtask count badge — Monday.com style */}
                         {totalSubs > 0 && (
@@ -781,24 +809,33 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                         )}
                     </div>
 
-                    {/* Comment indicator */}
-                    {commentCount > 0 && (
-                        <span
-                            className="flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 shrink-0 cursor-pointer hover:bg-blue-500/25 transition-colors"
-                            title={`${commentCount} comentario${commentCount > 1 ? 's' : ''}`}
-                            onClick={e => { e.stopPropagation(); onOpenModal(task); }}
-                        >
-                            <MessageSquare className="w-2.5 h-2.5" />
-                            {commentCount}
-                        </span>
-                    )}
-
                     {/* Quick action icons on hover */}
                     <div className="hidden group-hover/row:flex items-center gap-0.5 shrink-0">
                         <button onClick={e => { e.stopPropagation(); onOpenModal(task); }} className="p-0.5 text-slate-600 hover:text-indigo-400 transition-colors" title="Agregar subtarea">
                             <Plus className="w-3 h-3" />
                         </button>
                     </div>
+                </div>
+
+                {/* Comentarios */}
+                <div 
+                    className="flex flex-col gap-1 px-2 py-1.5 min-w-0 cursor-pointer hover:bg-slate-500/5 dark:hover:bg-slate-700/10 rounded-lg transition-colors"
+                    onClick={(e) => { e.stopPropagation(); onOpenModal(task); }}
+                    title="Hacer clic para ver o agregar comentarios"
+                >
+                    {taskComments && taskComments.length > 0 ? (
+                        taskComments.map((c, i) => {
+                            const dateLabel = formatCommentDate(c.created_at);
+                            return (
+                                <div key={i} className="text-[11px] text-[var(--text-secondary)] break-words leading-tight">
+                                    {dateLabel && <strong className="text-[var(--text-primary)] font-black mr-1">{dateLabel}:</strong>}
+                                    <span>{c.text}</span>
+                                </div>
+                            );
+                        })
+                    ) : (
+                        <span className="text-[11px] text-slate-500/50 italic select-none truncate">—</span>
+                    )}
                 </div>
 
                 {/* Owner */}
@@ -861,12 +898,21 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                                 onSelect={v => {
                                     saveField('workAreaTypeId', v || null);
                                     if (v && task.taskTypeId) {
-                                        const newArea = (workAreaTypes || []).find(a => a.id === v);
-                                        const allowedNames = newArea?.defaultTaskTypes || [];
-                                        const currentType = (taskTypes || []).find(t => t.id === task.taskTypeId);
-                                        if (currentType && allowedNames.length > 0 && !allowedNames.includes(currentType.name)) {
-                                            saveField('taskTypeId', null);
-                                        }
+                                         const newArea = (workAreaTypes || []).find(a => a.id === v);
+                                         const allowedValues = newArea?.defaultTaskTypes || [];
+                                         const currentType = (taskTypes || []).find(t => t.id === task.taskTypeId);
+                                         if (currentType && allowedValues.length > 0) {
+                                             const isAllowed = allowedValues.includes(currentType.id) || 
+                                                               allowedValues.includes(currentType.name) ||
+                                                               (currentType.firestoreId && allowedValues.includes(currentType.firestoreId)) ||
+                                                               allowedValues.some(val => 
+                                                                   (currentType.name && val?.toString().toLowerCase() === currentType.name.toLowerCase()) ||
+                                                                   (currentType.firestoreId && val?.toString().toLowerCase() === currentType.firestoreId.toLowerCase())
+                                                               );
+                                             if (!isAllowed) {
+                                                 saveField('taskTypeId', null);
+                                             }
+                                         }
                                     }
                                 }}
                                 renderValue={() => (
@@ -885,7 +931,15 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
                         const selectedArea = (workAreaTypes || []).find(a => a.id === task.workAreaTypeId);
                         const allowedValues = selectedArea?.defaultTaskTypes || [];
                         const filteredTypes = allowedValues.length > 0
-                            ? (taskTypes || []).filter(t => allowedValues.includes(t.id) || allowedValues.includes(t.name))
+                            ? (taskTypes || []).filter(t => 
+                                  allowedValues.includes(t.id) || 
+                                  allowedValues.includes(t.name) || 
+                                  (t.firestoreId && allowedValues.includes(t.firestoreId)) ||
+                                  allowedValues.some(val => 
+                                      (t.name && val?.toString().toLowerCase() === t.name.toLowerCase()) ||
+                                      (t.firestoreId && val?.toString().toLowerCase() === t.firestoreId.toLowerCase())
+                                  )
+                              )
                             : (taskTypes || []);
                         const tt = (taskTypes || []).find(t => t.id === task.taskTypeId);
                         const typeOptions = [
@@ -1053,179 +1107,145 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
     );
 }
 
-// ============================================================
-// MOBILE TASK CARD (Monday.com style)
-// ============================================================
-
 function MobileTaskCard({ task, engProjects, teamMembers, subtasks, canEdit, onOpenModal, groupColor, taskTypes, workAreaTypes }) {
     const [expandedSubs, setExpandedSubs] = useState(false);
 
     const project = engProjects.find(p => p.id === task.projectId);
     const statusCfg = TASK_STATUS_CONFIG[task.status] || {};
     const priorityCfg = TASK_PRIORITY_CONFIG[task.priority] || {};
-    const priorityColors = { low: '#94a3b8', medium: '#60a5fa', high: '#fbbf24', critical: '#f87171' };
-    const pColor = priorityColors[task.priority] || '#94a3b8';
+    
+    const PRIORITY_DOT = {
+        critical: 'bg-red-500',
+        high:     'bg-amber-400',
+        medium:   'bg-blue-400',
+        low:      'bg-slate-500',
+    };
+    const priorityDot = PRIORITY_DOT[task.priority] || PRIORITY_DOT.medium;
 
     const totalSubs = subtasks.length;
     const doneSubs = subtasks.filter(s => s.completed || s.done).length;
-    const subsPct = totalSubs > 0 ? Math.round((doneSubs / totalSubs) * 100) : 0;
-    const subsColor = subsPct === 100 ? '#22c55e' : subsPct >= 50 ? '#f59e0b' : subsPct > 0 ? '#6366f1' : '#334155';
 
     const startRaw = task.plannedStartDate || task.createdAt;
     const endRaw = task.dueDate || task.plannedEndDate;
-    const startDate = startRaw ? new Date(startRaw) : null;
     const endDate = endRaw ? new Date(endRaw) : null;
     const now = new Date();
 
-    let timelinePct = 0, timelineColor = '#6366f1', daysLeft = null;
-    if (startDate && endDate) {
-        const total = Math.max(1, (endDate - startDate) / (1000 * 60 * 60 * 24));
-        const elapsed = Math.max(0, (now - startDate) / (1000 * 60 * 60 * 24));
-        timelinePct = Math.min(100, Math.max(0, (elapsed / total) * 100));
+    let daysLeft = null;
+    if (endDate) {
         daysLeft = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
-        if (daysLeft < 0 && task.status !== 'completed') timelineColor = '#ef4444';
-        else if (timelinePct > 80) timelineColor = '#f59e0b';
     }
 
     const actual = task.actualHours || 0;
     const estimated = task.estimatedHours || 0;
-    const hoursPct = estimated > 0 ? Math.round((actual / estimated) * 100) : 0;
-    const hoursBarColor = hoursPct > 100 ? '#ef4444' : hoursPct > 80 ? '#f59e0b' : '#22c55e';
 
-    const fmtDate = (d) => d ? d.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' }) : '—';
+    const fmtDate = (d) => d ? d.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' }) : '';
 
     const owner = teamMembers.find(m => m.uid === task.assignedTo);
+    const wa = (workAreaTypes || []).find(a => a.id === task.workAreaTypeId);
+    const tt = (taskTypes || []).find(t => t.id === task.taskTypeId);
 
     return (
         <div
-            className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 space-y-3"
-            style={{ borderLeft: `4px solid ${groupColor}` }}
+            className="bg-slate-800/40 border border-slate-700/30 hover:bg-slate-800/60 rounded-xl px-4 py-3 flex flex-col gap-1 transition-colors cursor-pointer"
+            style={{ borderLeft: `3px solid ${groupColor}` }}
             onClick={() => onOpenModal(task)}
         >
-            {/* Row 1: Title + Priority badge */}
-            <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="flex items-center gap-3">
+                {/* Left Side: Priority dot and optional subtask toggle */}
+                <div className="flex items-center gap-2 shrink-0">
+                    <div className={`w-2 h-2 rounded-full ${priorityDot}`} title={`Prioridad: ${priorityCfg.label || task.priority}`} />
                     {totalSubs > 0 && (
-                        <button onClick={e => { e.stopPropagation(); setExpandedSubs(!expandedSubs); }} className="text-slate-500 shrink-0">
-                            {expandedSubs ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                        <button onClick={e => { e.stopPropagation(); setExpandedSubs(!expandedSubs); }} className="text-slate-500 hover:text-slate-300 shrink-0">
+                            {expandedSubs ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                         </button>
                     )}
-                    <h4 className="text-sm font-bold text-slate-100 truncate">{task.title || 'Sin título'}</h4>
                 </div>
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0"
-                    style={{ backgroundColor: pColor + '18', color: pColor, border: `1px solid ${pColor}30` }}>
-                    {priorityCfg.label || task.priority}
-                </span>
-            </div>
 
-            {/* Row 2: Owner + Status */}
-            <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
+                {/* Main info */}
+                <div className="flex-1 min-w-0">
+                    {/* Row 1: Categorization (Status, Project, Area, Classification) */}
+                    <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-slate-450 font-bold mb-1">
+                        {/* Status Badge */}
+                        <span 
+                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider shrink-0"
+                            style={{ 
+                                backgroundColor: (statusCfg.color || '#64748b') + '15', 
+                                color: statusCfg.color || '#94a3b8', 
+                                border: `1px solid ${(statusCfg.color || '#64748b')}25` 
+                            }}
+                        >
+                            {statusCfg.label || task.status}
+                        </span>
+
+                        {/* Project Name */}
+                        {project && (
+                            <span className="text-slate-300 font-extrabold truncate max-w-[120px]" title={project.name}>
+                                {project.name}
+                            </span>
+                        )}
+
+                        {/* Area */}
+                        {wa && (
+                            <span className="text-teal-400 font-semibold">
+                                · {wa.name}
+                            </span>
+                        )}
+
+                        {/* Task Type */}
+                        {tt && (
+                            <span className="text-slate-400 font-medium">
+                                · {tt.name}
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Row 2: Planning & Status (Due Date, Subtasks, Hours) */}
+                    {(endDate || totalSubs > 0 || actual > 0 || estimated > 0) && (
+                        <div className="flex flex-wrap items-center gap-2.5 text-[10px] text-slate-500 font-semibold mb-1">
+                            {/* Due Date */}
+                            {endDate && (
+                                <span className={`inline-flex items-center gap-0.5 ${daysLeft !== null && daysLeft < 0 && task.status !== 'completed' ? 'text-red-400 font-bold' : 'text-slate-450'}`}>
+                                    📅 {fmtDate(endDate)}
+                                </span>
+                            )}
+
+                            {/* Subtasks Count */}
+                            {totalSubs > 0 && (
+                                <span className="inline-flex items-center gap-0.5 text-slate-450">
+                                    📋 {doneSubs}/{totalSubs} sub
+                                </span>
+                            )}
+
+                            {/* Hours */}
+                            {(actual > 0 || estimated > 0) && (
+                                <span className="inline-flex items-center gap-0.5 text-slate-450">
+                                    ⏱️ {actual.toFixed(1)}h/{estimated}h
+                                </span>
+                            )}
+                        </div>
+                    )}
+                    
+                    {/* Task Title */}
+                    <p className="font-bold text-slate-100 text-sm break-words whitespace-normal">
+                        {task.title || 'Sin título'}
+                    </p>
+                </div>
+
+                {/* Right Side: Owner Avatar */}
+                <div className="shrink-0 flex items-center ml-2">
                     {owner?.photoURL ? (
-                        <img src={owner.photoURL} alt="" className="w-7 h-7 rounded-full border border-slate-700" />
+                        <img src={owner.photoURL} alt={owner.displayName || ''} className="w-6 h-6 rounded-full border border-slate-700" title={owner.displayName} />
                     ) : (
-                        <div className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center text-[11px] font-bold text-white shrink-0">
+                        <div className="w-6 h-6 rounded-full bg-indigo-600/70 border border-slate-700/50 flex items-center justify-center text-[10px] font-bold text-white uppercase" title={owner?.displayName || 'Sin asignar'}>
                             {(owner?.displayName || task.assignedTo || '?')[0]?.toUpperCase()}
                         </div>
                     )}
-                    <span className="text-xs text-slate-300 truncate">{owner?.displayName || 'Sin asignar'}</span>
                 </div>
-                <span className="inline-flex items-center px-2.5 py-1 rounded text-[10px] font-bold uppercase whitespace-nowrap"
-                    style={{ backgroundColor: (statusCfg.color || '#64748b') + '20', color: statusCfg.color, border: `1px solid ${(statusCfg.color || '#64748b')}33` }}>
-                    {statusCfg.label || task.status}
-                </span>
             </div>
-
-            {/* Row 2.5: Area + Task Type */}
-            {(() => {
-                const wa = (workAreaTypes || []).find(a => a.id === task.workAreaTypeId);
-                const tt = (taskTypes || []).find(t => t.id === task.taskTypeId);
-                return (wa || tt) ? (
-                    <div className="flex items-center gap-3 text-xs">
-                        {wa && (
-                            <div className="flex items-center gap-1">
-                                <span className="text-slate-500">Área</span>
-                                <span className="text-teal-400 font-medium">{wa.name}</span>
-                            </div>
-                        )}
-                        {tt && (
-                            <div className="flex items-center gap-1">
-                                <span className="text-slate-500">Tipo</span>
-                                <span className="text-slate-300 font-medium">{tt.name}</span>
-                            </div>
-                        )}
-                    </div>
-                ) : null;
-            })()}
-
-            {/* Row 3: Progress bar */}
-            {totalSubs > 0 && (
-                <div className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-500">Progreso</span>
-                        <span className="font-bold text-slate-300">{doneSubs}/{totalSubs} <span className="text-slate-500">({subsPct}%)</span></span>
-                    </div>
-                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${subsPct}%`, background: subsColor }} />
-                    </div>
-                </div>
-            )}
-
-            {/* Row 4: Timeline */}
-            {startDate && endDate && (
-                <div className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-500">Timeline</span>
-                        <div className="flex items-center gap-2">
-                            <span className="text-slate-300">{fmtDate(startDate)} → {fmtDate(endDate)}</span>
-                            {daysLeft !== null && (
-                                <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
-                                    daysLeft < 0 && task.status !== 'completed' ? 'text-rose-400 bg-rose-500/15' :
-                                    daysLeft <= 3 ? 'text-amber-400' : 'text-slate-500'
-                                }`}>
-                                    {task.status === 'completed' ? '✓' : daysLeft < 0 ? `${Math.abs(daysLeft)}d late` : `${daysLeft}d`}
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${timelinePct}%`, background: timelineColor }} />
-                    </div>
-                </div>
-            )}
-
-            {/* Row 5: Hours */}
-            {(actual > 0 || estimated > 0) && (
-                <div className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-500">Horas</span>
-                        <div className="flex items-center gap-2">
-                            <span className="text-white font-bold">{actual.toFixed(1)}h</span>
-                            <span className="text-slate-600">/</span>
-                            <span className="text-slate-400">{estimated}h</span>
-                            {estimated > 0 && (
-                                <span className={`text-[11px] font-bold ${hoursPct > 100 ? 'text-rose-400' : hoursPct > 80 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                                    {hoursPct}%
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                    {estimated > 0 && (
-                        <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(hoursPct, 100)}%`, background: hoursBarColor }} />
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Project tag */}
-            {project && (
-                <div className="text-[11px] text-slate-500 italic">{project.name}</div>
-            )}
 
             {/* Subtasks expansion */}
             {expandedSubs && totalSubs > 0 && (
-                <div onClick={e => e.stopPropagation()}>
+                <div className="mt-2 pt-2 border-t border-slate-700/30" onClick={e => e.stopPropagation()}>
                     <SubtaskExpander subtasks={subtasks} taskId={task.id} canEdit={canEdit} />
                 </div>
             )}
@@ -1237,7 +1257,7 @@ function MobileTaskCard({ task, engProjects, teamMembers, subtasks, canEdit, onO
 // TABLE GROUP (responsive: grid on desktop, cards on mobile)
 // ============================================================
 
-function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers, canEdit, canEditDates, onOpenModal, isExpanded, onToggle, savedField, onSaved, taskTypes, workAreaTypes, groupStatus, groupProjectId, user, selectedTaskIds, onToggleSelect, onTaskCreated, activeFilterProject, activeFilterAssignee, commentCounts }) {
+function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers, canEdit, canEditDates, onOpenModal, isExpanded, onToggle, savedField, onSaved, taskTypes, workAreaTypes, groupStatus, groupProjectId, user, selectedTaskIds, onToggleSelect, onTaskCreated, activeFilterProject, activeFilterAssignee, commentCounts, taskCommentsMap }) {
     const [addingTask, setAddingTask] = useState(false);
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const addInputRef = useRef(null);
@@ -1256,8 +1276,12 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
             setNewTaskTitle('');
             if (newId && onTaskCreated) onTaskCreated(newId);
             setTimeout(() => addInputRef.current?.focus(), 50);
-        } catch (err) { console.error('Failed to create task:', err); }
+        } catch (err) {
+            console.error('Failed to create task:', err);
+            alert('No se pudo crear la tarea: ' + (err.message || 'Error desconocido'));
+        }
     };
+
 
     // Summary calculations
     const statusDist = useMemo(() => {
@@ -1306,13 +1330,12 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
             {isExpanded && (
                 <>
                     {/* Desktop: grid table (hidden on mobile) */}
-                    <div className="mt-1 rounded-xl border border-slate-800/50 bg-slate-800/20 hidden md:block max-h-[70vh] overflow-y-auto">
-                        {/* Header */}
+                    <div className="mt-1 rounded-xl border border-slate-800/50 bg-slate-800/20 hidden md:block max-h-[70vh] overflow-auto">
                         <div
-                            className="grid items-center px-2 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-800/90 text-center sticky top-0 z-10 backdrop-blur-sm"
-                            style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${color}` }}
+                            className="grid items-center px-2 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-[var(--bg-table-header-solid)] text-center sticky top-0 z-20 min-w-[1100px]"
+                            style={{ gridTemplateColumns: GRID_COLS }}
                         >
-                            <div className="flex items-center justify-center">
+                            <div className="sticky left-0 z-10 bg-[var(--bg-table-header-solid)] flex items-center justify-center h-full" style={{ borderLeft: `3px solid ${color}` }}>
                                 <input
                                     type="checkbox"
                                     checked={tasks.length > 0 && tasks.every(t => selectedTaskIds?.has(t.id))}
@@ -1321,7 +1344,8 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                     title="Seleccionar todo el grupo"
                                 />
                             </div>
-                            <div className="text-left">Tarea</div>
+                            <div className="sticky left-[28px] z-10 text-left bg-[var(--bg-table-header-solid)] h-full flex items-center">Tarea</div>
+                            <div className="text-left px-1 flex items-center gap-1" title="Comentarios">💬 Comentarios</div>
                             <div>Resp</div>
                             <div>STN</div>
                             <div>Estado</div>
@@ -1359,6 +1383,7 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                     isSelected={selectedTaskIds?.has(task.id)}
                                     onToggleSelect={onToggleSelect}
                                     commentCount={commentCounts?.[task.id] || 0}
+                                    taskComments={taskCommentsMap?.[task.id] || []}
                                 />
                             ))
                         )}
@@ -1366,13 +1391,13 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                         {/* Inline Add Task Row */}
                         {canEdit && (
                             <div
-                                className="grid items-center px-2 py-1.5 border-t border-slate-800/30"
-                                style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${color}` }}
+                                className="grid items-center px-2 py-1.5 border-t border-slate-800/30 bg-[var(--bg-table-row)] min-w-[1100px]"
+                                style={{ gridTemplateColumns: GRID_COLS }}
                             >
-                                <div></div>
-                                <div className="min-w-0">
+                                <div className="sticky left-0 z-10 bg-[var(--bg-table-row)] h-full flex items-center justify-center" style={{ borderLeft: `3px solid ${color}` }}></div>
+                                <div className="sticky left-[28px] z-10 bg-[var(--bg-table-row)] pr-1 min-w-0 flex items-center h-full">
                                     {addingTask ? (
-                                        <div className="flex items-center gap-1">
+                                        <div className="flex items-center gap-1 w-full">
                                             <input
                                                 ref={addInputRef}
                                                 value={newTaskTitle}
@@ -1396,20 +1421,21 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                     )}
                                 </div>
                                 {/* Rest of columns empty */}
-                                <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+                                <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
                             </div>
                         )}
 
                         {/* Group Summary Row — Monday.com style */}
                         {tasks.length > 0 && (
                             <div
-                                className="grid items-center px-2 py-2 border-t border-slate-700/40 bg-slate-900/30"
-                                style={{ gridTemplateColumns: GRID_COLS, borderLeft: `3px solid ${color}` }}
+                                className="grid items-center px-2 py-2 border-t border-slate-700/40 bg-[var(--bg-table-row-summary)] min-w-[1100px]"
+                                style={{ gridTemplateColumns: GRID_COLS }}
                             >
-                                <div></div> {/* 1. Checkbox */}
-                                <div></div> {/* 2. Task */}
-                                <div></div> {/* 3. Owner */}
-                                <div></div> {/* 4. STN placeholder */}
+                                <div className="sticky left-0 z-10 bg-[var(--bg-table-row-summary)] h-full flex items-center justify-center" style={{ borderLeft: `3px solid ${color}` }}></div> {/* 1. Checkbox */}
+                                <div className="sticky left-[28px] z-10 bg-[var(--bg-table-row-summary)] h-full"></div> {/* 2. Task */}
+                                <div></div> {/* 3. Comentarios placeholder */}
+                                <div></div> {/* 4. Owner */}
+                                <div></div> {/* 5. STN placeholder */}
                                 
                                 {/* 6. Status distribution mini bars */}
                                 <div className="flex h-5 rounded overflow-hidden mx-1" title="Distribución de estados">
@@ -1514,28 +1540,58 @@ export default function MainTable({ forceProjectId = null }) {
         taskSearch, setTaskSearch,
         taskFilterProject, setTaskFilterProject,
         taskFilterAssignee, setTaskFilterAssignee,
-        taskFilterPriority, setTaskFilterPriority
+        taskFilterPriority, setTaskFilterPriority,
+        taskFilterArea, setTaskFilterArea
     } = useEngineeringData();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
     const [collapsedGroups, setCollapsedGroups] = useState({});
+    const [showMobileFilters, setShowMobileFilters] = useState(false);
 
-    // --- Comment counts per task (global query, single fetch) ---
+    // --- Comment counts and all comments per task (global query, single fetch with realtime subscription) ---
     const [commentCounts, setCommentCounts] = useState({});
+    const [taskCommentsMap, setTaskCommentsMap] = useState({});
     useEffect(() => {
-        supabase
-            .from('task_comments')
-            .select('task_id')
-            .then(({ data }) => {
-                if (!data) return;
-                const counts = {};
-                data.forEach(row => {
-                    counts[row.task_id] = (counts[row.task_id] || 0) + 1;
+        const fetchAllComments = () => {
+            supabase
+                .from('task_comments')
+                .select('task_id, text, user_name, created_at')
+                .order('created_at', { ascending: true })
+                .then(({ data }) => {
+                    if (!data) return;
+                    const counts = {};
+                    const commentsMap = {};
+                    data.forEach(row => {
+                        counts[row.task_id] = (counts[row.task_id] || 0) + 1;
+                        if (!commentsMap[row.task_id]) {
+                            commentsMap[row.task_id] = [];
+                        }
+                        commentsMap[row.task_id].push({
+                            text: row.text,
+                            user_name: row.user_name,
+                            created_at: row.created_at
+                        });
+                    });
+                    setCommentCounts(counts);
+                    setTaskCommentsMap(commentsMap);
                 });
-                setCommentCounts(counts);
-            });
-    }, [engTasks.length]); // re-fetch when tasks change
+        };
+
+        fetchAllComments();
+
+        // Subscribe to real-time updates for task_comments
+        const channel = supabase
+            .channel('task_comments_changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'task_comments' }, () => {
+                fetchAllComments();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [engTasks.length]);
 
     // --- Resource Assignments (team relationships) ---
     const [resourceAssignments, setResourceAssignments] = useState([]);
@@ -1628,9 +1684,10 @@ export default function MainTable({ forceProjectId = null }) {
             }
 
             const matchPriority = !taskFilterPriority || task.priority === taskFilterPriority;
-            return matchSearch && matchProject && matchAssignee && matchPriority;
+            const matchArea = !taskFilterArea || task.areaId === taskFilterArea || task.workAreaTypeId === taskFilterArea;
+            return matchSearch && matchProject && matchAssignee && matchPriority && matchArea;
         });
-    }, [engTasks, taskSearch, taskFilterProject, taskFilterAssignee, taskFilterPriority, myTeamUids, user, recentlyCreatedIds]);
+    }, [engTasks, taskSearch, taskFilterProject, taskFilterAssignee, taskFilterPriority, taskFilterArea, myTeamUids, user, recentlyCreatedIds]);
 
     // ── Group tasks by project ──
     const projectGroups = useMemo(() => {
@@ -1683,7 +1740,8 @@ export default function MainTable({ forceProjectId = null }) {
     }, [projectGroups]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const toggleGroup = (key) => setCollapsedGroups(prev => ({ ...prev, [key]: !prev[key] }));
-    const activeFilterCount = [taskSearch, taskFilterProject, taskFilterAssignee !== 'my-team' ? taskFilterAssignee : '', taskFilterPriority].filter(Boolean).length;
+    const activeFilterCount = [taskSearch, taskFilterProject, taskFilterAssignee, taskFilterPriority, taskFilterArea].filter(Boolean).length;
+    const activeDropdownFilterCount = [taskFilterProject, taskFilterAssignee, taskFilterPriority, taskFilterArea].filter(Boolean).length;
 
     const [isExporting, setIsExporting] = useState(false);
     const handleExport = useCallback(() => {
@@ -1760,7 +1818,15 @@ export default function MainTable({ forceProjectId = null }) {
     }, [refetch]);
 
     return (
-        <div className={isEmbedded ? 'flex flex-col' : '-m-4 md:-m-8 flex flex-col'} style={{ background: isEmbedded ? 'transparent' : 'var(--bg-app)', color: 'var(--text-primary)', minHeight: isEmbedded ? 'auto' : '100vh' }}>
+        <div 
+            className={isEmbedded ? 'flex flex-col flex-1 min-h-0 h-full' : '-m-4 md:-m-8 flex flex-col'} 
+            style={{ 
+                background: isEmbedded ? 'var(--bg-card)' : 'var(--bg-app)', 
+                color: 'var(--text-primary)', 
+                minHeight: isEmbedded ? 'auto' : '100vh',
+                height: isEmbedded ? '100%' : 'auto'
+            }}
+        >
             <TaskDetailModal isOpen={isModalOpen} onClose={closeModal} task={selectedTask} projects={engProjects} teamMembers={teamMembers}
                 subtasks={selectedTask ? engSubtasks.filter(s => s.taskId === selectedTask.id) : []} taskTypes={taskTypes} userId={user?.uid} canEdit={canEdit} canDelete={canDelete} />
             <TransitionConfirmModal isOpen={!!pendingTransition} pending={pendingTransition} isTransitioning={isTransitioning} onConfirm={confirmTransition} onCancel={cancelTransition} delayCauses={delayCauses} teamMembers={teamMembers} />
@@ -1781,45 +1847,84 @@ export default function MainTable({ forceProjectId = null }) {
             {!isEmbedded && <TaskModuleBanner onNewTask={canEdit ? openNew : null} canEdit={canEdit} />}
 
 
-            {/* Filters — always visible */}
-            <div className="flex flex-wrap gap-2 items-center px-6 py-2 border-b border-slate-800/40">
-                <div className="relative flex-1 min-w-[160px] max-w-xs">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
-                    <input value={taskSearch} onChange={e => setTaskSearch(e.target.value)} placeholder="Buscar..."
-                        className="pl-8 pr-3 py-1.5 w-full border border-slate-700/60 rounded-lg text-xs text-white outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 placeholder:text-slate-600" />
-                </div>
-                {!isEmbedded && (
-                    <select value={taskFilterProject} onChange={e => setTaskFilterProject(e.target.value)}
-                        className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer">
-                        <option value="">Todos los proyectos</option>
-                        {engProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                )}
-                <select value={taskFilterAssignee} onChange={e => setTaskFilterAssignee(e.target.value)}
-                    className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer">
-                    <option value="my-team">Mis tareas y equipo</option>
-                    <option value="">Todos los miembros</option>
-                    {teamMembers.map(u => <option key={u.uid} value={u.uid}>{u.displayName || u.email}</option>)}
-                </select>
-                <select value={taskFilterPriority} onChange={e => setTaskFilterPriority(e.target.value)}
-                    className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer">
-                    <option value="">Todas las prioridades</option>
-                    {Object.entries(TASK_PRIORITY_CONFIG).map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
-                </select>
-                {activeFilterCount > 0 && (
-                    <button onClick={() => { setTaskSearch(''); setTaskFilterProject(''); setTaskFilterAssignee('my-team'); setTaskFilterPriority(''); }}
-                        className="text-[11px] text-rose-400 hover:text-rose-300 px-2 py-1 rounded hover:bg-rose-500/10 transition-colors">
-                        Limpiar
+            {/* Filters Bar */}
+            <div className="flex flex-col md:flex-row md:items-center gap-2 px-6 py-2 border-b border-slate-800/40 bg-slate-900/20 backdrop-blur-sm">
+                {/* Always Visible Row (Search, Toggle button, Export button on mobile) */}
+                <div className="flex items-center gap-2 w-full md:w-auto md:flex-1">
+                    <div className="relative flex-1 max-w-xs">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+                        <input value={taskSearch} onChange={e => setTaskSearch(e.target.value)} placeholder="Buscar..."
+                            className="pl-8 pr-3 py-1.5 w-full border border-slate-700/60 rounded-lg text-xs text-white outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 placeholder:text-slate-600" />
+                    </div>
+
+                    {/* Mobile Filter Toggle Button */}
+                    <button
+                        onClick={() => setShowMobileFilters(!showMobileFilters)}
+                        className="flex md:hidden items-center gap-1.5 px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs font-semibold text-slate-300 bg-slate-800/60 hover:bg-slate-700/60 transition-colors"
+                    >
+                        <Filter className="w-3.5 h-3.5" />
+                        <span>Filtros</span>
+                        {activeDropdownFilterCount > 0 && (
+                            <span className="flex items-center justify-center bg-indigo-500 text-white text-[9px] font-bold rounded-full h-4 min-w-4 px-1">
+                                {activeDropdownFilterCount}
+                            </span>
+                        )}
                     </button>
-                )}
+
+                    {/* Mobile-only Export Button */}
+                    <button
+                        onClick={handleExport}
+                        disabled={isExporting || filteredTasks.length === 0}
+                        className="flex md:hidden items-center gap-1.5 px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs font-semibold transition-all hover:bg-emerald-500/10 hover:border-emerald-500/40 hover:text-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-400 bg-slate-800/60 ml-auto"
+                        title={`Exportar ${filteredTasks.length} tareas a Excel`}
+                    >
+                        <Download className={`w-3.5 h-3.5 ${isExporting ? 'animate-bounce' : ''}`} />
+                        <span>{isExporting ? '...' : 'Exportar'}</span>
+                    </button>
+                </div>
+
+                {/* Dropdowns Container (collapsible on mobile, always flex on desktop) */}
+                <div className={`${showMobileFilters ? 'flex animate-in slide-in-from-top-2 duration-200' : 'hidden'} md:flex flex-col md:flex-row flex-wrap items-stretch md:items-center gap-2 w-full md:w-auto`}>
+                    {!isEmbedded && (
+                        <select value={taskFilterProject} onChange={e => setTaskFilterProject(e.target.value)}
+                            className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer w-full md:w-auto">
+                            <option value="">Todos los proyectos</option>
+                            {engProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                    )}
+                    <select value={taskFilterAssignee} onChange={e => setTaskFilterAssignee(e.target.value)}
+                        className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer w-full md:w-auto">
+                        <option value="my-team">Mis tareas y equipo</option>
+                        <option value="">Todos los miembros</option>
+                        {teamMembers.map(u => <option key={u.uid} value={u.uid}>{u.displayName || u.email}</option>)}
+                    </select>
+                    <select value={taskFilterArea} onChange={e => setTaskFilterArea(e.target.value)}
+                        className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer w-full md:w-auto">
+                        <option value="">Todas las áreas</option>
+                        {workAreaTypes.map(area => <option key={area.id} value={area.id}>{area.name}</option>)}
+                    </select>
+                    <select value={taskFilterPriority} onChange={e => setTaskFilterPriority(e.target.value)}
+                        className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer w-full md:w-auto">
+                        <option value="">Todas las prioridades</option>
+                        {Object.entries(TASK_PRIORITY_CONFIG).map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
+                    </select>
+                    {activeFilterCount > 0 && (
+                        <button onClick={() => { setTaskSearch(''); setTaskFilterProject(''); setTaskFilterAssignee(''); setTaskFilterPriority(''); setTaskFilterArea(''); }}
+                            className="text-[11px] text-rose-400 hover:text-rose-300 px-2 py-1.5 rounded hover:bg-rose-500/10 transition-colors w-full md:w-auto text-center border border-dashed border-rose-500/20 md:border-none">
+                            Limpiar Filtros
+                        </button>
+                    )}
+                </div>
+
+                {/* Desktop-only Export Button */}
                 <button
                     onClick={handleExport}
                     disabled={isExporting || filteredTasks.length === 0}
-                    className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs font-semibold transition-all hover:bg-emerald-500/10 hover:border-emerald-500/40 hover:text-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-400 bg-slate-800/60 ml-auto"
+                    className="hidden md:flex items-center gap-1.5 px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs font-semibold transition-all hover:bg-emerald-500/10 hover:border-emerald-500/40 hover:text-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-400 bg-slate-800/60 ml-auto"
                     title={`Exportar ${filteredTasks.length} tareas a Excel`}
                 >
                     <Download className={`w-3.5 h-3.5 ${isExporting ? 'animate-bounce' : ''}`} />
-                    <span className="hidden sm:inline">{isExporting ? 'Exportando...' : 'Exportar'}</span>
+                    <span>{isExporting ? 'Exportando...' : 'Exportar'}</span>
                 </button>
             </div>
 
@@ -1891,6 +1996,7 @@ export default function MainTable({ forceProjectId = null }) {
                             activeFilterProject={taskFilterProject}
                             activeFilterAssignee={taskFilterAssignee}
                             commentCounts={commentCounts}
+                            taskCommentsMap={taskCommentsMap}
                         />
                     );
                 })}

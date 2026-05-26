@@ -1,0 +1,15 @@
+{
+  "name": "autobom-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for AutoBOM Pro data integration",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.1",
+    "@supabase/supabase-js": "^2.105.4",
+    "dotenv": "^16.4.5"
+  }
+}

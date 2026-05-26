@@ -91,6 +91,53 @@ ${text}`;
         }
     );
 
+    // Helper for scraping DuckDuckGo Image Search as a fallback
+    const searchDuckDuckGoImages = async (query) => {
+        try {
+            console.log("Attempting DuckDuckGo fallback image search for:", query);
+            const response = await fetch('https://duckduckgo.com/', {
+                method: 'POST',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                },
+                body: new URLSearchParams({ q: query })
+            });
+            const html = await response.text();
+            const vqdMatch = html.match(/vqd=['"]?([^'"]+)['"]?/) || html.match(/vqd\s*=\s*['"]?([^'"]+)['"]?/);
+            if (!vqdMatch) {
+                throw new Error("Could not find DDG VQD token");
+            }
+            const vqd = vqdMatch[1];
+
+            const params = new URLSearchParams({
+                q: query,
+                vqd: vqd,
+                o: 'json',
+                l: 'wt-wt'
+            });
+
+            const imageResponse = await fetch(`https://duckduckgo.com/i.js?${params.toString()}`, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Referer': 'https://duckduckgo.com/'
+                }
+            });
+            const data = await imageResponse.json();
+            const images = (data.results || []).slice(0, 8).map((item) => ({
+                url: item.image,
+                thumbnail: item.thumbnail || item.image,
+                title: item.title,
+                source: item.url ? (item.url.match(/https?:\/\/([^\/]+)/)?.[1] || "duckduckgo") : "duckduckgo",
+                pageUrl: item.url || item.image,
+            }));
+            console.log(`DuckDuckGo fallback succeeded. Found ${images.length} images.`);
+            return images;
+        } catch (ddgErr) {
+            console.error("DuckDuckGo fallback failed:", ddgErr);
+            throw ddgErr;
+        }
+    };
+
     const searchImages = onCall(
         { secrets: [googleCseKey, googleCx] },
         async (request) => {
@@ -98,25 +145,39 @@ ${text}`;
             if (!query || typeof query !== "string" || !query.trim()) {
                 throw new HttpsError("invalid-argument", "Se requiere un término de búsqueda.");
             }
-            const key = googleCseKey.value();
-            const cx = googleCx.value();
-            const url = `https://www.googleapis.com/customsearch/v1?key=${key}&cx=${cx}&q=${encodeURIComponent(query + " product")}&searchType=image&num=8&imgSize=medium&safe=active`;
+            
+            // Try Google Custom Search first
             try {
+                const key = googleCseKey.value();
+                const cx = googleCx.value();
+                const url = `https://www.googleapis.com/customsearch/v1?key=${key}&cx=${cx}&q=${encodeURIComponent(query + " product")}&searchType=image&num=8&imgSize=medium&safe=active`;
                 const response = await fetch(url);
                 const data = await response.json();
+                
                 if (data.error) {
-                    throw new HttpsError("internal", data.error.message || "Error en la búsqueda de imágenes");
+                    console.warn("Google Custom Search API error, falling back to DuckDuckGo:", JSON.stringify(data.error));
+                    // Trigger fallback to DDG
+                    const images = await searchDuckDuckGoImages(query);
+                    return { images };
                 }
+                
                 const images = (data.items || []).map((item) => ({
                     url: item.link,
                     thumbnail: item.image?.thumbnailLink || item.link,
                     title: item.title,
                     source: item.displayLink,
+                    pageUrl: item.image?.contextLink || item.link,
                 }));
                 return { images };
             } catch (err) {
-                if (err instanceof HttpsError) throw err;
-                throw new HttpsError("internal", err.message);
+                console.warn("Google search failed, attempting DuckDuckGo fallback:", err);
+                try {
+                    const images = await searchDuckDuckGoImages(query);
+                    return { images };
+                } catch (ddgErr) {
+                    if (err instanceof HttpsError) throw err;
+                    throw new HttpsError("internal", `Búsqueda fallida en Google y DuckDuckGo: ${err.message || err}`);
+                }
             }
         }
     );

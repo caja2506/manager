@@ -15,7 +15,7 @@ import DependencyArrows from './DependencyArrows';
 import {
     ChevronDown, ChevronRight, Plus, Ban, Circle, Play, CheckCircle2,
     Clock, PanelLeftOpen, PanelLeftClose, CheckCircle, AlertTriangle, Link2,
-    Target, ListTodo, MoreVertical,
+    Target, ListTodo, MoreVertical, Flag, CalendarX,
 } from 'lucide-react';
 
 // ---- Layout constants ----
@@ -37,6 +37,7 @@ const STATUS_ICONS = {
 };
 
 const GROUP_COLORS = ['indigo', 'violet', 'sky', 'emerald', 'amber', 'rose', 'cyan', 'fuchsia'];
+const PROJECT_COLORS = ['blue', 'violet', 'emerald', 'amber', 'pink', 'orange', 'cyan', 'rose'];
 
 function toMidnight(dateOrStr) {
     // When parsing "YYYY-MM-DD" strings, new Date() treats them as UTC.
@@ -54,17 +55,54 @@ function toMidnight(dateOrStr) {
 function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
 function daysBetween(a, b) { return Math.round((toMidnight(b) - toMidnight(a)) / (24 * 60 * 60 * 1000)); }
 
+function getLocalDateStr(dateOrStr) {
+    if (!dateOrStr) return null;
+    if (typeof dateOrStr === 'string' && dateOrStr.length === 10) {
+        return dateOrStr;
+    }
+    const d = new Date(dateOrStr);
+    if (isNaN(d.getTime())) return null;
+    return d.toLocaleDateString('en-CA');
+}
+
+function daysBetweenStr(str1, str2) {
+    if (!str1 || !str2) return 0;
+    const d1 = new Date(str1 + 'T12:00:00');
+    const d2 = new Date(str2 + 'T12:00:00');
+    return Math.round((d2 - d1) / (24 * 60 * 60 * 1000));
+}
+
 export default function GanttGrid({
     tasks, dependencies, viewMode, viewStart: viewStartProp, taskTypes, milestones = [], users,
     groupBy = 'type', onGroupByChange, onCreateMilestone,
     onCreateTaskInMilestone, onDeleteMilestone,
     placingTask, onPlacementComplete, onStartPlacement, onAssignMilestone,
     onTaskClick, onBarDragEnd, onLinkCreated, onDeleteDependency,
-    zoomLevel = 1,
+    zoomLevel = 1, showCriticalPath, projects = [],
+    onRemoveFromGantt,
 }) {
     const timelineRef = useRef(null);
-    const baseDayWidth = viewMode === 'weekly' ? DAY_WIDTH_WEEKLY : DAY_WIDTH_MONTHLY;
-    const dayWidth = baseDayWidth * zoomLevel;
+    const leftPanelRef = useRef(null);
+
+    const handleLeftScroll = (e) => {
+        if (timelineRef.current && timelineRef.current.scrollTop !== e.currentTarget.scrollTop) {
+            timelineRef.current.scrollTop = e.currentTarget.scrollTop;
+        }
+    };
+
+    const handleRightScroll = (e) => {
+        if (leftPanelRef.current && leftPanelRef.current.scrollTop !== e.currentTarget.scrollTop) {
+            leftPanelRef.current.scrollTop = e.currentTarget.scrollTop;
+        }
+    };
+    let dayWidth;
+    if (viewMode === 'weekly') {
+        dayWidth = DAY_WIDTH_WEEKLY * zoomLevel;
+    } else if (viewMode === 'weeks') {
+        dayWidth = (56 / 7) * zoomLevel; // 56px por semana de 7 días = 8px por día
+    } else {
+        dayWidth = DAY_WIDTH_MONTHLY * zoomLevel;
+    }
 
     // Hover sync
     const [hoveredTaskId, setHoveredTaskId] = useState(null);
@@ -160,6 +198,12 @@ export default function GanttGrid({
         if (today < minD) minD = addDays(today, -14);
         if (today > maxD) maxD = addDays(today, 30);
 
+        if (viewMode === 'weeks') {
+            const day = minD.getDay(); // 0=Sun, 1=Mon...
+            const diff = day === 0 ? -6 : 1 - day;
+            minD = addDays(minD, diff);
+        }
+
         const diffDays = Math.max(daysBetween(minD, maxD), 35); // minimum 35 days width
         return { computedStart: minD, computedNumDays: diffDays };
     }, [tasks]);
@@ -192,9 +236,27 @@ export default function GanttGrid({
         return m;
     }, [milestones]);
 
-    const milestoneOptionsTree = useMemo(() => {
+    const projectColorsMap = useMemo(() => {
+        const m = new Map();
+        (projects || []).forEach((p, idx) => {
+            const color = PROJECT_COLORS[idx % PROJECT_COLORS.length];
+            m.set(p.id, color);
+        });
+        return m;
+    }, [projects]);
+
+    const projectMap = useMemo(() => {
+        const m = new Map();
+        (projects || []).forEach(p => m.set(p.id, p));
+        return m;
+    }, [projects]);
+
+    const renderMilestoneOptions = useCallback((projectId) => {
         if (!milestones || milestones.length === 0) return [];
-        const allMs = [...milestones].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+        const projectMs = milestones.filter(m => m.projectId === projectId || m.parentProjectId === projectId);
+        if (projectMs.length === 0) return [];
+
+        const allMs = [...projectMs].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
         const roots = allMs.filter(m => !m.parentMilestoneId);
         const childrenOf = (parentId) => allMs.filter(m => m.parentMilestoneId === parentId);
         
@@ -215,9 +277,36 @@ export default function GanttGrid({
         return buildOptions(roots, 0);
     }, [milestones]);
 
-    function getTaskColor(task) {
-        return taskTypeMap.get(task.taskTypeId || task.taskType)?.color || 'indigo';
+    function getTaskHealthColor(task, defaultColor) {
+        if (task.status === 'cancelled') return 'slate';
+        if (task.status === 'completed') return 'green';
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Alerta de riesgo (quedan <= 3 días y avance < 75%)
+        if (task.plannedEndDate) {
+            const end = toMidnight(task.plannedEndDate);
+            const daysLeft = daysBetween(today, end);
+            const pct = task.percentComplete || 0;
+            if (daysLeft >= 0 && daysLeft <= 3 && pct < 75) {
+                return 'amber';
+            }
+        }
+
+        return defaultColor;
     }
+
+    function getTaskColor(task) {
+        const defaultColor = projectColorsMap.get(task.projectId) || taskTypeMap.get(task.taskTypeId || task.taskType)?.color || 'indigo';
+        return getTaskHealthColor(task, defaultColor);
+    }
+
+    // Ruta Crítica
+    const criticalTaskIds = useMemo(() => {
+        if (!showCriticalPath) return new Set();
+        return computeCriticalPath(tasks, dependencies);
+    }, [tasks, dependencies, showCriticalPath]);
 
     // Group tasks by type OR by milestone (hierarchical tree up to 4 levels)
     const groups = useMemo(() => {
@@ -246,10 +335,14 @@ export default function GanttGrid({
             // Build recursive tree nodes (max depth 4)
             const buildNode = (ms, depth, colorIdx) => {
                 const children = depth < 3 ? childrenOf(ms.id) : []; // depth 0-3 = 4 levels
+                const projectColor = projectColorsMap.get(ms.projectId) || GROUP_COLORS[colorIdx % GROUP_COLORS.length];
+                const projectName = projectMap.get(ms.projectId)?.name || '';
                 return {
                     id: ms.id,
                     name: ms.name || 'Sin nombre',
-                    color: GROUP_COLORS[colorIdx % GROUP_COLORS.length],
+                    projectName,
+                    projectId: ms.projectId,
+                    color: projectColor,
                     tasks: tasksByMs.get(ms.id) || [],
                     count: (tasksByMs.get(ms.id) || []).length,
                     isMilestone: true,
@@ -327,14 +420,35 @@ export default function GanttGrid({
 
     const totalGridHeight = rows.reduce((h, r) => h + (r.type === 'group' ? GROUP_HEADER_HEIGHT : ROW_HEIGHT), 0);
 
+    function getEffectiveEndDateStr(task) {
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        const startStr = task.plannedStartDate ? getLocalDateStr(task.plannedStartDate) : todayStr;
+        let endStr = task.plannedEndDate ? getLocalDateStr(task.plannedEndDate) : startStr;
+        
+        if (task.status === 'completed') {
+            if (task.completedDate) {
+                const completedStr = getLocalDateStr(task.completedDate);
+                if (completedStr && completedStr > endStr) {
+                    endStr = completedStr;
+                }
+            }
+        } else if (task.status !== 'cancelled') {
+            if (todayStr > endStr) {
+                endStr = todayStr;
+            }
+        }
+        return endStr;
+    }
+
     // Bar geometry
     function getBarGeometry(task) {
         if (!task.plannedStartDate) return null;
-        const start = toMidnight(task.plannedStartDate);
-        const end = task.plannedEndDate ? toMidnight(task.plannedEndDate) : start;
+        const viewStartStr = getLocalDateStr(viewStart);
+        const startStr = getLocalDateStr(task.plannedStartDate);
+        const endStr = getEffectiveEndDateStr(task);
         return {
-            left: daysBetween(viewStart, start) * dayWidth,
-            width: Math.max(daysBetween(start, end) + 1, 1) * dayWidth,
+            left: daysBetweenStr(viewStartStr, startStr) * dayWidth,
+            width: Math.max(daysBetweenStr(startStr, endStr) + 1, 1) * dayWidth,
         };
     }
 
@@ -400,11 +514,12 @@ export default function GanttGrid({
 
     // Monthly week groups
     const weekGroups = useMemo(() => {
-        if (viewMode !== 'monthly') return [];
+        if (viewMode !== 'monthly' && viewMode !== 'weeks') return [];
         const grps = []; let cur = null;
         dateCols.forEach((d, i) => {
             const wn = getISOWeek(d);
-            if (!cur || cur.week !== wn) { cur = { week: wn, start: i, count: 1, label: `Sem ${wn}` }; grps.push(cur); }
+            const label = viewMode === 'weeks' ? `W${wn}` : `Sem ${wn}`;
+            if (!cur || cur.week !== wn) { cur = { week: wn, start: i, count: 1, label }; grps.push(cur); }
             else cur.count++;
         });
         return grps;
@@ -427,7 +542,7 @@ export default function GanttGrid({
         return grps;
     }, [dateCols]);
 
-    const headerHeight = viewMode === 'monthly' ? 88 : 64;
+    const headerHeight = viewMode === 'weeks' ? 48 : 72;
 
     // Handle click on a bar to link (when in link mode)
     const handleBarClickForLink = useCallback((targetTaskId) => {
@@ -471,21 +586,26 @@ export default function GanttGrid({
             )}
 
             {/* ---- LEFT PANEL ---- */}
-            <div className={`${leftPanelOpen ? 'translate-x-0' : '-translate-x-full'
-                } md:translate-x-0 fixed md:relative z-40 md:z-auto h-full transition-transform duration-200 ease-in-out flex-shrink-0 bg-slate-900 border-r border-slate-700/50 overflow-y-auto`} style={{ width: LEFT_PANEL_W }}>
+            <div
+                ref={leftPanelRef}
+                onScroll={handleLeftScroll}
+                className={`${leftPanelOpen ? 'translate-x-0' : '-translate-x-full'
+                } md:translate-x-0 fixed md:relative z-40 md:z-auto h-full transition-transform duration-200 ease-in-out flex-shrink-0 bg-slate-900 border-r border-slate-700/50 overflow-y-auto`}
+                style={{ width: LEFT_PANEL_W }}
+            >
                 <div className="sticky top-0 z-20 bg-slate-800 border-b border-slate-700/50 px-4 flex items-center gap-3" style={{ height: headerHeight }}>
                     {onGroupByChange ? (
                         <div className="flex items-center gap-1 bg-slate-700/50 rounded-lg p-0.5">
                             <button
                                 onClick={() => onGroupByChange('milestone')}
-                                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold transition-colors ${groupBy === 'milestone' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' : 'text-slate-400 hover:text-slate-300'}`}
+                                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold transition-colors ${groupBy === 'milestone' ? 'bg-purple-500/20 dark:bg-purple-500/30 text-purple-700 dark:text-purple-300 border border-purple-500/40' : 'text-slate-400 hover:text-slate-300'}`}
                             >
                                 <Target className="w-3 h-3" />
                                 Milestone
                             </button>
                             <button
                                 onClick={() => onGroupByChange('type')}
-                                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold transition-colors ${groupBy === 'type' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40' : 'text-slate-400 hover:text-slate-300'}`}
+                                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold transition-colors ${groupBy === 'type' ? 'bg-indigo-500/20 dark:bg-indigo-500/30 text-indigo-700 dark:text-indigo-300 border border-indigo-500/40' : 'text-slate-400 hover:text-slate-300'}`}
                             >
                                 <ListTodo className="w-3 h-3" />
                                 Tipo
@@ -497,7 +617,7 @@ export default function GanttGrid({
                     {groupBy === 'milestone' && onCreateMilestone && (
                         <button
                             onClick={() => onCreateMilestone(null, null)}
-                            className="ml-auto flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-purple-300 bg-purple-500/10 border border-purple-500/30 hover:bg-purple-500/20 transition-all"
+                            className="ml-auto flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-500/10 dark:bg-purple-500/20 border border-purple-500/30 dark:border-purple-500/50 hover:bg-purple-500/20 dark:hover:bg-purple-500/30 transition-all"
                             title="Nuevo Milestone"
                         >
                             <Plus className="w-3 h-3" />
@@ -510,7 +630,7 @@ export default function GanttGrid({
                         const g = row.group;
                         const collapsed = collapsedGroups.has(g.id);
                         const depth = g.depth || 0;
-                        const depthColors = ['text-purple-300', 'text-blue-300', 'text-teal-300', 'text-amber-300'];
+                        const depthColors = ['text-purple-700 dark:text-purple-300', 'text-blue-700 dark:text-blue-300', 'text-teal-700 dark:text-teal-300', 'text-amber-700 dark:text-amber-300'];
                         const depthIconColors = ['text-purple-400', 'text-blue-400', 'text-teal-400', 'text-amber-400'];
                         const totalCount = g.count + (g.children || []).reduce((sum, c) => sum + c.count, 0);
                         return (
@@ -521,7 +641,14 @@ export default function GanttGrid({
                                     ? <Target className={`w-3 h-3 ${depthIconColors[depth] || 'text-purple-400'}`} />
                                     : <div className={`w-2 h-2 rounded-full bg-${g.color}-500`} />
                                 }
-                                <span className={`text-[11px] font-black uppercase tracking-wider flex-1 truncate ${g.isMilestone ? (depthColors[depth] || 'text-slate-300') : 'text-slate-300'}`}>{g.name}</span>
+                                <span className={`text-[11px] font-black uppercase tracking-wider flex-1 truncate ${g.isMilestone ? (depthColors[depth] || 'text-slate-300') : 'text-slate-300'}`}>
+                                    {g.name}
+                                    {g.projectName && (
+                                        <span className="ml-2 text-[9px] font-bold text-slate-400 bg-slate-800 border border-slate-700/80 px-1.5 py-0.5 rounded uppercase tracking-wider select-none">
+                                            {g.projectName}
+                                        </span>
+                                    )}
+                                </span>
                                 <span className="text-[10px] font-bold text-slate-500 mr-1">{totalCount || g.count}</span>
                                 {g.isMilestone && (
                                     <div className="relative mr-1">
@@ -578,24 +705,42 @@ export default function GanttGrid({
                                 </p>
                                 <div className="flex items-center gap-2 mt-0.5 min-w-0">
                                     {assignee && <p className="text-[10px] text-slate-500 truncate flex-shrink-0 max-w-[50%]" title={assignee.displayName || assignee.name || assignee.email}>{assignee.displayName || assignee.name || assignee.email}</p>}
-                                    {!task.milestone && milestones.length > 0 && onAssignMilestone && (
-                                        <select
-                                            className="opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 border border-slate-700 text-[9px] text-slate-300 rounded outline-none cursor-pointer w-auto h-4 py-0 pl-1 pr-4 truncate"
-                                            onClick={e => e.stopPropagation()}
-                                            onChange={e => {
-                                                e.stopPropagation();
-                                                if (e.target.value) onAssignMilestone(task.id, e.target.value);
-                                            }}
-                                            value=""
-                                        >
-                                            <option value="" disabled>+ Milestone</option>
-                                            {milestoneOptionsTree}
-                                        </select>
-                                    )}
+                                    {milestones.length > 0 && onAssignMilestone && (() => {
+                                        const opts = renderMilestoneOptions(task.projectId);
+                                        if (opts.length === 0) return null;
+                                        return (
+                                            <select
+                                                className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity bg-slate-800 border border-slate-700 text-[9px] text-slate-300 rounded outline-none cursor-pointer w-auto h-4 py-0 pl-1 pr-4 truncate"
+                                                onClick={e => e.stopPropagation()}
+                                                onChange={e => {
+                                                    e.stopPropagation();
+                                                    onAssignMilestone(task.id, e.target.value);
+                                                }}
+                                                value={task.milestone || ''}
+                                            >
+                                                <option value="">Sin Milestone</option>
+                                                {opts}
+                                            </select>
+                                        );
+                                    })()}
                                 </div>
                             </div>
                             {hasDates ? (
-                                <span className="text-[10px] font-bold text-slate-400">{task.percentComplete || 0}%</span>
+                                <div className="relative w-8 h-6 flex items-center justify-end">
+                                    <span className="text-[10px] font-bold text-slate-400 group-hover:hidden transition-all">
+                                        {task.percentComplete || 0}%
+                                    </span>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onRemoveFromGantt?.(task);
+                                        }}
+                                        className="hidden group-hover:flex items-center justify-center p-1 rounded-md text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-500/50 transition-all active:scale-95"
+                                        title="Quitar del Gantt"
+                                    >
+                                        <CalendarX className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
                             ) : (
                                 <button
                                     onClick={(e) => {
@@ -616,6 +761,7 @@ export default function GanttGrid({
             {/* ---- RIGHT PANEL (timeline) ---- */}
             <div
                 ref={timelineRef}
+                onScroll={handleRightScroll}
                 className={`flex-1 overflow-x-auto overflow-y-auto bg-slate-900 ${isPanning ? 'cursor-grabbing' : 'cursor-grab'} ${linkSource ? 'cursor-crosshair' : ''} ${placingTask ? 'cursor-crosshair ring-2 ring-amber-400/30 ring-inset' : ''}`}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
@@ -627,7 +773,7 @@ export default function GanttGrid({
                     <div className="sticky top-0 z-20 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700/50 flex" style={{ height: headerHeight }}>
                         {viewMode === 'weekly' ? (
                             <div className="flex flex-col w-full">
-                                <div className="flex border-b border-slate-200 dark:border-slate-700/30" style={{ height: 24 }}>
+                                <div className="flex border-b border-slate-200 dark:border-slate-700/30" style={{ height: 36 }}>
                                     {monthGroups.map((mg, i) => (
                                         <div key={i} className={`border-r border-slate-200 dark:border-slate-700/20 text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider ${i % 2 === 0 ? 'bg-slate-100 dark:bg-slate-800' : 'bg-slate-50 dark:bg-slate-900/50'}`}
                                             style={{ width: mg.count * dayWidth }}>
@@ -637,7 +783,7 @@ export default function GanttGrid({
                                         </div>
                                     ))}
                                 </div>
-                                <div className="flex" style={{ height: 40 }}>
+                                <div className="flex" style={{ height: 36 }}>
                                     {dateCols.map((d, i) => {
                                         const isToday = daysBetween(d, new Date()) === 0;
                                         const isWeekend = d.getDay() === 0 || d.getDay() === 6;
@@ -660,6 +806,25 @@ export default function GanttGrid({
                                         );
                                     })}
                                 </div>
+                             </div>
+                        ) : viewMode === 'weeks' ? (
+                            <div className="flex flex-col w-full">
+                                <div className="flex border-b border-slate-200 dark:border-slate-700/30" style={{ height: 24 }}>
+                                    {monthGroups.map((mg, i) => (
+                                        <div key={i} className={`border-r border-slate-200 dark:border-slate-700/20 text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider ${i % 2 === 0 ? 'bg-slate-100 dark:bg-slate-800' : 'bg-slate-50 dark:bg-slate-900/50'}`}
+                                            style={{ width: mg.count * dayWidth }}>
+                                            <div className="sticky left-0 flex items-center h-full px-3" style={{ width: 'max-content' }}>
+                                                {mg.label}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex" style={{ height: 24 }}>
+                                    {weekGroups.map((wg, i) => (
+                                        <div key={i} className="flex items-center justify-center border-r border-slate-200 dark:border-slate-700/20 text-[9px] font-black text-slate-500 uppercase tracking-wider bg-slate-50 dark:bg-slate-800/50"
+                                            style={{ width: wg.count * dayWidth }}>{wg.label}</div>
+                                    ))}
+                                </div>
                             </div>
                         ) : (
                             <div className="flex flex-col w-full">
@@ -679,7 +844,7 @@ export default function GanttGrid({
                                             style={{ width: wg.count * dayWidth }}>{wg.label}</div>
                                     ))}
                                 </div>
-                                <div className="flex" style={{ height: 40 }}>
+                                <div className="flex" style={{ height: 24 }}>
                                     {dateCols.map((d, i) => {
                                         const isToday = daysBetween(d, new Date()) === 0;
                                         const isWeekend = d.getDay() === 0 || d.getDay() === 6;
@@ -709,7 +874,7 @@ export default function GanttGrid({
                         onMouseMove={(e) => {
                             if (!placingTask) { if (hoverDayIndex >= 0) setHoverDayIndex(-1); return; }
                             const rect = e.currentTarget.getBoundingClientRect();
-                            const x = e.clientX - rect.left + (timelineRef.current?.scrollLeft || 0);
+                            const x = e.clientX - rect.left;
                             const idx = Math.floor(x / dayWidth);
                             if (idx >= 0 && idx < numDays && idx !== hoverDayIndex) setHoverDayIndex(idx);
                         }}
@@ -718,7 +883,7 @@ export default function GanttGrid({
                             if (!placingTask || !onPlacementComplete) return;
                             if (linkSource) return;
                             const rect = e.currentTarget.getBoundingClientRect();
-                            const x = e.clientX - rect.left + (timelineRef.current?.scrollLeft || 0);
+                            const x = e.clientX - rect.left;
                             const dayIndex = Math.floor(x / dayWidth);
                             if (dayIndex >= 0 && dayIndex < numDays) {
                                 const clickedDate = addDays(viewStart, dayIndex);
@@ -733,11 +898,24 @@ export default function GanttGrid({
                         }}
                     >
                         {/* Column lines */}
-                        {dateCols.map((d, i) => {
-                            const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                            return <div key={i} className={`absolute top-0 bottom-0 border-r border-slate-800/60 ${isWeekend ? 'bg-slate-800/20' : ''}`}
-                                style={{ left: i * dayWidth, width: dayWidth }} />;
-                        })}
+                        {viewMode === 'weeks' ? (
+                            weekGroups.map((wg, i) => {
+                                const isEven = i % 2 === 0;
+                                return (
+                                    <div
+                                        key={i}
+                                        className={`absolute top-0 bottom-0 border-r border-slate-800/60 ${isEven ? 'bg-slate-800/5 dark:bg-slate-950/10' : ''}`}
+                                        style={{ left: wg.start * dayWidth, width: wg.count * dayWidth }}
+                                    />
+                                );
+                            })
+                        ) : (
+                            dateCols.map((d, i) => {
+                                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                                return <div key={i} className={`absolute top-0 bottom-0 border-r border-slate-800/60 ${isWeekend ? 'bg-slate-800/20' : ''}`}
+                                    style={{ left: i * dayWidth, width: dayWidth }} />;
+                            })
+                        )}
 
                         {/* Today line */}
                         {showToday && (
@@ -811,7 +989,17 @@ export default function GanttGrid({
                                                     } else if (!linkSource) {
                                                         handleLinkStart(task.id);
                                                     }
-                                                }}>
+                                                }}
+                                                onContextMenu={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    if (linkSource && linkSource !== task.id) {
+                                                        handleBarClickForLink(task.id);
+                                                    } else if (!linkSource) {
+                                                        handleLinkStart(task.id);
+                                                    }
+                                                }}
+                                            >
                                                 <GanttBar
                                                     task={task}
                                                     left={geo.left}
@@ -826,6 +1014,8 @@ export default function GanttGrid({
                                                     onLinkComplete={handleBarClickForLink}
                                                     isLinking={!!linkSource}
                                                     isLinkSource={linkSource === task.id}
+                                                    isCritical={criticalTaskIds.has(task.id)}
+                                                    dimmed={showCriticalPath && !criticalTaskIds.has(task.id)}
                                                 />
                                             </div>
                                         )}
@@ -874,4 +1064,87 @@ function getISOWeek(date) {
     d.setUTCDate(d.getUTCDate() + 4 - dayNum);
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
     return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+
+// Algoritmo del Camino Crítico (CPM)
+function computeCriticalPath(tasks, dependencies) {
+    const scheduledTasks = tasks.filter(t => t.plannedStartDate && t.plannedEndDate);
+    if (scheduledTasks.length === 0) return new Set();
+
+    const taskMap = new Map(scheduledTasks.map(t => [t.id, t]));
+    
+    const adjSuccessors = new Map();
+    scheduledTasks.forEach(t => {
+        adjSuccessors.set(t.id, []);
+    });
+
+    dependencies.forEach(dep => {
+        const predId = dep.predecessorTaskId;
+        const succId = dep.successorTaskId;
+        if (taskMap.has(predId) && taskMap.has(succId)) {
+            adjSuccessors.get(predId).push(succId);
+        }
+    });
+
+    const getDuration = (task) => {
+        const start = new Date(task.plannedStartDate + 'T12:00:00');
+        const end = new Date(task.plannedEndDate + 'T12:00:00');
+        return Math.max(Math.round((end - start) / (24 * 60 * 60 * 1000)) + 1, 1);
+    };
+
+    let projectFinishDate = new Date('1970-01-01');
+    scheduledTasks.forEach(t => {
+        const end = new Date(t.plannedEndDate + 'T12:00:00');
+        if (end > projectFinishDate) projectFinishDate = end;
+    });
+
+    const lateFinish = new Map();
+    const lateStart = new Map();
+
+    const memoBackward = (taskId) => {
+        if (lateFinish.has(taskId)) return lateStart.get(taskId);
+
+        const task = taskMap.get(taskId);
+        const duration = getDuration(task);
+        const successors = adjSuccessors.get(taskId) || [];
+
+        let lf;
+        if (successors.length === 0) {
+            lf = new Date(projectFinishDate);
+        } else {
+            let minSuccLS = null;
+            successors.forEach(succId => {
+                const succLS = memoBackward(succId);
+                if (minSuccLS === null || succLS < minSuccLS) {
+                    minSuccLS = succLS;
+                }
+            });
+            const lfDate = new Date(minSuccLS);
+            lfDate.setDate(lfDate.getDate() - 1);
+            lf = lfDate;
+        }
+
+        const ls = new Date(lf);
+        ls.setDate(ls.getDate() - (duration - 1));
+
+        lateFinish.set(taskId, lf);
+        lateStart.set(taskId, ls);
+        return ls;
+    };
+
+    scheduledTasks.forEach(t => {
+        memoBackward(t.id);
+    });
+
+    const criticalTaskIds = new Set();
+    scheduledTasks.forEach(t => {
+        const ls = lateStart.get(t.id);
+        const actualStart = new Date(t.plannedStartDate + 'T12:00:00');
+        const slack = Math.round((ls - actualStart) / (24 * 60 * 60 * 1000));
+        if (slack <= 0) {
+            criticalTaskIds.add(t.id);
+        }
+    });
+
+    return criticalTaskIds;
 }

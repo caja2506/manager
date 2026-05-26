@@ -179,37 +179,52 @@ async function routeInboundMessage(adminDb, token, chatId, text, rawMessage, ext
         case TELEGRAM_SESSION_STATE.IDLE:
         default:
             if (isAudio) {
-                await sendMessageWithReplyKeyboard(token, chatIdStr,
-                    "🎙️ Recibí tu nota de voz, pero no estoy esperando un reporte.\nToca <b>📝 Reportar</b> para iniciar."
-                );
-            } else {
-                // ── ARIA Conversation Engine ──
-                // Route free-text messages through the AI agent for natural conversation
+                await sendMessage(token, chatIdStr, "🔄 <i>Procesando tu nota de voz...</i>");
                 try {
-                    const { processMessage } = require("../agent/conversationEngine");
-                    const user = await coreReader.loadUser(userId) || {};
-                    const userRole = user.operationalRole || user.teamRole || "engineer";
-
-                    const ariaResult = await processMessage({
-                        userId,
-                        chatId: chatIdStr,
-                        userMessage: text,
-                        userName: user.name || user.displayName || "Usuario",
-                        userRole,
-                        keys: {
-                            nvidiaKey: extras.nvidiaKey || null,
-                            geminiKey: extras.apiKey || null,
-                        },
-                    });
-
-                    await sendMessage(token, chatIdStr, ariaResult.response);
-                    console.log(`[telegramRouter] ARIA response sent (${ariaResult.latencyMs}ms, provider=${ariaResult.provider}, tools=[${ariaResult.toolsUsed.join(",")}])`);
-                } catch (ariaErr) {
-                    console.error("[telegramRouter] ARIA engine error:", ariaErr);
-                    await sendMessageWithReplyKeyboard(token, chatIdStr,
-                        "📬 Mensaje recibido. Usa los botones del menú para interactuar."
+                    const result = await processVoiceMessage(
+                        token, extras.apiKey, adminDb, rawMessage,
+                        { userId, chatId: chatIdStr }
                     );
+                    if (!result?.transcript) {
+                        await sendMessage(token, chatIdStr, "⚠️ No pude transcribir tu nota de voz. Por favor intenta hablar más claro o envía texto.");
+                        return;
+                    }
+                    await sendMessage(token, chatIdStr, `🎙️ <b>Transcripción:</b>\n<i>"${result.transcript}"</i>`);
+                    text = result.transcript;
+                } catch (err) {
+                    console.error("[router] General audio transcription failed:", err);
+                    await sendMessage(token, chatIdStr, "⚠️ Ocurrió un error al procesar tu nota de voz.");
+                    return;
                 }
+            }
+
+            // ── ARIA Conversation Engine ──
+            // Route free-text messages through the AI agent for natural conversation
+            try {
+                const { processMessage } = require("../agent/conversationEngine");
+                const user = await coreReader.loadUser(userId) || {};
+                const userRole = user.operationalRole || user.teamRole || "engineer";
+
+                const ariaResult = await processMessage({
+                    userId,
+                    chatId: chatIdStr,
+                    userMessage: text,
+                    userName: user.name || user.displayName || "Usuario",
+                    userRole,
+                    keys: {
+                        nvidiaKey: extras.nvidiaKey || null,
+                        deepseekKey: extras.deepseekKey || null,
+                        geminiKey: extras.apiKey || null,
+                    },
+                });
+
+                await sendMessage(token, chatIdStr, ariaResult.response);
+                console.log(`[telegramRouter] ARIA response sent (${ariaResult.latencyMs}ms, provider=${ariaResult.provider}, tools=[${ariaResult.toolsUsed.join(",")}])`);
+            } catch (ariaErr) {
+                console.error("[telegramRouter] ARIA engine error:", ariaErr);
+                await sendMessageWithReplyKeyboard(token, chatIdStr,
+                    "📬 Mensaje recibido. Usa los botones del menú para interactuar."
+                );
             }
             break;
     }
@@ -822,6 +837,137 @@ async function routeCallbackQuery(adminDb, token, chatId, callbackData, callback
         return;
     }
 
+    // ── Morning planning selection: "morning_start_task:{taskId}" ──
+    if (callbackData.startsWith("morning_start_task:")) {
+        const taskId = callbackData.split(":")[1];
+        
+        // 1. Cargar datos de la tarea
+        const { loadTask, updateTask, insertTimeLog, loadActiveTimerForUser, insertWeeklyPlanItem, loadUser, transitionTaskStatus } = require("../db/coreDataReader");
+        const taskData = await loadTask(taskId);
+        if (!taskData) {
+            await sendMessage(token, chatIdStr, "⚠️ Tarea no encontrada en el sistema.");
+            return;
+        }
+
+        const now = new Date();
+        const nowISO = now.toISOString();
+        const todayStr = now.toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
+
+        // Crear horarios para el plan (8:00 AM a 4:00 PM)
+        const start = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Costa_Rica" }));
+        start.setHours(8, 0, 0, 0);
+        const end = new Date(start.getTime() + 8 * 3600 * 1000); // 8 horas
+
+        // 2. Crear documento en Supabase (weeklyPlanItems)
+        const newPlanItem = {
+            assignedTo: userId,
+            taskId: taskId,
+            projectId: taskData.projectId || null,
+            startDateTime: start.toISOString(),
+            endDateTime: end.toISOString(),
+            plannedHours: 8,
+            notes: `Auto-planificado por planificador matutino de Aria: ${taskData.title}`,
+        };
+
+        const planItem = await insertWeeklyPlanItem(newPlanItem);
+        if (!planItem) {
+            console.error(`[morningPlanning] Failed to insert weekly plan item in Supabase`);
+        } else {
+            console.log(`[morningPlanning] Created plan item ${planItem.id} in Supabase`);
+        }
+        const planItemId = planItem ? planItem.id : null;
+
+        // 3. Detener temporizadores de planner_auto si existieran, e iniciar el nuevo
+        try {
+            const existingTimer = await loadActiveTimerForUser(userId);
+            let canStart = false;
+
+            if (existingTimer) {
+                if (existingTimer.taskId === taskId) {
+                    console.log(`[morningPlanning] Timer already running for user ${userId} on task ${taskId}.`);
+                } else if (existingTimer.source === "planner_auto") {
+                    console.log(`[morningPlanning] Stopping existing active planner timer.`);
+                    const { loadBreakBands, getBreakHoursInRange } = require("../utils/breakTimeUtils");
+                    const { updateTimeLog, recalculateTaskHours } = require("../db/coreDataReader");
+                    
+                    const timerStart = new Date(existingTimer.startTime);
+                    const grossHours = (now - timerStart) / 3_600_000;
+                    
+                    await loadBreakBands(adminDb);
+                    const breakHours = getBreakHoursInRange(timerStart, now);
+                    const netHours = Math.max(0, grossHours - breakHours);
+
+                    await updateTimeLog(existingTimer.id, {
+                        endTime: nowISO,
+                        totalHours: parseFloat(netHours.toFixed(6)),
+                        totalHoursGross: parseFloat(grossHours.toFixed(6)),
+                        breakHoursDeducted: parseFloat(breakHours.toFixed(4)),
+                        autoStopped: true,
+                    });
+
+                    if (existingTimer.taskId) {
+                        await recalculateTaskHours(existingTimer.taskId).catch(() => {});
+                    }
+                    canStart = true;
+                } else {
+                    console.log(`[morningPlanning] Manual timer active. Skipping timer start.`);
+                }
+            } else {
+                canStart = true;
+            }
+
+            if (canStart) {
+                // Iniciar nuevo timer en Supabase
+                await insertTimeLog({
+                    taskId,
+                    projectId: taskData.projectId || null,
+                    userId,
+                    startTime: nowISO,
+                    endTime: null,
+                    totalHours: 0,
+                    overtime: false,
+                    overtimeHours: 0,
+                    autoStopped: false,
+                    notes: `Auto-iniciado por planificador matutino de Aria: ${taskData.title}`,
+                    source: "planner_auto",
+                    planItemId: planItemId,
+                });
+                console.log(`[morningPlanning] Started timer in Supabase`);
+            }
+
+            // 4. Cambiar estado de la tarea en Supabase a in_progress
+            const CAN_AUTO_START = ["backlog", "pending", "blocked"];
+            if (CAN_AUTO_START.includes(taskData.status)) {
+                let userName = "Usuario de Telegram";
+                try {
+                    const userProfile = await loadUser(userId);
+                    if (userProfile && (userProfile.displayName || userProfile.name)) {
+                        userName = userProfile.displayName || userProfile.name;
+                    }
+                } catch (userErr) {
+                    console.warn(`[morningPlanning] Error loading user profile for name:`, userErr.message);
+                }
+                
+                await transitionTaskStatus(taskId, "in_progress", userId, userName, true);
+                console.log(`[morningPlanning] Task status updated to in_progress via transitionTaskStatus`);
+            }
+
+        } catch (dbErr) {
+            console.error(`[morningPlanning] Error in timer/task DB operations:`, dbErr.message);
+        }
+
+        // 5. Resetear la sesión a IDLE
+        await forceResetSession(adminDb, chatIdStr);
+
+        // 6. Confirmar la acción al usuario
+        await sendMessageWithReplyKeyboard(token, chatIdStr,
+            `✅ <b>¡Entendido!</b>\n\n` +
+            `He programado la tarea <b>${taskData.title}</b> para el día de hoy (8 horas) e iniciado tu temporizador automáticamente.\n\n` +
+            `¡Mucho éxito hoy! 🚀`
+        );
+        return;
+    }
+
     // ── Task selection: "task:{taskId}" or "task:new" ──
     if (callbackData.startsWith("task:")) {
         const taskRef = callbackData.split(":")[1];
@@ -1285,10 +1431,15 @@ async function saveTaskReport(adminDb, token, chatId, userId, userName, data) {
     // 3. Update task progress
     if (taskId && progress > 0) {
         try {
-            const { updateTask: updateTaskSB } = require("../db/coreDataReader");
+            const { updateTask: updateTaskSB, transitionTaskStatus } = require("../db/coreDataReader");
             const updateData = { progress };
-            if (hasBlocker) updateData.status = "blocked";
             await updateTaskSB(taskId, updateData);
+            
+            if (hasBlocker) {
+                const blockerReason = safe.blockerSummary || "Bloqueado vía Telegram";
+                await transitionTaskStatus(taskId, "blocked", userId || "unknown", userName || "Usuario", true, blockerReason);
+                console.log(`[saveTaskReport] Task ${taskId} status transitioned to blocked via transitionTaskStatus`);
+            }
         } catch (e) {
             console.error("[saveTaskReport] STEP 3 task update failed:", e.message);
         }

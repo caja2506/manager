@@ -4,15 +4,23 @@ import {
     ChevronDown, ChevronRight, Settings2, User,
     Link2, ShieldAlert, CalendarRange, CalendarDays, Target, MapPin, X, Plus, CheckCircle,
     FolderOpen, Clipboard, ClipboardCheck, Paperclip,
-    XSquare, CheckSquare, MinusSquare, MessageSquare, Square, Eye
+    XSquare, CheckSquare, MinusSquare, MessageSquare, Square, Eye,
+    FolderGit2, Flag, Layers, Wrench
 } from 'lucide-react';
 import FileAttachments from '../attachments/FileAttachments';
 import { resolveDelay } from '../../../services/delayService';
 import {
     TASK_STATUS, TASK_STATUS_CONFIG,
+    TASK_PRIORITY_CONFIG,
+    formatStationLabel,
 } from '../../../models/schemas';
 import AvailabilityCalendar from '../../planner/AvailabilityCalendar';
 import TaskHealthScore from './TaskHealthScore';
+import { canAutoScheduleFor } from '../../../services/autoPlannerService';
+import TaskStatusStepper from './TaskStatusStepper';
+import SearchableInlineSelect from '../../ui/SearchableInlineSelect';
+import { hasMultipleIndexers } from '../../../services/stationService';
+import { registerOrphanUser } from '../../../services/userAdminService';
 
 /**
  * TaskControlPanel — right column of the task editor.
@@ -62,13 +70,55 @@ export default function TaskControlPanel({
     timeLogs = [], allTasks = [], delays = [], dependencies = [], plannerItems = [],
     userPlanItems = [],
     projectMilestones = [], milestoneWorkAreas = [],
+    projects = [], stations = [], workAreas = [], onAreaChange, onTaskTypeChange,
     onStatusChange, onOpenDelayReport, onOpenListManager, onDeleteDependency,
     onAddManualTime, isSavingManualTime,
     onOpenPRRequest, onOpenPRExecution, onOpenPRFeedback, onWaivePR,
-    activePeerReview, currentUserId, children
+    activePeerReview, currentUserId, teamRole, isAdmin, resourceAssignments, onOpenAutoPlanner, onOpenActivity,
+    children
 }) {
     // Clipboard state for network path copy
     const [pathCopied, setPathCopied] = useState(false);
+
+    const multiIdx = hasMultipleIndexers(stations);
+
+    const handleCreateExternal = async (name) => {
+        const normalized = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').trim();
+        const customId = `ext_${normalized}_${Date.now()}`;
+        try {
+            await registerOrphanUser(customId, {
+                displayName: name,
+                email: `${normalized}@external.com`,
+            }, 'viewer');
+            setForm(f => ({ ...f, assignedTo: customId }));
+        } catch (err) {
+            console.error('Error creating external assignee:', err);
+            alert('Error al agregar el responsable externo: ' + err.message);
+        }
+    };
+
+    // Filter task types by selected area
+    let filteredTaskTypes = taskTypes;
+    if (form.areaId) {
+        const selectedArea = workAreas.find(a => a.id === form.areaId);
+        if (selectedArea) {
+            const allowedValues = (selectedArea.taskTypeIds && selectedArea.taskTypeIds.length > 0)
+                ? selectedArea.taskTypeIds
+                : (selectedArea.defaultTaskTypes || []);
+
+            if (allowedValues.length > 0) {
+                filteredTaskTypes = taskTypes.filter(t => 
+                    allowedValues.includes(t.id) || 
+                    allowedValues.includes(t.name) || 
+                    (t.firestoreId && allowedValues.includes(t.firestoreId)) ||
+                    allowedValues.some(val => 
+                        (t.name && val?.toString().toLowerCase() === t.name.toLowerCase()) ||
+                        (t.firestoreId && val?.toString().toLowerCase() === t.firestoreId.toLowerCase())
+                    )
+                );
+            }
+        }
+    }
     // ── Subtask-based auto progress ──
     const totalSubtasks = subtasks.length;
     const completedSubtasks = subtasks.filter(s => s.completed).length;
@@ -270,6 +320,19 @@ export default function TaskControlPanel({
                     >
                         {isSavingManualTime ? 'Guardando...' : 'Guardar Horas'}
                     </button>
+                </div>
+            )}
+
+            {form.status === 'completed' && (
+                <div className="mt-2">
+                    <span className="text-[9px] font-bold text-white block mb-0.5">Fecha real de cierre</span>
+                    <input
+                        type="date"
+                        value={form.completedDate}
+                        onChange={e => setForm({ ...form, completedDate: e.target.value })}
+                        className="w-full px-2.5 py-1.5 border border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800 text-slate-200"
+                        disabled={!canEditDates}
+                    />
                 </div>
             )}
 
@@ -603,6 +666,65 @@ export default function TaskControlPanel({
     );
 
 
+    const MobileActionsContent = (
+        <div className="space-y-2 pt-2 pb-1 border-t border-slate-700/50 lg:hidden">
+            {/* Auto-Planner Button */}
+            {(form.assignedTo || task?.assignedTo) && (isAdmin || isNew || canAutoScheduleFor(teamRole, currentUserId, form.assignedTo || task?.assignedTo, resourceAssignments)) && (() => {
+                const hasData = form.plannedStartDate || form.estimatedHours;
+                const totalPlanned = (plannerItems || []).reduce((s, pi) => s + (pi.plannedHours || 0), 0);
+                const isFullyPlanned = !isNew && form.estimatedHours && totalPlanned >= form.estimatedHours;
+                const willAutoOnSave = isNew && form.plannedStartDate && form.estimatedHours;
+                return (
+                    <button
+                        type="button"
+                        onClick={() => !isNew && hasData && !isFullyPlanned ? onOpenAutoPlanner?.() : null}
+                        disabled={!hasData || isFullyPlanned}
+                        className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.98] ${
+                            !hasData
+                                ? 'bg-slate-800/50 border border-slate-700/50 text-white cursor-not-allowed'
+                                : willAutoOnSave
+                                    ? 'bg-teal-500/10 border border-teal-500/20 text-teal-400 cursor-default'
+                                    : isFullyPlanned
+                                        ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 cursor-default'
+                                        : 'bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 hover:border-indigo-500/40 text-indigo-400'
+                        }`}
+                    >
+                        <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        <span className="truncate">
+                            {!hasData
+                                ? 'Auto planificar (requiere config)'
+                                : willAutoOnSave
+                                    ? `Se auto-planificará al crear (${form.estimatedHours}h)`
+                                    : isFullyPlanned
+                                        ? `Completamente planificada (${totalPlanned.toFixed(1)}h)`
+                                        : <>Auto-planificar
+                                            {form.estimatedHours > 0 && (
+                                                <span className="text-[10px] ml-1 opacity-70">({form.estimatedHours}h est. — {totalPlanned.toFixed(1)}h plan.)</span>
+                                            )}
+                                        </>
+                            }
+                        </span>
+                    </button>
+                );
+            })()}
+
+            {/* Activity Timeline Link */}
+            {!isNew && task?.id && (
+                <button
+                    type="button"
+                    onClick={() => onOpenActivity?.()}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-bold hover:bg-emerald-600/20 hover:border-emerald-500/50 transition-all group"
+                >
+                    <Clock className="w-4 h-4 group-hover:scale-110 transition-transform flex-shrink-0" />
+                    <span className="truncate">Ver Avance y Actividad</span>
+                </button>
+            )}
+        </div>
+    );
+
+
     // ═══════════════════════════════════════════
     // RENDER
     // ═══════════════════════════════════════════
@@ -613,9 +735,120 @@ export default function TaskControlPanel({
             {/* ══════════ MOBILE: Single scroll column ══════════ */}
             <div className="lg:hidden flex-1 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
                 <div className="p-4 space-y-3">
+                    {/* Stepper móvil */}
+                    {!isNew && (
+                        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden p-1">
+                            <TaskStatusStepper
+                                currentStatus={form.status}
+                                onStatusChange={onStatusChange}
+                                canEdit={canEdit}
+                                variant="inline"
+                            />
+                        </div>
+                    )}
+
+                    {/* Fila de selectores rápidos en móvil */}
+                    <div className="flex flex-wrap gap-1.5 pb-2 border-b border-slate-800/80 -mx-1 px-1">
+                        {/* Proyecto */}
+                        <SearchableInlineSelect
+                            icon={<FolderGit2 className="w-3 h-3 text-white shrink-0" />}
+                            options={projects.map(p => ({ value: p.id, label: p.name }))}
+                            value={form.projectId}
+                            onChange={val => setForm({ ...form, projectId: val, stationId: '' })}
+                            placeholder="Sin proyecto"
+                            disabled={!canEdit}
+                        />
+
+                        {/* Estación */}
+                        {form.projectId && stations.length > 0 && (
+                            <SearchableInlineSelect
+                                icon={<MapPin className="w-3 h-3 text-white shrink-0" />}
+                                options={stations.filter(s => s.active !== false).map(s => ({
+                                    value: s.id,
+                                    label: s.description || s.abbreviation
+                                        ? `${formatStationLabel(s, multiIdx)} — ${s.description || s.abbreviation}`
+                                        : formatStationLabel(s, multiIdx)
+                                }))}
+                                value={form.stationId || ''}
+                                onChange={val => setForm({ ...form, stationId: val || null })}
+                                placeholder="Estación"
+                                disabled={!canEdit}
+                            />
+                        )}
+
+                        {/* Responsable */}
+                        <SearchableInlineSelect
+                            icon={<User className="w-3 h-3 text-white shrink-0" />}
+                            options={teamMembers.map(u => ({ value: u.uid, label: u.displayName || u.email }))}
+                            value={form.assignedTo}
+                            onChange={val => setForm({ ...form, assignedTo: val })}
+                            placeholder="Sin asignar"
+                            disabled={!canEdit}
+                            allowAddExternal={canEdit}
+                            onAddExternal={handleCreateExternal}
+                        />
+
+                        {/* Prioridad */}
+                        <SearchableInlineSelect
+                            icon={<Flag className="w-3 h-3 text-white shrink-0" />}
+                            options={Object.entries(TASK_PRIORITY_CONFIG).map(([key, cfg]) => ({ value: key, label: cfg.label }))}
+                            value={form.priority}
+                            onChange={val => setForm({ ...form, priority: val })}
+                            placeholder="Prioridad"
+                            disabled={!canEdit}
+                            alignRight={true}
+                        />
+
+                        {/* Área */}
+                        <div className="flex items-center gap-1 flex-shrink-0 min-w-0">
+                            <SearchableInlineSelect
+                                icon={<Layers className="w-3 h-3 text-white shrink-0" />}
+                                options={workAreas.map(a => ({ value: a.id, label: a.name }))}
+                                value={form.areaId || ''}
+                                onChange={val => onAreaChange ? onAreaChange(val) : setForm({ ...form, areaId: val })}
+                                placeholder="Área"
+                                disabled={!canEdit}
+                            />
+                            {canEdit && onOpenListManager && (
+                                <button
+                                    type="button"
+                                    onClick={() => onOpenListManager({ isOpen: true, type: 'workAreaType', title: 'Gestionar Áreas' })}
+                                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800 border border-slate-700 hover:border-slate-600 hover:text-indigo-400 text-indigo-500 transition-colors cursor-pointer text-xs shrink-0"
+                                    title="Gestionar Áreas"
+                                >
+                                    ⚙
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Tipo de tarea */}
+                        <div className="flex items-center gap-1 flex-shrink-0 min-w-0">
+                            <SearchableInlineSelect
+                                icon={<Wrench className="w-3 h-3 text-white shrink-0" />}
+                                options={filteredTaskTypes.map(t => ({ value: t.id, label: t.name }))}
+                                value={form.taskTypeId}
+                                onChange={val => onTaskTypeChange ? onTaskTypeChange(val) : setForm({ ...form, taskTypeId: val })}
+                                placeholder="Clasificación"
+                                disabled={!canEdit}
+                                alignRight={true}
+                            />
+                            {canEdit && onOpenListManager && (
+                                <button
+                                    type="button"
+                                    onClick={() => onOpenListManager({ isOpen: true, type: 'taskType', title: 'Gestionar Tipos de Tarea' })}
+                                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800 border border-slate-700 hover:border-slate-600 hover:text-indigo-400 text-indigo-500 transition-colors cursor-pointer text-xs shrink-0"
+                                    title="Gestionar Tipos de Tarea"
+                                >
+                                    ⚙
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
                     {/* Control sections first */}
                     {QuickActionsContent}
                     {TimeContent}
+                    {MobileActionsContent}
                     {PlannerContent}
                     {BlockersContent}
 

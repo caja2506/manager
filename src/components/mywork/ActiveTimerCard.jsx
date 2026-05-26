@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Square, Clock, Zap, ListTodo, FolderGit2, Play, AlertTriangle, Info } from 'lucide-react';
 import {
     formatElapsed, stopTimer, startTimerSafe,
@@ -66,6 +66,36 @@ export default function ActiveTimerCard({ tasks, allTasks, projects, userId, tim
         } catch (e) { console.error(e); }
         setIsStarting(false);
     }, [formTask, formProject, tasks, userId]);
+
+    // Lista de tareas filtrada por el proyecto seleccionado
+    const filteredTasksForForm = useMemo(() => {
+        if (!tasks) return [];
+        const activeTasks = tasks.filter(t => t.status !== 'completed' && t.status !== 'cancelled');
+        if (!formProject) return activeTasks;
+        return activeTasks.filter(t => t.projectId === formProject);
+    }, [tasks, formProject]);
+
+    // Manejador del cambio de proyecto
+    const handleFormProjectChange = (projectId) => {
+        setFormProject(projectId);
+        if (formTask) {
+            const currentTask = tasks?.find(t => t.id === formTask);
+            if (currentTask && currentTask.projectId !== projectId) {
+                setFormTask('');
+            }
+        }
+    };
+
+    // Manejador del cambio de tarea
+    const handleFormTaskChange = (taskId) => {
+        setFormTask(taskId);
+        if (taskId) {
+            const currentTask = tasks?.find(t => t.id === taskId);
+            if (currentTask?.projectId) {
+                setFormProject(currentTask.projectId);
+            }
+        }
+    };
 
     const lookupTasks = allTasks || tasks;
     const activeTaskName = activeTimer?.taskId
@@ -147,28 +177,27 @@ export default function ActiveTimerCard({ tasks, allTasks, projects, userId, tim
                     </div>
                 ) : (
                     <div className="space-y-3 animate-in fade-in zoom-in-95 duration-200">
-                        <select
-                            value={formTask}
-                            onChange={e => {
-                                setFormTask(e.target.value);
-                                const t = tasks?.find(t => t.id === e.target.value);
-                                if (t?.projectId) setFormProject(t.projectId);
-                            }}
-                            className="w-full px-3 py-2.5 border border-slate-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-400 bg-slate-800 font-medium"
-                        >
-                            <option value="">Sin tarea específica</option>
-                            {tasks?.filter(t => t.status !== 'completed' && t.status !== 'cancelled').map(t => (
-                                <option key={t.id} value={t.id}>{t.title}</option>
-                            ))}
-                        </select>
+                        {/* Selector de Proyecto */}
                         <select
                             value={formProject}
-                            onChange={e => setFormProject(e.target.value)}
-                            className="w-full px-3 py-2.5 border border-slate-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-400 bg-slate-800 font-medium"
+                            onChange={e => handleFormProjectChange(e.target.value)}
+                            className="w-full px-3 py-2.5 border border-slate-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-400 bg-slate-800 font-medium text-white"
                         >
                             <option value="">Sin proyecto</option>
                             {projects?.map(p => (
                                 <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                        </select>
+
+                        {/* Selector de Tarea */}
+                        <select
+                            value={formTask}
+                            onChange={e => handleFormTaskChange(e.target.value)}
+                            className="w-full px-3 py-2.5 border border-slate-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-400 bg-slate-800 font-medium text-white"
+                        >
+                            <option value="">Sin tarea específica</option>
+                            {filteredTasksForForm.map(t => (
+                                <option key={t.id} value={t.id}>{t.title}</option>
                             ))}
                         </select>
                         <div className="flex gap-2">

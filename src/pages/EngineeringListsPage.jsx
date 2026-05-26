@@ -6,8 +6,9 @@ import WorkAreasCard from '../components/ui/WorkAreasCard';
 import AreaTaskKanban from '../components/engineering/AreaTaskKanban';
 import MilestoneAreaKanban from '../components/engineering/MilestoneAreaKanban';
 import { createDelayCause, updateDelayCause, deleteDelayCause } from '../services/delayService';
+import { registerOrphanUser, removeRbacUser } from '../services/userAdminService';
 import { 
-    AlertOctagon, ListTodo, Compass, Target, Plus, Trash2, Search, Settings2
+    AlertOctagon, ListTodo, Compass, Target, Plus, Trash2, Search, Settings2, Users
 } from 'lucide-react';
 
 // ============================================================
@@ -150,11 +151,193 @@ function DelayCausesCard({ causes }) {
 
 
 // ============================================================
+// External Users Card — for managing external assignees
+// ============================================================
+function ExternalUsersCard({ teamMembers }) {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editItems, setEditItems] = useState([]);
+    const [search, setSearch] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+
+    const externalUsers = (teamMembers || []).filter(u => u.uid && u.uid.startsWith('ext_'));
+
+    const startEdit = () => {
+        setEditItems(externalUsers.map(u => ({
+            uid: u.uid,
+            displayName: u.displayName || '',
+            email: u.email || '',
+            active: u.active !== false,
+            isNew: false
+        })));
+        setIsEditing(true);
+    };
+
+    const handleAdd = () => {
+        setEditItems(prev => [...prev, {
+            uid: `ext_nuevo_${Date.now()}`,
+            displayName: '',
+            email: '',
+            active: true,
+            isNew: true
+        }]);
+    };
+
+    const handleRemove = (uid) => {
+        setEditItems(prev => prev.filter(i => i.uid !== uid));
+    };
+
+    const handleChange = (uid, field, value) => {
+        setEditItems(prev => prev.map(i => i.uid === uid ? { ...i, [field]: value } : i));
+    };
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            // 1. Create new items
+            for (const item of editItems.filter(i => i.isNew && i.displayName.trim())) {
+                const normalized = item.displayName.toLowerCase().replace(/[^a-z0-9]+/g, '_').trim();
+                const customId = `ext_${normalized}_${Date.now()}`;
+                const email = item.email.trim();
+                await registerOrphanUser(customId, {
+                    displayName: item.displayName.trim(),
+                    email,
+                }, 'viewer');
+            }
+            // 2. Update existing items that changed
+            for (const item of editItems.filter(i => !i.isNew)) {
+                const original = externalUsers.find(u => u.uid === item.uid);
+                if (original && (original.displayName !== item.displayName.trim() || original.email !== item.email.trim())) {
+                    await registerOrphanUser(item.uid, {
+                        displayName: item.displayName.trim(),
+                        email: item.email.trim(),
+                    }, 'viewer');
+                }
+            }
+            // 3. Delete removed items
+            const keptUids = editItems.filter(i => !i.isNew).map(i => i.uid);
+            for (const u of externalUsers) {
+                if (!keptUids.includes(u.uid)) {
+                    await removeRbacUser(u.uid);
+                }
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error al guardar responsables externos: ' + e.message);
+        }
+        setIsSaving(false);
+        setIsEditing(false);
+    };
+
+    const cancel = () => {
+        setIsEditing(false);
+        setEditItems([]);
+    };
+
+    const filtered = externalUsers.filter(u => 
+        (u.displayName || '').toLowerCase().includes(search.toLowerCase()) ||
+        (u.email || '').toLowerCase().includes(search.toLowerCase())
+    );
+
+    return (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-lg overflow-hidden flex flex-col h-[400px]">
+            {/* Header */}
+            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between min-h-[73px]">
+                {!isEditing ? (
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl flex items-center justify-center shrink-0">
+                            <Users className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                        </div>
+                        <div className="min-w-0">
+                            <h3 className="font-bold text-slate-800 dark:text-white text-sm truncate">Responsables Externos</h3>
+                            <p className="text-[11px] text-slate-500 truncate">Contactos / Grupos · {externalUsers.length}</p>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="min-w-0">
+                        <h3 className="font-bold text-slate-800 dark:text-white text-sm truncate">Editar Externos</h3>
+                    </div>
+                )}
+                {!isEditing ? (
+                    <button onClick={startEdit} className="flex items-center gap-1.5 text-xs font-bold text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 dark:hover:text-indigo-300 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/20 px-3 py-1.5 rounded-lg transition-colors shrink-0">
+                        Editar
+                    </button>
+                ) : (
+                    <div className="flex gap-1.5 shrink-0">
+                        <button onClick={cancel} className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">Cancelar</button>
+                        <button onClick={handleSave} disabled={isSaving} className="text-xs font-bold text-white bg-indigo-600 px-3.5 py-1.5 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50">
+                            {isSaving ? '...' : 'Guardar'}
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {/* Body */}
+            <div className="p-4 flex-1 overflow-hidden flex flex-col">
+                {isEditing ? (
+                    <div className="space-y-3 flex-1 overflow-y-auto pr-1 custom-scrollbar">
+                        {editItems.map(item => (
+                            <div key={item.uid} className="flex items-start gap-2 bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                                <div className="flex-1 space-y-1.5">
+                                    <input
+                                        value={item.displayName}
+                                        onChange={e => handleChange(item.uid, 'displayName', e.target.value)}
+                                        placeholder="Nombre (ej. Industrial)"
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                    <input
+                                        value={item.email}
+                                        onChange={e => handleChange(item.uid, 'email', e.target.value)}
+                                        placeholder="Correo (opcional)"
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                </div>
+                                <button onClick={() => handleRemove(item.uid)} className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/15 rounded-lg transition-colors shrink-0">
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ))}
+                        <button onClick={handleAdd} className="w-full mt-2 p-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 rounded-lg flex items-center justify-center hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors">
+                            <Plus className="w-3.5 h-3.5 mr-1" /> Agregar otro
+                        </button>
+                    </div>
+                ) : (
+                    <>
+                        {externalUsers.length > 5 && (
+                            <div className="relative mb-3 flex-shrink-0">
+                                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                    placeholder="Buscar..."
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
+                            </div>
+                        )}
+                        <div className="space-y-1.5 flex-1 overflow-y-auto pr-1 custom-scrollbar">
+                            {filtered.length === 0 && (
+                                <p className="text-xs text-slate-500 text-center py-4">Sin resultados</p>
+                            )}
+                            {filtered.map(u => (
+                                <div key={u.uid} className="px-3 py-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-transparent flex flex-col">
+                                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{u.displayName}</span>
+                                    {u.email && <span className="text-[10px] text-slate-400">{u.email}</span>}
+                                </div>
+                            ))}
+                        </div>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+}
+
+
+// ============================================================
 // Main Engineering Lists Page
 // ============================================================
 export default function EngineeringListsPage() {
     const { handleSaveManagedList } = useAppData();
-    const { delayCauses, taskTypes, workAreaTypes, milestoneTypes } = useEngineeringData();
+    const { delayCauses, taskTypes, workAreaTypes, milestoneTypes, teamMembers } = useEngineeringData();
 
     return (
         <div className="w-full space-y-6 pb-20">
@@ -189,7 +372,7 @@ export default function EngineeringListsPage() {
             </div>
 
             {/* Grid of basic lists */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                 <div className="lg:col-span-1">
                     <DelayCausesCard causes={delayCauses || []} />
                 </div>
@@ -217,6 +400,9 @@ export default function EngineeringListsPage() {
                 </div>
                 <div className="lg:col-span-1 border-0">
                     <WorkAreasCard workAreas={workAreaTypes || []} />
+                </div>
+                <div className="lg:col-span-1">
+                    <ExternalUsersCard teamMembers={teamMembers || []} />
                 </div>
             </div>
         </div>

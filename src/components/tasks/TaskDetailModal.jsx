@@ -48,7 +48,14 @@ export default function TaskDetailModal({
         setIsDelayReportOpen, setDelayReportTarget, setListManager,
     } = useAppData();
     const { role, teamRole, canEditDates, isAdmin } = useRole();
-    const { timeLogs, engTasks, engProjects, delays, workAreaTypes, delayCauses, refetch } = useEngineeringData();
+    const { 
+        timeLogs, engTasks, engProjects, delays, workAreaTypes, delayCauses, refetch,
+        taskTypes: contextTaskTypes, teamMembers: contextTeamMembers
+    } = useEngineeringData();
+
+    const effectiveTaskTypes = (contextTaskTypes && contextTaskTypes.length > 0) ? contextTaskTypes : taskTypes;
+    const effectiveTeamMembers = (contextTeamMembers && contextTeamMembers.length > 0) ? contextTeamMembers : teamMembers;
+    const effectiveProjects = (engProjects && engProjects.length > 0) ? engProjects : projects;
     const navigate = useNavigate();
     const isNew = !task;
     
@@ -72,6 +79,7 @@ export default function TaskDetailModal({
         dueDate: '',
         plannedStartDate: '',
         plannedEndDate: '',
+        completedDate: '',
         estimatedHours: '',
         blockedReason: '',
         percentComplete: 0,
@@ -182,6 +190,7 @@ export default function TaskDetailModal({
                 dueDate: toDate(task.dueDate),
                 plannedStartDate: toDate(task.plannedStartDate),
                 plannedEndDate: toDate(task.plannedEndDate),
+                completedDate: toDate(task.completedDate),
                 estimatedHours: task.estimatedHours || '',
                 blockedReason: task.blockedReason || '',
                 percentComplete: task.percentComplete ?? 0,
@@ -198,6 +207,7 @@ export default function TaskDetailModal({
                 status: TASK_STATUS.BACKLOG, taskTypeId: '', areaId: '', milestoneId: initialData.milestoneId || '', stationId: '',
                 dueDate: '',
                 plannedStartDate: '', plannedEndDate: '',
+                completedDate: '',
                 estimatedHours: '', blockedReason: '', percentComplete: 0,
                 networkPath: '',
             });
@@ -305,9 +315,18 @@ export default function TaskDetailModal({
             const selectedArea = workAreaTypes.find(a => a.id === newAreaId);
             if (selectedArea) {
                 const allowedValues = selectedArea.taskTypeIds || selectedArea.defaultTaskTypes || [];
-                const currentType = taskTypes.find(t => t.id === form.taskTypeId);
-                if (currentType && allowedValues.length > 0 && !allowedValues.includes(currentType.id) && !allowedValues.includes(currentType.name)) {
-                    newTypeId = ''; // Clear it if it doesn't belong
+                const currentType = effectiveTaskTypes.find(t => t.id === form.taskTypeId);
+                if (currentType && allowedValues.length > 0) {
+                    const isAllowed = allowedValues.includes(currentType.id) || 
+                                      allowedValues.includes(currentType.name) ||
+                                      (currentType.firestoreId && allowedValues.includes(currentType.firestoreId)) ||
+                                      allowedValues.some(val => 
+                                          (currentType.name && val?.toString().toLowerCase() === currentType.name.toLowerCase()) ||
+                                          (currentType.firestoreId && val?.toString().toLowerCase() === currentType.firestoreId.toLowerCase())
+                                      );
+                    if (!isAllowed) {
+                        newTypeId = ''; // Clear it if it doesn't belong
+                    }
                 }
             }
         }
@@ -354,6 +373,7 @@ export default function TaskDetailModal({
                 dueDate: toISO(form.dueDate),
                 plannedStartDate: form.plannedStartDate || null,
                 plannedEndDate: form.plannedEndDate || null,
+                completedDate: form.completedDate ? toISO(form.completedDate) : null,
                 estimatedHours: form.estimatedHours ? Number(form.estimatedHours) : 0,
                 percentComplete: autoProgress !== null ? autoProgress : Number(form.percentComplete ?? 0),
                 networkPath: form.networkPath || '',
@@ -396,7 +416,7 @@ export default function TaskDetailModal({
                 }
 
                 // ── Detect and log field changes ──
-                const loggedInUserName = teamMembers?.find(m => m.uid === userId)?.displayName || null;
+                const loggedInUserName = effectiveTeamMembers?.find(m => m.uid === userId)?.displayName || null;
 
                 if (form.priority !== task.priority) {
                     logActivity(task.id, {
@@ -407,8 +427,8 @@ export default function TaskDetailModal({
                     });
                 }
                 if (form.assignedTo !== task.assignedTo) {
-                    const fromName = teamMembers?.find(m => m.uid === task.assignedTo)?.displayName || task.assignedTo || '—';
-                    const toName = teamMembers?.find(m => m.uid === form.assignedTo)?.displayName || form.assignedTo || '—';
+                    const fromName = effectiveTeamMembers?.find(m => m.uid === task.assignedTo)?.displayName || task.assignedTo || '—';
+                    const toName = effectiveTeamMembers?.find(m => m.uid === form.assignedTo)?.displayName || form.assignedTo || '—';
                     logActivity(task.id, {
                         type: ACTIVITY_TYPES.ASSIGNEE_CHANGED,
                         description: `Reasignado: ${fromName} → ${toName}`,
@@ -484,39 +504,46 @@ export default function TaskDetailModal({
 
     // Execute status change (called directly or after WIP modal confirmation)
     const _executeStatusChange = async (oldStatus, newStatus) => {
-        setForm(f => ({ ...f, status: newStatus }));
-        await updateTaskStatus(task.id, newStatus, task.projectId || form.projectId);
+        try {
+            setForm(f => ({ ...f, status: newStatus }));
+            await updateTaskStatus(task.id, newStatus, task.projectId || form.projectId);
 
-        // Log the status change
-        const loggedInUserName = teamMembers?.find(m => m.uid === userId)?.displayName || null;
-        logActivity(task.id, {
-            type: ACTIVITY_TYPES.STATUS_CHANGED,
-            description: `Estado: ${oldStatus} → ${newStatus}`,
-            userId,
-            userName: loggedInUserName,
-            meta: { from: oldStatus, to: newStatus },
-        });
-
-        if (newStatus === 'done') {
+            // Log the status change
+            const loggedInUserName = effectiveTeamMembers?.find(m => m.uid === userId)?.displayName || null;
             logActivity(task.id, {
-                type: ACTIVITY_TYPES.TASK_COMPLETED,
-                description: `Tarea completada: ${form.title}`,
+                type: ACTIVITY_TYPES.STATUS_CHANGED,
+                description: `Estado: ${oldStatus} → ${newStatus}`,
                 userId,
                 userName: loggedInUserName,
-                meta: { completedAt: new Date().toISOString() },
+                meta: { from: oldStatus, to: newStatus },
             });
+
+            if (newStatus === 'done') {
+                logActivity(task.id, {
+                    type: ACTIVITY_TYPES.TASK_COMPLETED,
+                    description: `Tarea completada: ${form.title}`,
+                    userId,
+                    userName: loggedInUserName,
+                    meta: { completedAt: new Date().toISOString() },
+                });
+            }
+        } catch (err) {
+            console.error('Error al actualizar estado:', err);
+            alert('No se pudo cambiar el estado: ' + (err.message || 'Error desconocido'));
+            setForm(f => ({ ...f, status: oldStatus }));
+            throw err;
         }
 
         // Auto-Timer logic
         const taskOwner = form.assignedTo || task?.assignedTo;
         const isSelf = taskOwner === userId;
         const canManageOthers = canManageOthersTimers(role, teamRole);
-        const isSupervisor = isSupervisorOf(userId, taskOwner, teamMembers, resourceAssignments);
+        const isSupervisor = isSupervisorOf(userId, taskOwner, effectiveTeamMembers, resourceAssignments);
 
         if (newStatus === TASK_STATUS.IN_PROGRESS && oldStatus !== TASK_STATUS.IN_PROGRESS) {
             if (taskOwner && (isSelf || canManageOthers || isSupervisor)) {
-                const proj = projects?.find(p => p.id === (task.projectId || form.projectId));
-                const owner = teamMembers?.find(m => (m.uid || m.id) === taskOwner);
+                const proj = effectiveProjects?.find(p => p.id === (task.projectId || form.projectId));
+                const owner = effectiveTeamMembers?.find(m => (m.uid || m.id) === taskOwner);
                 await handleTaskStatusTimerSync({
                     taskId: task.id, projectId: task.projectId || form.projectId,
                     newStatus, userId: taskOwner, timeLogs,
@@ -551,7 +578,7 @@ export default function TaskDetailModal({
             );
 
             // Log preemption event on the paused task
-            const loggedInUserName = teamMembers?.find(m => m.uid === userId)?.displayName || null;
+            const loggedInUserName = effectiveTeamMembers?.find(m => m.uid === userId)?.displayName || null;
             await logActivity(wipCurrentTask.id, {
                 type: ACTIVITY_TYPES.TASK_PREEMPTED,
                 description: `⚡ Interrumpida: ${blockData.blockedReason || 'Cambio de prioridad'}`,
@@ -587,6 +614,7 @@ export default function TaskDetailModal({
             setWipPendingStatus(null);
         } catch (err) {
             console.error('WIP switch error:', err);
+            alert('Error en cambio WIP: ' + (err.message || 'Error desconocido'));
         }
         setWipSwitching(false);
     };
@@ -603,6 +631,7 @@ export default function TaskDetailModal({
         setDeleteError(null);
         try {
             await deleteTask(task.id);
+            if (typeof refetch === 'function') refetch();
             setShowDeleteConfirm(false);
             onClose();
         } catch (err) {
@@ -699,9 +728,9 @@ export default function TaskDetailModal({
                     setForm={setForm}
                     isNew={isNew}
                     task={task}
-                    projects={projects}
-                    teamMembers={teamMembers}
-                    taskTypes={taskTypes}
+                    projects={effectiveProjects}
+                    teamMembers={effectiveTeamMembers}
+                    taskTypes={effectiveTaskTypes}
                     workAreas={workAreaTypes}
                     stations={projectStations}
                     canEdit={effectiveCanEdit}
@@ -719,7 +748,7 @@ export default function TaskDetailModal({
 
                 {/* Third Row: 5 states Stepper & Health Score */}
                 {!isNew && (
-                    <div className="flex flex-col lg:flex-row bg-slate-900 border-b border-slate-800 relative z-20">
+                    <div className="hidden lg:flex flex-col lg:flex-row bg-slate-900 border-b border-slate-800 relative z-20">
                         <div className="lg:w-2/3 overflow-hidden lg:border-r border-slate-800 flex items-center">
                             <TaskStatusStepper
                                 currentStatus={form.status}
@@ -747,11 +776,16 @@ export default function TaskDetailModal({
                         setForm={setForm}
                         isNew={isNew}
                         task={task}
+                        projects={effectiveProjects}
+                        stations={projectStations}
+                        workAreas={workAreaTypes}
+                        onAreaChange={handleAreaChange}
+                        onTaskTypeChange={handleTaskTypeChange}
                         canEdit={effectiveCanEdit}
                         canEditDates={effectiveCanEditDates}
                         subtasks={subtasks}
-                        teamMembers={teamMembers}
-                        taskTypes={taskTypes}
+                        teamMembers={effectiveTeamMembers}
+                        taskTypes={effectiveTaskTypes}
                         timeLogs={timeLogs}
                         allTasks={engTasks}
                         delays={delays}
@@ -772,6 +806,11 @@ export default function TaskDetailModal({
                         onWaivePR={handleWaiveReview}
                         activePeerReview={activePeerReview}
                         currentUserId={userId}
+                        teamRole={teamRole}
+                        isAdmin={isAdmin}
+                        resourceAssignments={resourceAssignments}
+                        onOpenAutoPlanner={() => setAutoPlannerOpen(true)}
+                        onOpenActivity={() => navigate(`/reports/activity?taskId=${task.id}`)}
                     >
                         <TaskMainPanel
                             form={form}
@@ -782,6 +821,7 @@ export default function TaskDetailModal({
                             canEdit={effectiveCanEdit}
                             userId={userId}
                             userName={teamMembers?.find(m => m.uid === userId)?.displayName || null}
+                            teamMembers={teamMembers}
                         />
                     </TaskControlPanel>
                 </div>
@@ -796,7 +836,7 @@ export default function TaskDetailModal({
                     onClose={pendingNewTask ? onClose : onClose}
                     willAutoPlan={isNew && !!form.plannedStartDate && !!form.estimatedHours && !!form.assignedTo}
                 >
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full">
+                    <div className="hidden lg:flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full">
                         {/* ── Auto-Planner Button ── */}
                         {(form.assignedTo || task?.assignedTo) && (isAdmin || isNew || canAutoScheduleFor(teamRole, userId, form.assignedTo || task?.assignedTo, resourceAssignments)) && (() => {
                             const hasData = form.plannedStartDate || form.estimatedHours;
@@ -964,6 +1004,7 @@ export default function TaskDetailModal({
                         setTransitionPending(null);
                     } catch (err) {
                         console.error('Transition reason error:', err);
+                        alert('No se pudo procesar la transición: ' + (err.message || 'Error desconocido'));
                     }
                     setIsTransitioningReason(false);
                 }}

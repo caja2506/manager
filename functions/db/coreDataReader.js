@@ -609,8 +609,99 @@ async function loadDelaysByProject(projectId) {
     return mapRows(data);
 }
 
+/**
+ * Load weekly plan items for a specific date (YYYY-MM-DD) in Costa Rica timezone.
+ * @param {string} dateStr - YYYY-MM-DD
+ * @returns {Promise<Array>}
+ */
+async function loadWeeklyPlanItemsForDate(dateStr) {
+    const sb = getSupabase();
+    const startISO = `${dateStr}T00:00:00-06:00`;
+    const endISO = `${dateStr}T23:59:59.999-06:00`;
+    const { data, error } = await sb.from("weekly_plan_items")
+        .select("*")
+        .gte("start_date_time", startISO)
+        .lte("start_date_time", endISO);
+    if (error) { console.error("[coreDataReader] loadWeeklyPlanItemsForDate:", error.message); return []; }
+    return mapRows(data);
+}
+
+/**
+ * Insert a weekly plan item.
+ * @param {Object} data - camelCase plan item data
+ * @returns {Promise<Object|null>}
+ */
+async function insertWeeklyPlanItem(data) {
+    const sb = getSupabase();
+    const getMondayStr = (d) => {
+        const date = new Date(d);
+        const day = date.getDay();
+        const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+        return new Date(date.setDate(diff)).toISOString().split("T")[0];
+    };
+    const snake = {
+        task_id: data.taskId || null,
+        assigned_to: data.assignedTo || null,
+        week_start_date: data.weekStartDate || getMondayStr(data.startDateTime || new Date()),
+        start_date_time: data.startDateTime || null,
+        end_date_time: data.endDateTime || null,
+        planned_hours: data.plannedHours || 0,
+        notes: data.notes || "",
+        created_by: data.createdBy || data.assignedTo || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        day_of_week: data.dayOfWeek !== undefined ? data.dayOfWeek : (data.startDateTime ? new Date(data.startDateTime).getDay() : null),
+        project_id: data.projectId || null,
+        task_title: data.taskTitle || "",
+        project_name: data.projectName || "",
+        status: data.status || "planned",
+        date: data.date || (data.startDateTime ? data.startDateTime.split("T")[0] : null),
+        task_title_snapshot: data.taskTitleSnapshot || data.taskTitle || "",
+        project_name_snapshot: data.projectNameSnapshot || data.projectName || "",
+        assigned_to_name: data.assignedToName || "",
+        status_snapshot: data.statusSnapshot || data.status || "planned",
+        priority: data.priority || "medium",
+        color_key: data.colorKey || "indigo",
+    };
+    const { data: result, error } = await sb.from("weekly_plan_items")
+        .insert(snake)
+        .select()
+        .single();
+    if (error) { console.error("[coreDataReader] insertWeeklyPlanItem:", error.message); return null; }
+    return toCamel(result);
+}
+
+/**
+ * Transition task status using stored procedure for workflow validation and audit logging.
+ * @param {string} taskId
+ * @param {string} newStatus
+ * @param {string} userId
+ * @param {string} [userName='']
+ * @param {boolean} [force=false]
+ * @param {string} [blockedReason=null]
+ * @returns {Promise<{success: boolean, previousStatus?: string, newStatus?: string, taskId?: string, error?: string}>}
+ */
+async function transitionTaskStatus(taskId, newStatus, userId, userName = '', force = false, blockedReason = null) {
+    const sb = getSupabase();
+    const { data, error } = await sb.rpc('transition_task_status', {
+        p_task_id: taskId,
+        p_new_status: newStatus,
+        p_user_id: userId,
+        p_user_name: userName,
+        p_force: force,
+        p_blocked_reason: blockedReason
+    });
+    if (error) {
+        console.error("[coreDataReader] transitionTaskStatus error:", error.message);
+        return { success: false, error: error.message };
+    }
+    return data;
+}
+
 module.exports = {
+    transitionTaskStatus,
     // Reads
+    loadWeeklyPlanItemsForDate,
     loadAllTasks,
     loadUserTasks,
     loadTask,
@@ -646,6 +737,7 @@ module.exports = {
     loadDelaysByProject,
 
     // Writes
+    insertWeeklyPlanItem,
     updateTimeLog,
     insertTimeLog,
     updateTask,

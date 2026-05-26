@@ -1,14 +1,26 @@
 import React, { useState, useMemo } from 'react';
-import { ShoppingCart, X, Search, Plus, Check, Loader2, Camera } from 'lucide-react';
+import { ShoppingCart, X, Search, Plus, Check, Loader2, Camera, PackageCheck } from 'lucide-react';
 import SearchableDropdown from '../ui/SearchableDropdown';
 
 // ========================================================
 // COMPONENTE: MODAL "CARRITO" PARA AGREGAR DEL CATÁLOGO
 // ========================================================
-const CatalogPickerModal = ({ onClose, catalogo, managedLists, onAddItems }) => {
+const CatalogPickerModal = ({ onClose, catalogo, managedLists, onAddItems, existingBomItems = [] }) => {
     const [selectedItems, setSelectedItems] = useState({}); // { id: quantity }
     const [filters, setFilters] = useState({ search: '', brand: '', category: '', provider: '' });
     const [isAdding, setIsAdding] = useState(false);
+
+    // Build a lookup map: masterPartRefId → total quantity already in project
+    const existingMap = useMemo(() => {
+        const map = {};
+        existingBomItems.forEach(bi => {
+            const refId = bi.masterPartRef?.id || bi.master_part_ref_id;
+            if (refId) {
+                map[refId] = (map[refId] || 0) + (bi.quantity || 0);
+            }
+        });
+        return map;
+    }, [existingBomItems]);
 
     // Opciones para filtros
     const brandOptions = [{ value: '', label: 'Todas las Marcas' }, ...managedLists.brands.map(b => ({ value: b.id, label: b.name }))];
@@ -90,12 +102,20 @@ const CatalogPickerModal = ({ onClose, catalogo, managedLists, onAddItems }) => 
                         {filteredCatalog.map(item => {
                             const isSelected = !!selectedItems[item.id];
                             const brandName = item.brand ? managedLists.brands.find(b => b.id === item.brand.id)?.name : '';
+                            const existingQty = existingMap[item.id] || 0;
+                            const isInProject = existingQty > 0;
 
                             return (
                                 <div
                                     key={item.id}
                                     onClick={() => handleToggleItem(item.id)}
-                                    className={`relative p-4 rounded-2xl border transition-all cursor-pointer group hover:shadow-md ${isSelected ? 'bg-indigo-500/10 border-indigo-500 ring-1 ring-indigo-500' : 'bg-slate-900 border-slate-700 hover:border-indigo-500/50'}`}
+                                    className={`relative p-4 rounded-2xl border transition-all cursor-pointer group hover:shadow-md ${
+                                        isSelected
+                                            ? 'bg-indigo-500/10 border-indigo-500 ring-1 ring-indigo-500'
+                                            : isInProject
+                                                ? 'bg-emerald-500/5 border-emerald-500/40 hover:border-emerald-400'
+                                                : 'bg-slate-900 border-slate-700 hover:border-indigo-500/50'
+                                    }`}
                                 >
                                     <div className="flex justify-between items-start mb-3 gap-3">
                                         <div className="flex items-start gap-3 flex-1 overflow-hidden">
@@ -121,6 +141,14 @@ const CatalogPickerModal = ({ onClose, catalogo, managedLists, onAddItems }) => 
                                             <span className="font-black text-green-400 text-sm">${(item.lastPrice || 0).toLocaleString()}</span>
                                         </div>
                                     </div>
+
+                                    {/* Badge: Ya en proyecto — bottom strip */}
+                                    {isInProject && (
+                                        <div className="flex items-center gap-1.5 px-3 py-1.5 -mx-4 -mb-4 mt-2 rounded-b-2xl bg-emerald-500/10 border-t border-emerald-500/20">
+                                            <PackageCheck className="w-3.5 h-3.5 text-emerald-400" />
+                                            <span className="text-[11px] font-black text-emerald-400">Ya en BOM — {existingQty} ud.</span>
+                                        </div>
+                                    )}
 
                                     {isSelected && (
                                         <div className="mt-3 pt-3 border-t border-indigo-500/20 flex items-center justify-between animate-in fade-in slide-in-from-bottom-2 duration-200" onClick={e => e.stopPropagation()}>

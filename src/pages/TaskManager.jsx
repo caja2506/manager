@@ -24,7 +24,7 @@ import {
 } from '../models/schemas';
 import { getAvailableTransitions } from '../core/workflow/workflowModel';
 import {
-    Plus, Search
+    Plus, Search, Filter
 } from 'lucide-react';
 
 // ============================================================
@@ -100,15 +100,19 @@ export default function TaskManager() {
     const { canEdit, canDelete, role, teamRole } = useRole();
     const { 
         engProjects, engTasks, engSubtasks, teamMembers, 
-        taskTypes, timeLogs, delayCauses,
+        taskTypes, workAreaTypes, timeLogs, delayCauses,
         taskSearch, setTaskSearch,
         taskFilterProject, setTaskFilterProject,
         taskFilterAssignee, setTaskFilterAssignee,
-        taskFilterPriority, setTaskFilterPriority
+        taskFilterPriority, setTaskFilterPriority,
+        taskFilterArea, setTaskFilterArea
     } = useEngineeringData();
+
+    const activeDropdownFilterCount = [taskFilterProject, taskFilterAssignee, taskFilterPriority, taskFilterArea].filter(Boolean).length;
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
+    const [showMobileFilters, setShowMobileFilters] = useState(false);
 
     // Drag state
     const [activeId, setActiveId] = useState(null);
@@ -196,9 +200,10 @@ export default function TaskManager() {
             }
 
             const matchPriority = !taskFilterPriority || task.priority === taskFilterPriority;
-            return matchSearch && matchProject && matchAssignee && matchPriority;
+            const matchArea = !taskFilterArea || task.areaId === taskFilterArea || task.workAreaTypeId === taskFilterArea;
+            return matchSearch && matchProject && matchAssignee && matchPriority && matchArea;
         });
-    }, [engTasks, taskSearch, taskFilterProject, taskFilterAssignee, taskFilterPriority, myTeamUids, user]);
+    }, [engTasks, taskSearch, taskFilterProject, taskFilterAssignee, taskFilterPriority, taskFilterArea, myTeamUids, user]);
 
     // --- Group by status ---
     const tasksByStatus = useMemo(() => {
@@ -437,35 +442,61 @@ export default function TaskManager() {
             {/* ══════════════ SHARED BANNER ══════════════ */}
             <TaskModuleBanner onNewTask={canEdit ? openNew : null} canEdit={canEdit} />
 
-            {/* ══════════════ FILTERS BAR (always visible) ══════════════ */}
-            <div className="flex flex-wrap gap-2 items-center px-6 py-2 border-b border-slate-800/40">
-                <div className="relative flex-1 min-w-[160px] max-w-xs">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
-                    <input value={taskSearch} onChange={e => setTaskSearch(e.target.value)} placeholder="Buscar..."
-                        className="pl-8 pr-3 py-1.5 w-full border border-slate-700/60 rounded-lg text-xs text-white outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 placeholder:text-slate-600" />
-                </div>
-                <select value={taskFilterProject} onChange={e => setTaskFilterProject(e.target.value)}
-                    className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer">
-                    <option value="">Todos los proyectos</option>
-                    {engProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-                <select value={taskFilterAssignee} onChange={e => setTaskFilterAssignee(e.target.value)}
-                    className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer">
-                    <option value="my-team">Mis tareas y equipo</option>
-                    <option value="">Todos los miembros</option>
-                    {teamMembers.map(u => <option key={u.uid} value={u.uid}>{u.displayName || u.email}</option>)}
-                </select>
-                <select value={taskFilterPriority} onChange={e => setTaskFilterPriority(e.target.value)}
-                    className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer">
-                    <option value="">Todas las prioridades</option>
-                    {Object.entries(TASK_PRIORITY_CONFIG).map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
-                </select>
-                {(taskSearch !== '' || taskFilterProject !== '' || taskFilterAssignee !== 'my-team' || taskFilterPriority !== '') && (
-                    <button onClick={() => { setTaskSearch(''); setTaskFilterProject(''); setTaskFilterAssignee('my-team'); setTaskFilterPriority(''); }}
-                        className="text-[11px] text-rose-400 hover:text-rose-300 px-2 py-1 rounded hover:bg-rose-500/10 transition-colors">
-                        Limpiar
+            {/* ══════════════ FILTERS BAR ══════════════ */}
+            <div className="flex flex-col md:flex-row md:items-center gap-2 px-6 py-2 border-b border-slate-800/40 bg-slate-900/20 backdrop-blur-sm">
+                {/* Always Visible Row (Search, Toggle button on mobile) */}
+                <div className="flex items-center gap-2 w-full md:w-auto md:flex-1">
+                    <div className="relative flex-1 max-w-xs">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+                        <input value={taskSearch} onChange={e => setTaskSearch(e.target.value)} placeholder="Buscar..."
+                            className="pl-8 pr-3 py-1.5 w-full border border-slate-700/60 rounded-lg text-xs text-white outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 placeholder:text-slate-600" />
+                    </div>
+
+                    {/* Mobile Filter Toggle Button */}
+                    <button
+                        onClick={() => setShowMobileFilters(!showMobileFilters)}
+                        className="flex md:hidden items-center gap-1.5 px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs font-semibold text-slate-300 bg-slate-800/60 hover:bg-slate-700/60 transition-colors"
+                    >
+                        <Filter className="w-3.5 h-3.5" />
+                        <span>Filtros</span>
+                        {activeDropdownFilterCount > 0 && (
+                            <span className="flex items-center justify-center bg-indigo-500 text-white text-[9px] font-bold rounded-full h-4 min-w-4 px-1">
+                                {activeDropdownFilterCount}
+                            </span>
+                        )}
                     </button>
-                )}
+                </div>
+
+                {/* Dropdowns Container (collapsible on mobile, always flex on desktop) */}
+                <div className={`${showMobileFilters ? 'flex animate-in slide-in-from-top-2 duration-200' : 'hidden'} md:flex flex-col md:flex-row flex-wrap items-stretch md:items-center gap-2 w-full md:w-auto`}>
+                    <select value={taskFilterProject} onChange={e => setTaskFilterProject(e.target.value)}
+                        className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer w-full md:w-auto">
+                        <option value="">Todos los proyectos</option>
+                        {engProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                    <select value={taskFilterAssignee} onChange={e => setTaskFilterAssignee(e.target.value)}
+                        className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer w-full md:w-auto">
+                        <option value="">Todos los miembros</option>
+                        <option value="my-team">Mis tareas y equipo</option>
+                        {teamMembers.map(u => <option key={u.uid} value={u.uid}>{u.displayName || u.email}</option>)}
+                    </select>
+                    <select value={taskFilterArea} onChange={e => setTaskFilterArea(e.target.value)}
+                        className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer w-full md:w-auto">
+                        <option value="">Todas las áreas</option>
+                        {(workAreaTypes || []).map(area => <option key={area.id} value={area.id}>{area.name}</option>)}
+                    </select>
+                    <select value={taskFilterPriority} onChange={e => setTaskFilterPriority(e.target.value)}
+                        className="px-3 py-1.5 border border-slate-700/60 rounded-lg text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 cursor-pointer w-full md:w-auto">
+                        <option value="">Todas las prioridades</option>
+                        {Object.entries(TASK_PRIORITY_CONFIG).map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
+                    </select>
+                    {(taskSearch !== '' || taskFilterProject !== '' || taskFilterAssignee !== '' || taskFilterPriority !== '' || taskFilterArea !== '') && (
+                        <button onClick={() => { setTaskSearch(''); setTaskFilterProject(''); setTaskFilterAssignee(''); setTaskFilterPriority(''); setTaskFilterArea(''); }}
+                            className="text-[11px] text-rose-400 hover:text-rose-300 px-2 py-1.5 rounded hover:bg-rose-500/10 transition-colors w-full md:w-auto text-center border border-dashed border-rose-500/20 md:border-none">
+                            Limpiar Filtros
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* ══════════════ KANBAN BOARD ══════════════ */}

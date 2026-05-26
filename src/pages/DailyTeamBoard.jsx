@@ -10,6 +10,8 @@ import { getEffectiveHours } from '../utils/breakTimeUtils';
 import { usePlannerTimerStatus } from '../hooks/usePlannerTimerSync';
 import PlannerSidebar from '../components/planner/PlannerSidebar';
 import DailyTeamGrid from '../components/planner/DailyTeamGrid';
+import PlannerTaskModal from '../components/planner/PlannerTaskModal';
+import PlannerConflictsModal from '../components/planner/PlannerConflictsModal';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
 import TaskModuleBanner from '../components/layout/TaskModuleBanner';
 import {
@@ -42,9 +44,11 @@ export default function DailyTeamBoard() {
     const [rawPlanItems, setRawPlanItems] = useState([]);
     const [loading, setLoading] = useState(false);
     const [taskModalTask, setTaskModalTask] = useState(undefined);
+    const [selectedItem, setSelectedItem] = useState(null);
     const [placingTask, setPlacingTask] = useState(null);
     const [plannerError, setPlannerError] = useState(null);
     const [plannerWarnings, setPlannerWarnings] = useState([]);
+    const [conflictsModalOpen, setConflictsModalOpen] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     // Fetch plan items for the week containing the selected day
@@ -257,11 +261,61 @@ export default function DailyTeamBoard() {
         } catch (e) { console.error('Error deleting block:', e); }
     }, [rawPlanItems]);
 
-    // ──────────────── Block click → open task modal ────────────────
+    // ──────────────── Modal save handler ────────────────
+    const handleModalSave = useCallback(async (updates) => {
+        if (!selectedItem) return;
+        try {
+            if (selectedItem.id.startsWith('temp-')) {
+                const blockData = {
+                    ...selectedItem,
+                    ...updates,
+                    id: undefined,
+                };
+                const { id: newId } = await plannerService.createPlanItem(blockData);
+                setRawPlanItems(prev => [...prev, { id: newId, ...blockData }]);
+            } else {
+                await plannerService.updatePlanItem(selectedItem.id, updates);
+                setRawPlanItems(prev => prev.map(pi =>
+                    pi.id === selectedItem.id ? { ...pi, ...updates } : pi
+                ));
+                if (selectedItem.taskId) {
+                    syncPlannerToGantt(selectedItem.taskId).catch(console.warn);
+                }
+            }
+            setSelectedItem(null);
+        } catch (e) {
+            console.error("Error saving block:", e);
+        }
+    }, [selectedItem]);
+
+    // ──────────────── Block click → open PlannerTaskModal ────────────────
     const handleBlockClick = useCallback((planItem) => {
-        const fullTask = engTasks.find(t => t.id === planItem.taskId) || null;
-        setTaskModalTask(fullTask);
-    }, [engTasks]);
+        setSelectedItem(planItem);
+    }, []);
+
+    // ──────────────── Cell Click handler for empty grid spaces ────────────────
+    const handleCellClick = useCallback(({ date, hour, minute, assignedTo }) => {
+        if (!canEdit) return;
+        const startDt = new Date(`${date}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`);
+        const endDt = new Date(startDt.getTime() + 1 * 3600000); // 1h default
+
+        const newBlock = {
+            id: 'temp-' + Date.now(),
+            taskId: null,
+            weekStartDate: weekStartStr,
+            date,
+            dayOfWeek: startDt.getDay(),
+            startDateTime: startDt.toISOString(),
+            endDateTime: endDt.toISOString(),
+            plannedHours: 1,
+            notes: '',
+            assignedTo: assignedTo || user?.uid,
+            taskTitleSnapshot: 'Planificación libre',
+            projectNameSnapshot: '',
+            colorKey: 'indigo',
+        };
+        setSelectedItem(newBlock);
+    }, [canEdit, weekStartStr, user]);
 
     // ──────────────── Placement ────────────────
     const handlePlacementComplete = useCallback(async (placement) => {
@@ -290,6 +344,30 @@ export default function DailyTeamBoard() {
             }
         });
         return ids;
+    }, [dayPlanItems]);
+
+    const conflictsList = useMemo(() => {
+        const list = [];
+        const byPersonDay = {};
+        dayPlanItems.forEach(pi => {
+            const key = `${pi.assignedTo}-${pi.date}`;
+            if (!byPersonDay[key]) byPersonDay[key] = [];
+            byPersonDay[key].push(pi);
+        });
+
+        Object.values(byPersonDay).forEach(items => {
+            for (let i = 0; i < items.length; i++) {
+                for (let j = i + 1; j < items.length; j++) {
+                    const a = items[i], b = items[j];
+                    const aS = new Date(a.startDateTime), aE = new Date(a.endDateTime);
+                    const bS = new Date(b.startDateTime), bE = new Date(b.endDateTime);
+                    if (aS < bE && aE > bS) {
+                        list.push({ itemA: a, itemB: b });
+                    }
+                }
+            }
+        });
+        return list;
     }, [dayPlanItems]);
 
     const isTodaySelected = isToday(selectedDate);
@@ -373,9 +451,12 @@ export default function DailyTeamBoard() {
                 )}
 
                 {conflictIds.size > 0 && (
-                    <div className="flex items-center gap-1.5 bg-rose-500/15 border border-rose-500/30 text-rose-400 px-2.5 py-1 rounded-lg text-[10px] font-bold animate-pulse">
+                    <button
+                        onClick={() => setConflictsModalOpen(true)}
+                        className="flex items-center gap-1.5 bg-rose-500/15 border border-rose-500/30 hover:bg-rose-500/25 text-rose-400 px-2.5 py-1 rounded-lg text-[10px] font-bold animate-pulse cursor-pointer transition-colors"
+                    >
                         ⚠️ {conflictIds.size} conflicto(s)
-                    </div>
+                    </button>
                 )}
             </TaskModuleBanner>
 
@@ -432,6 +513,7 @@ export default function DailyTeamBoard() {
                             activeMemberFilter={filterMember}
                             allMemberUids={teamMembers.filter(m => m.teamRole !== 'manager').map(m => m.uid)}
                             timerStatusMap={timerStatusMap}
+                            onCellClick={handleCellClick}
                         />
                     )}
                 </div>
@@ -452,6 +534,31 @@ export default function DailyTeamBoard() {
                     canDelete={canDelete}
                 />
             )}
+
+            {selectedItem && (
+                <PlannerTaskModal
+                    item={selectedItem}
+                    task={selectedItem.taskId ? engTasks.find(t => t.id === selectedItem.taskId) : null}
+                    projects={engProjects}
+                    teamMembers={teamMembers}
+                    onClose={() => setSelectedItem(null)}
+                    onSave={handleModalSave}
+                    onDelete={() => handleBlockDelete(selectedItem.id)}
+                    onOpenTaskDetail={selectedItem.taskId ? () => {
+                        const fullTask = engTasks.find(t => t.id === selectedItem.taskId);
+                        setTaskModalTask(fullTask);
+                        setSelectedItem(null);
+                    } : null}
+                />
+            )}
+
+            <PlannerConflictsModal
+                isOpen={conflictsModalOpen}
+                onClose={() => setConflictsModalOpen(false)}
+                conflicts={conflictsList}
+                onResolveItem={(item) => setSelectedItem(item)}
+                onDeleteItem={handleBlockDelete}
+            />
         </div>
     );
 }

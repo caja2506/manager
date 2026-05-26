@@ -105,7 +105,7 @@ describe('Shared Workflow Contract (Single Source of Truth)', () => {
         const testCases = [
             ['backlog', 'pending', true],
             ['backlog', 'in_progress', true],
-            ['backlog', 'completed', false],
+            ['backlog', 'completed', true],
             ['in_progress', 'validation', true],
             ['in_progress', 'in_progress', false],
             ['completed', 'in_progress', true],

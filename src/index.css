@@ -28,6 +28,12 @@
   --scrollbar-hover: rgba(100, 116, 139, 0.5);
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3);
   --processing-bg: #0f172a;
+  --bg-table-header-solid: #161f30;
+  --bg-table-row: #0f172a;
+  --bg-table-row-hover: #1e293b;
+  --bg-table-row-critical: #1b0b11;
+  --bg-table-row-critical-hover: #2c121d;
+  --bg-table-row-summary: #161f30;
 }
 
 [data-theme="light"] {
@@ -52,6 +58,12 @@
   --scrollbar-hover: rgba(100, 116, 139, 0.6);
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
   --processing-bg: #ffffff;
+  --bg-table-header-solid: #e2e8f0;
+  --bg-table-row: #ffffff;
+  --bg-table-row-hover: #f8fafc;
+  --bg-table-row-critical: #fef2f2;
+  --bg-table-row-critical-hover: #fee2e2;
+  --bg-table-row-summary: #f1f5f9;
 }
 
 /* ── Hide scrollbar completely ── */
@@ -87,26 +99,26 @@
    ══════════════════════════════════════════════ */
 
 /* ── Backgrounds: wildcard to catch all opacity variants ── */
-[data-theme="light"] main [class*="bg-slate-950"] {
+[data-theme="light"] main :is([class^="bg-slate-950"], [class*=" bg-slate-950"]) {
   background-color: #f1f5f9 !important;
 }
 
-[data-theme="light"] main [class*="from-slate-900"] {
+[data-theme="light"] main :is([class^="from-slate-900"], [class*=" from-slate-900"]) {
   background-image: none !important;
   background-color: #ffffff !important;
 }
 
-[data-theme="light"] main [class*="bg-slate-900"] {
+[data-theme="light"] main :is([class^="bg-slate-900"], [class*=" bg-slate-900"]) {
   background-color: #ffffff !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
 
-[data-theme="light"] main [class*="bg-slate-800"] {
+[data-theme="light"] main :is([class^="bg-slate-800"], [class*=" bg-slate-800"]) {
   background-color: #ffffff !important;
 }
 
-[data-theme="light"] main [class*="bg-slate-700"]:not(.h-px):not([class*="bg-slate-700 rounded"]) {
+[data-theme="light"] main :is([class^="bg-slate-700"], [class*=" bg-slate-700"]):not(.h-px):not([class*="bg-slate-700 rounded"]) {
   background-color: #e2e8f0 !important;
 }
 

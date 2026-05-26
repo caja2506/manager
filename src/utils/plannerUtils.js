@@ -94,10 +94,7 @@ export function validatePlanItem(data) {
     const errors = [];
     const warnings = [];
 
-    // B1: taskId is required
-    if (!data.taskId) {
-        errors.push('taskId es obligatorio para crear un plan item.');
-    }
+    // B1: taskId is optional (for free/manual blocks)
 
     // B2: assignedTo is required
     if (!data.assignedTo) {
