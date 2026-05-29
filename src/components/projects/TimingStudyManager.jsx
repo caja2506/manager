@@ -2706,13 +2706,49 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
 
                             {/* 3. VIABILIDAD Y DESEMPEÑO (OEE) */}
                             <div className="xl:col-span-3 bg-slate-900/40 border border-slate-800 border-t-emerald-500/80 border-t-[3px] rounded-2xl p-4 flex flex-col gap-3 shadow-xl backdrop-blur-md transition-all duration-300 hover:border-slate-700/80">
-                                <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+                                <div 
+                                    className={`flex items-center gap-2 border-b border-slate-800 pb-2 cursor-pointer overflow-visible relative group ${getHighlightStyles('card-status').wrapperClass}`}
+                                    onClick={(e) => handleRelationClick('card-status', e)}
+                                >
+                                    {getHighlightLabel('card-status') && (
+                                        <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                            hoveredRelation === 'card-status' ? 'bg-cyan-500 text-slate-950' : 'bg-emerald-500 text-slate-950'
+                                        }`}>
+                                            {getHighlightLabel('card-status')}
+                                        </span>
+                                    )}
                                     <div className="p-1 bg-emerald-500/10 rounded-lg">
                                         <Award className="w-4 h-4 text-emerald-400" />
                                     </div>
-                                    <div>
+                                    <div className="flex-1">
                                         <h4 className="text-xs font-black text-slate-200 uppercase tracking-wider">Viabilidad y Desempeño</h4>
                                         <p className="text-[9px] text-slate-500 font-semibold font-mono">Resultados OEE & Calendario</p>
+                                    </div>
+                                    {getStatusBadge(localMetrics?.status)}
+
+                                    {/* Tooltip Status */}
+                                    <div className="absolute top-full right-0 left-auto mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
+                                        <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
+                                            <Info className="w-3.5 h-3.5 text-slate-400" />
+                                            <span>Status (Estado del Estudio)</span>
+                                        </div>
+                                        <div className="text-[11px] leading-relaxed space-y-1.5">
+                                            <p className="text-slate-400 text-[10px]">Indica si el ciclo real de la máquina cumple la meta requerida.</p>
+                                            <div className="space-y-1">
+                                                <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Criterio de Evaluación:</p>
+                                                <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                    <span className="text-emerald-500">OK</span> si <span className="text-sky-400">Ciclo Real</span> ≤ <span className="text-cyan-400">Ciclo Target</span>
+                                                </p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Comparación actual:</p>
+                                                <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center text-[10px] leading-normal">
+                                                    Real: <span className="text-sky-400">{((localMetrics?.machineCycleTimeMs || 0) / 1000).toFixed(2)} s</span><br />
+                                                    Límite: <span className="text-white font-bold">{(studyConfig?.targetPPM ? (60 / studyConfig.targetPPM) : 0).toFixed(2)} s</span>
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="absolute bottom-full right-6 left-auto border-4 border-transparent border-b-slate-950/95" />
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2.5 flex-1">
@@ -2876,53 +2912,13 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                                 </div>
                                                             </div>
                                                         </div>
+
                                                     </div>
                                                     <div className="absolute bottom-full left-6 border-4 border-transparent border-b-slate-950/95" />
                                                 </div>
                                             </div>
                                         );
                                     })()}
-
-                                    {/* Estatus */}
-                                    <div 
-                                        onClick={(e) => handleRelationClick('card-status', e)}
-                                        className={`relative group bg-slate-955/40 p-3 rounded-xl border border-slate-800 hover:border-emerald-500/30 text-center flex flex-col justify-center items-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-status').wrapperClass}`}
-                                    >
-                                        {getHighlightLabel('card-status') && (
-                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                hoveredRelation === 'card-status' ? 'bg-cyan-500 text-slate-950' : 'bg-emerald-500 text-slate-950'
-                                            }`}>
-                                                {getHighlightLabel('card-status')}
-                                            </span>
-                                        )}
-                                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-1 font-sans">Status</span>
-                                        {getStatusBadge(localMetrics?.status)}
-
-                                        {/* Tooltip */}
-                                        <div className="absolute top-full right-0 left-auto mt-2 w-64 p-3 bg-slate-955 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
-                                            <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
-                                                <Info className="w-3.5 h-3.5 text-slate-400" />
-                                                <span>Status (Estado del Estudio)</span>
-                                            </div>
-                                            <div className="text-[11px] leading-relaxed space-y-1.5">
-                                                <p className="text-slate-400 text-[10px]">Indica si el ciclo real de la máquina cumple la meta requerida.</p>
-                                                <div className="space-y-1">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Criterio de Evaluación:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                        <span className="text-emerald-500">OK</span> si <span className="text-sky-400">Ciclo Real</span> Γëñ <span className="text-cyan-400">Ciclo Target</span>
-                                                    </p>
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Comparación actual:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center text-[10px] leading-normal">
-                                                        Real: <span className="text-sky-400">{((localMetrics?.machineCycleTimeMs || 0) / 1000).toFixed(2)} s</span><br />
-                                                        Límite: <span className="text-white font-bold">{(studyConfig?.targetPPM ? (60 / studyConfig.targetPPM) : 0).toFixed(2)} s</span>
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="absolute bottom-full right-6 left-auto border-4 border-transparent border-b-slate-950/95" />
-                                        </div>
-                                    </div>
 
                                     {/* Piezas / Semana */}
                                     {(() => {
