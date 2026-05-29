@@ -346,24 +346,26 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
     const longTermMetrics = useMemo(() => {
         if (!studyConfig || !localMetrics) return null;
 
+        const calcMode = studyConfig.calcMode || 'pph'; // 'pph' | 'demand'
         const workDaysPerWeek = studyConfig.workDaysPerWeek !== undefined ? Number(studyConfig.workDaysPerWeek) : 5;
         const country = studyConfig.country || 'MX';
         const annualDemand = studyConfig.annualDemand !== undefined ? Number(studyConfig.annualDemand) : 18388734;
         const shiftHours = studyConfig.shiftHours !== undefined ? Number(studyConfig.shiftHours) : 8;
-
         const cycleOutputQty = studyConfig.cycleOutputQty !== undefined ? Number(studyConfig.cycleOutputQty) : 1;
 
         const feriados = country === 'MX' ? 7 : (country === 'CR' ? 11 : (country === 'US' ? 11 : 0));
         const diasAnuales = (workDaysPerWeek * 52) - feriados;
 
+        // ── Datos REALES del diagrama (siempre fijos) ──
         const machineCycleMs = localMetrics.machineCycleTimeMs || 0;
         const cicloRealSeg = machineCycleMs / 1000;
         const ppmReal = cicloRealSeg > 0 ? (60 / cicloRealSeg) : 0;
+        const piezasHoraReal = ppmReal * 60 * cycleOutputQty;
+        const cpmReal = ppmReal; // ciclos por minuto real (= PPM sin UP)
 
-        const targetPPM = Number(studyConfig.targetPPM) || 10;
         const linkOeeToStudy = !!studyConfig.linkOeeToStudy;
 
-        // OEE y Pérdidas
+        // ── OEE y Pérdidas ──
         const availability = studyConfig.availability !== undefined ? Number(studyConfig.availability) : 95;
         const yieldVal = studyConfig.yield !== undefined ? Number(studyConfig.yield) : 98;
 
@@ -371,35 +373,87 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         let oeeFactor;
         let oeePenalty;
 
-        if (linkOeeToStudy) {
-            efficiency = targetPPM > 0 ? (ppmReal / targetPPM) * 100 : 100;
-            oeeFactor = (availability / 100) * (efficiency / 100) * (yieldVal / 100);
-            oeePenalty = 100 - (oeeFactor * 100);
+        // ── Cálculos TARGET según MODO ──
+        let targetPPM;
+        let piezasHoraTarget;
+
+        if (calcMode === 'demand') {
+            // MODO DEMANDA: calcular PPH requerido desde demanda anual
+            // Primero necesitamos OEE para calcular bruto
+            if (linkOeeToStudy) {
+                // Usar PPM target provisional para calcular efficiency
+                const provisionalTargetPPM = Number(studyConfig.targetPPM) || 10;
+                efficiency = provisionalTargetPPM > 0 ? (ppmReal / provisionalTargetPPM) * 100 : 100;
+                oeeFactor = (availability / 100) * (efficiency / 100) * (yieldVal / 100);
+                oeePenalty = 100 - (oeeFactor * 100);
+            } else {
+                oeePenalty = studyConfig.oeePenalty !== undefined ? Number(studyConfig.oeePenalty) : 15;
+                oeeFactor = (100 - oeePenalty) / 100;
+                efficiency = studyConfig.efficiency !== undefined 
+                    ? Number(studyConfig.efficiency) 
+                    : ((oeeFactor * 1000000) / (availability * yieldVal));
+            }
+
+            const piezasDiaReq = diasAnuales > 0 ? annualDemand / diasAnuales : 0;
+            const piezasDiaBrutoReq = oeeFactor > 0 ? piezasDiaReq / oeeFactor : 0;
+            piezasHoraTarget = shiftHours > 0 ? piezasDiaBrutoReq / shiftHours : 0;
+            targetPPM = cycleOutputQty > 0 ? (piezasHoraTarget / 60 / cycleOutputQty) : 0;
         } else {
-            oeePenalty = studyConfig.oeePenalty !== undefined ? Number(studyConfig.oeePenalty) : 15;
-            oeeFactor = (100 - oeePenalty) / 100;
-            efficiency = studyConfig.efficiency !== undefined 
-                ? Number(studyConfig.efficiency) 
-                : ((oeeFactor * 1000000) / (availability * yieldVal));
+            // MODO PPH: usar Piezas por Hora del input del usuario
+            targetPPM = Number(studyConfig.targetPPM) || 10;
+            piezasHoraTarget = targetPPM * 60 * cycleOutputQty;
+
+            if (linkOeeToStudy) {
+                efficiency = targetPPM > 0 ? (ppmReal / targetPPM) * 100 : 100;
+                oeeFactor = (availability / 100) * (efficiency / 100) * (yieldVal / 100);
+                oeePenalty = 100 - (oeeFactor * 100);
+            } else {
+                oeePenalty = studyConfig.oeePenalty !== undefined ? Number(studyConfig.oeePenalty) : 15;
+                oeeFactor = (100 - oeePenalty) / 100;
+                efficiency = studyConfig.efficiency !== undefined 
+                    ? Number(studyConfig.efficiency) 
+                    : ((oeeFactor * 1000000) / (availability * yieldVal));
+            }
         }
 
-        const piezasHora = ppmReal * 60 * cycleOutputQty;
-        const piezasDiaSinOEE = piezasHora * shiftHours;
-        const piezasDia = piezasHora * shiftHours * oeeFactor;
+        // ── PPM y Ciclos Target ──
+        const ppmTarget = targetPPM;
+        const cpmTarget = targetPPM; // ciclos por minuto target (= PPM sin UP)
+        const cicloTargetSeg = targetPPM > 0 ? (60 / targetPPM) : 0;
+
+        // ── Producción calculada (basada en el TARGET, no en el real) ──
+        const piezasDiaSinOEE = piezasHoraTarget * shiftHours;
+        const piezasDia = piezasDiaSinOEE * oeeFactor;
         const piezasSemana = piezasDia * workDaysPerWeek;
         const piezasSemanaBruto = piezasDiaSinOEE * workDaysPerWeek;
         const piezasAno = piezasDia * diasAnuales;
         const piezasAnoBruto = piezasDiaSinOEE * diasAnuales;
+
+        // ── Producción REAL del diagrama (para comparación) ──
+        const piezasDiaReal = piezasHoraReal * shiftHours * oeeFactor;
+        const piezasSemanaReal = piezasDiaReal * workDaysPerWeek;
+        const piezasAnoReal = piezasDiaReal * diasAnuales;
+
         const metaAno = piezasAno;
         const cumplimiento = annualDemand > 0 ? (metaAno / annualDemand) * 100 : 0;
         const cumpleDemanda = metaAno >= annualDemand;
 
+        // Cumplimiento REAL (diagrama vs demanda)
+        const cumplimientoReal = annualDemand > 0 ? (piezasAnoReal / annualDemand) * 100 : 0;
+        const cumpleDemandaReal = piezasAnoReal >= annualDemand;
+
+        // ── Pérdidas OEE (basadas en target) ──
         const piezasPerdidasDisp = piezasDiaSinOEE * (1 - availability / 100);
         const piezasPerdidasEficiencia = piezasDiaSinOEE * (availability / 100) * (1 - efficiency / 100);
         const piezasPerdidasCalidad = piezasDiaSinOEE * (availability / 100) * (efficiency / 100) * (1 - yieldVal / 100);
 
+        // OEE % para UI (invertido de oeePenalty)
+        const oeePercent = Math.round((100 - oeePenalty) * 10) / 10;
+
         return {
+            calcMode,
             oeePenalty,
+            oeePercent,
             oeeFactor,
             workDaysPerWeek,
             country,
@@ -410,9 +464,16 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
             feriados,
             diasAnuales,
             cicloRealSeg,
+            cicloTargetSeg,
             ppmReal,
-            piezasHora,
+            ppmTarget,
+            cpmReal,
+            cpmTarget,
+            piezasHora: piezasHoraTarget, // backward compat
+            piezasHoraTarget,
+            piezasHoraReal,
             piezasDia,
+            piezasDiaSinOEE,
             piezasSemana,
             piezasSemanaBruto,
             piezasAno,
@@ -420,6 +481,13 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
             metaAno,
             cumplimiento,
             cumpleDemanda,
+
+            // Datos REALES del diagrama
+            piezasDiaReal,
+            piezasSemanaReal,
+            piezasAnoReal,
+            cumplimientoReal,
+            cumpleDemandaReal,
 
             // OEE y Pérdidas
             availability,
@@ -433,7 +501,9 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
     }, [studyConfig, localMetrics]);
 
     const {
+        calcMode = 'pph',
         oeePenalty = 15,
+        oeePercent = 85,
         oeeFactor = 0.85,
         workDaysPerWeek = 5,
         country = 'MX',
@@ -443,9 +513,16 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         feriados = 7,
         diasAnuales = 253,
         cicloRealSeg = 0,
+        cicloTargetSeg = 0,
         ppmReal = 0,
+        ppmTarget = 0,
+        cpmReal = 0,
+        cpmTarget = 0,
         piezasHora = 0,
+        piezasHoraTarget = 0,
+        piezasHoraReal = 0,
         piezasDia = 0,
+        piezasDiaSinOEE = 0,
         piezasSemana = 0,
         piezasSemanaBruto = 0,
         piezasAno = 0,
@@ -455,6 +532,12 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         cumpleDemanda = false,
         cycleOutputQty = 1,
 
+        piezasDiaReal = 0,
+        piezasSemanaReal = 0,
+        piezasAnoReal = 0,
+        cumplimientoReal = 0,
+        cumpleDemandaReal = false,
+
         availability = 95,
         yieldVal = 98,
         efficiency = 91.3978,
@@ -463,6 +546,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         piezasPerdidasCalidad = 0,
         linkOeeToStudy = false
     } = longTermMetrics || {};
+
 
     // ── Helpers de Exportación a CSV ──
     const getYYYYMMDD = () => {
@@ -1924,7 +2008,39 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                             </button>
 
                             {showConfig && studyConfig && (
-                                <div className="p-4 border-t border-slate-800/60 grid grid-cols-1 md:grid-cols-4 gap-2.5 bg-slate-950/20">
+                                <div className="p-4 border-t border-slate-800/60 space-y-3 bg-slate-950/20">
+                                    {/* Toggle Modo de Cálculo */}
+                                    <div className="flex items-center gap-2 p-2 bg-slate-900/60 rounded-xl border border-slate-800/60">
+                                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mr-1">Modo:</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleConfigChange('calcMode', 'pph')}
+                                            disabled={!canEdit}
+                                            className={`flex-1 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer border ${
+                                                (studyConfig.calcMode || 'pph') === 'pph'
+                                                    ? 'bg-cyan-600 border-cyan-500 text-white shadow-lg shadow-cyan-900/30'
+                                                    : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:bg-slate-850 hover:border-slate-700'
+                                            } disabled:opacity-50`}
+                                        >
+                                            📊 Desde PPH
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleConfigChange('calcMode', 'demand')}
+                                            disabled={!canEdit}
+                                            className={`flex-1 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer border ${
+                                                studyConfig.calcMode === 'demand'
+                                                    ? 'bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-900/30'
+                                                    : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:bg-slate-850 hover:border-slate-700'
+                                            } disabled:opacity-50`}
+                                        >
+                                            📈 Desde Demanda
+                                        </button>
+                                        <span className="text-[8px] text-slate-600 ml-1 hidden md:inline">
+                                            {(studyConfig.calcMode || 'pph') === 'pph' ? 'PPH → Piezas/Año' : 'Demanda → PPH requerido'}
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-2.5">
                                     {/* Nombre */}
                                     <div 
                                         onClick={(e) => handleRelationClick('input-name', e)}
@@ -1958,25 +2074,33 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 {getHighlightLabel('input-piecesPerHour')}
                                             </span>
                                         )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Piezas por Hora</label>
-                                        <input
-                                            type="number" min="1" step="1"
-                                            value={studyConfig.targetPiecesPerShift && studyConfig.shiftHours ? Math.round(studyConfig.targetPiecesPerShift / studyConfig.shiftHours) : ''}
-                                            onChange={e => {
-                                                const piecesPerHour = Number(e.target.value) || 0;
-                                                const hours = Number(studyConfig.shiftHours) || 8;
-                                                const up = Number(studyConfig.cycleOutputQty) || 1;
-                                                const targetPiecesPerShift = piecesPerHour * hours;
-                                                const targetPPM = piecesPerHour / 60 / up;
-                                                handleConfigChanges({ 
-                                                    targetPiecesPerShift, 
-                                                    targetPPM: Math.round(targetPPM * 100) / 100 
-                                                });
-                                            }}
-                                            disabled={!canEdit}
-                                            placeholder="ej. 1200"
-                                            className="w-full bg-slate-900 border border-cyan-700/40 rounded-lg px-2.5 py-1 text-xs text-cyan-300 font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
-                                        />
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">
+                                            Piezas por Hora {calcMode === 'demand' && <span className="text-violet-400 text-[7px] normal-case">(calculado)</span>}
+                                        </label>
+                                        {calcMode === 'demand' ? (
+                                            <div className="w-full bg-violet-950/30 border border-violet-600/40 rounded-lg px-2.5 py-1 text-xs text-violet-300 font-bold font-mono">
+                                                {piezasHoraTarget > 0 ? Math.round(piezasHoraTarget).toLocaleString() : '—'}
+                                            </div>
+                                        ) : (
+                                            <input
+                                                type="number" min="1" step="1"
+                                                value={studyConfig.targetPiecesPerShift && studyConfig.shiftHours ? Math.round(studyConfig.targetPiecesPerShift / studyConfig.shiftHours) : ''}
+                                                onChange={e => {
+                                                    const piecesPerHour = Number(e.target.value) || 0;
+                                                    const hours = Number(studyConfig.shiftHours) || 8;
+                                                    const up = Number(studyConfig.cycleOutputQty) || 1;
+                                                    const targetPiecesPerShift = piecesPerHour * hours;
+                                                    const targetPPM = piecesPerHour / 60 / up;
+                                                    handleConfigChanges({ 
+                                                        targetPiecesPerShift, 
+                                                        targetPPM: Math.round(targetPPM * 100) / 100 
+                                                    });
+                                                }}
+                                                disabled={!canEdit}
+                                                placeholder="ej. 1200"
+                                                className="w-full bg-slate-900 border border-cyan-700/40 rounded-lg px-2.5 py-1 text-xs text-cyan-300 font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                            />
+                                        )}
                                     </div>
 
                                     {/* Horas por Día */}
@@ -2011,7 +2135,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         />
                                     </div>
 
-                                    {/* Castigo OEE (%) */}
+                                    {/* OEE (%) */}
                                     <div 
                                         onClick={(e) => handleRelationClick('input-oeePenalty', e)}
                                         className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-oeePenalty').wrapperClass}`}
@@ -2024,7 +2148,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                             </span>
                                         )}
                                         <div className="flex items-center justify-between mb-0.5">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase block">Castigo OEE (%)</label>
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase block">OEE (%)</label>
                                             <button
                                                 type="button"
                                                 onClick={(e) => {
@@ -2043,11 +2167,11 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         </div>
                                         <input
                                             type="number" min="0" max="100" step="1"
-                                            value={Math.round(oeePenalty)}
-                                            onChange={e => handleConfigChange('oeePenalty', Number(e.target.value))}
+                                            value={Math.round(100 - oeePenalty)}
+                                            onChange={e => handleConfigChange('oeePenalty', 100 - Number(e.target.value))}
                                             disabled={!canEdit || linkOeeToStudy}
                                             className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
-                                            title={linkOeeToStudy ? "Calculado automáticamente en base al ciclo de máquina real" : "Castigo OEE (%)"}
+                                            title={linkOeeToStudy ? "Calculado automáticamente en base al ciclo de máquina real" : "OEE (%)"}
                                         />
                                     </div>
 
@@ -2111,13 +2235,19 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 {getHighlightLabel('input-annualDemand')}
                                             </span>
                                         )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Demanda Anual</label>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">
+                                            Demanda Anual {calcMode === 'demand' && <span className="text-violet-400 text-[7px] normal-case">(input primario)</span>}
+                                        </label>
                                         <input
                                             type="number" min="1" step="1"
                                             value={studyConfig.annualDemand !== undefined ? studyConfig.annualDemand : 18388734}
                                             onChange={e => handleConfigChange('annualDemand', Number(e.target.value))}
                                             disabled={!canEdit}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                            className={`w-full bg-slate-900 rounded-lg px-2.5 py-1 text-xs focus:outline-none disabled:opacity-50 ${
+                                                calcMode === 'demand'
+                                                    ? 'border border-violet-600/40 text-violet-300 font-bold focus:border-violet-500/50'
+                                                    : 'border border-slate-800 text-slate-200 focus:border-cyan-500/50'
+                                            }`}
                                         />
                                     </div>
 
@@ -2278,6 +2408,9 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                             />
                                         )}
                                     </div>
+
+                                    </div>
+                                    {/* end grid */}
 
                                     {/* Auto-save indicator */}
                                     {canEdit && (
@@ -2471,6 +2604,9 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                             {studyConfig?.targetPPM ? formatTime((60 / studyConfig.targetPPM) * 1000) : 'ΓÇö'}
                                         </span>
                                         <span className="text-[8px] text-slate-600 block">segundos</span>
+                                        <span className={`text-[8px] block mt-0.5 font-bold ${cicloRealSeg <= cicloTargetSeg ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                            vs Real: {cicloRealSeg.toFixed(2)}s {cicloRealSeg <= cicloTargetSeg ? '✅' : '⚠️'}
+                                        </span>
 
                                         {/* Tooltip */}
                                         <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
@@ -2701,6 +2837,50 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                             </div>
                                         );
                                     })()}
+
+                                    {/* CPM - Ciclos por Minuto */}
+                                    <div 
+                                        className="relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-amber-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible col-span-2"
+                                    >
+                                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Ciclos / Min (CPM)</span>
+                                        <div className="flex items-center justify-center gap-3 mt-1">
+                                            <div className="text-center">
+                                                <span className="text-xs font-black text-cyan-400 block">{cpmTarget > 0 ? cpmTarget.toFixed(2) : '—'}</span>
+                                                <span className="text-[7px] text-slate-600 block">Target</span>
+                                            </div>
+                                            <span className="text-slate-700">│</span>
+                                            <div className="text-center">
+                                                <span className={`text-xs font-black block ${cpmReal >= cpmTarget ? 'text-emerald-400' : 'text-amber-400'}`}>{cpmReal > 0 ? cpmReal.toFixed(2) : '—'}</span>
+                                                <span className="text-[7px] text-slate-600 block">Real</span>
+                                            </div>
+                                        </div>
+                                        <span className={`text-[8px] block mt-1 font-bold ${cpmReal >= cpmTarget ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                            {cpmReal >= cpmTarget ? '✅ Cumple' : '⚠️ Debajo'} ({cpmTarget > 0 ? Math.round(cpmReal / cpmTarget * 100) : 0}%)
+                                        </span>
+
+                                        {/* Tooltip */}
+                                        <div className="absolute top-full left-0 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
+                                            <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
+                                                <Info className="w-3.5 h-3.5 text-amber-400" />
+                                                <span>Ciclos por Minuto (CPM)</span>
+                                            </div>
+                                            <div className="text-[11px] leading-relaxed space-y-1.5">
+                                                <p className="text-slate-400 text-[10px]">Número de ciclos completos de máquina por minuto. Un ciclo puede producir {cycleOutputQty} pieza{cycleOutputQty > 1 ? 's' : ''} (UP: {cycleOutputQty}).</p>
+                                                <div className="space-y-1">
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
+                                                        CPM = 60 / Ciclo de Máquina (seg)
+                                                    </p>
+                                                </div>
+                                                <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-0.5">
+                                                    <p><span className="text-slate-500">Target:</span> <span className="text-cyan-400 font-bold">{cpmTarget.toFixed(2)} cpm</span></p>
+                                                    <p><span className="text-slate-500">Real:</span> <span className={`font-bold ${cpmReal >= cpmTarget ? 'text-emerald-400' : 'text-amber-400'}`}>{cpmReal.toFixed(2)} cpm</span></p>
+                                                    <p><span className="text-slate-500">PPM (con UP {cycleOutputQty}):</span> <span className="text-white font-bold">{(ppmReal * cycleOutputQty).toFixed(1)} pzas/min</span></p>
+                                                </div>
+                                            </div>
+                                            <div className="absolute bottom-full left-6 border-4 border-transparent border-b-slate-950/95" />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -2799,7 +2979,10 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                         <span className="text-lg font-black text-slate-200 block leading-tight">
                                                             {piezasDia > 0 ? Math.round(piezasDia).toLocaleString() : 'ΓÇö'}
                                                         </span>
-                                                        <span className="text-[8px] text-slate-600 block mt-0.5">piezas (con OEE: {Math.round((100 - oeePenalty) * 10) / 10}%{linkOeeToStudy ? ' real' : ''})</span>
+                                                        <span className="text-[8px] text-slate-600 block mt-0.5">piezas (con OEE: {oeePercent}%{linkOeeToStudy ? ' real' : ''})</span>
+                                                        <span className={`text-[8px] block mt-0.5 font-bold ${piezasDiaReal >= piezasDia ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                                            vs Real: {Math.round(piezasDiaReal).toLocaleString()} {piezasDiaReal >= piezasDia ? '✅' : '⚠️'}
+                                                        </span>
                                                     </div>
                                                 </div>
 
@@ -2940,7 +3123,10 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 <span className="text-lg font-black text-slate-200 block leading-tight mt-0.5">
                                                     {piezasSemana > 0 ? Math.round(piezasSemana).toLocaleString() : '—'}
                                                 </span>
-                                                <span className="text-[8px] text-slate-600 block mt-0.5">neto (OEE {Math.round((100 - oeePenalty) * 10) / 10}%)</span>
+                                                <span className="text-[8px] text-slate-600 block mt-0.5">neto (OEE {oeePercent}%)</span>
+                                                <span className={`text-[8px] block mt-0.5 font-bold ${piezasSemanaReal >= piezasSemana ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                                    vs Real: {Math.round(piezasSemanaReal).toLocaleString()} {piezasSemanaReal >= piezasSemana ? '✅' : '⚠️'}
+                                                </span>
 
                                                 {/* Tooltip */}
                                                 <div className="absolute top-full left-0 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
@@ -2993,8 +3179,9 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 <span className={`text-[8px] block mt-0.5 ${cumpleDemanda ? 'text-emerald-500' : 'text-rose-400'}`}>
                                                     {cumpleDemanda ? '✓ Cumple' : '✗ No cumple'} demanda ({Math.round(cumplimiento)}%)
                                                 </span>
-
-                                                {/* Tooltip */}
+                                                <span className={`text-[8px] block mt-0.5 font-bold ${piezasAnoReal >= annualDemand ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                                    vs Real: {Math.round(piezasAnoReal).toLocaleString()} ({Math.round(cumplimientoReal)}%) {cumpleDemandaReal ? '✅' : '⚠️'}
+                                                </span>
                                                 <div className="absolute top-full right-0 left-auto mt-2 w-72 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
                                                     <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                         <Info className="w-3.5 h-3.5 text-amber-400" />
