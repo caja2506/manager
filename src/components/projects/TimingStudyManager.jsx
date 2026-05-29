@@ -384,6 +384,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         }
 
         const piezasHora = ppmReal * 60 * cycleOutputQty;
+        const piezasDiaSinOEE = piezasHora * shiftHours;
         const piezasDia = piezasHora * shiftHours * oeeFactor;
         const piezasSemana = piezasDia * workDaysPerWeek;
         const piezasSemanaBruto = piezasDiaSinOEE * workDaysPerWeek;
@@ -393,7 +394,6 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         const cumplimiento = annualDemand > 0 ? (metaAno / annualDemand) * 100 : 0;
         const cumpleDemanda = metaAno >= annualDemand;
 
-        const piezasDiaSinOEE = piezasHora * shiftHours;
         const piezasPerdidasDisp = piezasDiaSinOEE * (1 - availability / 100);
         const piezasPerdidasEficiencia = piezasDiaSinOEE * (availability / 100) * (1 - efficiency / 100);
         const piezasPerdidasCalidad = piezasDiaSinOEE * (availability / 100) * (efficiency / 100) * (1 - yieldVal / 100);
