@@ -1908,6 +1908,406 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
             ) : (
                 currentStudy && (
                     <div className="space-y-6 animate-in fade-in duration-200">
+                        {/* ── SECCIÓN CONFIGURACIÓN DEL ESTUDIO (arriba de las tarjetas) ── */}
+                        <div className="bg-slate-900/70 rounded-xl border border-slate-800 overflow-hidden relative z-10">
+                            <button
+                                onClick={() => setShowConfig(!showConfig)}
+                                className="w-full px-5 py-3 flex items-center justify-between hover:bg-slate-850/30 transition text-left cursor-pointer focus:outline-none"
+                            >
+                                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                                    <Settings className="w-3.5 h-3.5 text-slate-400" />
+                                    Configuración General del Estudio
+                                </span>
+                                <span className="text-xs text-cyan-400 font-bold">
+                                    {showConfig ? 'Ocultar' : 'Mostrar'}
+                                </span>
+                            </button>
+
+                            {showConfig && studyConfig && (
+                                <div className="p-4 border-t border-slate-800/60 grid grid-cols-1 md:grid-cols-4 gap-2.5 bg-slate-950/20">
+                                    {/* Nombre */}
+                                    <div 
+                                        onClick={(e) => handleRelationClick('input-name', e)}
+                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-name').wrapperClass}`}
+                                    >
+                                        {getHighlightLabel('input-name') && (
+                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                hoveredRelation === 'input-name' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                            }`}>
+                                                {getHighlightLabel('input-name')}
+                                            </span>
+                                        )}
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Nombre</label>
+                                        <input
+                                            value={studyConfig.name || ''}
+                                            onChange={e => handleConfigChange('name', e.target.value)}
+                                            disabled={!canEdit}
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                        />
+                                    </div>
+
+                                    {/* Piezas por Hora */}
+                                    <div 
+                                        onClick={(e) => handleRelationClick('input-piecesPerHour', e)}
+                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-piecesPerHour').wrapperClass}`}
+                                    >
+                                        {getHighlightLabel('input-piecesPerHour') && (
+                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                hoveredRelation === 'input-piecesPerHour' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                            }`}>
+                                                {getHighlightLabel('input-piecesPerHour')}
+                                            </span>
+                                        )}
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Piezas por Hora</label>
+                                        <input
+                                            type="number" min="1" step="1"
+                                            value={studyConfig.targetPiecesPerShift && studyConfig.shiftHours ? Math.round(studyConfig.targetPiecesPerShift / studyConfig.shiftHours) : ''}
+                                            onChange={e => {
+                                                const piecesPerHour = Number(e.target.value) || 0;
+                                                const hours = Number(studyConfig.shiftHours) || 8;
+                                                const up = Number(studyConfig.cycleOutputQty) || 1;
+                                                const targetPiecesPerShift = piecesPerHour * hours;
+                                                const targetPPM = piecesPerHour / 60 / up;
+                                                handleConfigChanges({ 
+                                                    targetPiecesPerShift, 
+                                                    targetPPM: Math.round(targetPPM * 100) / 100 
+                                                });
+                                            }}
+                                            disabled={!canEdit}
+                                            placeholder="ej. 1200"
+                                            className="w-full bg-slate-900 border border-cyan-700/40 rounded-lg px-2.5 py-1 text-xs text-cyan-300 font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                        />
+                                    </div>
+
+                                    {/* Horas por Día */}
+                                    <div 
+                                        onClick={(e) => handleRelationClick('input-shiftHours', e)}
+                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-shiftHours').wrapperClass}`}
+                                    >
+                                        {getHighlightLabel('input-shiftHours') && (
+                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                hoveredRelation === 'input-shiftHours' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                            }`}>
+                                                {getHighlightLabel('input-shiftHours')}
+                                            </span>
+                                        )}
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Horas / Día</label>
+                                        <input
+                                            type="number" min="0.1" max="24" step="0.1"
+                                            value={studyConfig.shiftHours || 8}
+                                            onChange={e => {
+                                                const hours = Number(e.target.value) || 8;
+                                                const currentHours = Number(studyConfig.shiftHours) || 8;
+                                                const currentPieces = Number(studyConfig.targetPiecesPerShift) || 0;
+                                                const piecesPerHour = currentHours ? (currentPieces / currentHours) : 0;
+                                                const targetPiecesPerShift = Math.round(piecesPerHour * hours);
+                                                handleConfigChanges({ 
+                                                    shiftHours: hours, 
+                                                    targetPiecesPerShift 
+                                                });
+                                            }}
+                                            disabled={!canEdit}
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                        />
+                                    </div>
+
+                                    {/* Castigo OEE (%) */}
+                                    <div 
+                                        onClick={(e) => handleRelationClick('input-oeePenalty', e)}
+                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-oeePenalty').wrapperClass}`}
+                                    >
+                                        {getHighlightLabel('input-oeePenalty') && (
+                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                hoveredRelation === 'input-oeePenalty' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                            }`}>
+                                                {getHighlightLabel('input-oeePenalty')}
+                                            </span>
+                                        )}
+                                        <div className="flex items-center justify-between mb-0.5">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase block">Castigo OEE (%)</label>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleConfigChange('linkOeeToStudy', !studyConfig?.linkOeeToStudy);
+                                                }}
+                                                disabled={!canEdit}
+                                                className={`px-1.5 py-0.5 rounded text-[7px] font-bold border transition-all ${
+                                                    linkOeeToStudy
+                                                        ? 'bg-cyan-950/80 border-cyan-800 text-cyan-400 hover:bg-cyan-900/50'
+                                                        : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:bg-slate-850'
+                                                }`}
+                                            >
+                                                {linkOeeToStudy ? 'Vincular a Estudio' : 'Fijar OEE'}
+                                            </button>
+                                        </div>
+                                        <input
+                                            type="number" min="0" max="100" step="1"
+                                            value={Math.round(oeePenalty)}
+                                            onChange={e => handleConfigChange('oeePenalty', Number(e.target.value))}
+                                            disabled={!canEdit || linkOeeToStudy}
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                            title={linkOeeToStudy ? "Calculado automáticamente en base al ciclo de máquina real" : "Castigo OEE (%)"}
+                                        />
+                                    </div>
+
+                                    {/* Días / Semana */}
+                                    <div 
+                                        onClick={(e) => handleRelationClick('input-workDaysPerWeek', e)}
+                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-workDaysPerWeek').wrapperClass}`}
+                                    >
+                                        {getHighlightLabel('input-workDaysPerWeek') && (
+                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                hoveredRelation === 'input-workDaysPerWeek' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                            }`}>
+                                                {getHighlightLabel('input-workDaysPerWeek')}
+                                            </span>
+                                        )}
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Días Laborales / Sem</label>
+                                        <input
+                                            type="number" min="1" max="7" step="1"
+                                            value={studyConfig.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5}
+                                            onChange={e => handleConfigChange('workDaysPerWeek', Number(e.target.value))}
+                                            disabled={!canEdit}
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                        />
+                                    </div>
+
+                                    {/* País (Feriados) */}
+                                    <div 
+                                        onClick={(e) => handleRelationClick('input-country', e)}
+                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-country').wrapperClass}`}
+                                    >
+                                        {getHighlightLabel('input-country') && (
+                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                hoveredRelation === 'input-country' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                            }`}>
+                                                {getHighlightLabel('input-country')}
+                                            </span>
+                                        )}
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">País (Feriados)</label>
+                                        <select
+                                            value={studyConfig.country || 'MX'}
+                                            onChange={e => handleConfigChange('country', e.target.value)}
+                                            disabled={!canEdit}
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                        >
+                                            <option value="MX">México (7 días feriados)</option>
+                                            <option value="CR">Costa Rica (11 días feriados)</option>
+                                            <option value="US">USA (11 días feriados)</option>
+                                            <option value="NONE">Ninguno (0 días feriados)</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Demanda Anual */}
+                                    <div 
+                                        onClick={(e) => handleRelationClick('input-annualDemand', e)}
+                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-annualDemand').wrapperClass}`}
+                                    >
+                                        {getHighlightLabel('input-annualDemand') && (
+                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                hoveredRelation === 'input-annualDemand' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                            }`}>
+                                                {getHighlightLabel('input-annualDemand')}
+                                            </span>
+                                        )}
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Demanda Anual</label>
+                                        <input
+                                            type="number" min="1" step="1"
+                                            value={studyConfig.annualDemand !== undefined ? studyConfig.annualDemand : 18388734}
+                                            onChange={e => handleConfigChange('annualDemand', Number(e.target.value))}
+                                            disabled={!canEdit}
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                        />
+                                    </div>
+
+                                    {/* Tipo de Máquina */}
+                                    <div 
+                                        onClick={(e) => handleRelationClick('input-machineType', e)}
+                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-machineType').wrapperClass}`}
+                                    >
+                                        {getHighlightLabel('input-machineType') && (
+                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                hoveredRelation === 'input-machineType' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                            }`}>
+                                                {getHighlightLabel('input-machineType')}
+                                            </span>
+                                        )}
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Tipo de Máquina</label>
+                                        <select
+                                            value={studyConfig.mainIndexEnabled ? 'indexer' : 'robot'}
+                                            onChange={e => {
+                                                const isIndexer = e.target.value === 'indexer';
+                                                const updates = { mainIndexEnabled: isIndexer };
+                                                if (!isIndexer) updates.mainIndexTimeMs = 0;
+                                                handleConfigChanges(updates);
+                                            }}
+                                            disabled={!canEdit}
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                        >
+                                            <option value="indexer">🔄 Indexer (Mesa / Dial)</option>
+                                            <option value="robot">🤖 Robot Transfer</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Index Time - solo si Indexer */}
+                                    {studyConfig.mainIndexEnabled && (
+                                        <div 
+                                            onClick={(e) => handleRelationClick('input-indexTime', e)}
+                                            className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-indexTime').wrapperClass}`}
+                                        >
+                                            {getHighlightLabel('input-indexTime') && (
+                                                <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                    hoveredRelation === 'input-indexTime' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                                }`}>
+                                                    {getHighlightLabel('input-indexTime')}
+                                                </span>
+                                            )}
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Tiempo de Index (ms)</label>
+                                            <input
+                                                type="number" min="0"
+                                                value={studyConfig.mainIndexTimeMs || 0}
+                                                onChange={e => handleConfigChange('mainIndexTimeMs', e.target.value)}
+                                                disabled={!canEdit}
+                                                className="w-full bg-slate-900 border border-amber-700/40 rounded-lg px-2.5 py-1 text-xs text-amber-300 focus:outline-none focus:border-amber-500/50 disabled:opacity-50"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* Dwell calculado - solo si Indexer */}
+                                    {studyConfig.mainIndexEnabled && (
+                                        <div 
+                                            onClick={(e) => handleRelationClick('input-dwellTime', e)}
+                                            className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-dwellTime').wrapperClass}`}
+                                        >
+                                            {getHighlightLabel('input-dwellTime') && (
+                                                <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                    hoveredRelation === 'input-dwellTime' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                                }`}>
+                                                    {getHighlightLabel('input-dwellTime')}
+                                                </span>
+                                            )}
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Tiempo de Dwell (ms)</label>
+                                            <div className="w-full bg-emerald-950/30 border border-emerald-600/40 rounded-lg px-2.5 py-1 text-xs text-emerald-400 font-mono font-bold flex items-center justify-between">
+                                                <span>{currentStudy?.dwellTimeMs || 0} ms</span>
+                                                <span className="text-[8px] text-emerald-600/60 font-normal">auto</span>
+                                            </div>
+                                            <span className="text-[8px] text-slate-600 mt-0.5 block">= Estación bottleneck (más lenta)</span>
+                                        </div>
+                                    )}
+
+
+                                    {/* Configuración UP */}
+                                    <div 
+                                        onClick={(e) => handleRelationClick('input-up', e)}
+                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 md:col-span-2 ${getHighlightStyles('input-up').wrapperClass}`}
+                                    >
+                                        {getHighlightLabel('input-up') && (
+                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                hoveredRelation === 'input-up' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                            }`}>
+                                                {getHighlightLabel('input-up')}
+                                            </span>
+                                        )}
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Configuración UP</label>
+                                        <div className="flex gap-1">
+                                            {[1, 2, 4, 6].map(up => (
+                                                <button
+                                                    key={up}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const hours = Number(studyConfig.shiftHours) || 8;
+                                                        const piecesPerHour = (Number(studyConfig.targetPiecesPerShift) || 0) / hours;
+                                                        const updates = { cycleOutputQty: up };
+                                                        if (piecesPerHour > 0) {
+                                                            const ppm = piecesPerHour / 60 / up;
+                                                            updates.targetPPM = Math.round(ppm * 100) / 100;
+                                                        }
+                                                        handleConfigChanges(updates);
+                                                    }}
+                                                    disabled={!canEdit}
+                                                    className={`flex-1 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                                                        Number(studyConfig.cycleOutputQty || 1) === up
+                                                            ? 'bg-cyan-600 border-cyan-500 text-white shadow-lg shadow-cyan-900/30'
+                                                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-850 hover:border-slate-700'
+                                                    } disabled:opacity-50`}
+                                                >
+                                                    {up}-UP
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Notas */}
+                                    <div 
+                                        onClick={(e) => handleRelationClick('input-notes', e)}
+                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 md:col-span-4 ${getHighlightStyles('input-notes').wrapperClass}`}
+                                    >
+                                        {getHighlightLabel('input-notes') && (
+                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                hoveredRelation === 'input-notes' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                            }`}>
+                                                {getHighlightLabel('input-notes')}
+                                            </span>
+                                        )}
+                                        <div className="flex items-center justify-between mb-0.5">
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setShowNotes(!showNotes);
+                                                }}
+                                                className="text-[10px] font-bold text-slate-500 hover:text-slate-300 uppercase flex items-center gap-1 focus:outline-none"
+                                            >
+                                                {showNotes ? <ChevronDown className="w-3 h-3 text-slate-400" /> : <ChevronRight className="w-3 h-3 text-slate-400" />}
+                                                <span>Notas del Estudio</span>
+                                            </button>
+                                            {studyConfig.notes && !showNotes && (
+                                                <span className="bg-cyan-950/80 border border-cyan-800 text-cyan-400 text-[8px] font-bold px-1.5 py-0.5 rounded shadow-sm animate-fade-in">
+                                                    Contiene Notas
+                                                </span>
+                                            )}
+                                        </div>
+                                        {showNotes && (
+                                            <textarea
+                                                value={studyConfig.notes || ''}
+                                                onChange={e => handleConfigChange('notes', e.target.value)}
+                                                disabled={!canEdit}
+                                                rows="2"
+                                                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50 resize-none mt-1 animate-fade-in"
+                                            />
+                                        )}
+                                    </div>
+
+                                    {/* Auto-save indicator */}
+                                    {canEdit && (
+                                        <div className="md:col-span-4 flex justify-end pt-2">
+                                            <div className="flex items-center gap-1.5 text-[10px] font-semibold">
+                                                {configAutoSaveStatus === 'saving' && (
+                                                    <>
+                                                        <div className="w-3 h-3 rounded-full border-2 border-cyan-500 border-t-transparent animate-spin" />
+                                                        <span className="text-cyan-500">Guardando...</span>
+                                                    </>
+                                                )}
+                                                {configAutoSaveStatus === 'saved' && (
+                                                    <>
+                                                        <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                                                        <span className="text-emerald-500">Guardado</span>
+                                                    </>
+                                                )}
+                                                {configAutoSaveStatus === 'error' && (
+                                                    <>
+                                                        <XCircle className="w-3.5 h-3.5 text-rose-500" />
+                                                        <span className="text-rose-500">Error al guardar: {configAutoSaveError}</span>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
                         {/* ── KPI PANELS: GRUPOS LÓGICOS DE MÉTRICAS ── */}
                         <div className="grid grid-cols-1 xl:grid-cols-7 gap-4 relative z-20">
                             {/* 1. METAS DE DEMANDA (COMERCIAL) */}
@@ -2523,660 +2923,131 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                             <div className="absolute bottom-full right-6 left-auto border-4 border-transparent border-b-slate-950/95" />
                                         </div>
                                     </div>
-                                </div>
-                            </div>
-                        </div>
 
-                        {/* ── 4. PRODUCCIÓN ANUAL / SEMANAL (IMPACTO OEE) ── */}
-                        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 relative z-20">
-                            {/* Piezas / Semana */}
-                            {(() => {
-                                const perdidaOEESem = piezasSemanaBruto - piezasSemana;
-                                const pctPerdida = piezasSemanaBruto > 0 ? (perdidaOEESem / piezasSemanaBruto) * 100 : 0;
-                                return (
-                                    <div 
-                                        onClick={(e) => handleRelationClick('card-piezasSem', e)}
-                                        className={`relative group bg-slate-900/40 border border-slate-800 border-t-violet-500/80 border-t-[3px] rounded-2xl p-4 flex flex-col gap-2.5 shadow-xl backdrop-blur-md transition-all duration-300 hover:border-slate-700/80 cursor-pointer overflow-visible ${getHighlightStyles('card-piezasSem').wrapperClass}`}
-                                    >
-                                        {getHighlightLabel('card-piezasSem') && (
-                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                hoveredRelation === 'card-piezasSem' ? 'bg-cyan-500 text-slate-950' : 'bg-emerald-500 text-slate-950'
-                                            }`}>
-                                                {getHighlightLabel('card-piezasSem')}
-                                            </span>
-                                        )}
-                                        <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
-                                            <div className="p-1 bg-violet-500/10 rounded-lg">
-                                                <Activity className="w-4 h-4 text-violet-400" />
-                                            </div>
-                                            <div>
-                                                <h4 className="text-xs font-black text-slate-200 uppercase tracking-wider">Piezas / Semana</h4>
-                                                <p className="text-[9px] text-slate-500 font-semibold font-mono">Impacto OEE Semanal</p>
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            {/* Bruto */}
-                                            <div className="bg-slate-955/40 p-3 rounded-xl border border-slate-800/80">
-                                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Bruto</span>
-                                                <span className="text-[8px] text-slate-600 block">Sin pérdidas OEE</span>
-                                                <span className="text-lg font-black text-slate-300 block leading-tight mt-1">
-                                                    {piezasSemanaBruto > 0 ? Math.round(piezasSemanaBruto).toLocaleString() : '—'}
-                                                </span>
-                                                <span className="text-[8px] text-slate-600 block mt-0.5">pzas/semana (100%)</span>
-                                            </div>
-                                            {/* Neto */}
-                                            <div className="bg-slate-955/40 p-3 rounded-xl border border-violet-500/20">
-                                                <span className="text-[9px] font-bold text-violet-400 uppercase tracking-widest block font-sans">Neto</span>
-                                                <span className="text-[8px] text-slate-600 block">Con OEE: {Math.round((100 - oeePenalty) * 10) / 10}%</span>
-                                                <span className="text-lg font-black text-violet-300 block leading-tight mt-1">
+                                    {/* Piezas / Semana */}
+                                    {(() => {
+                                        const pzSemBruto = piezasSemanaBruto;
+                                        const perdidaSem = pzSemBruto - piezasSemana;
+                                        return (
+                                            <div 
+                                                onClick={(e) => handleRelationClick('card-piezasSem', e)}
+                                                className={`relative group bg-slate-955/40 p-3 rounded-xl border border-slate-800/80 hover:border-emerald-500/30 transition-all duration-200 overflow-visible cursor-pointer ${getHighlightStyles('card-piezasSem').wrapperClass}`}
+                                            >
+                                                {getHighlightLabel('card-piezasSem') && (
+                                                    <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                        hoveredRelation === 'card-piezasSem' ? 'bg-cyan-500 text-slate-950' : 'bg-emerald-500 text-slate-950'
+                                                    }`}>
+                                                        {getHighlightLabel('card-piezasSem')}
+                                                    </span>
+                                                )}
+                                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Piezas / Sem</span>
+                                                <span className="text-lg font-black text-slate-200 block leading-tight mt-0.5">
                                                     {piezasSemana > 0 ? Math.round(piezasSemana).toLocaleString() : '—'}
                                                 </span>
-                                                <span className="text-[8px] text-rose-400/80 block mt-0.5">−{Math.round(perdidaOEESem).toLocaleString()} pzas perdidas</span>
-                                            </div>
-                                        </div>
-                                        {/* Barra de pérdida visual */}
-                                        <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                                            <div 
-                                                className="h-full rounded-full bg-gradient-to-r from-violet-500 to-violet-400 transition-all duration-500"
-                                                style={{ width: `${Math.max(0, 100 - pctPerdida)}%` }}
-                                            />
-                                        </div>
-                                        <span className="text-[8px] text-slate-600 text-center block">
-                                            Eficiencia neta: {(100 - pctPerdida).toFixed(1)}% — Pérdida: {pctPerdida.toFixed(1)}%
-                                        </span>
+                                                <span className="text-[8px] text-slate-600 block mt-0.5">neto (OEE {Math.round((100 - oeePenalty) * 10) / 10}%)</span>
 
-                                        {/* Tooltip */}
-                                        <div className="absolute top-full left-0 mt-2 w-72 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
-                                            <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
-                                                <Info className="w-3.5 h-3.5 text-violet-400" />
-                                                <span>Piezas / Semana — Bruto vs Neto</span>
-                                            </div>
-                                            <div className="text-[11px] leading-relaxed space-y-1.5">
-                                                <p className="text-slate-400 text-[10px]">
-                                                    Compara la capacidad semanal bruta (sin pérdidas) contra la neta (aplicando OEE).
-                                                </p>
-                                                <div className="space-y-1">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
-                                                        Bruto = PPH × Hrs/Turno × Días/Sem<br/>
-                                                        Neto = Bruto × OEE ({Math.round((100 - oeePenalty) * 10) / 10}%)
-                                                    </p>
-                                                </div>
-                                                <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-0.5">
-                                                    <p><span className="text-slate-500">Bruto:</span> <span className="text-white font-bold">{Math.round(piezasSemanaBruto).toLocaleString()} pzas</span></p>
-                                                    <p className="text-rose-400">Pérdida OEE: <span className="font-bold">−{Math.round(perdidaOEESem).toLocaleString()} pzas</span></p>
-                                                    <div className="border-t border-slate-700 pt-0.5">
-                                                        <span className="text-slate-500">Neto:</span> <span className="text-violet-400 font-bold">{Math.round(piezasSemana).toLocaleString()} pzas/sem</span>
+                                                {/* Tooltip */}
+                                                <div className="absolute top-full left-0 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
+                                                    <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
+                                                        <Info className="w-3.5 h-3.5 text-violet-400" />
+                                                        <span>Piezas / Semana — Bruto vs Neto</span>
                                                     </div>
+                                                    <div className="text-[11px] leading-relaxed space-y-1.5">
+                                                        <div className="space-y-1">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
+                                                                Bruto = PPH × Hrs/Turno × Días/Sem<br/>
+                                                                Neto = Bruto × OEE ({Math.round((100 - oeePenalty) * 10) / 10}%)
+                                                            </p>
+                                                        </div>
+                                                        <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-0.5">
+                                                            <p><span className="text-slate-500">Bruto:</span> <span className="text-white font-bold">{Math.round(pzSemBruto).toLocaleString()} pzas</span></p>
+                                                            <p className="text-rose-400">Pérdida OEE: <span className="font-bold">−{Math.round(perdidaSem).toLocaleString()} pzas</span></p>
+                                                            <div className="border-t border-slate-700 pt-0.5">
+                                                                <span className="text-slate-500">Neto:</span> <span className="text-violet-400 font-bold">{Math.round(piezasSemana).toLocaleString()} pzas/sem</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="absolute bottom-full left-6 border-4 border-transparent border-b-slate-950/95" />
                                                 </div>
                                             </div>
-                                            <div className="absolute bottom-full left-6 border-4 border-transparent border-b-slate-950/95" />
-                                        </div>
-                                    </div>
-                                );
-                            })()}
+                                        );
+                                    })()}
 
-                            {/* Piezas / Año */}
-                            {(() => {
-                                const perdidaOEEAno = piezasAnoBruto - piezasAno;
-                                const pctPerdidaAno = piezasAnoBruto > 0 ? (perdidaOEEAno / piezasAnoBruto) * 100 : 0;
-                                return (
-                                    <div 
-                                        onClick={(e) => handleRelationClick('card-piezasAno', e)}
-                                        className={`relative group bg-slate-900/40 border border-slate-800 border-t-amber-500/80 border-t-[3px] rounded-2xl p-4 flex flex-col gap-2.5 shadow-xl backdrop-blur-md transition-all duration-300 hover:border-slate-700/80 cursor-pointer overflow-visible ${getHighlightStyles('card-piezasAno').wrapperClass}`}
-                                    >
-                                        {getHighlightLabel('card-piezasAno') && (
-                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                hoveredRelation === 'card-piezasAno' ? 'bg-cyan-500 text-slate-950' : 'bg-emerald-500 text-slate-950'
-                                            }`}>
-                                                {getHighlightLabel('card-piezasAno')}
-                                            </span>
-                                        )}
-                                        <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
-                                            <div className="p-1 bg-amber-500/10 rounded-lg">
-                                                <TrendingUp className="w-4 h-4 text-amber-400" />
-                                            </div>
-                                            <div className="flex-1">
-                                                <h4 className="text-xs font-black text-slate-200 uppercase tracking-wider">Piezas / Año</h4>
-                                                <p className="text-[9px] text-slate-500 font-semibold font-mono">Impacto OEE Anual ({diasAnuales} días)</p>
-                                            </div>
-                                            <span className="text-[8px] text-slate-600 font-mono">{country} · {feriados} fer.</span>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            {/* Bruto */}
-                                            <div className="bg-slate-955/40 p-3 rounded-xl border border-slate-800/80">
-                                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Bruto</span>
-                                                <span className="text-[8px] text-slate-600 block">Sin pérdidas OEE</span>
-                                                <span className="text-lg font-black text-slate-300 block leading-tight mt-1">
-                                                    {piezasAnoBruto > 0 ? Math.round(piezasAnoBruto).toLocaleString() : '—'}
-                                                </span>
-                                                <span className="text-[8px] text-slate-600 block mt-0.5">pzas/año (100%)</span>
-                                            </div>
-                                            {/* Neto */}
-                                            <div className="bg-slate-955/40 p-3 rounded-xl border border-amber-500/20">
-                                                <span className="text-[9px] font-bold text-amber-400 uppercase tracking-widest block font-sans">Neto</span>
-                                                <span className="text-[8px] text-slate-600 block">Con OEE: {Math.round((100 - oeePenalty) * 10) / 10}%</span>
-                                                <span className="text-lg font-black text-amber-300 block leading-tight mt-1">
+                                    {/* Piezas / Año */}
+                                    {(() => {
+                                        const pzAnoBruto = piezasAnoBruto;
+                                        const perdidaAno = pzAnoBruto - piezasAno;
+                                        return (
+                                            <div 
+                                                onClick={(e) => handleRelationClick('card-piezasAno', e)}
+                                                className={`relative group bg-slate-955/40 p-3 rounded-xl border border-slate-800/80 hover:border-emerald-500/30 transition-all duration-200 overflow-visible cursor-pointer ${getHighlightStyles('card-piezasAno').wrapperClass}`}
+                                            >
+                                                {getHighlightLabel('card-piezasAno') && (
+                                                    <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                        hoveredRelation === 'card-piezasAno' ? 'bg-cyan-500 text-slate-950' : 'bg-emerald-500 text-slate-950'
+                                                    }`}>
+                                                        {getHighlightLabel('card-piezasAno')}
+                                                    </span>
+                                                )}
+                                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Piezas / Año</span>
+                                                <span className="text-lg font-black text-amber-300 block leading-tight mt-0.5">
                                                     {piezasAno > 0 ? Math.round(piezasAno).toLocaleString() : '—'}
                                                 </span>
-                                                <span className="text-[8px] text-rose-400/80 block mt-0.5">−{Math.round(perdidaOEEAno).toLocaleString()} pzas perdidas</span>
-                                            </div>
-                                        </div>
-                                        {/* Barra de pérdida visual */}
-                                        <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                                            <div 
-                                                className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-400 transition-all duration-500"
-                                                style={{ width: `${Math.max(0, 100 - pctPerdidaAno)}%` }}
-                                            />
-                                        </div>
-                                        <span className="text-[8px] text-slate-600 text-center block">
-                                            Eficiencia neta: {(100 - pctPerdidaAno).toFixed(1)}% — Pérdida: {pctPerdidaAno.toFixed(1)}%
-                                        </span>
-
-                                        {/* Tooltip */}
-                                        <div className="absolute top-full left-0 mt-2 w-80 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
-                                            <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
-                                                <Info className="w-3.5 h-3.5 text-amber-400" />
-                                                <span>Piezas / Año — Bruto vs Neto</span>
-                                            </div>
-                                            <div className="text-[11px] leading-relaxed space-y-1.5">
-                                                <p className="text-slate-400 text-[10px]">
-                                                    Proyección anual de piezas considerando {diasAnuales} días laborales ({workDaysPerWeek} días/sem × 52 sem − {feriados} feriados).
-                                                </p>
-                                                <div className="space-y-1">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
-                                                        Bruto = PPH × Hrs/Turno × {diasAnuales} días<br/>
-                                                        Neto = Bruto × OEE ({Math.round((100 - oeePenalty) * 10) / 10}%)
-                                                    </p>
-                                                </div>
-                                                <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-0.5">
-                                                    <p><span className="text-slate-500">Bruto:</span> <span className="text-white font-bold">{Math.round(piezasAnoBruto).toLocaleString()} pzas</span></p>
-                                                    <p className="text-rose-400">Pérdida OEE: <span className="font-bold">−{Math.round(perdidaOEEAno).toLocaleString()} pzas</span></p>
-                                                    <div className="border-t border-slate-700 pt-0.5">
-                                                        <span className="text-slate-500">Neto:</span> <span className="text-amber-400 font-bold">{Math.round(piezasAno).toLocaleString()} pzas/año</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="absolute bottom-full left-6 border-4 border-transparent border-b-slate-950/95" />
-                                        </div>
-                                    </div>
-                                );
-                            })()}
-
-                            {/* Cumplimiento vs Demanda Anual */}
-                            <div 
-                                onClick={(e) => handleRelationClick('card-piezasAno', e)}
-                                className={`relative group bg-slate-900/40 border border-slate-800 ${cumpleDemanda ? 'border-t-emerald-500/80' : 'border-t-rose-500/80'} border-t-[3px] rounded-2xl p-4 flex flex-col gap-2.5 shadow-xl backdrop-blur-md transition-all duration-300 hover:border-slate-700/80 cursor-pointer overflow-visible`}
-                            >
-                                <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
-                                    <div className={`p-1 ${cumpleDemanda ? 'bg-emerald-500/10' : 'bg-rose-500/10'} rounded-lg`}>
-                                        <Award className={`w-4 h-4 ${cumpleDemanda ? 'text-emerald-400' : 'text-rose-400'}`} />
-                                    </div>
-                                    <div>
-                                        <h4 className="text-xs font-black text-slate-200 uppercase tracking-wider">Cumplimiento</h4>
-                                        <p className="text-[9px] text-slate-500 font-semibold font-mono">vs Demanda Anual</p>
-                                    </div>
-                                </div>
-                                <div className="flex-1 flex flex-col justify-center items-center gap-2">
-                                    <span className={`text-3xl font-black ${cumpleDemanda ? 'text-emerald-400' : 'text-rose-400'} leading-none`}>
-                                        {cumplimiento > 0 ? `${Math.round(cumplimiento)}%` : '—'}
-                                    </span>
-                                    <div className={`px-2.5 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${
-                                        cumpleDemanda 
-                                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' 
-                                            : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
-                                    }`}>
-                                        {cumpleDemanda ? '✓ Cumple' : '✗ No Cumple'}
-                                    </div>
-                                    <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden mt-1">
-                                        <div 
-                                            className={`h-full rounded-full transition-all duration-700 ${cumpleDemanda ? 'bg-gradient-to-r from-emerald-600 to-emerald-400' : 'bg-gradient-to-r from-rose-600 to-rose-400'}`}
-                                            style={{ width: `${Math.min(100, cumplimiento)}%` }}
-                                        />
-                                    </div>
-                                    <div className="w-full flex justify-between text-[8px] text-slate-600 font-mono">
-                                        <span>Neto: {Math.round(piezasAno).toLocaleString()}</span>
-                                        <span>Demanda: {Math.round(annualDemand).toLocaleString()}</span>
-                                    </div>
-                                    {!cumpleDemanda && annualDemand > 0 && piezasAno > 0 && (
-                                        <span className="text-[8px] text-rose-400/70 font-mono">
-                                            Faltan {Math.round(annualDemand - piezasAno).toLocaleString()} pzas/año
-                                        </span>
-                                    )}
-                                </div>
-
-                                {/* Tooltip */}
-                                <div className="absolute top-full right-0 left-auto mt-2 w-72 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
-                                    <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
-                                        <Info className="w-3.5 h-3.5 text-slate-400" />
-                                        <span>Cumplimiento vs Demanda</span>
-                                    </div>
-                                    <div className="text-[11px] leading-relaxed space-y-1.5">
-                                        <p className="text-slate-400 text-[10px]">
-                                            Compara la capacidad anual neta (con OEE) contra la demanda comercial configurada.
-                                        </p>
-                                        <div className="space-y-1">
-                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
-                                                Cumplimiento = (Pzas Neto/Año ÷ Demanda) × 100
-                                            </p>
-                                        </div>
-                                        <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-0.5">
-                                            <p><span className="text-slate-500">Pzas Neto/Año:</span> <span className="text-amber-400 font-bold">{Math.round(piezasAno).toLocaleString()}</span></p>
-                                            <p><span className="text-slate-500">Demanda Anual:</span> <span className="text-white font-bold">{Math.round(annualDemand).toLocaleString()}</span></p>
-                                            <div className="border-t border-slate-700 pt-0.5">
-                                                <span className="text-slate-500">Resultado:</span>{' '}
-                                                <span className={`font-bold ${cumpleDemanda ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                                    {cumplimiento.toFixed(1)}% {cumpleDemanda ? '✓' : '✗'}
+                                                <span className={`text-[8px] block mt-0.5 ${cumpleDemanda ? 'text-emerald-500' : 'text-rose-400'}`}>
+                                                    {cumpleDemanda ? '✓ Cumple' : '✗ No cumple'} demanda ({Math.round(cumplimiento)}%)
                                                 </span>
+
+                                                {/* Tooltip */}
+                                                <div className="absolute top-full right-0 left-auto mt-2 w-72 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
+                                                    <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
+                                                        <Info className="w-3.5 h-3.5 text-amber-400" />
+                                                        <span>Piezas / Año — Bruto vs Neto</span>
+                                                    </div>
+                                                    <div className="text-[11px] leading-relaxed space-y-1.5">
+                                                        <p className="text-slate-400 text-[10px]">
+                                                            Proyección anual: {diasAnuales} días laborales ({workDaysPerWeek} días/sem × 52 − {feriados} feriados {country}).
+                                                        </p>
+                                                        <div className="space-y-1">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
+                                                                Bruto = PPH × Hrs/Turno × {diasAnuales} días<br/>
+                                                                Neto = Bruto × OEE ({Math.round((100 - oeePenalty) * 10) / 10}%)
+                                                            </p>
+                                                        </div>
+                                                        <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-0.5">
+                                                            <p><span className="text-slate-500">Bruto:</span> <span className="text-white font-bold">{Math.round(pzAnoBruto).toLocaleString()} pzas</span></p>
+                                                            <p className="text-rose-400">Pérdida OEE: <span className="font-bold">−{Math.round(perdidaAno).toLocaleString()} pzas</span></p>
+                                                            <div className="border-t border-slate-700 pt-0.5">
+                                                                <span className="text-slate-500">Neto:</span> <span className="text-amber-400 font-bold">{Math.round(piezasAno).toLocaleString()} pzas/año</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cumplimiento vs Demanda:</p>
+                                                            <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-0.5">
+                                                                <p><span className="text-slate-500">Neto/Año:</span> <span className="text-amber-400 font-bold">{Math.round(piezasAno).toLocaleString()}</span></p>
+                                                                <p><span className="text-slate-500">Demanda:</span> <span className="text-white font-bold">{Math.round(annualDemand).toLocaleString()}</span></p>
+                                                                <div className="border-t border-slate-700 pt-0.5">
+                                                                    <span className="text-slate-500">Resultado:</span>{' '}
+                                                                    <span className={`font-bold ${cumpleDemanda ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                                        {cumplimiento.toFixed(1)}% {cumpleDemanda ? '✓ Cumple' : '✗ No cumple'}
+                                                                    </span>
+                                                                </div>
+                                                                {!cumpleDemanda && annualDemand > 0 && piezasAno > 0 && (
+                                                                    <p className="text-rose-400/70">Faltan {Math.round(annualDemand - piezasAno).toLocaleString()} pzas/año</p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="absolute bottom-full right-6 left-auto border-4 border-transparent border-b-slate-950/95" />
+                                                </div>
                                             </div>
-                                        </div>
-                                    </div>
-                                    <div className="absolute bottom-full right-6 left-auto border-4 border-transparent border-b-slate-950/95" />
+                                        );
+                                    })()}
                                 </div>
                             </div>
                         </div>
 
-                        {/* ── SECCIÓN CONFIGURACIÓN DEL ESTUDIO (arriba del Gantt) ── */}
-                        <div className="bg-slate-900/70 rounded-xl border border-slate-800 overflow-hidden relative z-10">
-                            <button
-                                onClick={() => setShowConfig(!showConfig)}
-                                className="w-full px-5 py-3 flex items-center justify-between hover:bg-slate-850/30 transition text-left cursor-pointer focus:outline-none"
-                            >
-                                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                                    <Settings className="w-3.5 h-3.5 text-slate-400" />
-                                    Configuración General del Estudio
-                                </span>
-                                <span className="text-xs text-cyan-400 font-bold">
-                                    {showConfig ? 'Ocultar' : 'Mostrar'}
-                                </span>
-                            </button>
-
-                            {showConfig && studyConfig && (
-                                <div className="p-4 border-t border-slate-800/60 grid grid-cols-1 md:grid-cols-4 gap-2.5 bg-slate-950/20">
-                                    {/* Nombre */}
-                                    <div 
-                                        onClick={(e) => handleRelationClick('input-name', e)}
-                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-name').wrapperClass}`}
-                                    >
-                                        {getHighlightLabel('input-name') && (
-                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                hoveredRelation === 'input-name' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                            }`}>
-                                                {getHighlightLabel('input-name')}
-                                            </span>
-                                        )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Nombre</label>
-                                        <input
-                                            value={studyConfig.name || ''}
-                                            onChange={e => handleConfigChange('name', e.target.value)}
-                                            disabled={!canEdit}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
-                                        />
-                                    </div>
-
-                                    {/* Piezas por Hora */}
-                                    <div 
-                                        onClick={(e) => handleRelationClick('input-piecesPerHour', e)}
-                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-piecesPerHour').wrapperClass}`}
-                                    >
-                                        {getHighlightLabel('input-piecesPerHour') && (
-                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                hoveredRelation === 'input-piecesPerHour' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                            }`}>
-                                                {getHighlightLabel('input-piecesPerHour')}
-                                            </span>
-                                        )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Piezas por Hora</label>
-                                        <input
-                                            type="number" min="1" step="1"
-                                            value={studyConfig.targetPiecesPerShift && studyConfig.shiftHours ? Math.round(studyConfig.targetPiecesPerShift / studyConfig.shiftHours) : ''}
-                                            onChange={e => {
-                                                const piecesPerHour = Number(e.target.value) || 0;
-                                                const hours = Number(studyConfig.shiftHours) || 8;
-                                                const up = Number(studyConfig.cycleOutputQty) || 1;
-                                                const targetPiecesPerShift = piecesPerHour * hours;
-                                                const targetPPM = piecesPerHour / 60 / up;
-                                                handleConfigChanges({ 
-                                                    targetPiecesPerShift, 
-                                                    targetPPM: Math.round(targetPPM * 100) / 100 
-                                                });
-                                            }}
-                                            disabled={!canEdit}
-                                            placeholder="ej. 1200"
-                                            className="w-full bg-slate-900 border border-cyan-700/40 rounded-lg px-2.5 py-1 text-xs text-cyan-300 font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
-                                        />
-                                    </div>
-
-                                    {/* Horas por Día */}
-                                    <div 
-                                        onClick={(e) => handleRelationClick('input-shiftHours', e)}
-                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-shiftHours').wrapperClass}`}
-                                    >
-                                        {getHighlightLabel('input-shiftHours') && (
-                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                hoveredRelation === 'input-shiftHours' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                            }`}>
-                                                {getHighlightLabel('input-shiftHours')}
-                                            </span>
-                                        )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Horas / Día</label>
-                                        <input
-                                            type="number" min="0.1" max="24" step="0.1"
-                                            value={studyConfig.shiftHours || 8}
-                                            onChange={e => {
-                                                const hours = Number(e.target.value) || 8;
-                                                const currentHours = Number(studyConfig.shiftHours) || 8;
-                                                const currentPieces = Number(studyConfig.targetPiecesPerShift) || 0;
-                                                const piecesPerHour = currentHours ? (currentPieces / currentHours) : 0;
-                                                const targetPiecesPerShift = Math.round(piecesPerHour * hours);
-                                                handleConfigChanges({ 
-                                                    shiftHours: hours, 
-                                                    targetPiecesPerShift 
-                                                });
-                                            }}
-                                            disabled={!canEdit}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
-                                        />
-                                    </div>
-
-                                    {/* Castigo OEE (%) */}
-                                    <div 
-                                        onClick={(e) => handleRelationClick('input-oeePenalty', e)}
-                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-oeePenalty').wrapperClass}`}
-                                    >
-                                        {getHighlightLabel('input-oeePenalty') && (
-                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                hoveredRelation === 'input-oeePenalty' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                            }`}>
-                                                {getHighlightLabel('input-oeePenalty')}
-                                            </span>
-                                        )}
-                                        <div className="flex items-center justify-between mb-0.5">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase block">Castigo OEE (%)</label>
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleConfigChange('linkOeeToStudy', !studyConfig?.linkOeeToStudy);
-                                                }}
-                                                disabled={!canEdit}
-                                                className={`px-1.5 py-0.5 rounded text-[7px] font-bold border transition-all ${
-                                                    linkOeeToStudy
-                                                        ? 'bg-cyan-950/80 border-cyan-800 text-cyan-400 hover:bg-cyan-900/50'
-                                                        : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:bg-slate-850'
-                                                }`}
-                                            >
-                                                {linkOeeToStudy ? 'Vincular a Estudio' : 'Fijar OEE'}
-                                            </button>
-                                        </div>
-                                        <input
-                                            type="number" min="0" max="100" step="1"
-                                            value={Math.round(oeePenalty)}
-                                            onChange={e => handleConfigChange('oeePenalty', Number(e.target.value))}
-                                            disabled={!canEdit || linkOeeToStudy}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
-                                            title={linkOeeToStudy ? "Calculado automáticamente en base al ciclo de máquina real" : "Castigo OEE (%)"}
-                                        />
-                                    </div>
-
-                                    {/* Días / Semana */}
-                                    <div 
-                                        onClick={(e) => handleRelationClick('input-workDaysPerWeek', e)}
-                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-workDaysPerWeek').wrapperClass}`}
-                                    >
-                                        {getHighlightLabel('input-workDaysPerWeek') && (
-                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                hoveredRelation === 'input-workDaysPerWeek' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                            }`}>
-                                                {getHighlightLabel('input-workDaysPerWeek')}
-                                            </span>
-                                        )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Días Laborales / Sem</label>
-                                        <input
-                                            type="number" min="1" max="7" step="1"
-                                            value={studyConfig.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5}
-                                            onChange={e => handleConfigChange('workDaysPerWeek', Number(e.target.value))}
-                                            disabled={!canEdit}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
-                                        />
-                                    </div>
-
-                                    {/* País (Feriados) */}
-                                    <div 
-                                        onClick={(e) => handleRelationClick('input-country', e)}
-                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-country').wrapperClass}`}
-                                    >
-                                        {getHighlightLabel('input-country') && (
-                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                hoveredRelation === 'input-country' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                            }`}>
-                                                {getHighlightLabel('input-country')}
-                                            </span>
-                                        )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">País (Feriados)</label>
-                                        <select
-                                            value={studyConfig.country || 'MX'}
-                                            onChange={e => handleConfigChange('country', e.target.value)}
-                                            disabled={!canEdit}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
-                                        >
-                                            <option value="MX">México (7 días feriados)</option>
-                                            <option value="CR">Costa Rica (11 días feriados)</option>
-                                            <option value="US">USA (11 días feriados)</option>
-                                            <option value="NONE">Ninguno (0 días feriados)</option>
-                                        </select>
-                                    </div>
-
-                                    {/* Demanda Anual */}
-                                    <div 
-                                        onClick={(e) => handleRelationClick('input-annualDemand', e)}
-                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-annualDemand').wrapperClass}`}
-                                    >
-                                        {getHighlightLabel('input-annualDemand') && (
-                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                hoveredRelation === 'input-annualDemand' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                            }`}>
-                                                {getHighlightLabel('input-annualDemand')}
-                                            </span>
-                                        )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Demanda Anual</label>
-                                        <input
-                                            type="number" min="1" step="1"
-                                            value={studyConfig.annualDemand !== undefined ? studyConfig.annualDemand : 18388734}
-                                            onChange={e => handleConfigChange('annualDemand', Number(e.target.value))}
-                                            disabled={!canEdit}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
-                                        />
-                                    </div>
-
-                                    {/* Tipo de Máquina */}
-                                    <div 
-                                        onClick={(e) => handleRelationClick('input-machineType', e)}
-                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-machineType').wrapperClass}`}
-                                    >
-                                        {getHighlightLabel('input-machineType') && (
-                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                hoveredRelation === 'input-machineType' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                            }`}>
-                                                {getHighlightLabel('input-machineType')}
-                                            </span>
-                                        )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Tipo de Máquina</label>
-                                        <select
-                                            value={studyConfig.mainIndexEnabled ? 'indexer' : 'robot'}
-                                            onChange={e => {
-                                                const isIndexer = e.target.value === 'indexer';
-                                                const updates = { mainIndexEnabled: isIndexer };
-                                                if (!isIndexer) updates.mainIndexTimeMs = 0;
-                                                handleConfigChanges(updates);
-                                            }}
-                                            disabled={!canEdit}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
-                                        >
-                                            <option value="indexer">🔄 Indexer (Mesa / Dial)</option>
-                                            <option value="robot">🤖 Robot Transfer</option>
-                                        </select>
-                                    </div>
-
-                                    {/* Index Time - solo si Indexer */}
-                                    {studyConfig.mainIndexEnabled && (
-                                        <div 
-                                            onClick={(e) => handleRelationClick('input-indexTime', e)}
-                                            className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-indexTime').wrapperClass}`}
-                                        >
-                                            {getHighlightLabel('input-indexTime') && (
-                                                <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                    hoveredRelation === 'input-indexTime' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                                }`}>
-                                                    {getHighlightLabel('input-indexTime')}
-                                                </span>
-                                            )}
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Tiempo de Index (ms)</label>
-                                            <input
-                                                type="number" min="0"
-                                                value={studyConfig.mainIndexTimeMs || 0}
-                                                onChange={e => handleConfigChange('mainIndexTimeMs', e.target.value)}
-                                                disabled={!canEdit}
-                                                className="w-full bg-slate-900 border border-amber-700/40 rounded-lg px-2.5 py-1 text-xs text-amber-300 focus:outline-none focus:border-amber-500/50 disabled:opacity-50"
-                                            />
-                                        </div>
-                                    )}
-
-                                    {/* Dwell calculado - solo si Indexer */}
-                                    {studyConfig.mainIndexEnabled && (
-                                        <div 
-                                            onClick={(e) => handleRelationClick('input-dwellTime', e)}
-                                            className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-dwellTime').wrapperClass}`}
-                                        >
-                                            {getHighlightLabel('input-dwellTime') && (
-                                                <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                    hoveredRelation === 'input-dwellTime' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                                }`}>
-                                                    {getHighlightLabel('input-dwellTime')}
-                                                </span>
-                                            )}
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Tiempo de Dwell (ms)</label>
-                                            <div className="w-full bg-emerald-950/30 border border-emerald-600/40 rounded-lg px-2.5 py-1 text-xs text-emerald-400 font-mono font-bold flex items-center justify-between">
-                                                <span>{currentStudy?.dwellTimeMs || 0} ms</span>
-                                                <span className="text-[8px] text-emerald-600/60 font-normal">auto</span>
-                                            </div>
-                                            <span className="text-[8px] text-slate-600 mt-0.5 block">= Estación bottleneck (más lenta)</span>
-                                        </div>
-                                    )}
-
-
-                                    {/* Configuración UP */}
-                                    <div 
-                                        onClick={(e) => handleRelationClick('input-up', e)}
-                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 md:col-span-2 ${getHighlightStyles('input-up').wrapperClass}`}
-                                    >
-                                        {getHighlightLabel('input-up') && (
-                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                hoveredRelation === 'input-up' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                            }`}>
-                                                {getHighlightLabel('input-up')}
-                                            </span>
-                                        )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Configuración UP</label>
-                                        <div className="flex gap-1">
-                                            {[1, 2, 4, 6].map(up => (
-                                                <button
-                                                    key={up}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const hours = Number(studyConfig.shiftHours) || 8;
-                                                        const piecesPerHour = (Number(studyConfig.targetPiecesPerShift) || 0) / hours;
-                                                        const updates = { cycleOutputQty: up };
-                                                        if (piecesPerHour > 0) {
-                                                            const ppm = piecesPerHour / 60 / up;
-                                                            updates.targetPPM = Math.round(ppm * 100) / 100;
-                                                        }
-                                                        handleConfigChanges(updates);
-                                                    }}
-                                                    disabled={!canEdit}
-                                                    className={`flex-1 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
-                                                        Number(studyConfig.cycleOutputQty || 1) === up
-                                                            ? 'bg-cyan-600 border-cyan-500 text-white shadow-lg shadow-cyan-900/30'
-                                                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-850 hover:border-slate-700'
-                                                    } disabled:opacity-50`}
-                                                >
-                                                    {up}-UP
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Notas */}
-                                    <div 
-                                        onClick={(e) => handleRelationClick('input-notes', e)}
-                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 md:col-span-4 ${getHighlightStyles('input-notes').wrapperClass}`}
-                                    >
-                                        {getHighlightLabel('input-notes') && (
-                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                hoveredRelation === 'input-notes' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                            }`}>
-                                                {getHighlightLabel('input-notes')}
-                                            </span>
-                                        )}
-                                        <div className="flex items-center justify-between mb-0.5">
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setShowNotes(!showNotes);
-                                                }}
-                                                className="text-[10px] font-bold text-slate-500 hover:text-slate-300 uppercase flex items-center gap-1 focus:outline-none"
-                                            >
-                                                {showNotes ? <ChevronDown className="w-3 h-3 text-slate-400" /> : <ChevronRight className="w-3 h-3 text-slate-400" />}
-                                                <span>Notas del Estudio</span>
-                                            </button>
-                                            {studyConfig.notes && !showNotes && (
-                                                <span className="bg-cyan-950/80 border border-cyan-800 text-cyan-400 text-[8px] font-bold px-1.5 py-0.5 rounded shadow-sm animate-fade-in">
-                                                    Contiene Notas
-                                                </span>
-                                            )}
-                                        </div>
-                                        {showNotes && (
-                                            <textarea
-                                                value={studyConfig.notes || ''}
-                                                onChange={e => handleConfigChange('notes', e.target.value)}
-                                                disabled={!canEdit}
-                                                rows="2"
-                                                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50 resize-none mt-1 animate-fade-in"
-                                            />
-                                        )}
-                                    </div>
-
-                                    {/* Auto-save indicator */}
-                                    {canEdit && (
-                                        <div className="md:col-span-4 flex justify-end pt-2">
-                                            <div className="flex items-center gap-1.5 text-[10px] font-semibold">
-                                                {configAutoSaveStatus === 'saving' && (
-                                                    <>
-                                                        <div className="w-3 h-3 rounded-full border-2 border-cyan-500 border-t-transparent animate-spin" />
-                                                        <span className="text-cyan-500">Guardando...</span>
-                                                    </>
-                                                )}
-                                                {configAutoSaveStatus === 'saved' && (
-                                                    <>
-                                                        <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
-                                                        <span className="text-emerald-500">Guardado</span>
-                                                    </>
-                                                )}
-                                                {configAutoSaveStatus === 'error' && (
-                                                    <>
-                                                        <XCircle className="w-3.5 h-3.5 text-rose-500" />
-                                                        <span className="text-rose-500">Error al guardar: {configAutoSaveError}</span>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
 
                         {/* ── GANTT INTERACTIVO DE PASOS ── */}
                         <TimingStudyGantt
