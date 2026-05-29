@@ -15,7 +15,8 @@ import { useEngineeringData } from '../hooks/useEngineeringData';
 import {
     ArrowLeft, Target, ListTodo, Clock, Calendar, AlertTriangle,
     ChevronRight, Plus, BarChart3, Settings, FolderGit2,
-    CheckCircle2, Activity, Edit3, Trash2, AlertCircle, Loader2, Table2, GanttChartSquare, Grid3X3
+    CheckCircle2, Activity, Edit3, Trash2, AlertCircle, Loader2, Table2, GanttChartSquare, Grid3X3,
+    Timer
 } from 'lucide-react';
 import { PROJECT_STATUS_CONFIG, TASK_PRIORITY_CONFIG, MILESTONE_TYPE } from '../models/schemas';
 import ProjectModal from '../components/tasks/ProjectModal';
@@ -23,6 +24,7 @@ import MilestoneModal from '../components/milestones/MilestoneModal';
 import StationManager from '../components/projects/StationManager';
 import StationTaskMatrix from '../components/engineering/StationTaskMatrix';
 import MainTable from './MainTable';
+import TimingStudyManager from '../components/projects/TimingStudyManager';
 import { createMilestone, deleteMilestone, getMilestonesByProject } from '../services/milestoneService';
 
 const ProjectGantt = React.lazy(() => import('./ProjectGantt'));
@@ -285,6 +287,19 @@ export default function ProjectDetailPage() {
                         <span className="absolute bottom-0 left-1 right-1 h-0.5 bg-indigo-500 rounded-t-full" />
                     )}
                 </button>
+                <button
+                    onClick={() => setActiveTab('timingStudy')}
+                    className={`relative flex items-center gap-1.5 px-2.5 md:px-4 py-2.5 md:py-3 text-[11px] md:text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                        activeTab === 'timingStudy'
+                            ? 'text-slate-900 dark:text-white'
+                            : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                    }`}
+                >
+                    <Timer className="w-3.5 h-3.5" /> Estudio de Tiempos
+                    {activeTab === 'timingStudy' && (
+                        <span className="absolute bottom-0 left-1 right-1 h-0.5 bg-indigo-500 rounded-t-full" />
+                    )}
+                </button>
             </div>
 
             {activeTab === 'resumen' && (
@@ -509,6 +524,16 @@ export default function ProjectDetailPage() {
             </div>
             </div>
             </>
+            )}
+
+            {activeTab === 'timingStudy' && (
+                <div className="flex-1 overflow-y-auto px-3 md:px-6 pb-4">
+                    <TimingStudyManager
+                        projectId={projectId}
+                        canEdit={canEdit}
+                        userId={user?.uid}
+                    />
+                </div>
             )}
         </div>
     );

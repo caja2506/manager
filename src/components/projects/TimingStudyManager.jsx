@@ -1,7 +1,7 @@
-﻿import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     Timer, Plus, Trash2, Copy, RefreshCw, Save, AlertTriangle, CheckCircle, XCircle,
-    ChevronUp, ChevronDown, Sparkles, Settings, Eye, Info, Clock, Play, List, HelpCircle, Download,
+    ChevronUp, ChevronDown, ChevronRight, Sparkles, Settings, Eye, Info, Clock, Play, List, HelpCircle, Download,
     Target, Activity, Award, TrendingUp, ArrowRight
 } from 'lucide-react';
 import {
@@ -146,6 +146,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
 
     // ── Estado colapsable para configuración ──
     const [showConfig, setShowConfig] = useState(true);
+    const [showNotes, setShowNotes] = useState(false);
 
     // ── Configuración en edición local ──
     const [studyConfig, setStudyConfig] = useState(null);
@@ -2523,10 +2524,10 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                         <div className="bg-slate-900/70 rounded-xl border border-slate-800 overflow-hidden relative z-10">
                             <button
                                 onClick={() => setShowConfig(!showConfig)}
-                                className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-850/30 transition text-left cursor-pointer focus:outline-none"
+                                className="w-full px-5 py-3 flex items-center justify-between hover:bg-slate-850/30 transition text-left cursor-pointer focus:outline-none"
                             >
                                 <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                                    <Settings className="w-4 h-4 text-slate-400" />
+                                    <Settings className="w-3.5 h-3.5 text-slate-400" />
                                     Configuración General del Estudio
                                 </span>
                                 <span className="text-xs text-cyan-400 font-bold">
@@ -2535,11 +2536,11 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                             </button>
 
                             {showConfig && studyConfig && (
-                                <div className="p-6 border-t border-slate-800/60 grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-950/20">
+                                <div className="p-4 border-t border-slate-800/60 grid grid-cols-1 md:grid-cols-4 gap-2.5 bg-slate-950/20">
                                     {/* Nombre */}
                                     <div 
                                         onClick={(e) => handleRelationClick('input-name', e)}
-                                        className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-name').wrapperClass}`}
+                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-name').wrapperClass}`}
                                     >
                                         {getHighlightLabel('input-name') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2548,19 +2549,19 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 {getHighlightLabel('input-name')}
                                             </span>
                                         )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Nombre</label>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Nombre</label>
                                         <input
                                             value={studyConfig.name || ''}
                                             onChange={e => handleConfigChange('name', e.target.value)}
                                             disabled={!canEdit}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
                                         />
                                     </div>
 
                                     {/* Piezas por Hora */}
                                     <div 
                                         onClick={(e) => handleRelationClick('input-piecesPerHour', e)}
-                                        className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-piecesPerHour').wrapperClass}`}
+                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-piecesPerHour').wrapperClass}`}
                                     >
                                         {getHighlightLabel('input-piecesPerHour') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2569,7 +2570,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 {getHighlightLabel('input-piecesPerHour')}
                                             </span>
                                         )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Piezas por Hora</label>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Piezas por Hora</label>
                                         <input
                                             type="number" min="1" step="1"
                                             value={studyConfig.targetPiecesPerShift && studyConfig.shiftHours ? Math.round(studyConfig.targetPiecesPerShift / studyConfig.shiftHours) : ''}
@@ -2586,14 +2587,14 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                             }}
                                             disabled={!canEdit}
                                             placeholder="ej. 1200"
-                                            className="w-full bg-slate-900 border border-cyan-700/40 rounded-lg px-3 py-1.5 text-xs text-cyan-300 font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                            className="w-full bg-slate-900 border border-cyan-700/40 rounded-lg px-2.5 py-1 text-xs text-cyan-300 font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
                                         />
                                     </div>
 
                                     {/* Horas por Día */}
                                     <div 
                                         onClick={(e) => handleRelationClick('input-shiftHours', e)}
-                                        className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-shiftHours').wrapperClass}`}
+                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-shiftHours').wrapperClass}`}
                                     >
                                         {getHighlightLabel('input-shiftHours') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2602,7 +2603,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 {getHighlightLabel('input-shiftHours')}
                                             </span>
                                         )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Horas / Día</label>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Horas / Día</label>
                                         <input
                                             type="number" min="0.1" max="24" step="0.1"
                                             value={studyConfig.shiftHours || 8}
@@ -2618,14 +2619,14 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 });
                                             }}
                                             disabled={!canEdit}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
                                         />
                                     </div>
 
                                     {/* Castigo OEE (%) */}
                                     <div 
                                         onClick={(e) => handleRelationClick('input-oeePenalty', e)}
-                                        className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-oeePenalty').wrapperClass}`}
+                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-oeePenalty').wrapperClass}`}
                                     >
                                         {getHighlightLabel('input-oeePenalty') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2634,7 +2635,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 {getHighlightLabel('input-oeePenalty')}
                                             </span>
                                         )}
-                                        <div className="flex items-center justify-between mb-1">
+                                        <div className="flex items-center justify-between mb-0.5">
                                             <label className="text-[10px] font-bold text-slate-500 uppercase block">Castigo OEE (%)</label>
                                             <button
                                                 type="button"
@@ -2657,7 +2658,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                             value={Math.round(oeePenalty)}
                                             onChange={e => handleConfigChange('oeePenalty', Number(e.target.value))}
                                             disabled={!canEdit || linkOeeToStudy}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
                                             title={linkOeeToStudy ? "Calculado automáticamente en base al ciclo de máquina real" : "Castigo OEE (%)"}
                                         />
                                     </div>
@@ -2665,7 +2666,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {/* Días / Semana */}
                                     <div 
                                         onClick={(e) => handleRelationClick('input-workDaysPerWeek', e)}
-                                        className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-workDaysPerWeek').wrapperClass}`}
+                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-workDaysPerWeek').wrapperClass}`}
                                     >
                                         {getHighlightLabel('input-workDaysPerWeek') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2674,20 +2675,20 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 {getHighlightLabel('input-workDaysPerWeek')}
                                             </span>
                                         )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Días Laborales / Sem</label>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Días Laborales / Sem</label>
                                         <input
                                             type="number" min="1" max="7" step="1"
                                             value={studyConfig.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5}
                                             onChange={e => handleConfigChange('workDaysPerWeek', Number(e.target.value))}
                                             disabled={!canEdit}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
                                         />
                                     </div>
 
                                     {/* País (Feriados) */}
                                     <div 
                                         onClick={(e) => handleRelationClick('input-country', e)}
-                                        className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-country').wrapperClass}`}
+                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-country').wrapperClass}`}
                                     >
                                         {getHighlightLabel('input-country') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2696,12 +2697,12 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 {getHighlightLabel('input-country')}
                                             </span>
                                         )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">País (Feriados)</label>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">País (Feriados)</label>
                                         <select
                                             value={studyConfig.country || 'MX'}
                                             onChange={e => handleConfigChange('country', e.target.value)}
                                             disabled={!canEdit}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
                                         >
                                             <option value="MX">México (7 días feriados)</option>
                                             <option value="CR">Costa Rica (11 días feriados)</option>
@@ -2713,7 +2714,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {/* Demanda Anual */}
                                     <div 
                                         onClick={(e) => handleRelationClick('input-annualDemand', e)}
-                                        className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-annualDemand').wrapperClass}`}
+                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-annualDemand').wrapperClass}`}
                                     >
                                         {getHighlightLabel('input-annualDemand') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2722,20 +2723,20 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 {getHighlightLabel('input-annualDemand')}
                                             </span>
                                         )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Demanda Anual</label>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Demanda Anual</label>
                                         <input
                                             type="number" min="1" step="1"
                                             value={studyConfig.annualDemand !== undefined ? studyConfig.annualDemand : 18388734}
                                             onChange={e => handleConfigChange('annualDemand', Number(e.target.value))}
                                             disabled={!canEdit}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
                                         />
                                     </div>
 
                                     {/* Tipo de Máquina */}
                                     <div 
                                         onClick={(e) => handleRelationClick('input-machineType', e)}
-                                        className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-machineType').wrapperClass}`}
+                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-machineType').wrapperClass}`}
                                     >
                                         {getHighlightLabel('input-machineType') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2744,7 +2745,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 {getHighlightLabel('input-machineType')}
                                             </span>
                                         )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Tipo de Máquina</label>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Tipo de Máquina</label>
                                         <select
                                             value={studyConfig.mainIndexEnabled ? 'indexer' : 'robot'}
                                             onChange={e => {
@@ -2754,7 +2755,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 handleConfigChanges(updates);
                                             }}
                                             disabled={!canEdit}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
                                         >
                                             <option value="indexer">🔄 Indexer (Mesa / Dial)</option>
                                             <option value="robot">🤖 Robot Transfer</option>
@@ -2765,7 +2766,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {studyConfig.mainIndexEnabled && (
                                         <div 
                                             onClick={(e) => handleRelationClick('input-indexTime', e)}
-                                            className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-indexTime').wrapperClass}`}
+                                            className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-indexTime').wrapperClass}`}
                                         >
                                             {getHighlightLabel('input-indexTime') && (
                                                 <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2774,13 +2775,13 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                     {getHighlightLabel('input-indexTime')}
                                                 </span>
                                             )}
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Tiempo de Index (ms)</label>
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Tiempo de Index (ms)</label>
                                             <input
                                                 type="number" min="0"
                                                 value={studyConfig.mainIndexTimeMs || 0}
                                                 onChange={e => handleConfigChange('mainIndexTimeMs', e.target.value)}
                                                 disabled={!canEdit}
-                                                className="w-full bg-slate-900 border border-amber-700/40 rounded-lg px-3 py-1.5 text-xs text-amber-300 focus:outline-none focus:border-amber-500/50 disabled:opacity-50"
+                                                className="w-full bg-slate-900 border border-amber-700/40 rounded-lg px-2.5 py-1 text-xs text-amber-300 focus:outline-none focus:border-amber-500/50 disabled:opacity-50"
                                             />
                                         </div>
                                     )}
@@ -2789,7 +2790,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {studyConfig.mainIndexEnabled && (
                                         <div 
                                             onClick={(e) => handleRelationClick('input-dwellTime', e)}
-                                            className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-dwellTime').wrapperClass}`}
+                                            className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-dwellTime').wrapperClass}`}
                                         >
                                             {getHighlightLabel('input-dwellTime') && (
                                                 <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2798,8 +2799,8 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                     {getHighlightLabel('input-dwellTime')}
                                                 </span>
                                             )}
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Tiempo de Dwell (ms)</label>
-                                            <div className="w-full bg-emerald-950/30 border border-emerald-600/40 rounded-lg px-3 py-1.5 text-xs text-emerald-400 font-mono font-bold flex items-center justify-between">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Tiempo de Dwell (ms)</label>
+                                            <div className="w-full bg-emerald-950/30 border border-emerald-600/40 rounded-lg px-2.5 py-1 text-xs text-emerald-400 font-mono font-bold flex items-center justify-between">
                                                 <span>{currentStudy?.dwellTimeMs || 0} ms</span>
                                                 <span className="text-[8px] text-emerald-600/60 font-normal">auto</span>
                                             </div>
@@ -2811,7 +2812,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {/* Configuración UP */}
                                     <div 
                                         onClick={(e) => handleRelationClick('input-up', e)}
-                                        className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 md:col-span-2 ${getHighlightStyles('input-up').wrapperClass}`}
+                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 md:col-span-2 ${getHighlightStyles('input-up').wrapperClass}`}
                                     >
                                         {getHighlightLabel('input-up') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2820,8 +2821,8 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 {getHighlightLabel('input-up')}
                                             </span>
                                         )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Configuración UP</label>
-                                        <div className="flex gap-1.5">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Configuración UP</label>
+                                        <div className="flex gap-1">
                                             {[1, 2, 4, 6].map(up => (
                                                 <button
                                                     key={up}
@@ -2837,7 +2838,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                         handleConfigChanges(updates);
                                                     }}
                                                     disabled={!canEdit}
-                                                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                                                    className={`flex-1 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
                                                         Number(studyConfig.cycleOutputQty || 1) === up
                                                             ? 'bg-cyan-600 border-cyan-500 text-white shadow-lg shadow-cyan-900/30'
                                                             : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-850 hover:border-slate-700'
@@ -2852,7 +2853,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {/* Notas */}
                                     <div 
                                         onClick={(e) => handleRelationClick('input-notes', e)}
-                                        className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 md:col-span-4 ${getHighlightStyles('input-notes').wrapperClass}`}
+                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 md:col-span-4 ${getHighlightStyles('input-notes').wrapperClass}`}
                                     >
                                         {getHighlightLabel('input-notes') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2861,14 +2862,33 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 {getHighlightLabel('input-notes')}
                                             </span>
                                         )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Notas del Estudio</label>
-                                        <textarea
-                                            value={studyConfig.notes || ''}
-                                            onChange={e => handleConfigChange('notes', e.target.value)}
-                                            disabled={!canEdit}
-                                            rows="2"
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50 resize-none"
-                                        />
+                                        <div className="flex items-center justify-between mb-0.5">
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setShowNotes(!showNotes);
+                                                }}
+                                                className="text-[10px] font-bold text-slate-500 hover:text-slate-300 uppercase flex items-center gap-1 focus:outline-none"
+                                            >
+                                                {showNotes ? <ChevronDown className="w-3 h-3 text-slate-400" /> : <ChevronRight className="w-3 h-3 text-slate-400" />}
+                                                <span>Notas del Estudio</span>
+                                            </button>
+                                            {studyConfig.notes && !showNotes && (
+                                                <span className="bg-cyan-950/80 border border-cyan-800 text-cyan-400 text-[8px] font-bold px-1.5 py-0.5 rounded shadow-sm animate-fade-in">
+                                                    Contiene Notas
+                                                </span>
+                                            )}
+                                        </div>
+                                        {showNotes && (
+                                            <textarea
+                                                value={studyConfig.notes || ''}
+                                                onChange={e => handleConfigChange('notes', e.target.value)}
+                                                disabled={!canEdit}
+                                                rows="2"
+                                                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50 resize-none mt-1 animate-fade-in"
+                                            />
+                                        )}
                                     </div>
 
                                     {/* Auto-save indicator */}

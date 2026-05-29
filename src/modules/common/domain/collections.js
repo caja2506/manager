@@ -95,6 +95,10 @@ export const COLLECTIONS = {
     // ── Peer Review ──
     PEER_REVIEWS: 'peerReviews',
     PEER_REVIEW_TEMPLATES: 'peerReviewTemplates',
+
+    // ── Timing Study Module ──
+    TIMING_STUDIES: 'timingStudies',
+    TIMING_STEPS: 'steps',
 };
 
 

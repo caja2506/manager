@@ -9,7 +9,7 @@ import {
     Activity, LayoutDashboard, User, FolderGit2,
     ListTodo, Database, Clock, FileText, BarChart3, Users,
     Bell, Settings, Shield, LayoutList, Briefcase, LineChart, CalendarDays, GanttChartSquare, Radar, Zap,
-    ChevronRight, X, Target, Map, Award, LayoutGrid, Sun, Moon, DatabaseZap, ListTree, Plus
+    ChevronRight, X, Target, Map, Award, LayoutGrid, Sun, Moon, DatabaseZap, ListTree, Plus, Timer
 } from 'lucide-react';
 
 // ─── Section Definitions ───
@@ -45,6 +45,7 @@ const SECTIONS = [
             { to: '/tasks', label: 'Tareas', icon: ListTodo, countKey: 'engTasks' },
             { to: '/main-table', label: 'Main Table', icon: LayoutList },
             { to: '/engineering/lists', label: 'Clasificadores', icon: ListTree },
+            { to: '/engineering/timing', label: 'Estudio de Tiempos', icon: Timer },
             { to: '/daily-scrum', label: 'Equipo Hoy', icon: Users },
             { to: '/planner', label: 'Weekly Planner', icon: CalendarDays },
             { to: '/daily-board', label: 'Daily Board', icon: LayoutGrid },

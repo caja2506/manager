@@ -87,6 +87,25 @@ export {
     createScoreSnapshotDocument,
 } from '../modules/planning/domain/planningModel';
 
+export {
+    TIMING_DEVICE_TYPES,
+    TIMING_ACTIONS,
+    TIMING_SENSOR_TYPES,
+    TIMING_CYLINDER_ATTITUDES,
+    TIMING_VALVE_TYPES,
+    DEFAULT_MOTION_TIME_VALUES,
+    createTimingStudyDocument,
+    createTimingStepDocument,
+    normalizeTimingStudy,
+    normalizeTimingStep,
+    calculateSuggestedDuration,
+    detectDependencyCycles,
+    calculateTimingStudyMetrics,
+    calculateCriticalPath,
+    getTimingStudyStatus,
+    validateTimingStudy,
+} from '../modules/planning/domain/timingStudyModel';
+
 // ── Analytics Domain ──
 export {
     AUDIT_FINDING_SEVERITY,

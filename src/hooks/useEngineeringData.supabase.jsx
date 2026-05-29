@@ -21,7 +21,7 @@ import { useAuth } from '../contexts/AuthContext';
 const safeLocaleCompare = (a, b, field) =>
     String(a[field] || '').localeCompare(String(b[field] || ''));
 
-const TOTAL_TABLES = 10;
+const TOTAL_TABLES = 12;
 
 // ── Context ──
 const EngineeringDataContext = createContext(null);
@@ -48,6 +48,8 @@ export function EngineeringDataProvider({ children }) {
     const [timeLogs, setTimeLogs] = useState([]);
     const [delayCauses, setDelayCauses] = useState([]);
     const [delays, setDelays] = useState([]);
+    const [timingActions, setTimingActions] = useState([]);
+    const [motionProfiles, setMotionProfiles] = useState([]);
 
     // --- Global Task Filters ---
     const [taskSearch, setTaskSearch] = useState('');
@@ -102,6 +104,8 @@ export function EngineeringDataProvider({ children }) {
                 { data: proj }, { data: tasks }, { data: subs },
                 { data: tt }, { data: wa }, { data: mt },
                 { data: users }, { data: tl }, { data: dc }, { data: del },
+                { data: ta },
+                { data: mp },
             ] = await Promise.all([
                 supabase.from('projects').select('*'),
                 supabase.from('tasks').select('*'),
@@ -113,6 +117,8 @@ export function EngineeringDataProvider({ children }) {
                 supabase.from('time_logs').select('*'),
                 supabase.from('delay_causes').select('*'),
                 supabase.from('delays').select('*'),
+                supabase.from('timing_actions').select('*'),
+                supabase.from('motion_profiles').select('*'),
             ]);
 
             setEngProjects((proj || []).map(mapProject).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)));
@@ -134,6 +140,10 @@ export function EngineeringDataProvider({ children }) {
             setDelayCauses((dc || []).map(mapDelayCause).sort((a, b) => (a.order || 0) - (b.order || 0)));
             markLoaded();
             setDelays((del || []).map(mapDelay).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)));
+            markLoaded();
+            setTimingActions((ta || []).map(r => ({ id: r.id, name: r.name, description: r.description || '' })).sort((a, b) => safeLocaleCompare(a, b, 'name')));
+            markLoaded();
+            setMotionProfiles((mp || []).map(r => ({ id: r.id, name: r.name, value: r.value, unit: r.unit })).sort((a, b) => safeLocaleCompare(a, b, 'name')));
             markLoaded();
         }
 
@@ -187,6 +197,8 @@ export function EngineeringDataProvider({ children }) {
             'time_logs': { setter: setTimeLogs, mapper: mapTimeLog },
             'delay_causes': { setter: setDelayCauses, mapper: mapDelayCause },
             'delays': { setter: setDelays, mapper: mapDelay },
+            'timing_actions': { setter: setTimingActions, mapper: r => ({ id: r.id, name: r.name, description: r.description || '' }) },
+            'motion_profiles': { setter: setMotionProfiles, mapper: r => ({ id: r.id, name: r.name, value: r.value, unit: r.unit }) },
         };
 
         channel.on(
@@ -215,6 +227,8 @@ export function EngineeringDataProvider({ children }) {
         engProjects, engTasks, engSubtasks,
         taskTypes, workAreaTypes, milestoneTypes,
         teamMembers, timeLogs, delayCauses, delays,
+        timingActions, setTimingActions,
+        motionProfiles, setMotionProfiles,
         isReady,
         refetch: refetchTable,
         // Global Filters

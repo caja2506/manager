@@ -25,12 +25,13 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { collection, onSnapshot } from 'firebase/firestore';
 import { COLLECTIONS } from '../models/schemas';
 import { db } from '../firebase';
+import { supabase } from '../supabase';
 
 const safeLocaleCompare = (a, b, field) =>
     String(a[field] || '').localeCompare(String(b[field] || ''));
 
 // Total number of Firestore subscriptions managed by this provider
-const TOTAL_SUBSCRIPTIONS = 10;
+const TOTAL_SUBSCRIPTIONS = 12;
 
 // ── Context ──
 const EngineeringDataContext = createContext(null);
@@ -76,6 +77,8 @@ export function EngineeringDataProvider({ children }) {
     const [timeLogs, setTimeLogs] = useState([]);
     const [delayCauses, setDelayCauses] = useState([]);
     const [delays, setDelays] = useState([]);
+    const [timingActions, setTimingActions] = useState([]);
+    const [motionProfiles, setMotionProfiles] = useState([]);
 
     // --- Global Task Filters ---
     const [taskSearch, setTaskSearch] = useState('');
@@ -142,6 +145,18 @@ export function EngineeringDataProvider({ children }) {
             markLoaded();
         });
 
+        // ── Timing Actions (from Supabase — global list) ──
+        supabase.from('timing_actions').select('id, name, description').order('name').then(({ data }) => {
+            setTimingActions((data || []).map(a => ({ ...a })));
+            markLoaded();
+        });
+
+        // ── Motion Profiles (from Supabase — global list) ──
+        supabase.from('motion_profiles').select('id, name, value, unit').order('name').then(({ data }) => {
+            setMotionProfiles((data || []).map(a => ({ ...a })));
+            markLoaded();
+        });
+
         return () => {
             unsubEngProjects(); unsubEngTasks(); unsubEngSubtasks();
             unsubTaskTypes(); unsubWorkAreaTypes(); unsubMilestoneTypes();
@@ -161,6 +176,8 @@ export function EngineeringDataProvider({ children }) {
         timeLogs,
         delayCauses,
         delays,
+        timingActions, setTimingActions,
+        motionProfiles, setMotionProfiles,
         isReady,
         // Global Filters
         taskSearch, setTaskSearch,

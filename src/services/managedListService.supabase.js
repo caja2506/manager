@@ -10,6 +10,7 @@ const TABLE_MAP = {
     taskType: 'task_types',
     workAreaType: 'work_area_types',
     milestoneType: 'milestone_types',
+    timingAction: 'timing_actions',
 };
 
 export async function saveManagedList({ type, data }) {

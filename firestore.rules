@@ -162,6 +162,20 @@ service cloud.firestore {
         allow create, update: if isEditor();
         allow delete: if isAdmin();
       }
+
+      // --- timingStudies (sub-collection) ---
+      match /timingStudies/{timingStudyId} {
+        allow read: if isAuthenticated();
+        allow create, update: if isEditor();
+        allow delete: if isAdmin();
+
+        // --- steps (sub-collection) ---
+        match /steps/{stepId} {
+          allow read: if isAuthenticated();
+          allow create, update: if isEditor();
+          allow delete: if isAdmin();
+        }
+      }
     }
 
     // --- tasks ---
