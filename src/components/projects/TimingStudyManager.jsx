@@ -1903,7 +1903,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                 currentStudy && (
                     <div className="space-y-6 animate-in fade-in duration-200">
                         {/* ── KPI PANELS: GRUPOS LÓGICOS DE MÉTRICAS ── */}
-                        <div className="grid grid-cols-1 xl:grid-cols-7 gap-4">
+                        <div className="grid grid-cols-1 xl:grid-cols-7 gap-4 relative z-20">
                             {/* 1. METAS DE DEMANDA (COMERCIAL) */}
                             <div className="xl:col-span-2 bg-slate-900/40 border border-slate-800 border-t-cyan-500/80 border-t-[3px] rounded-2xl p-4 flex flex-col gap-3 shadow-xl backdrop-blur-md transition-all duration-300 hover:border-slate-700/80">
                                 <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
