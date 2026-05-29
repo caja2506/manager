@@ -2840,42 +2840,27 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
 
                                     {/* CPM - Ciclos por Minuto */}
                                     <div 
-                                        className="relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-amber-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible col-span-2"
+                                        className="relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-amber-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible"
                                     >
-                                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Ciclos / Min (CPM)</span>
-                                        <div className="flex items-center justify-center gap-3 mt-1">
-                                            <div className="text-center">
-                                                <span className="text-xs font-black text-cyan-400 block">{cpmTarget > 0 ? cpmTarget.toFixed(2) : '—'}</span>
-                                                <span className="text-[7px] text-slate-600 block">Target</span>
-                                            </div>
-                                            <span className="text-slate-700">│</span>
-                                            <div className="text-center">
-                                                <span className={`text-xs font-black block ${cpmReal >= cpmTarget ? 'text-emerald-400' : 'text-amber-400'}`}>{cpmReal > 0 ? cpmReal.toFixed(2) : '—'}</span>
-                                                <span className="text-[7px] text-slate-600 block">Real</span>
-                                            </div>
-                                        </div>
-                                        <span className={`text-[8px] block mt-1 font-bold ${cpmReal >= cpmTarget ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                            {cpmReal >= cpmTarget ? '✅ Cumple' : '⚠️ Debajo'} ({cpmTarget > 0 ? Math.round(cpmReal / cpmTarget * 100) : 0}%)
+                                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">CPM</span>
+                                        <span className="text-lg font-black text-slate-200 block mt-1">{cpmReal > 0 ? cpmReal.toFixed(2) : '—'}</span>
+                                        <span className="text-[8px] text-slate-600 block">ciclos/min</span>
+                                        <span className={`text-[8px] block mt-0.5 font-bold ${cpmReal >= cpmTarget ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                            vs Obj: {cpmTarget.toFixed(2)} {cpmReal >= cpmTarget ? '✅' : '⚠️'}
                                         </span>
 
                                         {/* Tooltip */}
-                                        <div className="absolute top-full left-0 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
+                                        <div className="absolute top-full left-0 mt-2 w-56 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
                                             <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                 <Info className="w-3.5 h-3.5 text-amber-400" />
-                                                <span>Ciclos por Minuto (CPM)</span>
+                                                <span>Ciclos/Min (CPM)</span>
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
-                                                <p className="text-slate-400 text-[10px]">Número de ciclos completos de máquina por minuto. Un ciclo puede producir {cycleOutputQty} pieza{cycleOutputQty > 1 ? 's' : ''} (UP: {cycleOutputQty}).</p>
-                                                <div className="space-y-1">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
-                                                        CPM = 60 / Ciclo de Máquina (seg)
-                                                    </p>
-                                                </div>
+                                                <p className="text-slate-400 text-[10px]">Ciclos completos de máquina por minuto. UP: {cycleOutputQty} pza{cycleOutputQty > 1 ? 's' : ''}/ciclo.</p>
                                                 <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-0.5">
                                                     <p><span className="text-slate-500">Target:</span> <span className="text-cyan-400 font-bold">{cpmTarget.toFixed(2)} cpm</span></p>
                                                     <p><span className="text-slate-500">Real:</span> <span className={`font-bold ${cpmReal >= cpmTarget ? 'text-emerald-400' : 'text-amber-400'}`}>{cpmReal.toFixed(2)} cpm</span></p>
-                                                    <p><span className="text-slate-500">PPM (con UP {cycleOutputQty}):</span> <span className="text-white font-bold">{(ppmReal * cycleOutputQty).toFixed(1)} pzas/min</span></p>
+                                                    <p><span className="text-slate-500">PPM (UP {cycleOutputQty}):</span> <span className="text-white font-bold">{(ppmReal * cycleOutputQty).toFixed(1)} pzas/min</span></p>
                                                 </div>
                                             </div>
                                             <div className="absolute bottom-full left-6 border-4 border-transparent border-b-slate-950/95" />
