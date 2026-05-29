@@ -34,10 +34,10 @@ import {
 } from '../../models/schemas';
 
 const DEVICE_LABELS = {
-    'CAM': 'C├ímara/Visi├│n',
-    'CYL PNEU': 'Cil. Neum├ítico',
-    'CYL ELEC': 'Cil. El├⌐ctrico',
-    'CYL HYD': 'Cil. Hidr├íulico',
+    'CAM': 'Cámara/Visión',
+    'CYL PNEU': 'Cil. Neumático',
+    'CYL ELEC': 'Cil. Eléctrico',
+    'CYL HYD': 'Cil. Hidráulico',
     'DISP': 'Dispensador',
     'FEEDER': 'Alimentador',
     'GPR': 'Gripper/Pinza',
@@ -46,26 +46,26 @@ const DEVICE_LABELS = {
     'HEAT CRT': 'Cartucho Calefactor',
     'INDEXER': 'Indexador',
     'IONIZER': 'Ionizador',
-    'LASER': 'Marcador L├íser',
+    'LASER': 'Marcador Láser',
     'LT CURT': 'Cortina Luz',
     'SV': 'Servo',
     'ST': 'Stepper/Motor Paso a Paso',
     'ROBOT': 'Robot',
-    'ROD LOCK': 'Bloq. V├ístago',
-    'ROT PNEU': 'Rot. Neum├ítico/Aire',
-    'ROT ELEC': 'Rot. El├⌐ctrico',
+    'ROD LOCK': 'Bloq. Vástago',
+    'ROT PNEU': 'Rot. Neumático/Aire',
+    'ROT ELEC': 'Rot. Eléctrico',
     'MAN': 'Op. Manual',
     'MTR': 'Motor',
-    'VAC GEN': 'Generador de Vac├¡o',
-    'VAC PMP': 'Bomba de Vac├¡o',
+    'VAC GEN': 'Generador de Vacío',
+    'VAC PMP': 'Bomba de Vacío',
     'VFD': 'Variador Frecuencia (VFD)',
     'VIB': 'Alimentador Vibratorio',
-    'VISN LT': 'Iluminaci├│n Visi├│n',
+    'VISN LT': 'Iluminación Visión',
     'WELDER': 'Soldadora',
     'LIGHT': 'Indicador Luminoso',
     'HORN': 'Alarma Sonora',
-    'MISC': 'Miscel├íneo',
-    'VAL': 'V├ílvula Neum├ítica',
+    'MISC': 'Misceláneo',
+    'VAL': 'Válvula Neumática',
 };
 
 const ACTION_LABELS = {
@@ -90,7 +90,7 @@ const ACTION_LABELS = {
 
 const SENSOR_LABELS = {
     'ANLG': 'Sensor Anal├│gico',
-    'CNTRL': 'Se├▒al Control',
+    'CNTRL': 'Señal Control',
     'ENC': 'Encoder',
     'FO': 'Fibra ├ôptica',
     'HS': 'Sensor Hall/Reed',
@@ -98,15 +98,15 @@ const SENSOR_LABELS = {
     'LS': 'Limit Switch',
     'LVDT': 'Transd. LVDT',
     'LC': 'Celda Carga',
-    'PE': 'Fotoel├⌐ctrico',
-    'PLC': 'Se├▒al PLC',
+    'PE': 'Fotoeléctrico',
+    'PLC': 'Señal PLC',
     'PS': 'Presostato',
     'PX': 'Prox. Inductivo',
     'PX AM': 'Prox. Anti-Mag',
     'RF': 'RFID',
     'TC': 'Termopar',
-    'VS': 'Sensor Visi├│n',
-    'VISN': 'C├ímara Visi├│n',
+    'VS': 'Sensor Visión',
+    'VISN': 'Cámara Visión',
     'PB': 'Pulsador',
     'FRC/DIST': 'Fuerza/Distancia',
 };
@@ -134,7 +134,7 @@ function TableInput({ value, onBlur, type = 'text', className = '', placeholder 
 }
 
 export default function TimingStudyManager({ projectId, canEdit = false, userId = null }) {
-    // ΓöÇΓöÇ Estados Principales ΓöÇΓöÇ
+    // ── Estados Principales ──
     const [studies, setStudies] = useState([]);
     const [stations, setStations] = useState([]);
     const [steps, setSteps] = useState([]);
@@ -144,10 +144,10 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(null);
 
-    // ΓöÇΓöÇ Estado colapsable para configuraci├│n ΓöÇΓöÇ
+    // ── Estado colapsable para configuración ──
     const [showConfig, setShowConfig] = useState(true);
 
-    // ΓöÇΓöÇ Configuraci├│n en edici├│n local ΓöÇΓöÇ
+    // ── Configuración en edición local ──
     const [studyConfig, setStudyConfig] = useState(null);
     const [hasConfigChanges, setHasConfigChanges] = useState(false);
     const [configAutoSaveStatus, setConfigAutoSaveStatus] = useState('idle'); // idle | saving | saved | error
@@ -156,10 +156,10 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
     const configInitialLoadRef = useRef(true);
     const justSavedConfigRef = useRef(0); // timestamp of last save
 
-    // ΓöÇΓöÇ Paso que tiene abierto el selector de dependencias ΓöÇΓöÇ
+    // ── Paso que tiene abierto el selector de dependencias ──
     const [activeDependencyStepId, setActiveDependencyStepId] = useState(null);
 
-    // ΓöÇΓöÇ Resaltado Din├ímico de Dependencias (F├│rmulas) ΓöÇΓöÇ
+    // ── Resaltado Dinámico de Dependencias (Fórmulas) ──
     const [hoveredRelation, setHoveredRelation] = useState(null);
 
     const handleRelationClick = useCallback((relationId, e) => {
@@ -243,28 +243,28 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
             if (hoveredRelation.startsWith('input-')) {
                 return id.startsWith('input-') ? 'Influenciado' : 'Impactado';
             } else {
-                return id.startsWith('input-') ? 'F├│rmula' : 'Componente';
+                return id.startsWith('input-') ? 'Fórmula' : 'Componente';
             }
         }
         return null;
     }, [hoveredRelation, DEPENDENCY_RELATIONS]);
 
-    // ΓöÇΓöÇ Ajustes Est├índar por Proyecto (Clasificadores y Tiempos) ΓöÇΓöÇ
+    // ── Ajustes Estándar por Proyecto (Clasificadores y Tiempos) ──
     const [showStandards, setShowStandards] = useState(false);
     const [standardsConfig, setStandardsConfig] = useState(null);
     const [hasStandardsChanges, setHasStandardsChanges] = useState(false);
     const [standardsActiveTab, setStandardsActiveTab] = useState('classifiers');
     const [actuatorGroups, setActuatorGroups] = useState(null);
 
-    // ΓöÇΓöÇ Obtener el estudio seleccionado actualmente ΓöÇΓöÇ
+    // ── Obtener el estudio seleccionado actualmente ──
     const currentStudy = useMemo(() => {
         return studies.find(s => s.id === selectedStudyId) || null;
     }, [studies, selectedStudyId]);
 
-    // ΓöÇΓöÇ Obtener acciones v├ílidas: grupos din├ímicos primero, luego clasificadores ΓöÇΓöÇ
+    // ── Obtener acciones válidas: grupos dinámicos primero, luego clasificadores ──
     const getValidActionsForDevice = useCallback((deviceType) => {
         if (!deviceType) return Object.values(TIMING_ACTIONS);
-        // 1. Grupos din├ímicos
+        // 1. Grupos dinámicos
         if (actuatorGroups && actuatorGroups.length > 0) {
             const group = actuatorGroups.find(g => g.subtypes && g.subtypes.includes(deviceType));
             if (group && group.actions && group.actions.length > 0) {
@@ -283,7 +283,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         return Array.from(new Set(actions));
     }, [standardsConfig, actuatorGroups]);
 
-    // ΓöÇΓöÇ Resultados de Validaci├│n del Estudio ΓöÇΓöÇ
+    // ── Resultados de Validación del Estudio ──
     const validationResults = useMemo(() => {
         if (!currentStudy) {
             return {
@@ -297,7 +297,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         return validateTimingStudy(currentStudy, steps, stations);
     }, [currentStudy, steps, stations]);
 
-    // ΓöÇΓöÇ Confiabilidad (Data Quality) ΓöÇΓöÇ
+    // ── Confiabilidad (Data Quality) ──
     const dataQuality = useMemo(() => {
         if (!currentStudy || steps.length === 0) return 'EMPTY';
         if (validationResults.errorCount > 0) return 'BLOCKED';
@@ -305,13 +305,13 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         return 'READY';
     }, [currentStudy, steps, validationResults]);
 
-    // ΓöÇΓöÇ M├⌐tricas calculadas en memoria local para detectar discrepancias ΓöÇΓöÇ
+    // ── Métricas calculadas en memoria local para detectar discrepancias ──
     const localMetrics = useMemo(() => {
         if (!studyConfig) return null;
         return calculateTimingStudyMetrics(studyConfig, steps, stations);
     }, [studyConfig, steps, stations]);
 
-    // ΓöÇΓöÇ Bandera que detecta si el estudio requiere rec├ílculo ΓöÇΓöÇ
+    // ── Bandera que detecta si el estudio requiere recálculo ──
     const needsRecalculate = useMemo(() => {
         if (!currentStudy || !localMetrics) return false;
         if (hasConfigChanges) return true;
@@ -341,7 +341,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         return cycleDiff || ppmDiff || statusDiff || stepsDiff;
     }, [currentStudy, localMetrics, steps, hasConfigChanges]);
 
-    // ΓöÇΓöÇ M├⌐tricas a largo plazo (Capacidad Anual, OEE, etc.) ΓöÇΓöÇ
+    // ── Métricas a largo plazo (Capacidad Anual, OEE, etc.) ──
     const longTermMetrics = useMemo(() => {
         if (!studyConfig || !localMetrics) return null;
 
@@ -362,7 +362,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         const targetPPM = Number(studyConfig.targetPPM) || 10;
         const linkOeeToStudy = !!studyConfig.linkOeeToStudy;
 
-        // OEE y P├⌐rdidas
+        // OEE y Pérdidas
         const availability = studyConfig.availability !== undefined ? Number(studyConfig.availability) : 95;
         const yieldVal = studyConfig.yield !== undefined ? Number(studyConfig.yield) : 98;
 
@@ -416,7 +416,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
             cumplimiento,
             cumpleDemanda,
 
-            // OEE y P├⌐rdidas
+            // OEE y Pérdidas
             availability,
             yieldVal,
             efficiency,
@@ -457,7 +457,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         linkOeeToStudy = false
     } = longTermMetrics || {};
 
-    // ΓöÇΓöÇ Helpers de Exportaci├│n a CSV ΓöÇΓöÇ
+    // ── Helpers de Exportación a CSV ──
     const getYYYYMMDD = () => {
         const now = new Date();
         const yyyy = now.getFullYear();
@@ -482,7 +482,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         if (!currentStudy) return;
 
         if (validationResults.errorCount > 0) {
-            showMessage('La exportaci├│n est├í bloqueada porque existen errores cr├¡ticos de validaci├│n.', 'error');
+            showMessage('La exportación está bloqueada porque existen errores críticos de validación.', 'error');
             return;
         }
 
@@ -569,7 +569,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         if (!currentStudy) return;
 
         if (validationResults.errorCount > 0) {
-            showMessage('La exportaci├│n est├í bloqueada porque existen errores cr├¡ticos de validaci├│n.', 'error');
+            showMessage('La exportación está bloqueada porque existen errores críticos de validación.', 'error');
             return;
         }
 
@@ -633,7 +633,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         }
     };
 
-    // ΓöÇΓöÇ Listeners de datos ΓöÇΓöÇ
+    // ── Listeners de datos ──
     useEffect(() => {
         if (!projectId) {
             setStudies([]);
@@ -675,7 +675,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         };
     }, [projectId]);
 
-    // ΓöÇΓöÇ Cargar pasos del estudio seleccionado ΓöÇΓöÇ
+    // ── Cargar pasos del estudio seleccionado ──
     useEffect(() => {
         if (!projectId || !selectedStudyId) {
             setSteps([]);
@@ -691,7 +691,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         };
     }, [projectId, selectedStudyId]);
 
-    // ΓöÇΓöÇ Sincronizar configuraci├│n local al cambiar de estudio ΓöÇΓöÇ
+    // ── Sincronizar configuración local al cambiar de estudio ──
     useEffect(() => {
         if (currentStudy) {
             // Skip sync if we recently saved (prevents onSnapshot from overwriting local edits)
@@ -744,7 +744,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         }
     }, [currentStudy]);
 
-    // ΓöÇΓöÇ Sincronizar ajustes est├índar globales (con fallback a locales de estudio si existen) ΓöÇΓöÇ
+    // ── Sincronizar ajustes estándar globales (con fallback a locales de estudio si existen) ──
     useEffect(() => {
         if (currentStudy) {
             const defaults = {
@@ -800,7 +800,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                     setStandardsConfig(merged);
                     setHasStandardsChanges(false);
                 } catch (e) {
-                    console.error("Error cargando est├índares globales en TimingStudyManager:", e);
+                    console.error("Error cargando estándares globales en TimingStudyManager:", e);
                     setStandardsConfig(JSON.parse(JSON.stringify(defaults)));
                     setHasStandardsChanges(false);
                 }
@@ -813,7 +813,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         }
     }, [currentStudy]);
 
-    // ΓöÇΓöÇ Cargar grupos de actuadores din├ímicos desde Firestore ΓöÇΓöÇ
+    // ── Cargar grupos de actuadores dinámicos desde Firestore ──
     useEffect(() => {
         getActuatorGroups()
             .then(data => {
@@ -824,7 +824,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
             .catch(err => console.warn('[TimingStudyManager] No se pudieron cargar grupos:', err));
     }, []);
 
-    // ΓöÇΓöÇ Mostrar mensajes temporales ΓöÇΓöÇ
+    // ── Mostrar mensajes temporales ──
     const showMessage = (msg, type = 'success') => {
         if (type === 'success') {
             setSuccess(msg);
@@ -835,7 +835,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         }
     };
 
-    // ΓöÇΓöÇ Configuraci├│n Handlers ΓöÇΓöÇ
+    // ── Configuración Handlers ──
     const handleConfigChanges = useCallback((updates) => {
         setStudyConfig(prev => {
             if (!prev) return prev;
@@ -1133,14 +1133,14 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
             await updateTimingStudy(projectId, selectedStudyId, payload, userId);
 
             setHasConfigChanges(false);
-            showMessage('Configuraci├│n del estudio guardada con ├⌐xito.');
+            showMessage('Configuración del estudio guardada con éxito.');
         } catch (err) {
             console.error(err);
-            showMessage(`Error al guardar configuraci├│n: ${err.message}`, 'error');
+            showMessage(`Error al guardar configuración: ${err.message}`, 'error');
         }
     };
 
-    // ΓöÇΓöÇ Ajustes Est├índar del Proyecto Handlers ΓöÇΓöÇ
+    // ── Ajustes Estándar del Proyecto Handlers ──
     const handleMotionValueChange = (key, value) => {
         setStandardsConfig(prev => {
             if (!prev) return prev;
@@ -1220,17 +1220,17 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
             }, userId);
 
             setHasStandardsChanges(false);
-            showMessage('Ajustes est├índar del proyecto guardados en Supabase.');
+            showMessage('Ajustes estándar del proyecto guardados en Supabase.');
         } catch (err) {
             console.warn('[TimingStudyManager] Fall├│ guardado en Supabase, guardando en localStorage como fallback:', err.message);
             // Guardar en localStorage como fallback
             localStorage.setItem(`custom_standards_${selectedStudyId}`, JSON.stringify(standardsConfig));
             setHasStandardsChanges(false);
-            showMessage('Ajustes est├índar guardados localmente (ejecuta el script SQL en Supabase para habilitar guardado en la nube).', 'warning');
+            showMessage('Ajustes estándar guardados localmente (ejecuta el script SQL en Supabase para habilitar guardado en la nube).', 'warning');
         }
     };
 
-    // ΓöÇΓöÇ CRUD Timing Study Handlers ΓöÇΓöÇ
+    // ── CRUD Timing Study Handlers ──
     const handleCreateStudy = async (name = '') => {
         if (!projectId || !canEdit) return;
 
@@ -1259,7 +1259,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
             }, userId);
 
             setSelectedStudyId(newId);
-            showMessage('Estudio de tiempos creado con ├⌐xito.');
+            showMessage('Estudio de tiempos creado con éxito.');
         } catch (err) {
             console.error(err);
             showMessage(`Error al crear estudio: ${err.message}`, 'error');
@@ -1328,7 +1328,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
 
     const handleDeleteStudy = async () => {
         if (!projectId || !selectedStudyId || !canEdit) return;
-        if (!confirm('┬┐Est├í seguro de que desea eliminar este estudio de tiempos? Esta acci├│n se aplicar├í mediante soft-delete.')) return;
+        if (!confirm('┬┐Está seguro de que desea eliminar este estudio de tiempos? Esta acción se aplicará mediante soft-delete.')) return;
 
         try {
             await deleteTimingStudy(projectId, selectedStudyId, userId);
@@ -1345,7 +1345,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         setError(null);
 
         try {
-            // 1. Si hay cambios de configuraci├│n pendientes, guardarlos primero
+            // 1. Si hay cambios de configuración pendientes, guardarlos primero
             if (hasConfigChanges && studyConfig && canEdit) {
                 if (configSaveTimerRef.current) {
                     clearTimeout(configSaveTimerRef.current);
@@ -1360,7 +1360,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                 setTimeout(() => setConfigAutoSaveStatus('idle'), 2500);
             }
 
-            // 2. Ahora s├¡ recalcular (la BD ya tiene los datos m├ís recientes)
+            // 2. Ahora sí recalcular (la BD ya tiene los datos más recientes)
             const metrics = await recalculateTimingStudy(projectId, selectedStudyId, userId);
             showMessage('Estudio recalculado correctamente.');
             if (metrics && metrics.steps) {
@@ -1388,12 +1388,12 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         }
     };
 
-    // ΓöÇΓöÇ CRUD Timing Steps Handlers ΓöÇΓöÇ
+    // ── CRUD Timing Steps Handlers ──
     const handleAddStep = async (stationId = null) => {
         if (!projectId || !selectedStudyId || !canEdit) return;
         if (stations.length === 0) return;
 
-        // Buscar el ├║ltimo sortOrder
+        // Buscar el último sortOrder
         const lastSortOrder = steps.length > 0 ? Math.max(...steps.map(s => s.sortOrder || 0)) : 0;
         const defaultStation = stationId 
             ? (stations.find(s => s.id === stationId) || stations[0])
@@ -1430,7 +1430,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
             setSteps(prev => [...prev, fullNewStep].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)));
         } catch (err) {
             console.error(err);
-            showMessage(`Error al a├▒adir paso: ${err.message}`, 'error');
+            showMessage(`Error al añadir paso: ${err.message}`, 'error');
         }
     };
 
@@ -1444,10 +1444,10 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
             // Limpiar campos UI-only antes de guardar en Firestore
             const { selectedGroupId: _sg, ...cleanedUpdates } = updates;
 
-            // Si el drawer ya env├¡a durationMs expl├¡cito, respetarlo (no recalcular)
+            // Si el drawer ya envía durationMs explícito, respetarlo (no recalcular)
             const drawerSentDuration = cleanedUpdates.durationMs !== undefined;
 
-            // Campos que afectan la duraci├│n sugerida (solo recalcular si el drawer NO envi├│ durationMs)
+            // Campos que afectan la duración sugerida (solo recalcular si el drawer NO envi├│ durationMs)
             const isCalculationFieldChanged = !drawerSentDuration && [
                 'deviceType',
                 'deviceAction',
@@ -1478,7 +1478,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
             // Actualizar localmente los pasos
             setSteps(prev => {
                 const updatedSteps = prev.map(s => s.id === stepId ? { ...s, ...finalUpdates } : s);
-                // Si el cambio afecta tiempos de inicio/fin, recalcular m├⌐tricas localmente de forma instant├ínea
+                // Si el cambio afecta tiempos de inicio/fin, recalcular métricas localmente de forma instantánea
                 const metrics = calculateTimingStudyMetrics(currentStudy, updatedSteps, stations);
                 if (metrics && Array.isArray(metrics.steps)) {
                     return metrics.steps;
@@ -1502,7 +1502,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
 
         // Validaciones locales
         if (field === 'durationMs' && Number(value) < 0) {
-            showMessage('La duraci├│n no puede ser negativa.', 'error');
+            showMessage('La duración no puede ser negativa.', 'error');
             return;
         }
         if (field === 'linearDistanceMm' && Number(value) < 0) {
@@ -1510,7 +1510,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
             return;
         }
         if (field === 'angularDistanceDeg' && Number(value) < 0) {
-            showMessage('El ├íngulo no puede ser negativo.', 'error');
+            showMessage('El ángulo no puede ser negativo.', 'error');
             return;
         }
 
@@ -1525,17 +1525,17 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                 }
             }
 
-            // Si se modifica el tipo de dispositivo, resetear acci├│n y distancias incompatibles
+            // Si se modifica el tipo de dispositivo, resetear acción y distancias incompatibles
             if (field === 'deviceType') {
                 const newDeviceType = value;
                 
-                // Resetear acci├│n si ya no es v├ílida para el nuevo tipo de dispositivo
+                // Resetear acción si ya no es válida para el nuevo tipo de dispositivo
                 const validActions = getValidActionsForDevice(newDeviceType);
                 if (step.deviceAction && !validActions.includes(step.deviceAction)) {
                     updates.deviceAction = '';
                 }
 
-                // Resetear distancias seg├║n el tipo f├¡sico
+                // Resetear distancias según el tipo físico
                 const isCylinderOrServo = ['CYL PNEU', 'CYL ELEC', 'CYL HYD', 'SV'].includes(newDeviceType);
                 const isRotary = ['ROT PNEU', 'ROT ELEC'].includes(newDeviceType);
 
@@ -1553,7 +1553,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                 ...updates
             };
 
-            // Campos que afectan la duraci├│n sugerida
+            // Campos que afectan la duración sugerida
             const isCalculationField = [
                 'deviceType',
                 'deviceAction',
@@ -1583,7 +1583,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         if (!projectId || !selectedStudyId || !canEdit) return;
 
         try {
-            // Clonar datos sin ID ni auditor├¡a
+            // Clonar datos sin ID ni auditoría
             const clonedData = {
                 ...step,
                 sortOrder: step.sortOrder + 1,
@@ -1631,7 +1631,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         if (suggestion !== null && suggestion !== undefined && suggestion >= 0) {
             try {
                 await updateTimingStep(projectId, selectedStudyId, step.id, { durationMs: suggestion }, userId);
-                showMessage(`Duraci├│n sugerida aplicada: ${suggestion} ms`);
+                showMessage(`Duración sugerida aplicada: ${suggestion} ms`);
                 setSteps(prev => prev.map(s => s.id === step.id ? { ...s, durationMs: suggestion } : s));
             } catch (err) {
                 console.error(err);
@@ -1644,7 +1644,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
 
     const handleSuggestAllDurations = async () => {
         if (!projectId || !selectedStudyId || !canEdit || steps.length === 0) return;
-        if (!confirm('┬┐Desea recalcular y aplicar la duraci├│n sugerida a TODOS los pasos activos del estudio? Esto sobrescribir├í las duraciones manuales actuales.')) return;
+        if (!confirm('┬┐Desea recalcular y aplicar la duración sugerida a TODOS los pasos activos del estudio? Esto sobrescribirá las duraciones manuales actuales.')) return;
 
         try {
             setRecalculating(true);
@@ -1669,7 +1669,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                 return found ? found : s;
             }));
             
-            showMessage('Duraciones sugeridas aplicadas a todos los pasos activos con ├⌐xito.');
+            showMessage('Duraciones sugeridas aplicadas a todos los pasos activos con éxito.');
         } catch (err) {
             console.error(err);
             showMessage(`Error al sugerir todas las duraciones: ${err.message}`, 'error');
@@ -1705,7 +1705,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         }
     };
 
-    // ΓöÇΓöÇ Manejar dependencias ΓöÇΓöÇ
+    // ── Manejar dependencias ──
     const handleToggleDependency = async (step, targetId) => {
         if (!projectId || !selectedStudyId || !canEdit) return;
 
@@ -1729,7 +1729,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         }
     };
 
-    // ΓöÇΓöÇ Formateo Visual Helpers ΓöÇΓöÇ
+    // ── Formateo Visual Helpers ──
     const formatTime = (ms) => {
         if (ms === undefined || ms === null) return '0 ms';
         if (ms >= 1000) return `${(ms / 1000).toFixed(2)} s`;
@@ -1749,7 +1749,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         }
     };
 
-    // ΓöÇΓöÇ Renders Secundarios ΓöÇΓöÇ
+    // ── Renders Secundarios ──
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center py-16 bg-slate-900/40 rounded-2xl border border-slate-800/80">
@@ -1761,7 +1761,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
 
     return (
         <div className="space-y-6">
-            {/* ΓöÇΓöÇ Banners de Alertas y ├ëxito ΓöÇΓöÇ */}
+            {/* ── Banners de Alertas y ├ëxito ── */}
             {error && (
                 <div className="flex items-center gap-3 px-4 py-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs animate-in fade-in duration-200">
                     <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -1776,20 +1776,20 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
             )}
 
 
-            {/* ΓöÇΓöÇ Alerta si no hay estaciones en el proyecto ΓöÇΓöÇ */}
+            {/* ── Alerta si no hay estaciones en el proyecto ── */}
             {stations.length === 0 && (
                 <div className="flex items-start gap-4 p-4 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-2xl">
                     <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-amber-400" />
                     <div>
                         <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-1">Proyecto Sin Estaciones</h4>
                         <p className="text-xs text-slate-400 leading-relaxed">
-                            Este proyecto no tiene estaciones configuradas. Crea estaciones primero en la pesta├▒a de estaciones para poder registrar y vincular correctamente los pasos del estudio de tiempos.
+                            Este proyecto no tiene estaciones configuradas. Crea estaciones primero en la pestaña de estaciones para poder registrar y vincular correctamente los pasos del estudio de tiempos.
                         </p>
                     </div>
                 </div>
             )}
 
-            {/* ΓöÇΓöÇ HEADER PRINCIPAL ΓöÇΓöÇ */}
+            {/* ── HEADER PRINCIPAL ── */}
             <div className="bg-slate-900/70 p-6 rounded-2xl border border-slate-800 backdrop-blur-md flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
                 <div>
                     <h2 className="text-lg font-black text-white flex items-center gap-2 tracking-wide">
@@ -1797,7 +1797,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                         ESTUDIO DE TIEMPOS
                     </h2>
                     <p className="text-xs text-slate-400 mt-1">
-                        Estimaci├│n de ciclo, PPM, cuello de botella y secuencia por estaci├│n.
+                        Estimación de ciclo, PPM, cuello de botella y secuencia por estación.
                     </p>
                 </div>
 
@@ -1827,7 +1827,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                 <button
                                     onClick={handleCreateFromStations}
                                     className="flex items-center gap-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition cursor-pointer"
-                                    title="Pre-cargar todos los pasos bas├índose en las estaciones activas del proyecto"
+                                    title="Pre-cargar todos los pasos basándose en las estaciones activas del proyecto"
                                 >
                                     <List className="w-3.5 h-3.5" /> Crear desde Estaciones
                                 </button>
@@ -1871,13 +1871,13 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                 </div>
             </div>
 
-            {/* ΓöÇΓöÇ ESTADO VAC├ìO DE ESTUDIOS ΓöÇΓöÇ */}
+            {/* ── ESTADO VAC├ìO DE ESTUDIOS ── */}
             {studies.length === 0 ? (
                 <div className="bg-slate-900/50 p-12 text-center rounded-2xl border border-slate-800 shadow-lg">
                     <Clock className="w-12 h-12 text-slate-600 mx-auto mb-4" />
                     <h3 className="text-base font-bold text-white mb-2">No hay estudios de tiempos para este proyecto</h3>
                     <p className="text-xs text-slate-500 max-w-sm mx-auto mb-6">
-                        Crea tu primer estudio de tiempos en blanco o pre-c├írgalo utilizando las estaciones configuradas en el proyecto.
+                        Crea tu primer estudio de tiempos en blanco o pre-cárgalo utilizando las estaciones configuradas en el proyecto.
                     </p>
                     {canEdit && (
                         <div className="flex justify-center gap-3">
@@ -1901,7 +1901,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
             ) : (
                 currentStudy && (
                     <div className="space-y-6 animate-in fade-in duration-200">
-                        {/* ΓöÇΓöÇ KPI PANELS: GRUPOS L├ôGICOS DE M├ëTRICAS ΓöÇΓöÇ */}
+                        {/* ── KPI PANELS: GRUPOS LÓGICOS DE MÉTRICAS ── */}
                         <div className="grid grid-cols-1 xl:grid-cols-7 gap-4">
                             {/* 1. METAS DE DEMANDA (COMERCIAL) */}
                             <div className="xl:col-span-2 bg-slate-900/40 border border-slate-800 border-t-cyan-500/80 border-t-[3px] rounded-2xl p-4 flex flex-col gap-3 shadow-xl backdrop-blur-md transition-all duration-300 hover:border-slate-700/80">
@@ -1915,7 +1915,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2.5 flex-1">
-                                    {/* Piezas Objetivo / D├¡a */}
+                                    {/* Piezas Objetivo / Día */}
                                     <div 
                                         onClick={(e) => handleRelationClick('card-objDia', e)}
                                         className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-objDia').wrapperClass}`}
@@ -1927,30 +1927,30 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 {getHighlightLabel('card-objDia')}
                                             </span>
                                         )}
-                                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Objetivo / D├¡a</span>
+                                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Objetivo / Día</span>
                                         <span className="text-lg font-black text-slate-200 block mt-1">
                                             {studyConfig?.targetPiecesPerShift ? Number(studyConfig.targetPiecesPerShift).toLocaleString() : 'ΓÇö'}
                                         </span>
-                                        <span className="text-[8px] text-slate-600 block">piezas/d├¡a</span>
+                                        <span className="text-[8px] text-slate-600 block">piezas/día</span>
 
                                         {/* Tooltip */}
                                         <div className="absolute top-full left-0 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
                                             <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                 <Info className="w-3.5 h-3.5 text-cyan-400" />
-                                                <span>Objetivo / D├¡a</span>
+                                                <span>Objetivo / Día</span>
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
-                                                <p className="text-slate-400 text-[10px]">Meta de producci├│n requerida por d├¡a de trabajo.</p>
+                                                <p className="text-slate-400 text-[10px]">Meta de producción requerida por día de trabajo.</p>
                                                 <div className="space-y-1">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">F├│rmula:</p>
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
                                                     <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[11px] leading-normal">
-                                                        <span className="text-cyan-400">PPM_obj</span> ├ù 60 ├ù <span className="text-indigo-400">Horas/D├¡a</span> ├ù <span className="text-fuchsia-400">UP</span>
+                                                        <span className="text-cyan-400">PPM_obj</span> × 60 × <span className="text-indigo-400">Horas/Día</span> × <span className="text-fuchsia-400">UP</span>
                                                     </p>
                                                 </div>
                                                 <div className="space-y-1">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Valores actuales:</p>
                                                     <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center text-[10px] leading-normal">
-                                                        <span className="text-cyan-400">{studyConfig?.targetPPM || 0}</span> ├ù 60 ├ù <span className="text-indigo-400">{studyConfig?.shiftHours || 8}</span> ├ù <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-white font-bold">{Math.round((studyConfig?.targetPPM || 0) * 60 * (studyConfig?.shiftHours || 8) * (studyConfig?.cycleOutputQty || 1)).toLocaleString()} pzas/d├¡a</span>
+                                                        <span className="text-cyan-400">{studyConfig?.targetPPM || 0}</span> × 60 × <span className="text-indigo-400">{studyConfig?.shiftHours || 8}</span> × <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-white font-bold">{Math.round((studyConfig?.targetPPM || 0) * 60 * (studyConfig?.shiftHours || 8) * (studyConfig?.cycleOutputQty || 1)).toLocaleString()} pzas/día</span>
                                                     </p>
                                                 </div>
                                             </div>
@@ -1983,17 +1983,17 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 <span>Objetivo / Hora</span>
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
-                                                <p className="text-slate-400 text-[10px]">Meta de producci├│n de piezas por hora de trabajo.</p>
+                                                <p className="text-slate-400 text-[10px]">Meta de producción de piezas por hora de trabajo.</p>
                                                 <div className="space-y-1">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">F├│rmula:</p>
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
                                                     <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[11px] leading-normal">
-                                                        <span className="text-cyan-400">PPM_obj</span> ├ù 60 ├ù <span className="text-fuchsia-400">UP</span>
+                                                        <span className="text-cyan-400">PPM_obj</span> × 60 × <span className="text-fuchsia-400">UP</span>
                                                     </p>
                                                 </div>
                                                 <div className="space-y-1">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Valores actuales:</p>
                                                     <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center text-[10px] leading-normal">
-                                                        <span className="text-cyan-400">{studyConfig?.targetPPM || 0}</span> ├ù 60 ├ù <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-blue-400 font-bold">{Math.round((studyConfig?.targetPPM || 0) * 60 * (studyConfig?.cycleOutputQty || 1)).toLocaleString()} pzas/hr</span>
+                                                        <span className="text-cyan-400">{studyConfig?.targetPPM || 0}</span> × 60 × <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-blue-400 font-bold">{Math.round((studyConfig?.targetPPM || 0) * 60 * (studyConfig?.cycleOutputQty || 1)).toLocaleString()} pzas/hr</span>
                                                     </p>
                                                 </div>
                                             </div>
@@ -2027,9 +2027,9 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 <span>Ciclos / Min Objetivo (PPM)</span>
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
-                                                <p className="text-slate-400 text-[10px]">Meta de ciclos por minuto (PPM) definida en la configuraci├│n del estudio.</p>
+                                                <p className="text-slate-400 text-[10px]">Meta de ciclos por minuto (PPM) definida en la configuración del estudio.</p>
                                                 <div className="space-y-1">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">F├│rmula:</p>
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
                                                     <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[11px] leading-normal">
                                                         <span className="text-blue-400">PPM</span> = 60 / <span className="text-cyan-400">Ciclo Target (s)</span>
                                                     </p>
@@ -2072,9 +2072,9 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 <span>Ciclo Target</span>
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
-                                                <p className="text-slate-400 text-[10px]">Tiempo m├íximo permitido por ciclo de m├íquina para cumplir la meta.</p>
+                                                <p className="text-slate-400 text-[10px]">Tiempo máximo permitido por ciclo de máquina para cumplir la meta.</p>
                                                 <div className="space-y-1">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">F├│rmula:</p>
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
                                                     <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[11px] leading-normal">
                                                         60 / <span className="text-cyan-400">PPM_obj</span>
                                                     </p>
@@ -2092,15 +2092,15 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                 </div>
                             </div>
 
-                            {/* 2. CAPACIDAD F├ìSICA REAL (AUTOMATIZACI├ôN) */}
+                            {/* 2. CAPACIDAD FÍSICA REAL (AUTOMATIZACI├ôN) */}
                             <div className="xl:col-span-2 bg-slate-900/40 border border-slate-800 border-t-amber-500/80 border-t-[3px] rounded-2xl p-4 flex flex-col gap-3 shadow-xl backdrop-blur-md transition-all duration-300 hover:border-slate-700/80">
                                 <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
                                     <div className="p-1 bg-amber-500/10 rounded-lg">
                                         <Activity className="w-4 h-4 text-amber-400" />
                                     </div>
                                     <div>
-                                        <h4 className="text-xs font-black text-slate-200 uppercase tracking-wider">Capacidad F├¡sica</h4>
-                                        <p className="text-[9px] text-slate-500 font-semibold font-mono">Desempe├▒o de M├íquina</p>
+                                        <h4 className="text-xs font-black text-slate-200 uppercase tracking-wider">Capacidad Física</h4>
+                                        <p className="text-[9px] text-slate-500 font-semibold font-mono">Desempeño de Máquina</p>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2.5 flex-1">
@@ -2132,9 +2132,9 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 <span>Ciclo Real</span>
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
-                                                <p className="text-slate-400 text-[10px]">Duraci├│n calculada del ciclo completo actual de la m├íquina.</p>
+                                                <p className="text-slate-400 text-[10px]">Duración calculada del ciclo completo actual de la máquina.</p>
                                                 <div className="space-y-1">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">F├│rmula:</p>
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
                                                     <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[11px] leading-normal">
                                                         <span className="text-emerald-400">Dwell</span> + <span className="text-orange-400">Index</span>
                                                     </p>
@@ -2179,7 +2179,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
                                                 <p className="text-slate-400 text-[10px]">Cantidad de ciclos ejecutados por minuto a velocidad real.</p>
                                                 <div className="space-y-1">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">F├│rmula:</p>
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
                                                     <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[11px] leading-normal">
                                                         60 / <span className="text-sky-400">Ciclo Real s</span>
                                                     </p>
@@ -2209,11 +2209,11 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                             </span>
                                         )}
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Bottleneck</span>
-                                        <span className="text-[10px] text-slate-500 block font-mono mt-0.5">estaci├│n</span>
+                                        <span className="text-[10px] text-slate-500 block font-mono mt-0.5">estación</span>
                                         <span className="text-sm font-black text-amber-500 block truncate mt-1 font-sans" title={localMetrics?.bottleneckStationLabel || 'ΓÇö'}>
                                             {localMetrics?.bottleneckStationLabel || 'ΓÇö'}
                                         </span>
-                                        <span className="text-[8px] text-slate-600 block">estaci├│n</span>
+                                        <span className="text-[8px] text-slate-600 block">estación</span>
 
                                         {/* Tooltip */}
                                         <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
@@ -2222,9 +2222,9 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 <span>Bottleneck (Cuello de Botella)</span>
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
-                                                <p className="text-slate-400 text-[10px]">Estaci├│n de trabajo m├ís lenta de la secuencia que limita la velocidad de producci├│n.</p>
+                                                <p className="text-slate-400 text-[10px]">Estación de trabajo más lenta de la secuencia que limita la velocidad de producción.</p>
                                                 <div className="space-y-1">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">F├│rmula:</p>
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
                                                     <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[11px] leading-normal">
                                                         Max(<span className="text-emerald-400">Estaciones</span>)
                                                     </p>
@@ -2232,8 +2232,8 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 <div className="space-y-1">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Valores actuales:</p>
                                                     <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center text-[10px] leading-normal">
-                                                        Estaci├│n: <span className="text-amber-500 font-bold">{localMetrics?.bottleneckStationLabel || 'ΓÇö'}</span><br />
-                                                        Duraci├│n: <span className="text-emerald-400 font-bold">{localMetrics?.dwellTimeMs || 0} ms ({((localMetrics?.dwellTimeMs || 0) / 1000).toFixed(2)} s)</span>
+                                                        Estación: <span className="text-amber-500 font-bold">{localMetrics?.bottleneckStationLabel || 'ΓÇö'}</span><br />
+                                                        Duración: <span className="text-emerald-400 font-bold">{localMetrics?.dwellTimeMs || 0} ms ({((localMetrics?.dwellTimeMs || 0) / 1000).toFixed(2)} s)</span>
                                                     </p>
                                                 </div>
                                             </div>
@@ -2274,18 +2274,18 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                         <span>Real / Hora</span>
                                                     </div>
                                                     <div className="text-[11px] leading-relaxed space-y-1.5">
-                                                        <p className="text-slate-400 text-[10px]">Producci├│n horaria proyectada con el ciclo real medido.</p>
+                                                        <p className="text-slate-400 text-[10px]">Producción horaria proyectada con el ciclo real medido.</p>
                                                         <div className="space-y-1">
-                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">F├│rmula Real:</p>
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula Real:</p>
                                                             <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                                (3.600.000 / <span className="text-sky-400">Ciclo Real ms</span>) ├ù <span className="text-fuchsia-400">UP</span>
+                                                                (3.600.000 / <span className="text-sky-400">Ciclo Real ms</span>) × <span className="text-fuchsia-400">UP</span>
                                                             </p>
                                                         </div>
                                                         <div className="space-y-1">
                                                             <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Valores actuales:</p>
                                                             <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-normal">
                                                                 Objetivo: <span className="text-white font-bold">{targetPPH.toLocaleString()} pzas/hr</span><br />
-                                                                Real: (3.600.000 / <span className="text-sky-400">{localMetrics?.machineCycleTimeMs || 1}</span>) ├ù <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-cyan-400 font-bold">{Math.round(realPPH).toLocaleString()} pzas/hr</span>
+                                                                Real: (3.600.000 / <span className="text-sky-400">{localMetrics?.machineCycleTimeMs || 1}</span>) × <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-cyan-400 font-bold">{Math.round(realPPH).toLocaleString()} pzas/hr</span>
                                                             </p>
                                                         </div>
                                                     </div>
@@ -2297,19 +2297,19 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                 </div>
                             </div>
 
-                            {/* 3. VIABILIDAD Y DESEMPE├æO (OEE) */}
+                            {/* 3. VIABILIDAD Y DESEMPEÑO (OEE) */}
                             <div className="xl:col-span-3 bg-slate-900/40 border border-slate-800 border-t-emerald-500/80 border-t-[3px] rounded-2xl p-4 flex flex-col gap-3 shadow-xl backdrop-blur-md transition-all duration-300 hover:border-slate-700/80">
                                 <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
                                     <div className="p-1 bg-emerald-500/10 rounded-lg">
                                         <Award className="w-4 h-4 text-emerald-400" />
                                     </div>
                                     <div>
-                                        <h4 className="text-xs font-black text-slate-200 uppercase tracking-wider">Viabilidad y Desempe├▒o</h4>
+                                        <h4 className="text-xs font-black text-slate-200 uppercase tracking-wider">Viabilidad y Desempeño</h4>
                                         <p className="text-[9px] text-slate-500 font-semibold font-mono">Resultados OEE & Calendario</p>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2.5 flex-1">
-                                    {/* Piezas / D├¡a (Desglose OEE) - spans 2 columns */}
+                                    {/* Piezas / Día (Desglose OEE) - spans 2 columns */}
                                     {(() => {
                                         const piezasDiaSinOEE = piezasHora * shiftHours;
                                         const perdidaOEE = piezasDiaSinOEE - piezasDia;
@@ -2326,11 +2326,11 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                     </span>
                                                 )}
                                                 
-                                                {/* Secci├│n Izquierda */}
+                                                {/* Sección Izquierda */}
                                                 <div className="flex-1 flex flex-col justify-between">
                                                     <div>
                                                         <div className="flex items-center justify-between">
-                                                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Piezas / D├¡a</span>
+                                                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Piezas / Día</span>
                                                             <button
                                                                 type="button"
                                                                 onClick={(e) => {
@@ -2345,7 +2345,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                                 }`}
                                                                 title={linkOeeToStudy ? 'OEE vinculado al ciclo del estudio de tiempos' : 'OEE fijo independiente del ciclo'}
                                                             >
-                                                                {linkOeeToStudy ? '≡ƒöù Vinculado' : '≡ƒöù Fijo'}
+                                                                {linkOeeToStudy ? '🔗 Vinculado' : '🔗 Fijo'}
                                                             </button>
                                                         </div>
                                                         <span className="text-[10px] text-slate-400 block font-mono mt-0.5" title="Capacidad te├│rica bruta al 100% de OEE">
@@ -2360,7 +2360,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                     </div>
                                                 </div>
 
-                                                {/* Secci├│n Derecha */}
+                                                {/* Sección Derecha */}
                                                 <div className="w-[60%] border-l border-slate-800/80 pl-3 flex flex-col gap-1.5">
                                                     {/* Disp */}
                                                     <div 
@@ -2378,7 +2378,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                             />
                                                             <span className="text-[8px] text-slate-600 font-bold">%</span>
                                                         </div>
-                                                        <span className="text-[9px] text-rose-400 font-mono font-medium min-w-10 text-right" title="P├⌐rdidas de disponibilidad">
+                                                        <span className="text-[9px] text-rose-400 font-mono font-medium min-w-10 text-right" title="Pérdidas de disponibilidad">
                                                             -{Math.round(piezasPerdidasDisp || 0).toLocaleString()}
                                                         </span>
                                                     </div>
@@ -2396,11 +2396,11 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                                 onChange={e => handleConfigChange('efficiency', Number(e.target.value))}
                                                                 disabled={!canEdit || linkOeeToStudy}
                                                                 className="w-11 bg-slate-955 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 font-mono text-center font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
-                                                                title={linkOeeToStudy ? "Calculado autom├íticamente: PPM Real / PPM Target" : "Eficiencia (Velocidad/Microparos)"}
+                                                                title={linkOeeToStudy ? "Calculado automáticamente: PPM Real / PPM Target" : "Eficiencia (Velocidad/Microparos)"}
                                                             />
                                                             <span className="text-[8px] text-slate-600 font-bold">%</span>
                                                         </div>
-                                                        <span className="text-[9px] text-amber-500 font-mono font-medium min-w-10 text-right" title="P├⌐rdidas de velocidad/eficiencia">
+                                                        <span className="text-[9px] text-amber-500 font-mono font-medium min-w-10 text-right" title="Pérdidas de velocidad/eficiencia">
                                                             -{Math.round(piezasPerdidasEficiencia || 0).toLocaleString()}
                                                         </span>
                                                     </div>
@@ -2421,7 +2421,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                             />
                                                             <span className="text-[8px] text-slate-600 font-bold">%</span>
                                                         </div>
-                                                        <span className="text-[9px] text-rose-500 font-mono font-medium min-w-10 text-right" title="P├⌐rdidas por scrap de calidad">
+                                                        <span className="text-[9px] text-rose-500 font-mono font-medium min-w-10 text-right" title="Pérdidas por scrap de calidad">
                                                             -{Math.round(piezasPerdidasCalidad || 0).toLocaleString()}
                                                         </span>
                                                     </div>
@@ -2431,41 +2431,41 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 <div className="absolute top-full left-0 mt-2 w-72 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
                                                     <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                         <Info className="w-3.5 h-3.5 text-cyan-400" />
-                                                        <span>Piezas / D├¡a ΓÇö Desglose de P├⌐rdidas OEE</span>
+                                                        <span>Piezas / Día ΓÇö Desglose de Pérdidas OEE</span>
                                                     </div>
                                                     <div className="text-[11px] leading-relaxed space-y-1.5">
                                                         <p className="text-slate-400 text-[10px]">
-                                                            El OEE ({Math.round((100 - oeePenalty) * 10) / 10}%) simula las p├⌐rdidas reales de producci├│n por paros no planeados, 
+                                                            El OEE ({Math.round((100 - oeePenalty) * 10) / 10}%) simula las pérdidas reales de producción por paros no planeados, 
                                                             rechazos de calidad y velocidad reducida.
                                                         </p>
                                                         <div className="space-y-1">
-                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">F├│rmula:</p>
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
                                                             <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
-                                                                OEE = Disp ({availability}%) ├ù Efec ({Math.round(efficiency * 10) / 10}%) ├ù Cal ({yieldVal}%)
+                                                                OEE = Disp ({availability}%) × Efec ({Math.round(efficiency * 10) / 10}%) × Cal ({yieldVal}%)
                                                             </p>
                                                         </div>
                                                         <div className="space-y-1">
-                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Desglose de P├⌐rdidas:</p>
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Desglose de Pérdidas:</p>
                                                             <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-1">
                                                                 <p>
                                                                     <span className="text-slate-500">Capacidad Bruta:</span>{' '}
                                                                     <span className="text-white font-bold">{Math.round(piezasDiaSinOEE).toLocaleString()} pzas</span>
                                                                 </p>
                                                                 <p className="text-rose-400">
-                                                                    <span>P├⌐rdida Disp:</span>{' '}
-                                                                    <span className="font-bold">ΓêÆ{Math.round(piezasPerdidasDisp).toLocaleString()} pzas</span>
+                                                                    <span>Pérdida Disp:</span>{' '}
+                                                                    <span className="font-bold">−{Math.round(piezasPerdidasDisp).toLocaleString()} pzas</span>
                                                                 </p>
                                                                 <p className="text-amber-500">
-                                                                    <span>P├⌐rdida Efec:</span>{' '}
-                                                                    <span className="font-bold">ΓêÆ{Math.round(piezasPerdidasEficiencia).toLocaleString()} pzas</span>
+                                                                    <span>Pérdida Efec:</span>{' '}
+                                                                    <span className="font-bold">−{Math.round(piezasPerdidasEficiencia).toLocaleString()} pzas</span>
                                                                 </p>
                                                                 <p className="text-rose-500">
-                                                                    <span>P├⌐rdida Calidad (Scrap):</span>{' '}
-                                                                    <span className="font-bold">ΓêÆ{Math.round(piezasPerdidasCalidad).toLocaleString()} pzas</span>
+                                                                    <span>Pérdida Calidad (Scrap):</span>{' '}
+                                                                    <span className="font-bold">−{Math.round(piezasPerdidasCalidad).toLocaleString()} pzas</span>
                                                                 </p>
                                                                 <div className="border-t border-slate-700 pt-1">
                                                                     <span className="text-slate-500">Capacidad Neta (OEE):</span>{' '}
-                                                                    <span className="text-cyan-400 font-bold">{Math.round(piezasDia).toLocaleString()} pzas/d├¡a</span>
+                                                                    <span className="text-cyan-400 font-bold">{Math.round(piezasDia).toLocaleString()} pzas/día</span>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -2498,18 +2498,18 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 <span>Status (Estado del Estudio)</span>
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
-                                                <p className="text-slate-400 text-[10px]">Indica si el ciclo real de la m├íquina cumple la meta requerida.</p>
+                                                <p className="text-slate-400 text-[10px]">Indica si el ciclo real de la máquina cumple la meta requerida.</p>
                                                 <div className="space-y-1">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Criterio de Evaluaci├│n:</p>
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Criterio de Evaluación:</p>
                                                     <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
                                                         <span className="text-emerald-500">OK</span> si <span className="text-sky-400">Ciclo Real</span> Γëñ <span className="text-cyan-400">Ciclo Target</span>
                                                     </p>
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Comparaci├│n actual:</p>
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Comparación actual:</p>
                                                     <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center text-[10px] leading-normal">
                                                         Real: <span className="text-sky-400">{((localMetrics?.machineCycleTimeMs || 0) / 1000).toFixed(2)} s</span><br />
-                                                        L├¡mite: <span className="text-white font-bold">{(studyConfig?.targetPPM ? (60 / studyConfig.targetPPM) : 0).toFixed(2)} s</span>
+                                                        Límite: <span className="text-white font-bold">{(studyConfig?.targetPPM ? (60 / studyConfig.targetPPM) : 0).toFixed(2)} s</span>
                                                     </p>
                                                 </div>
                                             </div>
@@ -2519,15 +2519,15 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                 </div>
                             </div>
                         </div>
-                        {/* ΓöÇΓöÇ SECCI├ôN CONFIGURACI├ôN DEL ESTUDIO (arriba del Gantt) ΓöÇΓöÇ */}
-                        <div className="bg-slate-900/70 rounded-xl border border-slate-800 overflow-hidden">
+                        {/* ── SECCIÓN CONFIGURACIÓN DEL ESTUDIO (arriba del Gantt) ── */}
+                        <div className="bg-slate-900/70 rounded-xl border border-slate-800 overflow-hidden relative z-10">
                             <button
                                 onClick={() => setShowConfig(!showConfig)}
                                 className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-850/30 transition text-left cursor-pointer focus:outline-none"
                             >
                                 <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
                                     <Settings className="w-4 h-4 text-slate-400" />
-                                    Configuraci├│n General del Estudio
+                                    Configuración General del Estudio
                                 </span>
                                 <span className="text-xs text-cyan-400 font-bold">
                                     {showConfig ? 'Ocultar' : 'Mostrar'}
@@ -2590,7 +2590,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         />
                                     </div>
 
-                                    {/* Horas por D├¡a */}
+                                    {/* Horas por Día */}
                                     <div 
                                         onClick={(e) => handleRelationClick('input-shiftHours', e)}
                                         className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-shiftHours').wrapperClass}`}
@@ -2602,7 +2602,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 {getHighlightLabel('input-shiftHours')}
                                             </span>
                                         )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Horas / D├¡a</label>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Horas / Día</label>
                                         <input
                                             type="number" min="0.1" max="24" step="0.1"
                                             value={studyConfig.shiftHours || 8}
@@ -2658,11 +2658,11 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                             onChange={e => handleConfigChange('oeePenalty', Number(e.target.value))}
                                             disabled={!canEdit || linkOeeToStudy}
                                             className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
-                                            title={linkOeeToStudy ? "Calculado autom├íticamente en base al ciclo de m├íquina real" : "Castigo OEE (%)"}
+                                            title={linkOeeToStudy ? "Calculado automáticamente en base al ciclo de máquina real" : "Castigo OEE (%)"}
                                         />
                                     </div>
 
-                                    {/* D├¡as / Semana */}
+                                    {/* Días / Semana */}
                                     <div 
                                         onClick={(e) => handleRelationClick('input-workDaysPerWeek', e)}
                                         className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-workDaysPerWeek').wrapperClass}`}
@@ -2674,7 +2674,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 {getHighlightLabel('input-workDaysPerWeek')}
                                             </span>
                                         )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">D├¡as Laborales / Sem</label>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Días Laborales / Sem</label>
                                         <input
                                             type="number" min="1" max="7" step="1"
                                             value={studyConfig.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5}
@@ -2684,7 +2684,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         />
                                     </div>
 
-                                    {/* Pa├¡s (Feriados) */}
+                                    {/* País (Feriados) */}
                                     <div 
                                         onClick={(e) => handleRelationClick('input-country', e)}
                                         className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-country').wrapperClass}`}
@@ -2696,17 +2696,17 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 {getHighlightLabel('input-country')}
                                             </span>
                                         )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Pa├¡s (Feriados)</label>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">País (Feriados)</label>
                                         <select
                                             value={studyConfig.country || 'MX'}
                                             onChange={e => handleConfigChange('country', e.target.value)}
                                             disabled={!canEdit}
                                             className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
                                         >
-                                            <option value="MX">M├⌐xico (7 d├¡as feriados)</option>
-                                            <option value="CR">Costa Rica (11 d├¡as feriados)</option>
-                                            <option value="US">USA (11 d├¡as feriados)</option>
-                                            <option value="NONE">Ninguno (0 d├¡as feriados)</option>
+                                            <option value="MX">México (7 días feriados)</option>
+                                            <option value="CR">Costa Rica (11 días feriados)</option>
+                                            <option value="US">USA (11 días feriados)</option>
+                                            <option value="NONE">Ninguno (0 días feriados)</option>
                                         </select>
                                     </div>
 
@@ -2732,7 +2732,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         />
                                     </div>
 
-                                    {/* Tipo de M├íquina */}
+                                    {/* Tipo de Máquina */}
                                     <div 
                                         onClick={(e) => handleRelationClick('input-machineType', e)}
                                         className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-machineType').wrapperClass}`}
@@ -2744,7 +2744,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 {getHighlightLabel('input-machineType')}
                                             </span>
                                         )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Tipo de M├íquina</label>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Tipo de Máquina</label>
                                         <select
                                             value={studyConfig.mainIndexEnabled ? 'indexer' : 'robot'}
                                             onChange={e => {
@@ -2756,8 +2756,8 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                             disabled={!canEdit}
                                             className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
                                         >
-                                            <option value="indexer">≡ƒöä Indexer (Mesa / Dial)</option>
-                                            <option value="robot">≡ƒñû Robot Transfer</option>
+                                            <option value="indexer">🔄 Indexer (Mesa / Dial)</option>
+                                            <option value="robot">🤖 Robot Transfer</option>
                                         </select>
                                     </div>
 
@@ -2803,12 +2803,12 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 <span>{currentStudy?.dwellTimeMs || 0} ms</span>
                                                 <span className="text-[8px] text-emerald-600/60 font-normal">auto</span>
                                             </div>
-                                            <span className="text-[8px] text-slate-600 mt-0.5 block">= Estaci├│n bottleneck (m├ís lenta)</span>
+                                            <span className="text-[8px] text-slate-600 mt-0.5 block">= Estación bottleneck (más lenta)</span>
                                         </div>
                                     )}
 
 
-                                    {/* Configuraci├│n UP */}
+                                    {/* Configuración UP */}
                                     <div 
                                         onClick={(e) => handleRelationClick('input-up', e)}
                                         className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 md:col-span-2 ${getHighlightStyles('input-up').wrapperClass}`}
@@ -2820,7 +2820,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 {getHighlightLabel('input-up')}
                                             </span>
                                         )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Configuraci├│n UP</label>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Configuración UP</label>
                                         <div className="flex gap-1.5">
                                             {[1, 2, 4, 6].map(up => (
                                                 <button
@@ -2900,7 +2900,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                             )}
                         </div>
 
-                        {/* ΓöÇΓöÇ GANTT INTERACTIVO DE PASOS ΓöÇΓöÇ */}
+                        {/* ── GANTT INTERACTIVO DE PASOS ── */}
                         <TimingStudyGantt
                             currentStudy={currentStudy}
                             steps={steps}
@@ -2920,7 +2920,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                             getValidActionsForDevice={getValidActionsForDevice}
                         />
 
-                        {/* ΓöÇΓöÇ PANEL DE VALIDACI├ôN DEL ESTUDIO ΓöÇΓöÇ */}
+                        {/* ── PANEL DE VALIDACI├ôN DEL ESTUDIO ── */}
                         <TimingStudyValidationPanel
                             validationResults={validationResults}
                             onSelectStep={(stepId) => {
@@ -2935,7 +2935,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                             }}
                         />
 
-                        {/* ΓöÇΓöÇ SECCI├ôN AJUSTES EST├üNDAR DEL PROYECTO ΓöÇΓöÇ */}
+                        {/* ── SECCIÓN AJUSTES EST├üNDAR DEL PROYECTO ── */}
                         <div className="bg-slate-900/70 rounded-xl border border-slate-800 overflow-hidden">
                             <button
                                 onClick={() => setShowStandards(!showStandards)}
@@ -2943,7 +2943,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                             >
                                 <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
                                     <Clock className="w-4 h-4 text-slate-400" />
-                                    Ajustes Est├índar de la Plataforma (S├│lo Lectura)
+                                    Ajustes Estándar de la Plataforma (S├│lo Lectura)
                                 </span>
                                 <span className="text-xs text-cyan-400 font-bold">
                                     {showStandards ? 'Ocultar' : 'Mostrar'}
@@ -2955,13 +2955,13 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {/* Banner Informativo */}
                                     <div className="mb-5 p-3 bg-indigo-950/30 border border-indigo-500/20 rounded-xl text-xs text-indigo-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-medium">
                                         <span>
-                                            Γä╣∩╕Å <strong>Est├índares de la Plataforma</strong>: Los clasificadores y tiempos est├índar son configuraciones globales de la empresa. Para modificarlos, dir├¡gete a la secci├│n de clasificadores de ingenier├¡a.
+                                            Γä╣∩╕Å <strong>Estándares de la Plataforma</strong>: Los clasificadores y tiempos estándar son configuraciones globales de la empresa. Para modificarlos, dirígete a la sección de clasificadores de ingeniería.
                                         </span>
                                         <a 
                                             href="/engineering/lists" 
                                             className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition shrink-0 text-[10px] text-center uppercase tracking-wider"
                                         >
-                                            Ir a Configuraci├│n Global
+                                            Ir a Configuración Global
                                         </a>
                                     </div>
 
@@ -2976,7 +2976,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                         : 'text-slate-400 hover:text-slate-200'
                                                 }`}
                                             >
-                                                Clasificadores (Acci├│n Γåö Dispositivo)
+                                                Clasificadores (Acción Γåö Dispositivo)
                                             </button>
                                             <button
                                                 onClick={() => setStandardsActiveTab('motionValues')}
@@ -2986,7 +2986,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                         : 'text-slate-400 hover:text-slate-200'
                                                 }`}
                                             >
-                                                Tiempos de Movimientos Est├índar
+                                                Tiempos de Movimientos Estándar
                                             </button>
                                         </div>
 
@@ -2995,7 +2995,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                             <div>
                                                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
                                                     <p className="text-xs text-slate-400">
-                                                        Define qu├⌐ perfil de tiempo o valor fijo se sugiere para cada combinaci├│n de Dispositivo y Acci├│n.
+                                                        Define qué perfil de tiempo o valor fijo se sugiere para cada combinación de Dispositivo y Acción.
                                                     </p>
                                                 </div>
 
@@ -3004,8 +3004,8 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                     <thead>
                                                         <tr className="border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider">
                                                             <th className="py-2.5 px-3">Tipo de Dispositivo</th>
-                                                            <th className="py-2.5 px-3">Acci├│n</th>
-                                                            <th className="py-2.5 px-3">Perfil Est├índar</th>
+                                                            <th className="py-2.5 px-3">Acción</th>
+                                                            <th className="py-2.5 px-3">Perfil Estándar</th>
                                                             <th className="py-2.5 px-3">Valor Fijo Override (ms)</th>
                                                         </tr>
                                                     </thead>
@@ -3051,21 +3051,21 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                                         <option value="">Ninguno (usar valor fijo)</option>
                                                                         <optgroup label="Tiempos Base">
                                                                             <option value="controller_scan_network">Scan de Red del Controlador</option>
-                                                                            <option value="valve_response">Respuesta de V├ílvula</option>
+                                                                            <option value="valve_response">Respuesta de Válvula</option>
                                                                             <option value="handshake_response">Respuesta de Handshake</option>
                                                                         </optgroup>
-                                                                        <optgroup label="Actuadores Neum├íticos / Grippers">
-                                                                            <option value="small_gripper">Gripper Peque├▒o</option>
+                                                                        <optgroup label="Actuadores Neumáticos / Grippers">
+                                                                            <option value="small_gripper">Gripper Pequeño</option>
                                                                             <option value="large_gripper">Gripper Grande</option>
-                                                                            <option value="vacuum_gripper">Gripper de Vac├¡o</option>
+                                                                            <option value="vacuum_gripper">Gripper de Vacío</option>
                                                                             <option value="escapement_tic_toc">Escapador Tic-Toc</option>
-                                                                            <option value="pneumatic_rotary_clamp">Clamp Giratorio Neum├ítico</option>
+                                                                            <option value="pneumatic_rotary_clamp">Clamp Giratorio Neumático</option>
                                                                         </optgroup>
                                                                         <optgroup label="Velocidades de Cilindros">
                                                                             <option value="guided_cylinder">Cilindro Guiado</option>
-                                                                            <option value="standard_pneumatic_cylinder">Cilindro Est├índar</option>
-                                                                            <option value="rodless_cylinder">Cilindro Sin V├ístago</option>
-                                                                            <option value="short_large_bore_cylinder">Cilindro Pancake / Di├ímetro Corto</option>
+                                                                            <option value="standard_pneumatic_cylinder">Cilindro Estándar</option>
+                                                                            <option value="rodless_cylinder">Cilindro Sin Vástago</option>
+                                                                            <option value="short_large_bore_cylinder">Cilindro Pancake / Diámetro Corto</option>
                                                                         </optgroup>
                                                                         <optgroup label="Actuadores Giratorios">
                                                                             <option value="small_rotary_actuator">Actuador Giratorio Chico</option>
@@ -3090,7 +3090,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                                         value={rule.overrideValue !== null && rule.overrideValue !== undefined ? rule.overrideValue : ''}
                                                                         onChange={(e) => handleUpdateClassifierRule(rule.id, { overrideValue: e.target.value === '' ? null : Number(e.target.value) })}
                                                                         disabled={!canEdit}
-                                                                        placeholder="Usar c├ílculo din├ímico..."
+                                                                        placeholder="Usar cálculo dinámico..."
                                                                         className="bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded-lg p-1.5 focus:outline-none focus:border-cyan-500/50 w-full max-w-[200px]"
                                                                     />
                                                                 </td>
@@ -3100,7 +3100,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                         {(!standardsConfig.classifiers || standardsConfig.classifiers.length === 0) && (
                                                             <tr>
                                                                 <td colSpan={5} className="py-8 text-center text-slate-500 italic">
-                                                                    No se han definido reglas de clasificaci├│n para este estudio.
+                                                                    No se han definido reglas de clasificación para este estudio.
                                                                 </td>
                                                             </tr>
                                                         )}
@@ -3132,7 +3132,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                             />
                                                         </div>
                                                         <div className="flex justify-between items-center gap-4">
-                                                            <label className="text-xs text-slate-300">Respuesta de V├ílvula Neum├ítica (ms):</label>
+                                                            <label className="text-xs text-slate-300">Respuesta de Válvula Neumática (ms):</label>
                                                             <input
                                                                 type="number"
                                                                 min="0"
@@ -3154,7 +3154,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                             />
                                                         </div>
                                                         <div className="flex justify-between items-center gap-4">
-                                                            <label className="text-xs text-slate-300">C├ímara / Visi├│n Artificial (ms):</label>
+                                                            <label className="text-xs text-slate-300">Cámara / Visión Artificial (ms):</label>
                                                             <input
                                                                 type="number"
                                                                 min="0"
@@ -3180,7 +3180,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-5 mb-3 pb-1 border-b border-slate-800/80">Grippers y Elementos Auxiliares</h4>
                                                     <div className="space-y-3">
                                                         <div className="flex justify-between items-center gap-4">
-                                                            <label className="text-xs text-slate-300">Gripper Peque├▒o (ms):</label>
+                                                            <label className="text-xs text-slate-300">Gripper Pequeño (ms):</label>
                                                             <input
                                                                 type="number"
                                                                 min="0"
@@ -3202,7 +3202,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                             />
                                                         </div>
                                                         <div className="flex justify-between items-center gap-4">
-                                                            <label className="text-xs text-slate-300">Gripper de Vac├¡o (ms):</label>
+                                                            <label className="text-xs text-slate-300">Gripper de Vacío (ms):</label>
                                                             <input
                                                                 type="number"
                                                                 min="0"
@@ -3213,7 +3213,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                             />
                                                         </div>
                                                         <div className="flex justify-between items-center gap-4">
-                                                            <label className="text-xs text-slate-300">Desaceleraci├│n Shock Absorber (ms):</label>
+                                                            <label className="text-xs text-slate-300">Desaceleración Shock Absorber (ms):</label>
                                                             <input
                                                                 type="number"
                                                                 min="0"
@@ -3235,7 +3235,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                             />
                                                         </div>
                                                         <div className="flex justify-between items-center gap-4">
-                                                            <label className="text-xs text-slate-300">Clamp Giratorio Neum├ítico (ms):</label>
+                                                            <label className="text-xs text-slate-300">Clamp Giratorio Neumático (ms):</label>
                                                             <input
                                                                 type="number"
                                                                 min="0"
@@ -3264,7 +3264,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                             />
                                                         </div>
                                                         <div className="flex justify-between items-center gap-4">
-                                                            <label className="text-xs text-slate-300">Cilindro Est├índar / Inox (mm/s):</label>
+                                                            <label className="text-xs text-slate-300">Cilindro Estándar / Inox (mm/s):</label>
                                                             <input
                                                                 type="number"
                                                                 min="0"
@@ -3275,7 +3275,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                             />
                                                         </div>
                                                         <div className="flex justify-between items-center gap-4">
-                                                            <label className="text-xs text-slate-300">Cilindro Sin V├ístago (mm/s):</label>
+                                                            <label className="text-xs text-slate-300">Cilindro Sin Vástago (mm/s):</label>
                                                             <input
                                                                 type="number"
                                                                 min="0"
@@ -3297,7 +3297,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                             />
                                                         </div>
                                                         <div className="flex justify-between items-center gap-4">
-                                                            <label className="text-xs text-slate-300">Actuador Giratorio Peque├▒o (deg/s):</label>
+                                                            <label className="text-xs text-slate-300">Actuador Giratorio Pequeño (deg/s):</label>
                                                             <input
                                                                 type="number"
                                                                 min="0"
@@ -3320,7 +3320,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                         </div>
                                                     </div>
 
-                                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-5 mb-3 pb-1 border-b border-slate-800/80">Servos y Actuadores El├⌐ctricos</h4>
+                                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-5 mb-3 pb-1 border-b border-slate-800/80">Servos y Actuadores Eléctricos</h4>
                                                     <div className="space-y-3">
                                                         <div className="flex justify-between items-center gap-4">
                                                             <label className="text-xs text-slate-300">Servo Acoplado a Correa / Banda (mm/s):</label>
@@ -3399,7 +3399,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                             )}
                         </div>
 
-                        {/* ΓöÇΓöÇ TABLA DE SECUENCIA / PASOS (OCULTA POR GANTT) ΓöÇΓöÇ */}
+                        {/* ── TABLA DE SECUENCIA / PASOS (OCULTA POR GANTT) ── */}
                         {false && (
                         <div className="bg-slate-900/70 rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
                             <div className="px-6 py-4 border-b border-slate-800/80 bg-slate-950/20 flex items-center justify-between">
@@ -3413,7 +3413,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                             onClick={handleSuggestAllDurations}
                                             disabled={recalculating || steps.length === 0}
                                             className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700/80 rounded-lg text-xs font-bold transition cursor-pointer disabled:opacity-50"
-                                            title="Sugerir duraci├│n autom├íticamente para todos los pasos en base a la configuraci├│n est├índar"
+                                            title="Sugerir duración automáticamente para todos los pasos en base a la configuración estándar"
                                         >
                                             <Sparkles className="w-3.5 h-3.5" /> Sugerir Todo
                                         </button>
@@ -3432,7 +3432,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     <Clock className="w-10 h-10 text-slate-600 mx-auto mb-3" />
                                     <h4 className="text-sm font-bold text-white mb-1">No hay pasos definidos en este estudio</h4>
                                     <p className="text-xs text-slate-500 max-w-xs mx-auto mb-6">
-                                        Agrega pasos individuales o imp├│rtalos autom├íticamente desde las estaciones del proyecto.
+                                        Agrega pasos individuales o imp├│rtalos automáticamente desde las estaciones del proyecto.
                                     </p>
                                     {canEdit && stations.length > 0 && (
                                         <div className="flex justify-center gap-3">
@@ -3612,7 +3612,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                                     value={step.taskDescription || ''}
                                                                     onBlur={e => handleUpdateStepField(step.id, 'taskDescription', e.target.value.trim())}
                                                                     disabled={!canEdit}
-                                                                    placeholder="Descripci├│n del paso..."
+                                                                    placeholder="Descripción del paso..."
                                                                     className="w-full bg-transparent border-0 border-b border-transparent hover:border-slate-700 focus:border-cyan-500 focus:ring-0 text-xs text-slate-200 py-1"
                                                                 />
                                                             </td>
@@ -3740,7 +3740,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                             <td className="px-2 py-2 text-center">
                                                                 <div className="flex justify-center items-center">
                                                                     {isCritical ? (
-                                                                        <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" title="Secuencia Cr├¡tica" />
+                                                                        <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" title="Secuencia Crítica" />
                                                                     ) : (
                                                                         <span className="w-1.5 h-1.5 rounded-full bg-slate-750" />
                                                                     )}
@@ -3763,11 +3763,11 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                             {canEdit && (
                                                                 <td className="px-3 py-2 text-right">
                                                                     <div className="flex items-center justify-end gap-1">
-                                                                        {/* Sugerencia de duraci├│n */}
+                                                                        {/* Sugerencia de duración */}
                                                                         <button
                                                                             onClick={() => handleSuggestDuration(step)}
                                                                             className="p-1 hover:bg-slate-800 text-cyan-500 rounded transition cursor-pointer"
-                                                                            title="Calcular duraci├│n sugerida"
+                                                                            title="Calcular duración sugerida"
                                                                         >
                                                                             <Sparkles className="w-3.5 h-3.5" />
                                                                         </button>
@@ -3781,7 +3781,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                                             <Copy className="w-3.5 h-3.5" />
                                                                         </button>
 
-                                                                        {/* Reordenaci├│n (Subir) */}
+                                                                        {/* Reordenación (Subir) */}
                                                                         <button
                                                                             onClick={() => handleMoveStep(idx, -1)}
                                                                             disabled={idx === 0}
@@ -3791,7 +3791,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                                             <ChevronUp className="w-3.5 h-3.5" />
                                                                         </button>
 
-                                                                        {/* Reordenaci├│n (Bajar) */}
+                                                                        {/* Reordenación (Bajar) */}
                                                                         <button
                                                                             onClick={() => handleMoveStep(idx, 1)}
                                                                             disabled={idx === steps.length - 1}
