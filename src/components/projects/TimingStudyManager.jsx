@@ -3202,7 +3202,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                                     </>
                                                                 ) : (
                                                                     <>
-                                                                        <span className="text-slate-300">Bruta/Sem</span> = <span className="text-cyan-400">{Math.round(piezasHora).toLocaleString()}</span> × <span className="text-slate-400">shiftHours</span> × <span className="text-slate-400">{studyConfig?.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5}</span> = <span className="text-slate-300">{Math.round(pzSemBruto).toLocaleString()} pzas</span><br/>
+                                                                        <span className="text-slate-300">Bruta/Sem</span> = <span className="text-cyan-400">{Math.round(piezasHora).toLocaleString()}</span> × <span className="text-slate-400">{shiftHours}</span> × <span className="text-slate-400">{studyConfig?.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5}</span> = <span className="text-slate-300">{Math.round(pzSemBruto).toLocaleString()} pzas</span><br/>
                                                                         <span className="text-cyan-400">Neta/Sem</span> = <span className="text-slate-300">{Math.round(pzSemBruto).toLocaleString()}</span> × <span className="text-emerald-400">{oeePercent}%</span> = <span className="text-cyan-400">{Math.round(piezasSemana).toLocaleString()} pzas</span>
                                                                     </>
                                                                 )}
@@ -3283,7 +3283,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                                     </>
                                                                 ) : (
                                                                     <>
-                                                                        <span className="text-slate-300">Bruta/Año</span> = <span className="text-cyan-400">{Math.round(piezasHora).toLocaleString()}</span> × <span className="text-slate-400">shiftHours</span> × <span className="text-indigo-400">{diasAnuales}</span> = <span className="text-slate-300">{Math.round(pzAnoBruto).toLocaleString()} pzas</span><br/>
+                                                                        <span className="text-slate-300">Bruta/Año</span> = <span className="text-cyan-400">{Math.round(piezasHora).toLocaleString()}</span> × <span className="text-slate-400">{shiftHours}</span> × <span className="text-indigo-400">{diasAnuales}</span> = <span className="text-slate-300">{Math.round(pzAnoBruto).toLocaleString()} pzas</span><br/>
                                                                         <span className="text-cyan-400">Neta/Año</span> = <span className="text-slate-300">{Math.round(pzAnoBruto).toLocaleString()}</span> × <span className="text-emerald-400">{oeePercent}%</span> = <span className="text-cyan-400">{Math.round(piezasAno).toLocaleString()} pzas</span>
                                                                     </>
                                                                 )}
