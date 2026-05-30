@@ -2485,6 +2485,12 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 {getHighlightLabel('card-objDia')}
                                             </span>
                                         )}
+                                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Objetivo / Día</span>
+                                        <span className="text-lg font-black text-slate-200 block mt-1">
+                                            {piezasDia ? Math.round(piezasDia).toLocaleString() : '—'}
+                                        </span>
+                                        <span className="text-[8px] text-slate-600 block">piezas/día</span>
+
                                                       {/* Tooltip */}
                                         <div className={`absolute top-full left-0 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-objDia' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
                                             <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
