@@ -2457,7 +2457,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                         {/* ── KPI PANELS: GRUPOS LÓGICOS DE MÉTRICAS ── */}
                         <div className="grid grid-cols-1 xl:grid-cols-7 gap-4 relative z-[35]">
                             {/* 1. METAS DE DEMANDA (COMERCIAL) */}
-                            <div className="xl:col-span-2 bg-slate-900/40 border border-slate-800 border-t-cyan-500/80 border-t-[3px] rounded-2xl p-4 flex flex-col gap-3 shadow-xl backdrop-blur-md transition-all duration-300 hover:border-slate-700/80">
+                            <div className={`xl:col-span-2 bg-slate-900/40 border border-slate-800 border-t-cyan-500/80 border-t-[3px] rounded-2xl p-4 flex flex-col gap-3 shadow-xl backdrop-blur-md transition-all duration-300 hover:border-slate-700/80 relative ${['card-objDia', 'card-objHora', 'card-ppmObj'].includes(activeTooltipId) ? 'z-[45]' : 'z-10'}`}>
                                 <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
                                     <div className="p-1 bg-cyan-500/10 rounded-lg">
                                         <Target className="w-4 h-4 text-cyan-400" />
@@ -2679,7 +2679,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                             </div>
 
                             {/* 2. CAPACIDAD FÍSICA REAL (AUTOMATIZACI├ôN) */}
-                            <div className="xl:col-span-2 bg-slate-900/40 border border-slate-800 border-t-amber-500/80 border-t-[3px] rounded-2xl p-4 flex flex-col gap-3 shadow-xl backdrop-blur-md transition-all duration-300 hover:border-slate-700/80">
+                            <div className={`xl:col-span-2 bg-slate-900/40 border border-slate-800 border-t-amber-500/80 border-t-[3px] rounded-2xl p-4 flex flex-col gap-3 shadow-xl backdrop-blur-md transition-all duration-300 hover:border-slate-700/80 relative ${['card-cicloTarget', 'card-cicloReal', 'card-ppmReal', 'card-bottleneck', 'card-realHora'].includes(activeTooltipId) ? 'z-[45]' : 'z-10'}`}>
                                 <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
                                     <div className="p-1 bg-amber-500/10 rounded-lg">
                                         <Activity className="w-4 h-4 text-amber-400" />
@@ -2900,7 +2900,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                             </div>
 
                             {/* 3. VIABILIDAD Y DESEMPEÑO (OEE) */}
-                            <div className="xl:col-span-3 bg-slate-900/40 border border-slate-800 border-t-emerald-500/80 border-t-[3px] rounded-2xl p-4 flex flex-col gap-3 shadow-xl backdrop-blur-md transition-all duration-300 hover:border-slate-700/80">
+                            <div className={`xl:col-span-3 bg-slate-900/40 border border-slate-800 border-t-emerald-500/80 border-t-[3px] rounded-2xl p-4 flex flex-col gap-3 shadow-xl backdrop-blur-md transition-all duration-300 hover:border-slate-700/80 relative ${['card-status', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno'].includes(activeTooltipId) ? 'z-[45]' : 'z-10'}`}>
                                 <div 
                                     className={`flex items-center gap-2 border-b border-slate-800 pb-2 cursor-pointer overflow-visible relative group ${activeTooltipId === 'card-status' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-status').wrapperClass}`}
                                     onClick={(e) => handleRelationClick('card-status', e)}
