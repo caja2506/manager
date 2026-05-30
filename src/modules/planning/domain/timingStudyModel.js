@@ -697,7 +697,7 @@ export function calculateTimingStudyMetrics(study, steps, stations = []) {
             
             let startTime = 0;
             if (deps.length === 0) {
-                startTime = normalized.startTimeMs || 0;
+                startTime = normalized.lagMs || 0;
             } else {
                 let maxDepFinish = 0;
                 for (const depId of deps) {
