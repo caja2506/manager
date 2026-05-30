@@ -162,13 +162,27 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
 
     // ── Resaltado Dinámico de Dependencias (Fórmulas) ──
     const [hoveredRelation, setHoveredRelation] = useState(null);
+    const [activeTooltipId, setActiveTooltipId] = useState(null);
 
     const handleRelationClick = useCallback((relationId, e) => {
         if (e && typeof e.stopPropagation === 'function') {
             e.stopPropagation();
         }
-        setHoveredRelation(prev => prev === relationId ? null : relationId);
-    }, []);
+        
+        if (hoveredRelation === relationId) {
+            // Estado 2 -> Clic 3: Desactivar todo
+            setHoveredRelation(null);
+            setActiveTooltipId(null);
+        } else if (activeTooltipId === relationId) {
+            // Estado 1 -> Clic 2: Activar ayuda visual, desactivar tooltip
+            setHoveredRelation(relationId);
+            setActiveTooltipId(null);
+        } else {
+            // Estado 0 -> Clic 1: Activar tooltip, desactivar ayuda visual
+            setHoveredRelation(null);
+            setActiveTooltipId(relationId);
+        }
+    }, [hoveredRelation, activeTooltipId]);
 
     // Mapa bidireccional de dependencias
     const DEPENDENCY_RELATIONS = useMemo(() => ({
@@ -2457,7 +2471,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {/* Piezas Objetivo / Día */}
                                     <div 
                                         onClick={(e) => handleRelationClick('card-objDia', e)}
-                                        className={`relative group hover:z-50 bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-objDia').wrapperClass}`}
+                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${activeTooltipId === 'card-objDia' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-objDia').wrapperClass}`}
                                     >
                                         {getHighlightLabel('card-objDia') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2473,7 +2487,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         <span className="text-[8px] text-slate-600 block">piezas/día</span>
 
                                         {/* Tooltip */}
-                                        <div className="absolute top-full left-0 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
+                                        <div className={`absolute top-full left-0 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-objDia' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
                                             <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                 <Info className="w-3.5 h-3.5 text-blue-400" />
                                                 <span>Objetivo / Día</span>
@@ -2516,7 +2530,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {/* Piezas/Hora Objetivo */}
                                     <div 
                                         onClick={(e) => handleRelationClick('card-objHora', e)}
-                                        className={`relative group hover:z-50 bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-objHora').wrapperClass}`}
+                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${activeTooltipId === 'card-objHora' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-objHora').wrapperClass}`}
                                     >
                                         {getHighlightLabel('card-objHora') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2532,7 +2546,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         <span className="text-[8px] text-slate-600 block">pzas/hr</span>
 
                                         {/* Tooltip */}
-                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
+                                        <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-objHora' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
                                             <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                 <Info className="w-3.5 h-3.5 text-blue-400" />
                                                 <span>Objetivo / Hora</span>
@@ -2575,7 +2589,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {/* Ciclos / Min Objetivo */}
                                     <div 
                                         onClick={(e) => handleRelationClick('card-ppmObj', e)}
-                                        className={`relative group hover:z-50 bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-ppmObj').wrapperClass}`}
+                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${activeTooltipId === 'card-ppmObj' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-ppmObj').wrapperClass}`}
                                     >
                                         {getHighlightLabel('card-ppmObj') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2592,7 +2606,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         <span className="text-[8px] text-slate-600 block">PPM Obj</span>
 
                                         {/* Tooltip */}
-                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
+                                        <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-ppmObj' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
                                             <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                 <Info className="w-3.5 h-3.5 text-blue-400" />
                                                 <span>Ciclos / Min Objetivo (PPM)</span>
@@ -2619,7 +2633,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {/* Ciclo Target */}
                                     <div 
                                         onClick={(e) => handleRelationClick('card-cicloTarget', e)}
-                                        className={`relative group hover:z-50 bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-cicloTarget').wrapperClass}`}
+                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${activeTooltipId === 'card-cicloTarget' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-cicloTarget').wrapperClass}`}
                                     >
                                         {getHighlightLabel('card-cicloTarget') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2638,7 +2652,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         </span>
 
                                         {/* Tooltip */}
-                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
+                                        <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-cicloTarget' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
                                             <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                 <Info className="w-3.5 h-3.5 text-blue-400" />
                                                 <span>Ciclo Target</span>
@@ -2679,7 +2693,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {/* Ciclo Real */}
                                     <div 
                                         onClick={(e) => handleRelationClick('card-cicloReal', e)}
-                                        className={`relative group hover:z-50 bg-slate-950/40 p-3 rounded-xl border border-cyan-700/20 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-cicloReal').wrapperClass}`}
+                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-cyan-700/20 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${activeTooltipId === 'card-cicloReal' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-cicloReal').wrapperClass}`}
                                     >
                                         {getHighlightLabel('card-cicloReal') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2698,7 +2712,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         <span className="text-[8px] text-slate-600 block">segundos (Real)</span>
 
                                         {/* Tooltip */}
-                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
+                                        <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-cicloReal' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
                                             <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                 <Info className="w-3.5 h-3.5 text-cyan-400" />
                                                 <span>Ciclo Real</span>
@@ -2741,7 +2755,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {/* Ciclos / Min Real */}
                                     <div 
                                         onClick={(e) => handleRelationClick('card-ppmReal', e)}
-                                        className={`relative group hover:z-50 bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-ppmReal').wrapperClass}`}
+                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${activeTooltipId === 'card-ppmReal' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-ppmReal').wrapperClass}`}
                                     >
                                         {getHighlightLabel('card-ppmReal') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2759,7 +2773,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         <span className="text-[8px] text-slate-500 block mt-0.5 font-mono">CPM: {cpmReal.toFixed(2)} · UP: {cycleOutputQty}</span>
 
                                         {/* Tooltip */}
-                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
+                                        <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-ppmReal' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
                                             <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                 <Info className="w-3.5 h-3.5 text-cyan-400" />
                                                 <span>Ciclos / Min Real (PPM)</span>
@@ -2788,7 +2802,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {/* Bottleneck Station */}
                                     <div 
                                         onClick={(e) => handleRelationClick('card-bottleneck', e)}
-                                        className={`relative group hover:z-50 bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-bottleneck').wrapperClass}`}
+                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${activeTooltipId === 'card-bottleneck' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-bottleneck').wrapperClass}`}
                                     >
                                         {getHighlightLabel('card-bottleneck') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2805,7 +2819,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         <span className="text-[8px] text-slate-600 block">estación</span>
 
                                         {/* Tooltip */}
-                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
+                                        <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-bottleneck' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
                                             <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                 <Info className="w-3.5 h-3.5 text-amber-500" />
                                                 <span>Bottleneck (Cuello de Botella)</span>
@@ -2837,7 +2851,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         return (
                                             <div 
                                                 onClick={(e) => handleRelationClick('card-realHora', e)}
-                                                className={`relative group hover:z-50 bg-slate-955/40 p-3 rounded-xl border text-center cursor-pointer transition-all duration-200 overflow-visible ${onTarget ? 'border-emerald-600/40 hover:border-emerald-500/60 font-bold' : 'border-red-650/30 hover:border-red-500/50'} ${getHighlightStyles('card-realHora').wrapperClass}`}
+                                                className={`relative group bg-slate-955/40 p-3 rounded-xl border text-center cursor-pointer transition-all duration-200 overflow-visible ${onTarget ? 'border-emerald-600/40 hover:border-emerald-500/60 font-bold' : 'border-red-650/30 hover:border-red-500/50'} ${activeTooltipId === 'card-realHora' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-realHora').wrapperClass}`}
                                             >
                                                 {getHighlightLabel('card-realHora') && (
                                                     <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2856,7 +2870,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 <span className="text-[8px] text-slate-600 block">pzas/hr</span>
 
                                                 {/* Tooltip */}
-                                                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
+                                                <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-realHora' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
                                                     <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                         <Info className={`w-3.5 h-3.5 ${onTarget ? 'text-emerald-400' : 'text-red-400'}`} />
                                                         <span>Real / Hora</span>
@@ -2888,7 +2902,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                             {/* 3. VIABILIDAD Y DESEMPEÑO (OEE) */}
                             <div className="xl:col-span-3 bg-slate-900/40 border border-slate-800 border-t-emerald-500/80 border-t-[3px] rounded-2xl p-4 flex flex-col gap-3 shadow-xl backdrop-blur-md transition-all duration-300 hover:border-slate-700/80">
                                 <div 
-                                    className={`flex items-center gap-2 border-b border-slate-800 pb-2 cursor-pointer overflow-visible relative group hover:z-50 ${getHighlightStyles('card-status').wrapperClass}`}
+                                    className={`flex items-center gap-2 border-b border-slate-800 pb-2 cursor-pointer overflow-visible relative group ${activeTooltipId === 'card-status' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-status').wrapperClass}`}
                                     onClick={(e) => handleRelationClick('card-status', e)}
                                 >
                                     {getHighlightLabel('card-status') && (
@@ -2908,7 +2922,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {getStatusBadge(localMetrics?.status)}
 
                                     {/* Tooltip Status */}
-                                    <div className="absolute top-full right-0 left-auto mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
+                                    <div className={`absolute top-full right-0 left-auto mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-status' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
                                         <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                             <Info className="w-3.5 h-3.5 text-slate-400" />
                                             <span>Status (Estado del Estudio)</span>
@@ -2939,7 +2953,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         return (
                                             <div 
                                                 onClick={(e) => handleRelationClick('card-piezasDia', e)}
-                                                className={`relative group hover:z-50 bg-slate-955/40 p-3 rounded-xl border border-slate-800/80 hover:border-emerald-500/30 transition-all duration-200 overflow-visible col-span-2 flex gap-3 text-left cursor-pointer ${getHighlightStyles('card-piezasDia').wrapperClass}`}
+                                                className={`relative group bg-slate-955/40 p-3 rounded-xl border border-slate-800/80 hover:border-emerald-500/30 transition-all duration-200 overflow-visible col-span-2 flex gap-3 text-left cursor-pointer ${activeTooltipId === 'card-piezasDia' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-piezasDia').wrapperClass}`}
                                             >
                                                 {getHighlightLabel('card-piezasDia') && (
                                                     <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -3054,7 +3068,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 </div>
 
                                                 {/* Tooltip */}
-                                                <div className="absolute top-full left-0 mt-2 w-72 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
+                                                <div className={`absolute top-full left-0 mt-2 w-72 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-piezasDia' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
                                                     <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                         <Info className="w-3.5 h-3.5 text-cyan-400" />
                                                         <span>Piezas / Día — Desglose de Pérdidas OEE</span>
@@ -3136,7 +3150,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         return (
                                             <div 
                                                 onClick={(e) => handleRelationClick('card-piezasSem', e)}
-                                                className={`relative group hover:z-50 bg-slate-955/40 p-3 rounded-xl border border-slate-800/80 hover:border-emerald-500/30 transition-all duration-200 overflow-visible cursor-pointer ${getHighlightStyles('card-piezasSem').wrapperClass}`}
+                                                className={`relative group bg-slate-955/40 p-3 rounded-xl border border-slate-800/80 hover:border-emerald-500/30 transition-all duration-200 overflow-visible cursor-pointer ${activeTooltipId === 'card-piezasSem' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-piezasSem').wrapperClass}`}
                                             >
                                                 {getHighlightLabel('card-piezasSem') && (
                                                     <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -3155,7 +3169,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 </span>
 
                                                 {/* Tooltip */}
-                                                <div className="absolute top-full left-0 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
+                                                <div className={`absolute top-full left-0 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-piezasSem' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
                                                     <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                         <Info className="w-3.5 h-3.5 text-violet-400" />
                                                         <span>Piezas / Semana — Bruto vs Neto</span>
@@ -3215,7 +3229,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         return (
                                             <div 
                                                 onClick={(e) => handleRelationClick('card-piezasAno', e)}
-                                                className={`relative group hover:z-50 bg-slate-955/40 p-3 rounded-xl border border-slate-800/80 hover:border-emerald-500/30 transition-all duration-200 overflow-visible cursor-pointer ${getHighlightStyles('card-piezasAno').wrapperClass}`}
+                                                className={`relative group bg-slate-955/40 p-3 rounded-xl border border-slate-800/80 hover:border-emerald-500/30 transition-all duration-200 overflow-visible cursor-pointer ${activeTooltipId === 'card-piezasAno' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-piezasAno').wrapperClass}`}
                                             >
                                                 {getHighlightLabel('card-piezasAno') && (
                                                     <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -3234,7 +3248,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 <span className={`text-[8px] block mt-0.5 font-bold ${piezasAnoReal >= annualDemand ? 'text-emerald-400' : 'text-amber-400'}`}>
                                                     vs Real: {Math.round(piezasAnoReal).toLocaleString()} ({Math.round(cumplimientoReal)}%) {cumpleDemandaReal ? '✅' : '⚠️'}
                                                 </span>
-                                                <div className="absolute top-full right-0 left-auto mt-2 w-72 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
+                                                <div className={`absolute top-full right-0 left-auto mt-2 w-72 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-piezasAno' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
                                                     <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                         <Info className="w-3.5 h-3.5 text-amber-400" />
                                                         <span>Piezas / Año — Bruto vs Neto</span>
