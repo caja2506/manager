@@ -2468,7 +2468,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         )}
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Objetivo / Día</span>
                                         <span className="text-lg font-black text-slate-200 block mt-1">
-                                            {studyConfig?.targetPiecesPerShift ? Number(studyConfig.targetPiecesPerShift).toLocaleString() : 'ΓÇö'}
+                                            {studyConfig?.targetPiecesPerShift ? Number(studyConfig.targetPiecesPerShift).toLocaleString() : '—'}
                                         </span>
                                         <span className="text-[8px] text-slate-600 block">piezas/día</span>
 
@@ -2527,7 +2527,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         )}
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Objetivo / Hora</span>
                                         <span className="text-lg font-black text-blue-400 block mt-1">
-                                            {studyConfig?.targetPPM ? Math.round(studyConfig.targetPPM * 60 * (studyConfig.cycleOutputQty || 1)).toLocaleString() : 'ΓÇö'}
+                                            {studyConfig?.targetPPM ? Math.round(studyConfig.targetPPM * 60 * (studyConfig.cycleOutputQty || 1)).toLocaleString() : '—'}
                                         </span>
                                         <span className="text-[8px] text-slate-600 block">pzas/hr</span>
 
@@ -2587,7 +2587,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Ciclos / Min</span>
                                         <span className="text-[10px] text-slate-500 block font-mono mt-0.5">Objetivo</span>
                                         <span className="text-lg font-black text-blue-400 block mt-0.5">
-                                            {studyConfig?.targetPPM || 'ΓÇö'}
+                                            {studyConfig?.targetPPM || '—'}
                                         </span>
                                         <span className="text-[8px] text-slate-600 block">PPM Obj</span>
 
@@ -2630,7 +2630,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         )}
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Ciclo Target</span>
                                         <span className="text-lg font-black text-slate-200 block mt-1">
-                                            {studyConfig?.targetPPM ? formatTime((60 / studyConfig.targetPPM) * 1000) : 'ΓÇö'}
+                                            {studyConfig?.targetPPM ? formatTime((60 / studyConfig.targetPPM) * 1000) : '—'}
                                         </span>
                                         <span className="text-[8px] text-slate-600 block">segundos</span>
                                         <span className={`text-[8px] block mt-0.5 font-bold ${cicloRealSeg <= cicloTargetSeg ? 'text-emerald-400' : 'text-amber-400'}`}>
@@ -2690,7 +2690,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         )}
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Ciclo Real</span>
                                         <span className="text-[10px] text-slate-500 block font-mono mt-0.5">
-                                            Obj: {studyConfig?.targetPPM ? `${(60 / studyConfig.targetPPM).toFixed(2)}s` : 'ΓÇö'}
+                                            Obj: {studyConfig?.targetPPM ? `${(60 / studyConfig.targetPPM).toFixed(2)}s` : '—'}
                                         </span>
                                         <span className="text-lg font-black text-cyan-400 block mt-0.5">
                                             {formatTime(localMetrics?.machineCycleTimeMs)}
@@ -2753,7 +2753,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Ciclos / Min</span>
                                         <span className="text-[10px] text-slate-500 block font-mono mt-0.5">Real</span>
                                         <span className="text-lg font-black text-cyan-400 block mt-0.5">
-                                            {ppmReal > 0 ? `${ppmReal.toFixed(1)}` : 'ΓÇö'}
+                                            {ppmReal > 0 ? `${ppmReal.toFixed(1)}` : '—'}
                                         </span>
                                         <span className="text-[8px] text-slate-600 block">PPM Real</span>
                                         <span className="text-[8px] text-slate-500 block mt-0.5 font-mono">CPM: {cpmReal.toFixed(2)} · UP: {cycleOutputQty}</span>
@@ -2799,8 +2799,8 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         )}
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Bottleneck</span>
                                         <span className="text-[10px] text-slate-500 block font-mono mt-0.5">estación</span>
-                                        <span className="text-sm font-black text-amber-500 block truncate mt-1 font-sans" title={localMetrics?.bottleneckStationLabel || 'ΓÇö'}>
-                                            {localMetrics?.bottleneckStationLabel || 'ΓÇö'}
+                                        <span className="text-sm font-black text-amber-500 block truncate mt-1 font-sans" title={localMetrics?.bottleneckStationLabel || '—'}>
+                                            {localMetrics?.bottleneckStationLabel || '—'}
                                         </span>
                                         <span className="text-[8px] text-slate-600 block">estación</span>
 
@@ -2812,17 +2812,16 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
                                                 <p className="text-slate-400 text-[10px]">Estación de trabajo más lenta de la secuencia que limita la velocidad de producción.</p>
-                                                <div className="space-y-1">
+                                                <div className="space-y-1.5">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[11px] leading-normal">
-                                                        Max(<span className="text-emerald-400">Estaciones</span>)
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                        <span className="text-amber-500">Bottleneck</span> = max(<span className="text-emerald-400">T_estación_i</span>)
                                                     </p>
                                                 </div>
-                                                <div className="space-y-1">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Valores actuales:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center text-[10px] leading-normal">
-                                                        Estación: <span className="text-amber-500 font-bold">{localMetrics?.bottleneckStationLabel || 'ΓÇö'}</span><br />
-                                                        Duración: <span className="text-emerald-400 font-bold">{localMetrics?.dwellTimeMs || 0} ms ({((localMetrics?.dwellTimeMs || 0) / 1000).toFixed(2)} s)</span>
+                                                <div className="space-y-1.5">
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                        <span className="text-amber-500">Bottleneck</span> = max(<span className="text-slate-300">{localMetrics?.bottleneckStationLabel || '—'}</span>) = <span className="text-emerald-400">{localMetrics?.dwellTimeMs || 0}ms ({((localMetrics?.dwellTimeMs || 0) / 1000).toFixed(2)}s)</span>
                                                     </p>
                                                 </div>
                                             </div>
@@ -2849,10 +2848,10 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 )}
                                                 <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Real / Hora</span>
                                                 <span className="text-[10px] text-slate-500 block font-mono mt-0.5">
-                                                    Obj: {targetPPH > 0 ? targetPPH.toLocaleString() : 'ΓÇö'}
+                                                    Obj: {targetPPH > 0 ? targetPPH.toLocaleString() : '—'}
                                                 </span>
                                                 <span className={`text-lg font-black block mt-0.5 ${onTarget ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                    {realPPH > 0 ? Math.round(realPPH).toLocaleString() : 'ΓÇö'}
+                                                    {realPPH > 0 ? Math.round(realPPH).toLocaleString() : '—'}
                                                 </span>
                                                 <span className="text-[8px] text-slate-600 block">pzas/hr</span>
 
@@ -2864,17 +2863,16 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                     </div>
                                                     <div className="text-[11px] leading-relaxed space-y-1.5">
                                                         <p className="text-slate-400 text-[10px]">Producción horaria proyectada con el ciclo real medido.</p>
-                                                        <div className="space-y-1">
-                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula Real:</p>
+                                                        <div className="space-y-1.5">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
                                                             <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                                (3.600.000 / <span className="text-sky-400">Ciclo Real ms</span>) × <span className="text-fuchsia-400">UP</span>
+                                                                <span className="text-cyan-400">PPH_real</span> = (3,600,000 / <span className="text-cyan-400">Ciclo Real (ms)</span>) × <span className="text-fuchsia-400">UP</span>
                                                             </p>
                                                         </div>
-                                                        <div className="space-y-1">
-                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Valores actuales:</p>
-                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-normal">
-                                                                Objetivo: <span className="text-white font-bold">{targetPPH.toLocaleString()} pzas/hr</span><br />
-                                                                Real: (3.600.000 / <span className="text-sky-400">{localMetrics?.machineCycleTimeMs || 1}</span>) × <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-cyan-400 font-bold">{Math.round(realPPH).toLocaleString()} pzas/hr</span>
+                                                        <div className="space-y-1.5">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                                <span className="text-cyan-400">PPH_real</span> = (3,600,000 / <span className="text-cyan-400">{localMetrics?.machineCycleTimeMs || 1}ms</span>) × <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className={`font-bold ${onTarget ? 'text-emerald-400' : 'text-cyan-400'}`}>{Math.round(realPPH).toLocaleString()} pzas/hr</span>
                                                             </p>
                                                         </div>
                                                     </div>
@@ -2917,17 +2915,16 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         </div>
                                         <div className="text-[11px] leading-relaxed space-y-1.5">
                                             <p className="text-slate-400 text-[10px]">Indica si el ciclo real de la máquina cumple la meta requerida.</p>
-                                            <div className="space-y-1">
-                                                <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Criterio de Evaluación:</p>
+                                            <div className="space-y-1.5">
+                                                <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
                                                 <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                    <span className="text-emerald-500">OK</span> si <span className="text-sky-400">Ciclo Real</span> ≤ <span className="text-cyan-400">Ciclo Target</span>
+                                                    <span className="text-emerald-500">Status</span> = <span className="text-cyan-400">Ciclo Real (s)</span> ≤ <span className="text-blue-400">Ciclo Target (s)</span>
                                                 </p>
                                             </div>
-                                            <div className="space-y-1">
-                                                <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Comparación actual:</p>
-                                                <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center text-[10px] leading-normal">
-                                                    Real: <span className="text-sky-400">{((localMetrics?.machineCycleTimeMs || 0) / 1000).toFixed(2)} s</span><br />
-                                                    Límite: <span className="text-white font-bold">{(studyConfig?.targetPPM ? (60 / studyConfig.targetPPM) : 0).toFixed(2)} s</span>
+                                            <div className="space-y-1.5">
+                                                <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+                                                <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                    <span className="text-cyan-400">{((localMetrics?.machineCycleTimeMs || 0) / 1000).toFixed(2)}s</span> ≤ <span className="text-blue-400">{(studyConfig?.targetPPM ? (60 / studyConfig.targetPPM) : 0).toFixed(2)}s</span> ⇒ <span className={`font-bold ${localMetrics?.status === 'OK' ? 'text-emerald-400' : 'text-rose-400'}`}>{localMetrics?.status || '—'}</span>
                                                 </p>
                                             </div>
                                         </div>
@@ -2975,12 +2972,12 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                             </button>
                                                         </div>
                                                         <span className="text-[10px] text-slate-400 block font-mono mt-0.5" title="Capacidad te├│rica bruta al 100% de OEE">
-                                                            Bruto: {piezasDiaSinOEE > 0 ? Math.round(piezasDiaSinOEE).toLocaleString() : 'ΓÇö'}
+                                                            Bruto: {piezasDiaSinOEE > 0 ? Math.round(piezasDiaSinOEE).toLocaleString() : '—'}
                                                         </span>
                                                     </div>
                                                     <div className="mt-1">
                                                         <span className="text-lg font-black text-slate-200 block leading-tight">
-                                                            {piezasDia > 0 ? Math.round(piezasDia).toLocaleString() : 'ΓÇö'}
+                                                            {piezasDia > 0 ? Math.round(piezasDia).toLocaleString() : '—'}
                                                         </span>
                                                         <span className="text-[8px] text-slate-600 block mt-0.5">piezas (con OEE: {oeePercent}%{linkOeeToStudy ? ' real' : ''})</span>
                                                         <span className={`text-[8px] block mt-0.5 font-bold ${piezasDiaReal >= piezasDia ? 'text-emerald-400' : 'text-amber-400'}`}>
@@ -3060,17 +3057,43 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 <div className="absolute top-full left-0 mt-2 w-72 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
                                                     <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                         <Info className="w-3.5 h-3.5 text-cyan-400" />
-                                                        <span>Piezas / Día ΓÇö Desglose de Pérdidas OEE</span>
+                                                        <span>Piezas / Día — Desglose de Pérdidas OEE</span>
                                                     </div>
                                                     <div className="text-[11px] leading-relaxed space-y-1.5">
                                                         <p className="text-slate-400 text-[10px]">
                                                             El OEE ({Math.round((100 - oeePenalty) * 10) / 10}%) simula las pérdidas reales de producción por paros no planeados, 
                                                             rechazos de calidad y velocidad reducida.
                                                         </p>
-                                                        <div className="space-y-1">
+                                                        <div className="space-y-1.5">
                                                             <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
-                                                                OEE = Disp ({availability}%) × Efec ({Math.round(efficiency * 10) / 10}%) × Cal ({yieldVal}%)
+                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal text-slate-300">
+                                                                {calcMode === 'demand' ? (
+                                                                    <>
+                                                                        <span className="text-violet-400">Demanda/Día</span> = <span className="text-violet-400">Demanda Anual</span> ÷ <span className="text-indigo-400">Días Anuales</span><br/>
+                                                                        <span className="text-cyan-400">Neta/Día</span> = <span className="text-cyan-400">PPH_real</span> × <span className="text-slate-400">Hrs/Día</span> × <span className="text-emerald-400">OEE</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <span className="text-slate-300">Bruta/Día</span> = <span className="text-cyan-400">PPH_real</span> × <span className="text-slate-400">Hrs/Día</span><br/>
+                                                                        <span className="text-cyan-400">Neta/Día</span> = <span className="text-slate-300">Bruta/Día</span> × <span className="text-emerald-400">OEE</span>
+                                                                    </>
+                                                                )}
+                                                            </p>
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal text-slate-300">
+                                                                {calcMode === 'demand' ? (
+                                                                    <>
+                                                                        <span className="text-violet-400">Demanda/Día</span> = <span className="text-violet-400">{Math.round(annualDemand).toLocaleString()}</span> ÷ <span className="text-indigo-400">{diasAnuales}</span> = <span className="text-violet-400">{Math.round(studyConfig?.targetPiecesPerShift || 0).toLocaleString()} pzas</span><br/>
+                                                                        <span className="text-cyan-400">Neta/Día</span> = <span className="text-cyan-400">{Math.round(piezasHora).toLocaleString()}</span> × <span className="text-slate-400">{shiftHours}</span> × <span className="text-emerald-400">{oeePercent}%</span> = <span className="text-cyan-400">{Math.round(piezasDia).toLocaleString()} pzas</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <span className="text-slate-300">Bruta/Día</span> = <span className="text-cyan-400">{Math.round(piezasHora).toLocaleString()}</span> × <span className="text-slate-400">{shiftHours}</span> = <span className="text-slate-300">{Math.round(piezasDiaSinOEE).toLocaleString()} pzas</span><br/>
+                                                                        <span className="text-cyan-400">Neta/Día</span> = <span className="text-slate-300">{Math.round(piezasDiaSinOEE).toLocaleString()}</span> × <span className="text-emerald-400">{oeePercent}%</span> = <span className="text-cyan-400">{Math.round(piezasDia).toLocaleString()} pzas</span>
+                                                                    </>
+                                                                )}
                                                             </p>
                                                         </div>
                                                         <div className="space-y-1">
@@ -3081,15 +3104,15 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                                     <span className="text-white font-bold">{Math.round(piezasDiaSinOEE).toLocaleString()} pzas</span>
                                                                 </p>
                                                                 <p className="text-rose-400">
-                                                                    <span>Pérdida Disp:</span>{' '}
+                                                                    <span>Pérdida Disp ({studyConfig?.availability !== undefined ? studyConfig.availability : 95}%):</span>{' '}
                                                                     <span className="font-bold">−{Math.round(piezasPerdidasDisp).toLocaleString()} pzas</span>
                                                                 </p>
                                                                 <p className="text-amber-500">
-                                                                    <span>Pérdida Efec:</span>{' '}
+                                                                    <span>Pérdida Efec ({Math.round(efficiency * 10) / 10}%):</span>{' '}
                                                                     <span className="font-bold">−{Math.round(piezasPerdidasEficiencia).toLocaleString()} pzas</span>
                                                                 </p>
                                                                 <p className="text-rose-500">
-                                                                    <span>Pérdida Calidad (Scrap):</span>{' '}
+                                                                    <span>Pérdida Calidad ({studyConfig?.yield !== undefined ? studyConfig.yield : 98}%):</span>{' '}
                                                                     <span className="font-bold">−{Math.round(piezasPerdidasCalidad).toLocaleString()} pzas</span>
                                                                 </p>
                                                                 <div className="border-t border-slate-700 pt-1">
@@ -3138,18 +3161,44 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                         <span>Piezas / Semana — Bruto vs Neto</span>
                                                     </div>
                                                     <div className="text-[11px] leading-relaxed space-y-1.5">
-                                                        <div className="space-y-1">
+                                                        <p className="text-slate-400 text-[10px]">Producción semanal proyectada neta versus objetivo semanal.</p>
+                                                        <div className="space-y-1.5">
                                                             <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
-                                                                Bruto = PPH × Hrs/Turno × Días/Sem<br/>
-                                                                Neto = Bruto × OEE ({Math.round((100 - oeePenalty) * 10) / 10}%)
+                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal text-slate-300">
+                                                                {calcMode === 'demand' ? (
+                                                                    <>
+                                                                        <span className="text-violet-400">Demanda/Sem</span> = <span className="text-violet-400">Demanda/Día</span> × <span className="text-slate-400">Días/Sem</span><br/>
+                                                                        <span className="text-cyan-400">Neta/Sem</span> = <span className="text-cyan-400">Neta/Día</span> × <span className="text-slate-400">Días/Sem</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <span className="text-slate-300">Bruta/Sem</span> = <span className="text-cyan-400">PPH_real</span> × <span className="text-slate-400">Hrs/Día</span> × <span className="text-slate-400">Días/Sem</span><br/>
+                                                                        <span className="text-cyan-400">Neta/Sem</span> = <span className="text-slate-300">Bruta/Sem</span> × <span className="text-emerald-400">OEE</span>
+                                                                    </>
+                                                                )}
+                                                            </p>
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal text-slate-300">
+                                                                {calcMode === 'demand' ? (
+                                                                    <>
+                                                                        <span className="text-violet-400">Demanda/Sem</span> = <span className="text-violet-400">{Math.round(studyConfig?.targetPiecesPerShift || 0).toLocaleString()}</span> × <span className="text-slate-400">{studyConfig.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5}</span> = <span className="text-violet-400">{Math.round((studyConfig?.targetPiecesPerShift || 0) * (studyConfig.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5)).toLocaleString()} pzas</span><br/>
+                                                                        <span className="text-cyan-400">Neta/Sem</span> = <span className="text-cyan-400">{Math.round(piezasDia).toLocaleString()}</span> × <span className="text-slate-400">{studyConfig.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5}</span> = <span className="text-cyan-400">{Math.round(piezasSemana).toLocaleString()} pzas</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <span className="text-slate-300">Bruta/Sem</span> = <span className="text-cyan-400">{Math.round(piezasHora).toLocaleString()}</span> × <span className="text-slate-400">shiftHours</span> × <span className="text-slate-400">{studyConfig.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5}</span> = <span className="text-slate-300">{Math.round(pzSemBruto).toLocaleString()} pzas</span><br/>
+                                                                        <span className="text-cyan-400">Neta/Sem</span> = <span className="text-slate-300">{Math.round(pzSemBruto).toLocaleString()}</span> × <span className="text-emerald-400">{oeePercent}%</span> = <span className="text-cyan-400">{Math.round(piezasSemana).toLocaleString()} pzas</span>
+                                                                    </>
+                                                                )}
                                                             </p>
                                                         </div>
                                                         <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-0.5">
-                                                            <p><span className="text-slate-500">Bruto:</span> <span className="text-white font-bold">{Math.round(pzSemBruto).toLocaleString()} pzas</span></p>
+                                                            <p><span className="text-slate-500">Bruto Semanal:</span> <span className="text-white font-bold">{Math.round(pzSemBruto).toLocaleString()} pzas</span></p>
                                                             <p className="text-rose-400">Pérdida OEE: <span className="font-bold">−{Math.round(perdidaSem).toLocaleString()} pzas</span></p>
                                                             <div className="border-t border-slate-700 pt-0.5">
-                                                                <span className="text-slate-500">Neto:</span> <span className="text-violet-400 font-bold">{Math.round(piezasSemana).toLocaleString()} pzas/sem</span>
+                                                                <span className="text-slate-500">Neto Semanal:</span> <span className="text-violet-400 font-bold">{Math.round(piezasSemana).toLocaleString()} pzas/sem</span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -3194,18 +3243,43 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                         <p className="text-slate-400 text-[10px]">
                                                             Proyección anual: {diasAnuales} días laborales ({workDaysPerWeek} días/sem × 52 − {feriados} feriados {country}).
                                                         </p>
-                                                        <div className="space-y-1">
+                                                        <div className="space-y-1.5">
                                                             <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
-                                                                Bruto = PPH × Hrs/Turno × {diasAnuales} días<br/>
-                                                                Neto = Bruto × OEE ({Math.round((100 - oeePenalty) * 10) / 10}%)
+                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal text-slate-300">
+                                                                {calcMode === 'demand' ? (
+                                                                    <>
+                                                                        <span className="text-violet-400">Demanda Anual</span> = (input primario)<br/>
+                                                                        <span className="text-cyan-400">Neta/Año</span> = <span className="text-cyan-400">Neta/Día</span> × <span className="text-indigo-400">{diasAnuales} días</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <span className="text-slate-300">Bruta/Año</span> = <span className="text-cyan-400">PPH_real</span> × <span className="text-slate-400">Hrs/Día</span> × <span className="text-indigo-400">{diasAnuales} días</span><br/>
+                                                                        <span className="text-cyan-400">Neta/Año</span> = <span className="text-slate-300">Bruta/Año</span> × <span className="text-emerald-400">OEE</span>
+                                                                    </>
+                                                                )}
+                                                            </p>
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal text-slate-300">
+                                                                {calcMode === 'demand' ? (
+                                                                    <>
+                                                                        <span className="text-violet-400">Demanda Anual</span> = <span className="text-violet-400">{Math.round(annualDemand).toLocaleString()} pzas</span><br/>
+                                                                        <span className="text-cyan-400">Neta/Año</span> = <span className="text-cyan-400">{Math.round(piezasDia).toLocaleString()}</span> × <span className="text-indigo-400">{diasAnuales}</span> = <span className="text-cyan-400">{Math.round(piezasAno).toLocaleString()} pzas</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <span className="text-slate-300">Bruta/Año</span> = <span className="text-cyan-400">{Math.round(piezasHora).toLocaleString()}</span> × <span className="text-slate-400">shiftHours</span> × <span className="text-indigo-400">{diasAnuales}</span> = <span className="text-slate-300">{Math.round(pzAnoBruto).toLocaleString()} pzas</span><br/>
+                                                                        <span className="text-cyan-400">Neta/Año</span> = <span className="text-slate-300">{Math.round(pzAnoBruto).toLocaleString()}</span> × <span className="text-emerald-400">{oeePercent}%</span> = <span className="text-cyan-400">{Math.round(piezasAno).toLocaleString()} pzas</span>
+                                                                    </>
+                                                                )}
                                                             </p>
                                                         </div>
                                                         <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-0.5">
-                                                            <p><span className="text-slate-500">Bruto:</span> <span className="text-white font-bold">{Math.round(pzAnoBruto).toLocaleString()} pzas</span></p>
+                                                            <p><span className="text-slate-500">Bruto Anual:</span> <span className="text-white font-bold">{Math.round(pzAnoBruto).toLocaleString()} pzas</span></p>
                                                             <p className="text-rose-400">Pérdida OEE: <span className="font-bold">−{Math.round(perdidaAno).toLocaleString()} pzas</span></p>
                                                             <div className="border-t border-slate-700 pt-0.5">
-                                                                <span className="text-slate-500">Neto:</span> <span className="text-amber-400 font-bold">{Math.round(piezasAno).toLocaleString()} pzas/año</span>
+                                                                <span className="text-slate-500">Neto Anual:</span> <span className="text-amber-400 font-bold">{Math.round(piezasAno).toLocaleString()} pzas/año</span>
                                                             </div>
                                                         </div>
                                                         <div className="space-y-1">
@@ -3847,7 +3921,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                                     disabled={!canEdit}
                                                                     className="w-full bg-transparent border-0 border-b border-transparent hover:border-slate-700 focus:border-cyan-500 focus:ring-0 text-xs text-slate-300 py-1"
                                                                 >
-                                                                    <option value="">ΓÇö Ninguno ΓÇö</option>
+                                                                    <option value="">— Ninguno —</option>
                                                                     {Object.entries(TIMING_DEVICE_TYPES).map(([k, v]) => (
                                                                         <option key={k} value={v}>
                                                                             {v}{DEVICE_LABELS[v] ? ` (${DEVICE_LABELS[v]})` : ''}
@@ -3864,7 +3938,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                                     disabled={!canEdit}
                                                                     className="w-full bg-transparent border-0 border-b border-transparent hover:border-slate-700 focus:border-cyan-500 focus:ring-0 text-xs text-slate-300 py-1"
                                                                 >
-                                                                    <option value="">ΓÇö Ninguno ΓÇö</option>
+                                                                    <option value="">— Ninguno —</option>
                                                                     {getValidActionsForDevice(step.deviceType).map((action) => (
                                                                         <option key={action} value={action}>
                                                                             {action}{ACTION_LABELS[action] ? ` (${ACTION_LABELS[action]})` : ''}
@@ -3893,7 +3967,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                                     disabled={!canEdit}
                                                                     className="w-full bg-transparent border-0 border-b border-transparent hover:border-slate-700 focus:border-cyan-500 focus:ring-0 text-xs text-slate-300 py-1"
                                                                 >
-                                                                    <option value="">ΓÇö Ninguno ΓÇö</option>
+                                                                    <option value="">— Ninguno —</option>
                                                                     {Object.entries(TIMING_SENSOR_TYPES).map(([k, v]) => (
                                                                         <option key={k} value={v}>
                                                                             {v}{SENSOR_LABELS[v] ? ` (${SENSOR_LABELS[v]})` : ''}
@@ -3910,7 +3984,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                                         <TableInput
                                                                             type={isCylinderOrServo ? "number" : "text"}
                                                                             min="0"
-                                                                            value={isCylinderOrServo ? (step.linearDistanceMm || 0) : 'ΓÇö'}
+                                                                            value={isCylinderOrServo ? (step.linearDistanceMm || 0) : '—'}
                                                                             onBlur={e => isCylinderOrServo && handleUpdateStepField(step.id, 'linearDistanceMm', Number(e.target.value) || 0)}
                                                                             disabled={!canEdit || !isCylinderOrServo}
                                                                             className={`w-full bg-transparent border-0 border-b border-transparent hover:border-slate-700 focus:border-cyan-500 focus:ring-0 text-xs text-center py-1 font-mono ${
@@ -3929,7 +4003,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                                         <TableInput
                                                                             type={isRotary ? "number" : "text"}
                                                                             min="0"
-                                                                            value={isRotary ? (step.angularDistanceDeg || 0) : 'ΓÇö'}
+                                                                            value={isRotary ? (step.angularDistanceDeg || 0) : '—'}
                                                                             onBlur={e => isRotary && handleUpdateStepField(step.id, 'angularDistanceDeg', Number(e.target.value) || 0)}
                                                                             disabled={!canEdit || !isRotary}
                                                                             className={`w-full bg-transparent border-0 border-b border-transparent hover:border-slate-700 focus:border-cyan-500 focus:ring-0 text-xs text-center py-1 font-mono ${
@@ -3962,7 +4036,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                                         <span>
                                                                             {step.dependencyStepIds?.length > 0
                                                                                 ? `${step.dependencyStepIds.length} dep(s)`
-                                                                                : 'ΓÇö Sin dep ΓÇö'
+                                                                                : '— Sin dep —'
                                                                             }
                                                                         </span>
                                                                         <ChevronDown className="w-3.5 h-3.5 text-slate-500 shrink-0" />
