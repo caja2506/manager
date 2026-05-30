@@ -2546,9 +2546,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         )}
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Objetivo / Hora</span>
                                         <span className="text-lg font-black text-blue-400 block mt-1">
-                                            {calcMode === 'demand'
-                                                ? Math.round(piezasHoraTarget).toLocaleString()
-                                                : (studyConfig?.targetPPM ? Math.round(studyConfig.targetPPM * 60 * (studyConfig.cycleOutputQty || 1)).toLocaleString() : '—')}
+                                            {piezasHoraTarget ? Math.round(piezasHoraTarget).toLocaleString() : '—'}
                                         </span>
                                         <span className="text-[8px] text-slate-600 block">pzas/hr</span>
 
@@ -2608,9 +2606,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Ciclos / Min</span>
                                         <span className="text-[10px] text-slate-500 block font-mono mt-0.5">Objetivo</span>
                                         <span className="text-lg font-black text-blue-400 block mt-0.5">
-                                            {calcMode === 'demand'
-                                                ? (ppmTarget ? ppmTarget.toFixed(2) : '—')
-                                                : (studyConfig?.targetPPM || '—')}
+                                            {ppmTarget ? ppmTarget.toFixed(2) : '—'}
                                         </span>
                                         <span className="text-[8px] text-slate-600 block">PPM Obj</span>
 
@@ -2631,7 +2627,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 <div className="space-y-1.5">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
                                                     <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                        <span className="text-blue-400">PPM_obj</span> = <span className="text-blue-400">{Math.round(piezasHoraTarget).toLocaleString()}</span> ÷ 60 ÷ <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-blue-400">{calcMode === 'demand' ? (ppmTarget ? ppmTarget.toFixed(2) : 0) : (studyConfig?.targetPPM || 0)} PPM</span>
+                                                        <span className="text-blue-400">PPM_obj</span> = <span className="text-blue-400">{Math.round(piezasHoraTarget).toLocaleString()}</span> ÷ 60 ÷ <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-blue-400">{ppmTarget ? ppmTarget.toFixed(2) : 0} PPM</span>
                                                     </p>
                                                 </div>
                                             </div>
