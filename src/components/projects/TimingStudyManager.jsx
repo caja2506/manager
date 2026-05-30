@@ -2482,7 +2482,9 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         )}
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Objetivo / Día</span>
                                         <span className="text-lg font-black text-slate-200 block mt-1">
-                                            {studyConfig?.targetPiecesPerShift ? Number(studyConfig.targetPiecesPerShift).toLocaleString() : '—'}
+                                            {calcMode === 'demand'
+                                                ? Math.round(piezasDia).toLocaleString()
+                                                : (studyConfig?.targetPiecesPerShift ? Number(studyConfig.targetPiecesPerShift).toLocaleString() : '—')}
                                         </span>
                                         <span className="text-[8px] text-slate-600 block">piezas/día</span>
 
@@ -2513,7 +2515,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                     <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
                                                         {calcMode === 'demand' ? (
                                                             <>
-                                                                <span className="text-violet-400">{Math.round(annualDemand).toLocaleString()}</span> ÷ <span className="text-indigo-400">{diasAnuales}</span> = <span className="text-blue-400">{Math.round(studyConfig?.targetPiecesPerShift || 0).toLocaleString()} pzas/día</span>
+                                                                <span className="text-violet-400">{Math.round(annualDemand).toLocaleString()}</span> ÷ <span className="text-indigo-400">{diasAnuales}</span> = <span className="text-blue-400">{Math.round(piezasDia || 0).toLocaleString()} pzas/día</span>
                                                             </>
                                                         ) : (
                                                             <>
@@ -2541,7 +2543,9 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         )}
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Objetivo / Hora</span>
                                         <span className="text-lg font-black text-blue-400 block mt-1">
-                                            {studyConfig?.targetPPM ? Math.round(studyConfig.targetPPM * 60 * (studyConfig.cycleOutputQty || 1)).toLocaleString() : '—'}
+                                            {calcMode === 'demand'
+                                                ? Math.round(piezasHoraTarget).toLocaleString()
+                                                : (studyConfig?.targetPPM ? Math.round(studyConfig.targetPPM * 60 * (studyConfig.cycleOutputQty || 1)).toLocaleString() : '—')}
                                         </span>
                                         <span className="text-[8px] text-slate-600 block">pzas/hr</span>
 
@@ -2601,7 +2605,9 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Ciclos / Min</span>
                                         <span className="text-[10px] text-slate-500 block font-mono mt-0.5">Objetivo</span>
                                         <span className="text-lg font-black text-blue-400 block mt-0.5">
-                                            {studyConfig?.targetPPM || '—'}
+                                            {calcMode === 'demand'
+                                                ? (ppmTarget ? ppmTarget.toFixed(2) : '—')
+                                                : (studyConfig?.targetPPM || '—')}
                                         </span>
                                         <span className="text-[8px] text-slate-600 block">PPM Obj</span>
 
@@ -2622,7 +2628,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 <div className="space-y-1.5">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
                                                     <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                        <span className="text-blue-400">PPM_obj</span> = <span className="text-blue-400">{Math.round(piezasHoraTarget).toLocaleString()}</span> ÷ 60 ÷ <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-blue-400">{studyConfig?.targetPPM || 0} PPM</span>
+                                                        <span className="text-blue-400">PPM_obj</span> = <span className="text-blue-400">{Math.round(piezasHoraTarget).toLocaleString()}</span> ÷ 60 ÷ <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-blue-400">{calcMode === 'demand' ? (ppmTarget ? ppmTarget.toFixed(2) : 0) : (studyConfig?.targetPPM || 0)} PPM</span>
                                                     </p>
                                                 </div>
                                             </div>
@@ -2644,7 +2650,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         )}
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Ciclo Target</span>
                                         <span className="text-lg font-black text-slate-200 block mt-1">
-                                            {studyConfig?.targetPPM ? formatTime((60 / studyConfig.targetPPM) * 1000) : '—'}
+                                            {cicloTargetSeg ? formatTime(cicloTargetSeg * 1000) : '—'}
                                         </span>
                                         <span className="text-[8px] text-slate-600 block">segundos</span>
                                         <span className={`text-[8px] block mt-0.5 font-bold ${cicloRealSeg <= cicloTargetSeg ? 'text-emerald-400' : 'text-amber-400'}`}>
@@ -2668,7 +2674,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 <div className="space-y-1.5">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
                                                     <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                        <span className="text-slate-300">Ciclo Target</span> = 60 / <span className="text-blue-400">{studyConfig?.targetPPM || 0}</span> = <span className="text-slate-300">{(studyConfig?.targetPPM ? (60 / studyConfig.targetPPM) : 0).toFixed(2)} s</span>
+                                                        <span className="text-slate-300">Ciclo Target</span> = 60 / <span className="text-blue-400">{calcMode === 'demand' ? (ppmTarget ? ppmTarget.toFixed(2) : 0) : (studyConfig?.targetPPM || 0)}</span> = <span className="text-slate-300">{cicloTargetSeg.toFixed(2)} s</span>
                                                     </p>
                                                 </div>
                                             </div>
@@ -2704,7 +2710,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         )}
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Ciclo Real</span>
                                         <span className="text-[10px] text-slate-500 block font-mono mt-0.5">
-                                            Obj: {studyConfig?.targetPPM ? `${(60 / studyConfig.targetPPM).toFixed(2)}s` : '—'}
+                                            Obj: {cicloTargetSeg ? `${cicloTargetSeg.toFixed(2)}s` : '—'}
                                         </span>
                                         <span className="text-lg font-black text-cyan-400 block mt-0.5">
                                             {formatTime(localMetrics?.machineCycleTimeMs)}
@@ -2845,7 +2851,9 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
 
                                     {/* Real / Hora */}
                                     {(() => {
-                                        const targetPPH = studyConfig?.targetPPM ? Math.round(studyConfig.targetPPM * 60 * (studyConfig.cycleOutputQty || 1)) : 0;
+                                        const targetPPH = calcMode === 'demand' 
+                                            ? Math.round(piezasHoraTarget)
+                                            : (studyConfig?.targetPPM ? Math.round(studyConfig.targetPPM * 60 * (studyConfig.cycleOutputQty || 1)) : 0);
                                         const realPPH = piezasHora || 0;
                                         const onTarget = targetPPH > 0 && realPPH >= targetPPH;
                                         return (
@@ -2938,7 +2946,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                             <div className="space-y-1.5">
                                                 <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
                                                 <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                    <span className="text-cyan-400">{((localMetrics?.machineCycleTimeMs || 0) / 1000).toFixed(2)}s</span> ≤ <span className="text-blue-400">{(studyConfig?.targetPPM ? (60 / studyConfig.targetPPM) : 0).toFixed(2)}s</span> ⇒ <span className={`font-bold ${localMetrics?.status === 'OK' ? 'text-emerald-400' : 'text-rose-400'}`}>{localMetrics?.status || '—'}</span>
+                                                    <span className="text-cyan-400">{((localMetrics?.machineCycleTimeMs || 0) / 1000).toFixed(2)}s</span> ≤ <span className="text-blue-400">{cicloTargetSeg.toFixed(2)}s</span> ⇒ <span className={`font-bold ${localMetrics?.status === 'OK' ? 'text-emerald-400' : 'text-rose-400'}`}>{localMetrics?.status || '—'}</span>
                                                 </p>
                                             </div>
                                         </div>
@@ -3099,7 +3107,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                             <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal text-slate-300">
                                                                 {calcMode === 'demand' ? (
                                                                     <>
-                                                                        <span className="text-violet-400">Demanda/Día</span> = <span className="text-violet-400">{Math.round(annualDemand).toLocaleString()}</span> ÷ <span className="text-indigo-400">{diasAnuales}</span> = <span className="text-violet-400">{Math.round(studyConfig?.targetPiecesPerShift || 0).toLocaleString()} pzas</span><br/>
+                                                                        <span className="text-violet-400">Demanda/Día</span> = <span className="text-violet-400">{Math.round(annualDemand).toLocaleString()}</span> ÷ <span className="text-indigo-400">{diasAnuales}</span> = <span className="text-violet-400">{Math.round(piezasDia).toLocaleString()} pzas</span><br/>
                                                                         <span className="text-cyan-400">Neta/Día</span> = <span className="text-cyan-400">{Math.round(piezasHora).toLocaleString()}</span> × <span className="text-slate-400">{shiftHours}</span> × <span className="text-emerald-400">{oeePercent}%</span> = <span className="text-cyan-400">{Math.round(piezasDia).toLocaleString()} pzas</span>
                                                                     </>
                                                                 ) : (
@@ -3197,7 +3205,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                             <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal text-slate-300">
                                                                 {calcMode === 'demand' ? (
                                                                     <>
-                                                                        <span className="text-violet-400">Demanda/Sem</span> = <span className="text-violet-400">{Math.round(studyConfig?.targetPiecesPerShift || 0).toLocaleString()}</span> × <span className="text-slate-400">{studyConfig?.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5}</span> = <span className="text-violet-400">{Math.round((studyConfig?.targetPiecesPerShift || 0) * (studyConfig?.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5)).toLocaleString()} pzas</span><br/>
+                                                                        <span className="text-violet-400">Demanda/Sem</span> = <span className="text-violet-400">{Math.round(piezasDia).toLocaleString()}</span> × <span className="text-slate-400">{studyConfig?.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5}</span> = <span className="text-violet-400">{Math.round(piezasSemana).toLocaleString()} pzas</span><br/>
                                                                         <span className="text-cyan-400">Neta/Sem</span> = <span className="text-cyan-400">{Math.round(piezasDia).toLocaleString()}</span> × <span className="text-slate-400">{studyConfig?.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5}</span> = <span className="text-cyan-400">{Math.round(piezasSemana).toLocaleString()} pzas</span>
                                                                     </>
                                                                 ) : (
