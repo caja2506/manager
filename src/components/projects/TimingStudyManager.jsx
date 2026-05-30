@@ -2485,30 +2485,24 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 {getHighlightLabel('card-objDia')}
                                             </span>
                                         )}
-                                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Objetivo / Día</span>
-                                        <span className="text-lg font-black text-slate-200 block mt-1">
-                                            {piezasDia ? Math.round(piezasDia).toLocaleString() : '—'}
-                                        </span>
-                                        <span className="text-[8px] text-slate-600 block">piezas/día</span>
-
-                                        {/* Tooltip */}
+                                                      {/* Tooltip */}
                                         <div className={`absolute top-full left-0 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-objDia' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
                                             <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                 <Info className="w-3.5 h-3.5 text-blue-400" />
                                                 <span>Objetivo / Día</span>
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
-                                                <p className="text-slate-400 text-[10px]">Meta de producción requerida por día de trabajo.</p>
+                                                <p className="text-slate-400 text-[10px]">Meta de producción neta (piezas buenas) requerida por día de trabajo.</p>
                                                 <div className="space-y-1.5">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
                                                     <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
                                                         {calcMode === 'demand' ? (
                                                             <>
-                                                                <span className="text-white">Obj/Día</span> = <span className="text-violet-400">Demanda</span> ÷ <span className="text-indigo-400">Días/Año</span>
+                                                                <span className="text-white">Obj/Día (Neto)</span> = <span className="text-violet-400">Demanda</span> ÷ <span className="text-indigo-400">Días/Año</span>
                                                             </>
                                                         ) : (
                                                             <>
-                                                                <span className="text-white">Obj/Día</span> = <span className="text-blue-400">PPM_obj</span> × 60 × <span className="text-slate-400">Hrs/Día</span> × <span className="text-fuchsia-400">UP</span> × <span className="text-emerald-400">OEE</span>
+                                                                <span className="text-white">Obj/Día (Neto)</span> = <span className="text-blue-400">Meta de Turno</span>
                                                             </>
                                                         )}
                                                     </p>
@@ -2522,7 +2516,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                             </>
                                                         ) : (
                                                             <>
-                                                                <span className="text-blue-400">{ppmTarget ? ppmTarget.toFixed(2) : 0}</span> × 60 × <span className="text-slate-400">{shiftHours}</span> × <span className="text-fuchsia-400">{cycleOutputQty}</span> × <span className="text-emerald-400">{oeePercent}%</span> = <span className="text-blue-400">{Math.round(piezasDia || 0).toLocaleString()} pzas/día</span>
+                                                                <span className="text-blue-400">{Math.round(piezasDia || 0).toLocaleString()} pzas/día</span> <span className="text-slate-500">(definido por usuario)</span>
                                                             </>
                                                         )}
                                                     </p>
@@ -2557,33 +2551,17 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 <span>Objetivo / Hora</span>
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
-                                                <p className="text-slate-400 text-[10px]">Meta de producción de piezas por hora de trabajo.</p>
+                                                <p className="text-slate-400 text-[10px]">Meta de producción de piezas por hora de trabajo (Bruta, considerando pérdidas por OEE).</p>
                                                 <div className="space-y-1.5">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
                                                     <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                        {calcMode === 'demand' ? (
-                                                            <>
-                                                                <span className="text-white">Obj/Hora</span> = (<span className="text-violet-400">Demanda</span> ÷ <span className="text-indigo-400">Días/Año</span>) ÷ <span className="text-emerald-400">OEE</span> ÷ <span className="text-slate-400">Hrs/Día</span>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <span className="text-white">Obj/Hora</span> = <span className="text-blue-400">PPM_obj</span> × 60 × <span className="text-fuchsia-400">UP</span>
-                                                            </>
-                                                        )}
+                                                        <span className="text-white">Obj/Hora (Bruto)</span> = <span className="text-blue-400">Obj/Día (Neto)</span> ÷ <span className="text-emerald-400">OEE</span> ÷ <span className="text-slate-400">Hrs/Día</span>
                                                     </p>
                                                 </div>
                                                 <div className="space-y-1.5">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
                                                     <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                        {calcMode === 'demand' ? (
-                                                            <>
-                                                                (<span className="text-violet-400">{Math.round(annualDemand).toLocaleString()}</span> ÷ <span className="text-indigo-400">{diasAnuales}</span>) ÷ <span className="text-emerald-400">{oeePercent}%</span> ÷ <span className="text-slate-400">{shiftHours}</span> = <span className="text-blue-400">{Math.round(piezasHoraTarget).toLocaleString()} pzas/hr</span>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <span className="text-blue-400">{ppmTarget ? ppmTarget.toFixed(2) : 0}</span> × 60 × <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-blue-400">{Math.round(piezasHoraTarget).toLocaleString()} pzas/hr</span>
-                                                            </>
-                                                        )}
+                                                        <span className="text-blue-400">{Math.round(piezasDia || 0).toLocaleString()}</span> ÷ <span className="text-emerald-400">{oeePercent}%</span> ÷ <span className="text-slate-400">{shiftHours}</span> = <span className="text-blue-400">{Math.round(piezasHoraTarget).toLocaleString()} pzas/hr</span>
                                                     </p>
                                                 </div>
                                             </div>
@@ -2617,17 +2595,17 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 <span>Ciclos / Min Objetivo (PPM)</span>
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
-                                                <p className="text-slate-400 text-[10px]">Meta de ciclos por minuto (PPM) definida en la configuración del estudio.</p>
+                                                <p className="text-slate-400 text-[10px]">Meta de velocidad bruta en ciclos por minuto (PPM) a la que debe operar la máquina.</p>
                                                 <div className="space-y-1.5">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
                                                     <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                        <span className="text-blue-400">PPM_obj</span> = <span className="text-blue-400">Obj/Hora</span> ÷ 60 ÷ <span className="text-fuchsia-400">UP</span>
+                                                        <span className="text-blue-400">PPM_obj</span> = <span className="text-blue-400">Obj/Hora (Bruto)</span> ÷ 60 ÷ <span className="text-fuchsia-400">UP</span>
                                                     </p>
                                                 </div>
                                                 <div className="space-y-1.5">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
                                                     <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                        <span className="text-blue-400">PPM_obj</span> = <span className="text-blue-400">{Math.round(piezasHoraTarget).toLocaleString()}</span> ÷ 60 ÷ <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-blue-400">{ppmTarget ? ppmTarget.toFixed(2) : 0} PPM</span>
+                                                        <span className="text-blue-400">PPM_obj</span> = <span className="text-blue-400">{Math.round(piezasHoraTarget).toLocaleString()}</span> ÷ 60 ÷ <span className="text-fuchsia-400">{cycleOutputQty}</span> = <span className="text-blue-400">{ppmTarget ? ppmTarget.toFixed(2) : 0} PPM</span>
                                                     </p>
                                                 </div>
                                             </div>
@@ -2663,7 +2641,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 <span>Ciclo Target</span>
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
-                                                <p className="text-slate-400 text-[10px]">Tiempo máximo permitido por ciclo de máquina para cumplir la meta.</p>
+                                                <p className="text-slate-400 text-[10px]">Tiempo máximo permitido por ciclo de máquina (en segundos) para cumplir la meta bruta.</p>
                                                 <div className="space-y-1.5">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
                                                     <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
@@ -2673,7 +2651,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 <div className="space-y-1.5">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
                                                     <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                        <span className="text-slate-300">Ciclo Target</span> = 60 / <span className="text-blue-400">{calcMode === 'demand' ? (ppmTarget ? ppmTarget.toFixed(2) : 0) : (studyConfig?.targetPPM || 0)}</span> = <span className="text-slate-300">{cicloTargetSeg.toFixed(2)} s</span>
+                                                        <span className="text-slate-300">Ciclo Target</span> = 60 / <span className="text-blue-400">{ppmTarget ? ppmTarget.toFixed(2) : 0}</span> = <span className="text-slate-300">{cicloTargetSeg.toFixed(2)} s</span>
                                                     </p>
                                                 </div>
                                             </div>
