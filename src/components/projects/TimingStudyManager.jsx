@@ -173,7 +173,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
     // Mapa bidireccional de dependencias
     const DEPENDENCY_RELATIONS = useMemo(() => ({
         // Inputs -> KPIs que afectan
-        'input-piecesPerHour': ['card-objDia', 'card-objHora', 'card-ppmObj', 'card-cicloTarget'],
+        'input-piecesPerHour': ['card-objDia', 'card-objHora', 'card-ppmObj', 'card-cicloTarget', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno'],
         'input-shiftHours': ['card-objDia', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno'],
         'input-oeePenalty': ['card-piezasDia', 'card-piezasSem', 'card-piezasAno', 'input-availability', 'input-efficiency', 'input-yield'],
         'input-availability': ['input-oeePenalty', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno'],
@@ -181,26 +181,25 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         'input-yield': ['input-oeePenalty', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno'],
         'input-workDaysPerWeek': ['card-piezasSem', 'card-piezasAno'],
         'input-country': ['card-piezasAno'],
-        'input-annualDemand': ['card-piezasAno'],
-        'input-machineType': ['card-cicloReal', 'card-ppmReal', 'card-realHora', 'card-piezasHora', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno', 'input-indexTime', 'input-dwellTime'],
-        'input-indexTime': ['card-cicloReal', 'card-ppmReal', 'card-realHora', 'card-piezasHora', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno'],
-        'input-dwellTime': ['card-cicloReal', 'card-ppmReal', 'card-realHora', 'card-piezasHora', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno', 'card-bottleneck'],
-        'input-up': ['card-objDia', 'card-objHora', 'card-ppmObj', 'card-cicloTarget', 'card-realHora', 'card-piezasHora', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno'],
+        'input-annualDemand': ['card-piezasAno', 'input-piecesPerHour'],
+        'input-machineType': ['card-cicloReal', 'card-ppmReal', 'card-realHora', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno', 'input-indexTime', 'input-dwellTime'],
+        'input-indexTime': ['card-cicloReal', 'card-ppmReal', 'card-realHora', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno'],
+        'input-dwellTime': ['card-cicloReal', 'card-ppmReal', 'card-realHora', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno', 'card-bottleneck'],
+        'input-up': ['card-objDia', 'card-objHora', 'card-ppmObj', 'card-cicloTarget', 'card-realHora', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno'],
 
         // KPIs -> Inputs de los que dependen o KPIs relacionados
         'card-objDia': ['input-piecesPerHour', 'input-shiftHours', 'input-up', 'card-ppmObj'],
         'card-objHora': ['input-piecesPerHour', 'input-up', 'card-ppmObj'],
         'card-ppmObj': ['input-piecesPerHour', 'input-up'],
         'card-cicloTarget': ['card-ppmObj'],
-        'card-realHora': ['card-ppmReal', 'input-up', 'input-machineType', 'card-piezasHora'],
+        'card-realHora': ['card-ppmReal', 'input-up', 'input-machineType', 'input-indexTime', 'input-dwellTime'],
         'card-bottleneck': ['input-dwellTime'],
         'card-status': ['card-cicloReal', 'card-cicloTarget'],
-        'card-piezasDia': ['card-realHora', 'card-piezasHora', 'input-shiftHours', 'input-oeePenalty', 'input-availability', 'input-efficiency', 'input-yield'],
-        'card-piezasHora': ['card-realHora', 'card-ppmReal', 'input-up'],
+        'card-piezasDia': ['card-realHora', 'input-shiftHours', 'input-oeePenalty', 'input-availability', 'input-efficiency', 'input-yield', 'input-piecesPerHour'],
         'card-ppmReal': ['card-cicloReal', 'input-machineType', 'input-indexTime', 'input-dwellTime'],
         'card-cicloReal': ['input-dwellTime', 'input-indexTime', 'input-machineType'],
-        'card-piezasSem': ['card-piezasDia', 'input-workDaysPerWeek', 'input-availability', 'input-efficiency', 'input-yield'],
-        'card-piezasAno': ['card-piezasDia', 'input-workDaysPerWeek', 'input-country', 'input-annualDemand', 'input-availability', 'input-efficiency', 'input-yield']
+        'card-piezasSem': ['card-piezasDia', 'input-workDaysPerWeek', 'input-shiftHours', 'input-oeePenalty', 'input-availability', 'input-efficiency', 'input-yield', 'input-piecesPerHour'],
+        'card-piezasAno': ['card-piezasDia', 'input-workDaysPerWeek', 'input-country', 'input-annualDemand', 'input-shiftHours', 'input-oeePenalty', 'input-availability', 'input-efficiency', 'input-yield', 'input-piecesPerHour']
     }), []);
 
     const getHighlightStyles = useCallback((id) => {
@@ -2476,21 +2475,37 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         {/* Tooltip */}
                                         <div className="absolute top-full left-0 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
                                             <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
-                                                <Info className="w-3.5 h-3.5 text-cyan-400" />
+                                                <Info className="w-3.5 h-3.5 text-blue-400" />
                                                 <span>Objetivo / Día</span>
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
                                                 <p className="text-slate-400 text-[10px]">Meta de producción requerida por día de trabajo.</p>
-                                                <div className="space-y-1">
+                                                <div className="space-y-1.5">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[11px] leading-normal">
-                                                        <span className="text-cyan-400">PPM_obj</span> × 60 × <span className="text-indigo-400">Horas/Día</span> × <span className="text-fuchsia-400">UP</span>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                        {calcMode === 'demand' ? (
+                                                            <>
+                                                                <span className="text-white">Obj/Día</span> = <span className="text-violet-400">Demanda</span> ÷ <span className="text-indigo-400">Días/Año</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <span className="text-white">Obj/Día</span> = <span className="text-blue-400">PPM_obj</span> × 60 × <span className="text-slate-400">Hrs/Día</span> × <span className="text-fuchsia-400">UP</span>
+                                                            </>
+                                                        )}
                                                     </p>
                                                 </div>
-                                                <div className="space-y-1">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Valores actuales:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center text-[10px] leading-normal">
-                                                        <span className="text-cyan-400">{studyConfig?.targetPPM || 0}</span> × 60 × <span className="text-indigo-400">{studyConfig?.shiftHours || 8}</span> × <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-white font-bold">{Math.round((studyConfig?.targetPPM || 0) * 60 * (studyConfig?.shiftHours || 8) * (studyConfig?.cycleOutputQty || 1)).toLocaleString()} pzas/día</span>
+                                                <div className="space-y-1.5">
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                        {calcMode === 'demand' ? (
+                                                            <>
+                                                                <span className="text-violet-400">{Math.round(annualDemand).toLocaleString()}</span> ÷ <span className="text-indigo-400">{diasAnuales}</span> = <span className="text-blue-400">{Math.round(studyConfig?.targetPiecesPerShift || 0).toLocaleString()} pzas/día</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <span className="text-blue-400">{studyConfig?.targetPPM || 0}</span> × 60 × <span className="text-slate-400">{studyConfig?.shiftHours || 8}</span> × <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-blue-400">{Math.round(studyConfig?.targetPiecesPerShift || 0).toLocaleString()} pzas/día</span>
+                                                            </>
+                                                        )}
                                                     </p>
                                                 </div>
                                             </div>
@@ -2524,16 +2539,32 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
                                                 <p className="text-slate-400 text-[10px]">Meta de producción de piezas por hora de trabajo.</p>
-                                                <div className="space-y-1">
+                                                <div className="space-y-1.5">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[11px] leading-normal">
-                                                        <span className="text-cyan-400">PPM_obj</span> × 60 × <span className="text-fuchsia-400">UP</span>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                        {calcMode === 'demand' ? (
+                                                            <>
+                                                                <span className="text-white">Obj/Hora</span> = (<span className="text-violet-400">Demanda</span> ÷ <span className="text-indigo-400">Días/Año</span>) ÷ <span className="text-emerald-400">OEE</span> ÷ <span className="text-slate-400">Hrs/Día</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <span className="text-white">Obj/Hora</span> = <span className="text-blue-400">PPM_obj</span> × 60 × <span className="text-fuchsia-400">UP</span>
+                                                            </>
+                                                        )}
                                                     </p>
                                                 </div>
-                                                <div className="space-y-1">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Valores actuales:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center text-[10px] leading-normal">
-                                                        <span className="text-cyan-400">{studyConfig?.targetPPM || 0}</span> × 60 × <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-blue-400 font-bold">{Math.round((studyConfig?.targetPPM || 0) * 60 * (studyConfig?.cycleOutputQty || 1)).toLocaleString()} pzas/hr</span>
+                                                <div className="space-y-1.5">
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                        {calcMode === 'demand' ? (
+                                                            <>
+                                                                (<span className="text-violet-400">{Math.round(annualDemand).toLocaleString()}</span> ÷ <span className="text-indigo-400">{diasAnuales}</span>) ÷ <span className="text-emerald-400">{oeePercent}%</span> ÷ <span className="text-slate-400">{shiftHours}</span> = <span className="text-blue-400">{Math.round(piezasHoraTarget).toLocaleString()} pzas/hr</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <span className="text-blue-400">{studyConfig?.targetPPM || 0}</span> × 60 × <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-blue-400">{Math.round(piezasHoraTarget).toLocaleString()} pzas/hr</span>
+                                                            </>
+                                                        )}
                                                     </p>
                                                 </div>
                                             </div>
@@ -2568,18 +2599,16 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
                                                 <p className="text-slate-400 text-[10px]">Meta de ciclos por minuto (PPM) definida en la configuración del estudio.</p>
-                                                <div className="space-y-1">
+                                                <div className="space-y-1.5">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[11px] leading-normal">
-                                                        <span className="text-blue-400">PPM</span> = 60 / <span className="text-cyan-400">Ciclo Target (s)</span>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                        <span className="text-blue-400">PPM_obj</span> = <span className="text-blue-400">Obj/Hora</span> ÷ 60 ÷ <span className="text-fuchsia-400">UP</span>
                                                     </p>
                                                 </div>
-                                                <div className="space-y-1">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Valores actuales:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center text-[10px] leading-normal">
-                                                        PPM Objetivo: <span className="text-blue-400 font-bold">{studyConfig?.targetPPM || 0}</span><br />
-                                                        Ciclo Target: 60 / <span className="text-blue-400">{studyConfig?.targetPPM || 0}</span> = <span className="text-white font-bold">{studyConfig?.targetPPM ? (60 / studyConfig.targetPPM).toFixed(2) : 0} s</span><br />
-                                                        PPM Real: <span className="text-cyan-400 font-bold">{ppmReal.toFixed(1)}</span>
+                                                <div className="space-y-1.5">
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                        <span className="text-blue-400">PPM_obj</span> = <span className="text-blue-400">{Math.round(piezasHoraTarget).toLocaleString()}</span> ÷ 60 ÷ <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-blue-400">{studyConfig?.targetPPM || 0} PPM</span>
                                                     </p>
                                                 </div>
                                             </div>
@@ -2611,21 +2640,21 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         {/* Tooltip */}
                                         <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
                                             <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
-                                                <Info className="w-3.5 h-3.5 text-slate-300" />
+                                                <Info className="w-3.5 h-3.5 text-blue-400" />
                                                 <span>Ciclo Target</span>
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
                                                 <p className="text-slate-400 text-[10px]">Tiempo máximo permitido por ciclo de máquina para cumplir la meta.</p>
-                                                <div className="space-y-1">
+                                                <div className="space-y-1.5">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[11px] leading-normal">
-                                                        60 / <span className="text-cyan-400">PPM_obj</span>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                        <span className="text-slate-300">Ciclo Target (s)</span> = 60 / <span className="text-blue-400">PPM_obj</span>
                                                     </p>
                                                 </div>
-                                                <div className="space-y-1">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Valores actuales:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center text-[10px] leading-normal">
-                                                        60 / <span className="text-cyan-400">{studyConfig?.targetPPM || 0}</span> = <span className="text-white font-bold">{studyConfig?.targetPPM ? (60 / studyConfig.targetPPM).toFixed(2) : 0} s</span>
+                                                <div className="space-y-1.5">
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                        <span className="text-slate-300">Ciclo Target</span> = 60 / <span className="text-blue-400">{studyConfig?.targetPPM || 0}</span> = <span className="text-slate-300">{(studyConfig?.targetPPM ? (60 / studyConfig.targetPPM) : 0).toFixed(2)} s</span>
                                                     </p>
                                                 </div>
                                             </div>
@@ -2676,17 +2705,32 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
                                                 <p className="text-slate-400 text-[10px]">Duración calculada del ciclo completo actual de la máquina.</p>
-                                                <div className="space-y-1">
+                                                <div className="space-y-1.5">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[11px] leading-normal">
-                                                        <span className="text-emerald-400">Dwell</span> + <span className="text-orange-400">Index</span>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                        {studyConfig?.mainIndexEnabled ? (
+                                                            <>
+                                                                <span className="text-cyan-400">Ciclo Real</span> = <span className="text-emerald-400">Dwell</span> + <span className="text-amber-400">Index</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <span className="text-cyan-400">Ciclo Real</span> = <span className="text-emerald-400">Dwell</span>
+                                                            </>
+                                                        )}
                                                     </p>
                                                 </div>
-                                                <div className="space-y-1">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Valores actuales:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-normal">
-                                                        Objetivo: <span className="text-white font-bold">{studyConfig?.targetPPM ? (60 / studyConfig.targetPPM).toFixed(2) : 0}s</span><br />
-                                                        Real: <span className="text-emerald-400">{localMetrics?.dwellTimeMs || 0} ms</span> + <span className="text-orange-400">{studyConfig?.mainIndexEnabled ? (studyConfig?.mainIndexTimeMs || 0) : 0} ms</span> = <span className="text-cyan-400 font-bold">{localMetrics?.machineCycleTimeMs || 0} ms ({((localMetrics?.machineCycleTimeMs || 0) / 1000).toFixed(2)} s)</span>
+                                                <div className="space-y-1.5">
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                        {studyConfig?.mainIndexEnabled ? (
+                                                            <>
+                                                                <span className="text-cyan-400">Ciclo Real</span> = <span className="text-emerald-400">{localMetrics?.dwellTimeMs || 0}ms</span> + <span className="text-amber-400">{studyConfig?.mainIndexTimeMs || 0}ms</span> = <span className="text-cyan-400">{localMetrics?.machineCycleTimeMs || 0}ms ({((localMetrics?.machineCycleTimeMs || 0) / 1000).toFixed(2)}s)</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <span className="text-cyan-400">Ciclo Real</span> = <span className="text-emerald-400">{localMetrics?.dwellTimeMs || 0}ms</span> = <span className="text-cyan-400">{localMetrics?.machineCycleTimeMs || 0}ms ({((localMetrics?.machineCycleTimeMs || 0) / 1000).toFixed(2)}s)</span>
+                                                            </>
+                                                        )}
                                                     </p>
                                                 </div>
                                             </div>
@@ -2722,17 +2766,18 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
                                                 <p className="text-slate-400 text-[10px]">Cantidad de ciclos ejecutados por minuto a velocidad real.</p>
-                                                <div className="space-y-1">
+                                                <div className="space-y-1.5">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[11px] leading-normal">
-                                                        60 / <span className="text-sky-400">Ciclo Real s</span>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal text-slate-300">
+                                                        <span className="text-cyan-400">PPM_real</span> = 60 / <span className="text-cyan-400">Ciclo Real (s)</span><br/>
+                                                        <span className="text-cyan-400">CPM_real</span> = <span className="text-cyan-400">PPM_real</span> × <span className="text-fuchsia-400">UP</span>
                                                     </p>
                                                 </div>
-                                                <div className="space-y-1">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Valores actuales:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center text-[10px] leading-normal">
-                                                        Objetivo: <span className="text-white font-bold">{studyConfig?.targetPPM || 0} PPM</span><br />
-                                                        Real: 60 / <span className="text-sky-400">{cicloRealSeg.toFixed(2)}</span> = <span className="text-cyan-400 font-bold">{ppmReal.toFixed(1)} PPM</span>
+                                                <div className="space-y-1.5">
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal text-slate-300">
+                                                        <span className="text-cyan-400">PPM_real</span> = 60 / <span className="text-cyan-400">{cicloRealSeg.toFixed(2)}s</span> = <span className="text-cyan-400">{ppmReal.toFixed(1)} PPM</span><br/>
+                                                        <span className="text-cyan-400">CPM_real</span> = <span className="text-cyan-400">{ppmReal.toFixed(1)}</span> × <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-cyan-400">{cpmReal.toFixed(2)} CPM</span>
                                                     </p>
                                                 </div>
                                             </div>
@@ -2949,16 +2994,16 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                     {/* Disp */}
                                                     <div 
                                                         onClick={(e) => handleRelationClick('input-availability', e)}
-                                                        className="flex items-center justify-between gap-1 relative cursor-pointer"
+                                                        className={`flex items-center justify-between gap-1 relative cursor-pointer p-0.5 rounded transition-all duration-200 ${getHighlightStyles('input-availability').wrapperClass}`}
                                                     >
                                                         <span className="text-[8px] font-bold text-slate-500 uppercase w-7" title="Disponibilidad (Paros/Setups)">Disp:</span>
                                                         <div className="flex items-center gap-1">
                                                             <input 
-                                                                type="number" min="0.1" max="100" step="0.1"
-                                                                value={studyConfig?.availability !== undefined ? studyConfig.availability : 95}
-                                                                onChange={e => handleConfigChange('availability', Number(e.target.value))}
-                                                                disabled={!canEdit}
-                                                                className="w-11 bg-slate-955 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 font-mono text-center font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                                                 type="number" min="0.1" max="100" step="0.1"
+                                                                 value={studyConfig?.availability !== undefined ? studyConfig.availability : 95}
+                                                                 onChange={e => handleConfigChange('availability', Number(e.target.value))}
+                                                                 disabled={!canEdit}
+                                                                 className="w-11 bg-slate-955 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 font-mono text-center font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
                                                             />
                                                             <span className="text-[8px] text-slate-600 font-bold">%</span>
                                                         </div>
@@ -2970,17 +3015,17 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                     {/* Efec */}
                                                     <div 
                                                         onClick={(e) => handleRelationClick('input-efficiency', e)}
-                                                        className="flex items-center justify-between gap-1 relative cursor-pointer"
+                                                        className={`flex items-center justify-between gap-1 relative cursor-pointer p-0.5 rounded transition-all duration-200 ${getHighlightStyles('input-efficiency').wrapperClass}`}
                                                     >
                                                         <span className="text-[8px] font-bold text-slate-500 uppercase w-7" title="Eficiencia (Velocidad/Microparos)">Efec:</span>
                                                         <div className="flex items-center gap-1">
                                                             <input 
-                                                                type="number" min="0.1" max="100" step="0.1"
-                                                                value={Math.round(efficiency * 10) / 10}
-                                                                onChange={e => handleConfigChange('efficiency', Number(e.target.value))}
-                                                                disabled={!canEdit || linkOeeToStudy}
-                                                                className="w-11 bg-slate-955 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 font-mono text-center font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
-                                                                title={linkOeeToStudy ? "Calculado automáticamente: PPM Real / PPM Target" : "Eficiencia (Velocidad/Microparos)"}
+                                                                 type="number" min="0.1" max="100" step="0.1"
+                                                                 value={Math.round(efficiency * 10) / 10}
+                                                                 onChange={e => handleConfigChange('efficiency', Number(e.target.value))}
+                                                                 disabled={!canEdit || linkOeeToStudy}
+                                                                 className="w-11 bg-slate-955 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 font-mono text-center font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                                                 title={linkOeeToStudy ? "Calculado automáticamente: PPM Real / PPM Target" : "Eficiencia (Velocidad/Microparos)"}
                                                             />
                                                             <span className="text-[8px] text-slate-600 font-bold">%</span>
                                                         </div>
@@ -2992,16 +3037,16 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                     {/* Cal / Yield */}
                                                     <div 
                                                         onClick={(e) => handleRelationClick('input-yield', e)}
-                                                        className="flex items-center justify-between gap-1 relative cursor-pointer"
+                                                        className={`flex items-center justify-between gap-1 relative cursor-pointer p-0.5 rounded transition-all duration-200 ${getHighlightStyles('input-yield').wrapperClass}`}
                                                     >
                                                         <span className="text-[8px] font-bold text-slate-500 uppercase w-7" title="Calidad / Yield (Scrap/Rechazos)">Cal:</span>
                                                         <div className="flex items-center gap-1">
                                                             <input 
-                                                                type="number" min="0.1" max="100" step="0.1"
-                                                                value={studyConfig?.yield !== undefined ? studyConfig.yield : 98}
-                                                                onChange={e => handleConfigChange('yield', Number(e.target.value))}
-                                                                disabled={!canEdit}
-                                                                className="w-11 bg-slate-955 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 font-mono text-center font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                                                 type="number" min="0.1" max="100" step="0.1"
+                                                                 value={studyConfig?.yield !== undefined ? studyConfig.yield : 98}
+                                                                 onChange={e => handleConfigChange('yield', Number(e.target.value))}
+                                                                 disabled={!canEdit}
+                                                                 className="w-11 bg-slate-955 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 font-mono text-center font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
                                                             />
                                                             <span className="text-[8px] text-slate-600 font-bold">%</span>
                                                         </div>
