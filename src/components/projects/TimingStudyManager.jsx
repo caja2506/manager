@@ -412,12 +412,11 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
             piezasHoraTarget = shiftHours > 0 ? piezasDiaBrutoReq / shiftHours : 0;
             targetPPM = cycleOutputQty > 0 ? (piezasHoraTarget / 60 / cycleOutputQty) : 0;
         } else {
-            // MODO PPH: usar Piezas por Hora del input del usuario
-            targetPPM = Number(studyConfig.targetPPM) || 10;
-            piezasHoraTarget = targetPPM * 60 * cycleOutputQty;
-
+            // MODO PPH: calcular PPH bruto requerido desde piezas netas ingresadas
             if (linkOeeToStudy) {
-                efficiency = targetPPM > 0 ? (ppmReal / targetPPM) * 100 : 100;
+                // Usar PPM target provisional para calcular efficiency
+                const provisionalTargetPPM = Number(studyConfig.targetPPM) || 10;
+                efficiency = provisionalTargetPPM > 0 ? (ppmReal / provisionalTargetPPM) * 100 : 100;
                 oeeFactor = (availability / 100) * (efficiency / 100) * (yieldVal / 100);
                 oeePenalty = 100 - (oeeFactor * 100);
             } else {
@@ -427,6 +426,12 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                     ? Number(studyConfig.efficiency) 
                     : ((oeeFactor * 1000000) / (availability * yieldVal));
             }
+
+            const targetPiecesPerShift = studyConfig.targetPiecesPerShift !== undefined ? Number(studyConfig.targetPiecesPerShift) : 8000;
+            const piezasDiaReq = targetPiecesPerShift;
+            const piezasDiaBrutoReq = oeeFactor > 0 ? piezasDiaReq / oeeFactor : 0;
+            piezasHoraTarget = shiftHours > 0 ? piezasDiaBrutoReq / shiftHours : 0;
+            targetPPM = cycleOutputQty > 0 ? (piezasHoraTarget / 60 / cycleOutputQty) : 0;
         }
 
         // ── PPM y Ciclos Target ──
@@ -2482,9 +2487,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         )}
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Objetivo / Día</span>
                                         <span className="text-lg font-black text-slate-200 block mt-1">
-                                            {calcMode === 'demand'
-                                                ? Math.round(piezasDia).toLocaleString()
-                                                : (studyConfig?.targetPiecesPerShift ? Number(studyConfig.targetPiecesPerShift).toLocaleString() : '—')}
+                                            {piezasDia ? Math.round(piezasDia).toLocaleString() : '—'}
                                         </span>
                                         <span className="text-[8px] text-slate-600 block">piezas/día</span>
 
@@ -2505,7 +2508,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                             </>
                                                         ) : (
                                                             <>
-                                                                <span className="text-white">Obj/Día</span> = <span className="text-blue-400">PPM_obj</span> × 60 × <span className="text-slate-400">Hrs/Día</span> × <span className="text-fuchsia-400">UP</span>
+                                                                <span className="text-white">Obj/Día</span> = <span className="text-blue-400">PPM_obj</span> × 60 × <span className="text-slate-400">Hrs/Día</span> × <span className="text-fuchsia-400">UP</span> × <span className="text-emerald-400">OEE</span>
                                                             </>
                                                         )}
                                                     </p>
@@ -2519,7 +2522,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                             </>
                                                         ) : (
                                                             <>
-                                                                <span className="text-blue-400">{studyConfig?.targetPPM || 0}</span> × 60 × <span className="text-slate-400">{studyConfig?.shiftHours || 8}</span> × <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-blue-400">{Math.round(studyConfig?.targetPiecesPerShift || 0).toLocaleString()} pzas/día</span>
+                                                                <span className="text-blue-400">{ppmTarget ? ppmTarget.toFixed(2) : 0}</span> × 60 × <span className="text-slate-400">{shiftHours}</span> × <span className="text-fuchsia-400">{cycleOutputQty}</span> × <span className="text-emerald-400">{oeePercent}%</span> = <span className="text-blue-400">{Math.round(piezasDia || 0).toLocaleString()} pzas/día</span>
                                                             </>
                                                         )}
                                                     </p>
@@ -2580,7 +2583,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                             </>
                                                         ) : (
                                                             <>
-                                                                <span className="text-blue-400">{studyConfig?.targetPPM || 0}</span> × 60 × <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-blue-400">{Math.round(piezasHoraTarget).toLocaleString()} pzas/hr</span>
+                                                                <span className="text-blue-400">{ppmTarget ? ppmTarget.toFixed(2) : 0}</span> × 60 × <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-blue-400">{Math.round(piezasHoraTarget).toLocaleString()} pzas/hr</span>
                                                             </>
                                                         )}
                                                     </p>

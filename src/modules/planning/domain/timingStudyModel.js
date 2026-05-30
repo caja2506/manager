@@ -804,7 +804,46 @@ export function calculateTimingStudyMetrics(study, steps, stations = []) {
     const machineCycleTimeSec = machineCycleTimeMs / 1000;
     
     // Target Calculations
-    const targetPPM = normalizedStudy.targetPPM;
+    const calcMode = normalizedStudy.calcMode || 'pph';
+    const linkOeeToStudy = !!normalizedStudy.linkOeeToStudy;
+    const availability = normalizedStudy.availability !== undefined ? Number(normalizedStudy.availability) : 95;
+    const yieldVal = normalizedStudy.yield !== undefined ? Number(normalizedStudy.yield) : 98;
+    const shiftHours = normalizedStudy.shiftHours !== undefined ? Number(normalizedStudy.shiftHours) : 8;
+    const cycleOutputQty = normalizedStudy.cycleOutputQty !== undefined ? Number(normalizedStudy.cycleOutputQty) : 1;
+    const workDaysPerWeek = normalizedStudy.workDaysPerWeek !== undefined ? Number(normalizedStudy.workDaysPerWeek) : 5;
+    const country = normalizedStudy.country || 'MX';
+    const annualDemand = normalizedStudy.annualDemand !== undefined ? Number(normalizedStudy.annualDemand) : 18388734;
+
+    const feriados = country === 'MX' ? 7 : (country === 'CR' ? 11 : (country === 'US' ? 11 : 0));
+    const diasAnuales = (workDaysPerWeek * 52) - feriados;
+
+    // ── OEE Factor ──
+    let oeeFactor = 0.85;
+    if (linkOeeToStudy) {
+        const ppmReal = machineCycleTimeMs > 0 ? (60000 / machineCycleTimeMs) : 0;
+        const provisionalTargetPPM = Number(normalizedStudy.targetPPM) || 10;
+        const efficiency = provisionalTargetPPM > 0 ? (ppmReal / provisionalTargetPPM) * 100 : 100;
+        oeeFactor = (availability / 100) * (efficiency / 100) * (yieldVal / 100);
+    } else {
+        const oeePenalty = normalizedStudy.oeePenalty !== undefined ? Number(normalizedStudy.oeePenalty) : 15;
+        oeeFactor = (100 - oeePenalty) / 100;
+    }
+
+    let targetPPM = Number(normalizedStudy.targetPPM) || 10;
+
+    if (calcMode === 'demand') {
+        const piezasDiaReq = diasAnuales > 0 ? annualDemand / diasAnuales : 0;
+        const piezasDiaBrutoReq = oeeFactor > 0 ? piezasDiaReq / oeeFactor : 0;
+        const piezasHoraTarget = shiftHours > 0 ? piezasDiaBrutoReq / shiftHours : 0;
+        targetPPM = cycleOutputQty > 0 ? (piezasHoraTarget / 60 / cycleOutputQty) : 0;
+    } else {
+        const targetPiecesPerShift = normalizedStudy.targetPiecesPerShift !== undefined ? Number(normalizedStudy.targetPiecesPerShift) : 8000;
+        const piezasDiaReq = targetPiecesPerShift;
+        const piezasDiaBrutoReq = oeeFactor > 0 ? piezasDiaReq / oeeFactor : 0;
+        const piezasHoraTarget = shiftHours > 0 ? piezasDiaBrutoReq / shiftHours : 0;
+        targetPPM = cycleOutputQty > 0 ? (piezasHoraTarget / 60 / cycleOutputQty) : 0;
+    }
+
     const targetCycleTimeSec = targetPPM > 0 ? 60 / targetPPM : 0;
     const effectiveTargetCycleTimeSec = targetCycleTimeSec;
     
@@ -910,7 +949,46 @@ export function validateTimingStudy(study, steps = [], stations = []) {
     const issues = [];
 
     // ── 1. Validaciones a nivel de estudio ──
-    const targetPPM = study?.targetPPM !== undefined ? Number(study.targetPPM) : 0;
+    const calcMode = study?.calcMode || 'pph';
+    const linkOeeToStudy = !!study?.linkOeeToStudy;
+    const availability = study?.availability !== undefined ? Number(study.availability) : 95;
+    const yieldVal = study?.yield !== undefined ? Number(study.yield) : 98;
+    const shiftHours = study?.shiftHours !== undefined ? Number(study.shiftHours) : 8;
+    const cycleOutputQty = study?.cycleOutputQty !== undefined ? Number(study.cycleOutputQty) : 1;
+    const workDaysPerWeek = study?.workDaysPerWeek !== undefined ? Number(study.workDaysPerWeek) : 5;
+    const country = study?.country || 'MX';
+    const annualDemand = study?.annualDemand !== undefined ? Number(study.annualDemand) : 18388734;
+
+    const feriados = country === 'MX' ? 7 : (country === 'CR' ? 11 : (country === 'US' ? 11 : 0));
+    const diasAnuales = (workDaysPerWeek * 52) - feriados;
+
+    let oeeFactor = 0.85;
+    if (linkOeeToStudy) {
+        const machineCycleMs = study?.machineCycleTimeMs || 0;
+        const ppmReal = machineCycleMs > 0 ? (60000 / machineCycleMs) : 0;
+        const provisionalTargetPPM = Number(study?.targetPPM) || 10;
+        const efficiency = provisionalTargetPPM > 0 ? (ppmReal / provisionalTargetPPM) * 100 : 100;
+        oeeFactor = (availability / 100) * (efficiency / 100) * (yieldVal / 100);
+    } else {
+        const oeePenalty = study?.oeePenalty !== undefined ? Number(study.oeePenalty) : 15;
+        oeeFactor = (100 - oeePenalty) / 100;
+    }
+
+    let targetPPM = Number(study?.targetPPM) || 10;
+
+    if (calcMode === 'demand') {
+        const piezasDiaReq = diasAnuales > 0 ? annualDemand / diasAnuales : 0;
+        const piezasDiaBrutoReq = oeeFactor > 0 ? piezasDiaReq / oeeFactor : 0;
+        const piezasHoraTarget = shiftHours > 0 ? piezasDiaBrutoReq / shiftHours : 0;
+        targetPPM = cycleOutputQty > 0 ? (piezasHoraTarget / 60 / cycleOutputQty) : 0;
+    } else {
+        const targetPiecesPerShift = study?.targetPiecesPerShift !== undefined ? Number(study.targetPiecesPerShift) : 8000;
+        const piezasDiaReq = targetPiecesPerShift;
+        const piezasDiaBrutoReq = oeeFactor > 0 ? piezasDiaReq / oeeFactor : 0;
+        const piezasHoraTarget = shiftHours > 0 ? piezasDiaBrutoReq / shiftHours : 0;
+        targetPPM = cycleOutputQty > 0 ? (piezasHoraTarget / 60 / cycleOutputQty) : 0;
+    }
+
     if (targetPPM <= 0) {
         issues.push({
             id: 'study_target_ppm_invalid',
