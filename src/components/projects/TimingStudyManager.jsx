@@ -2457,7 +2457,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {/* Piezas Objetivo / Día */}
                                     <div 
                                         onClick={(e) => handleRelationClick('card-objDia', e)}
-                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-objDia').wrapperClass}`}
+                                        className={`relative group hover:z-50 bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-objDia').wrapperClass}`}
                                     >
                                         {getHighlightLabel('card-objDia') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2516,7 +2516,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {/* Piezas/Hora Objetivo */}
                                     <div 
                                         onClick={(e) => handleRelationClick('card-objHora', e)}
-                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-objHora').wrapperClass}`}
+                                        className={`relative group hover:z-50 bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-objHora').wrapperClass}`}
                                     >
                                         {getHighlightLabel('card-objHora') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2575,7 +2575,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {/* Ciclos / Min Objetivo */}
                                     <div 
                                         onClick={(e) => handleRelationClick('card-ppmObj', e)}
-                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-ppmObj').wrapperClass}`}
+                                        className={`relative group hover:z-50 bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-ppmObj').wrapperClass}`}
                                     >
                                         {getHighlightLabel('card-ppmObj') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2619,7 +2619,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {/* Ciclo Target */}
                                     <div 
                                         onClick={(e) => handleRelationClick('card-cicloTarget', e)}
-                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-cicloTarget').wrapperClass}`}
+                                        className={`relative group hover:z-50 bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-cicloTarget').wrapperClass}`}
                                     >
                                         {getHighlightLabel('card-cicloTarget') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2679,7 +2679,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {/* Ciclo Real */}
                                     <div 
                                         onClick={(e) => handleRelationClick('card-cicloReal', e)}
-                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-cyan-700/20 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-cicloReal').wrapperClass}`}
+                                        className={`relative group hover:z-50 bg-slate-950/40 p-3 rounded-xl border border-cyan-700/20 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-cicloReal').wrapperClass}`}
                                     >
                                         {getHighlightLabel('card-cicloReal') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2741,7 +2741,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {/* Ciclos / Min Real */}
                                     <div 
                                         onClick={(e) => handleRelationClick('card-ppmReal', e)}
-                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-ppmReal').wrapperClass}`}
+                                        className={`relative group hover:z-50 bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-ppmReal').wrapperClass}`}
                                     >
                                         {getHighlightLabel('card-ppmReal') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2788,7 +2788,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {/* Bottleneck Station */}
                                     <div 
                                         onClick={(e) => handleRelationClick('card-bottleneck', e)}
-                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-bottleneck').wrapperClass}`}
+                                        className={`relative group hover:z-50 bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-bottleneck').wrapperClass}`}
                                     >
                                         {getHighlightLabel('card-bottleneck') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2837,7 +2837,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         return (
                                             <div 
                                                 onClick={(e) => handleRelationClick('card-realHora', e)}
-                                                className={`relative group bg-slate-955/40 p-3 rounded-xl border text-center cursor-pointer transition-all duration-200 overflow-visible ${onTarget ? 'border-emerald-600/40 hover:border-emerald-500/60 font-bold' : 'border-red-650/30 hover:border-red-500/50'} ${getHighlightStyles('card-realHora').wrapperClass}`}
+                                                className={`relative group hover:z-50 bg-slate-955/40 p-3 rounded-xl border text-center cursor-pointer transition-all duration-200 overflow-visible ${onTarget ? 'border-emerald-600/40 hover:border-emerald-500/60 font-bold' : 'border-red-650/30 hover:border-red-500/50'} ${getHighlightStyles('card-realHora').wrapperClass}`}
                                             >
                                                 {getHighlightLabel('card-realHora') && (
                                                     <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2888,7 +2888,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                             {/* 3. VIABILIDAD Y DESEMPEÑO (OEE) */}
                             <div className="xl:col-span-3 bg-slate-900/40 border border-slate-800 border-t-emerald-500/80 border-t-[3px] rounded-2xl p-4 flex flex-col gap-3 shadow-xl backdrop-blur-md transition-all duration-300 hover:border-slate-700/80">
                                 <div 
-                                    className={`flex items-center gap-2 border-b border-slate-800 pb-2 cursor-pointer overflow-visible relative group ${getHighlightStyles('card-status').wrapperClass}`}
+                                    className={`flex items-center gap-2 border-b border-slate-800 pb-2 cursor-pointer overflow-visible relative group hover:z-50 ${getHighlightStyles('card-status').wrapperClass}`}
                                     onClick={(e) => handleRelationClick('card-status', e)}
                                 >
                                     {getHighlightLabel('card-status') && (
@@ -2939,7 +2939,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         return (
                                             <div 
                                                 onClick={(e) => handleRelationClick('card-piezasDia', e)}
-                                                className={`relative group bg-slate-955/40 p-3 rounded-xl border border-slate-800/80 hover:border-emerald-500/30 transition-all duration-200 overflow-visible col-span-2 flex gap-3 text-left cursor-pointer ${getHighlightStyles('card-piezasDia').wrapperClass}`}
+                                                className={`relative group hover:z-50 bg-slate-955/40 p-3 rounded-xl border border-slate-800/80 hover:border-emerald-500/30 transition-all duration-200 overflow-visible col-span-2 flex gap-3 text-left cursor-pointer ${getHighlightStyles('card-piezasDia').wrapperClass}`}
                                             >
                                                 {getHighlightLabel('card-piezasDia') && (
                                                     <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -3136,7 +3136,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         return (
                                             <div 
                                                 onClick={(e) => handleRelationClick('card-piezasSem', e)}
-                                                className={`relative group bg-slate-955/40 p-3 rounded-xl border border-slate-800/80 hover:border-emerald-500/30 transition-all duration-200 overflow-visible cursor-pointer ${getHighlightStyles('card-piezasSem').wrapperClass}`}
+                                                className={`relative group hover:z-50 bg-slate-955/40 p-3 rounded-xl border border-slate-800/80 hover:border-emerald-500/30 transition-all duration-200 overflow-visible cursor-pointer ${getHighlightStyles('card-piezasSem').wrapperClass}`}
                                             >
                                                 {getHighlightLabel('card-piezasSem') && (
                                                     <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -3215,7 +3215,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         return (
                                             <div 
                                                 onClick={(e) => handleRelationClick('card-piezasAno', e)}
-                                                className={`relative group bg-slate-955/40 p-3 rounded-xl border border-slate-800/80 hover:border-emerald-500/30 transition-all duration-200 overflow-visible cursor-pointer ${getHighlightStyles('card-piezasAno').wrapperClass}`}
+                                                className={`relative group hover:z-50 bg-slate-955/40 p-3 rounded-xl border border-slate-800/80 hover:border-emerald-500/30 transition-all duration-200 overflow-visible cursor-pointer ${getHighlightStyles('card-piezasAno').wrapperClass}`}
                                             >
                                                 {getHighlightLabel('card-piezasAno') && (
                                                     <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
