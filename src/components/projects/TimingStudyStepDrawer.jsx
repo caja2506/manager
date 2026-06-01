@@ -9,7 +9,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Save, Sparkles, ListTodo, Zap } from 'lucide-react';
+import { X, Save, Sparkles, ListTodo, Zap, AlertTriangle } from 'lucide-react';
 import {
     TIMING_DEVICE_TYPES,
     TIMING_SENSOR_TYPES,
@@ -178,6 +178,7 @@ export default function TimingStudyStepDrawer({
                 taskDescription: step.taskDescription || '',
                 triggerCondition: step.triggerCondition || '',
                 lagMs: step.lagMs || 0,
+                startTimeMs: step.startTimeMs || 0,
                 durationMs: step.durationMs || 0,
                 sequenceGroup: step.sequenceGroup || '',
                 waitsForMainIndex: !!step.waitsForMainIndex,
@@ -249,6 +250,32 @@ export default function TimingStudyStepDrawer({
         getProfileSpeed(formData?.motionProfileId, currentGroup, standardsConfig)
     , [formData?.motionProfileId, currentGroup, standardsConfig]);
 
+    // ── Predecesor máximo y discrepancias físicas ──
+    const maxDepFinish = useMemo(() => {
+        if (!formData) return 0;
+        const deps = formData.dependencyStepIds || [];
+        if (deps.length === 0) return 0;
+        let maxFinish = 0;
+        for (const depId of deps) {
+            const depStep = allSteps.find(s => s.id === depId);
+            if (depStep) {
+                maxFinish = Math.max(maxFinish, depStep.finishTimeMs || 0);
+            }
+        }
+        return maxFinish;
+    }, [formData?.dependencyStepIds, allSteps]);
+
+    const suggestedDuration = useMemo(() => {
+        if (!formData || !formData.deviceType) return null;
+        return calculateSuggestedDuration(formData, { customStandards: standardsConfig });
+    }, [formData, standardsConfig]);
+
+    const isPhysicalMismatch = useMemo(() => {
+        if (!formData || !formData.deviceType || !formData.durationMs || formData.durationMs <= 0) return false;
+        if (suggestedDuration === null || suggestedDuration === undefined || suggestedDuration <= 0) return false;
+        return formData.durationMs < suggestedDuration;
+    }, [formData, suggestedDuration]);
+
     if (!isOpen || !formData) return null;
 
     const handleInputChange = (field, value) => {
@@ -272,6 +299,15 @@ export default function TimingStudyStepDrawer({
                 const grp = findGroupForSubtype(value, groups);
                 if (!grp?.needsLinearDistance) updated.linearDistanceMm = 0;
                 if (!grp?.needsAngularDistance) updated.angularDistanceDeg = 0;
+            }
+
+            // Recalcular lagMs y startTimeMs en cascada
+            if (field === 'startTimeMs') {
+                const newStartTime = Number(value) || 0;
+                updated.lagMs = Math.max(0, newStartTime - maxDepFinish);
+            } else if (field === 'lagMs') {
+                const newLag = Number(value) || 0;
+                updated.startTimeMs = maxDepFinish + newLag;
             }
 
             // Recalculo automático de duración
@@ -354,6 +390,7 @@ export default function TimingStudyStepDrawer({
                                 onInput={e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
                             />
                         </div>
+
                         <button type="button" onClick={onClose} className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors cursor-pointer shrink-0">
                             <X className="w-5 h-5" />
                         </button>
@@ -433,44 +470,89 @@ export default function TimingStudyStepDrawer({
                         </div>
                     </div>
 
-                    {/* ── Fila 2: Perfil (si el grupo tiene perfiles) ── */}
-                    {hasProfiles && (
-                        <div className="flex items-center gap-3 mt-1">
-                            <div className="flex flex-col gap-1 flex-1 max-w-xs">
-                                <span className="text-[9px] text-cyan-500 font-black uppercase tracking-wider px-0.5">Perfil de Velocidad</span>
-                                <select
-                                    value={formData.motionProfileId}
-                                    onChange={e => handleInputChange('motionProfileId', e.target.value)}
-                                    disabled={!formData.deviceType}
-                                    className="w-full bg-cyan-950/30 border border-cyan-700/40 rounded-xl px-3 py-2 text-xs font-bold text-cyan-300 cursor-pointer focus:outline-none focus:border-cyan-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                >
-                                    <option value="" className="bg-slate-900 text-white">— Seleccionar subtipo —</option>
-                                    {availableProfiles.map(p => (
-                                        <option key={p.id} value={p.id} className="bg-slate-900 text-white">
-                                            {p.name} · {p.value} {p.unit}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            {profileSpeedInfo && (
-                                <div className="flex flex-col gap-0.5 mt-4">
-                                    <span className="px-3 py-1.5 bg-cyan-500/15 border border-cyan-500/30 rounded-xl text-xs font-black text-cyan-400 font-mono">
-                                        {profileSpeedInfo.value} {profileSpeedInfo.unit}
-                                    </span>
-                                    {autoCalculated && formData.motionProfileId && (
-                                        <span className="text-[9px] text-cyan-600 font-mono px-1">
-                                            {profileSpeedInfo.unit === 'mm/s'
-                                                ? `${formData.linearDistanceMm}mm ÷ ${profileSpeedInfo.value} + overheads`
-                                                : profileSpeedInfo.unit === 'deg/s'
-                                                ? `${formData.angularDistanceDeg}° ÷ ${profileSpeedInfo.value} + overheads`
-                                                : `Fijo: ${profileSpeedInfo.value}ms`
-                                            }
+                    {/* ── Fila 2: Perfil y Tiempo de Inicio ── */}
+                    <div className="flex flex-wrap items-end justify-between gap-4 mt-2 pt-2 border-t border-slate-800/20">
+                        {/* Lado izquierdo: Perfil de Velocidad */}
+                        {hasProfiles ? (
+                            <div className="flex items-center gap-3 flex-1 min-w-[200px] max-w-sm">
+                                <div className="flex flex-col gap-1 flex-1">
+                                    <span className="text-[9px] text-cyan-500 font-black uppercase tracking-wider px-0.5">Perfil de Velocidad</span>
+                                    <select
+                                        value={formData.motionProfileId}
+                                        onChange={e => handleInputChange('motionProfileId', e.target.value)}
+                                        disabled={!formData.deviceType}
+                                        className="w-full bg-cyan-950/30 border border-cyan-700/40 rounded-xl px-3 py-2 text-xs font-bold text-cyan-300 cursor-pointer focus:outline-none focus:border-cyan-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        <option value="" className="bg-slate-900 text-white">— Seleccionar subtipo —</option>
+                                        {availableProfiles.map(p => (
+                                            <option key={p.id} value={p.id} className="bg-slate-900 text-white">
+                                                {p.name} · {p.value} {p.unit}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                {profileSpeedInfo && (
+                                    <div className="flex flex-col gap-0.5 mt-4">
+                                        <span className="px-3 py-1.5 bg-cyan-500/15 border border-cyan-500/30 rounded-xl text-xs font-black text-cyan-400 font-mono">
+                                            {profileSpeedInfo.value} {profileSpeedInfo.unit}
                                         </span>
-                                    )}
+                                        {autoCalculated && formData.motionProfileId && (
+                                            <span className="text-[9px] text-cyan-600 font-mono px-1">
+                                                {profileSpeedInfo.unit === 'mm/s'
+                                                    ? `${formData.linearDistanceMm}mm ÷ ${profileSpeedInfo.value} + overheads`
+                                                    : profileSpeedInfo.unit === 'deg/s'
+                                                    ? `${formData.angularDistanceDeg}° ÷ ${profileSpeedInfo.value} + overheads`
+                                                    : `Fijo: ${profileSpeedInfo.value}ms`
+                                                }
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="flex-1" />
+                        )}
+
+                        {/* Lado derecho: Tiempo de Inicio + Notificación de Dependencias */}
+                        <div className="flex items-center gap-3 shrink-0">
+                            {/* Notificación de Dependencias */}
+                            {formData.dependencyStepIds && formData.dependencyStepIds.length > 0 && (
+                                <div className="flex items-center gap-1.5 bg-cyan-950/40 border border-cyan-700/30 px-2.5 py-1.5 rounded-xl text-[10px] font-bold text-cyan-300 animate-pulse">
+                                    <span>🔗</span>
+                                    <span>Calculado por dependencias</span>
                                 </div>
                             )}
+
+                            {/* Caja del Input de Inicio */}
+                            <div className={`flex items-center gap-2 bg-slate-900 border px-3 py-1.5 rounded-xl transition-all duration-200 ${
+                                formData.dependencyStepIds && formData.dependencyStepIds.length > 0
+                                    ? 'border-cyan-700/50 bg-cyan-950/10 text-cyan-400 opacity-90'
+                                    : 'border-slate-800/80 text-white'
+                            }`}>
+                                <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                                    formData.dependencyStepIds && formData.dependencyStepIds.length > 0 ? 'text-cyan-400' : 'text-slate-500'
+                                }`}>
+                                    Inicio
+                                </span>
+                                <div className="flex items-center gap-1">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={formData.startTimeMs || 0}
+                                        onChange={e => handleInputChange('startTimeMs', Number(e.target.value) || 0)}
+                                        readOnly={formData.dependencyStepIds && formData.dependencyStepIds.length > 0}
+                                        title={formData.dependencyStepIds && formData.dependencyStepIds.length > 0 ? 'Este valor se calcula automáticamente debido a las dependencias. Modifica el Lag si deseas desplazarlo.' : 'Editar tiempo de inicio del paso'}
+                                        className={`w-16 bg-transparent text-right text-xs font-mono font-bold outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                                            formData.dependencyStepIds && formData.dependencyStepIds.length > 0
+                                                ? 'text-cyan-300 cursor-not-allowed'
+                                                : 'text-amber-400'
+                                        }`}
+                                    />
+                                    <span className="text-[9px] text-slate-500 font-medium">ms</span>
+                                </div>
+                            </div>
                         </div>
-                    )}
+                    </div>
                 </div>
 
                 {/* ── Form — Dos Columnas ── */}
@@ -516,9 +598,16 @@ export default function TimingStudyStepDrawer({
                                             type="number" min="0"
                                             value={formData.durationMs}
                                             onChange={e => { setAutoCalculated(false); handleInputChange('durationMs', Number(e.target.value) || 0); }}
-                                            className={`w-full border rounded-lg px-3 py-2 text-xs font-bold focus:outline-none font-mono transition-colors ${autoCalculated ? 'bg-cyan-950/30 border-cyan-600/40 text-cyan-300 focus:border-cyan-500' : 'bg-slate-950 border-slate-800 text-cyan-300 focus:border-cyan-500'}`}
+                                            className={`w-full border rounded-lg px-3 py-2 text-xs font-bold focus:outline-none font-mono transition-colors ${
+                                                isPhysicalMismatch
+                                                    ? 'bg-red-950/20 border-red-500/80 text-red-200 focus:border-red-500 focus:ring-1 focus:ring-red-500/50'
+                                                    : autoCalculated 
+                                                        ? 'bg-cyan-950/30 border-cyan-600/40 text-cyan-300 focus:border-cyan-500' 
+                                                        : 'bg-slate-950 border-slate-800 text-cyan-300 focus:border-cyan-500'
+                                            }`}
                                         />
-                                        {autoCalculated && <span className="absolute -top-1 -right-1"><Zap className="w-3 h-3 text-cyan-400" /></span>}
+                                        {autoCalculated && !isPhysicalMismatch && <span className="absolute -top-1 -right-1"><Zap className="w-3 h-3 text-cyan-400" /></span>}
+                                        {isPhysicalMismatch && <span className="absolute -top-1 -right-1 animate-pulse"><AlertTriangle className="w-3.5 h-3.5 text-red-500" /></span>}
                                     </div>
                                 </div>
                                 <div>
@@ -590,6 +679,16 @@ export default function TimingStudyStepDrawer({
                                     </div>
                                 );
                             })()}
+
+                            {isPhysicalMismatch && (
+                                <div className="mt-2.5 p-3 bg-red-950/30 border border-red-500/35 rounded-xl text-red-205 text-[10px] leading-relaxed flex gap-2.5 items-start animate-[pulse_2s_infinite]">
+                                    <AlertTriangle className="w-4 h-4 text-red-405 shrink-0 mt-0.5" />
+                                    <div>
+                                        <p className="font-extrabold tracking-wide text-red-400 uppercase text-[8px] mb-0.5">Discrepancia Física</p>
+                                        <p>La duración es inferior al mínimo sugerido de <strong className="text-white">{suggestedDuration} ms</strong> para esta distancia y perfil. Se recomienda recalcular la distancia o aumentar la duración.</p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
 

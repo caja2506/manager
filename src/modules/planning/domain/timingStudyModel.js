@@ -1139,6 +1139,21 @@ export function validateTimingStudy(study, steps = [], stations = []) {
             });
         }
 
+        // Discrepancia física (advertencia si la duración configurada es menor que la teórica)
+        if (step.deviceType && step.durationMs > 0) {
+            const suggested = calculateSuggestedDuration(step, { customStandards: study?.customStandards || null });
+            if (suggested > 0 && step.durationMs < suggested) {
+                issues.push({
+                    id: `step_physical_mismatch_${step.id}`,
+                    severity: 'warning',
+                    scope: 'step',
+                    stepId: step.id,
+                    message: `El paso [Orden: ${indexStr}] tiene una duración de ${step.durationMs} ms, la cual es menor al mínimo sugerido de ${suggested} ms para este perfil físico (distancia: ${step.linearDistanceMm || step.angularDistanceDeg || 0}).`,
+                    recommendation: 'Recalcula la distancia o ajusta la duración para corregir el desfase físico.'
+                });
+            }
+        }
+
         // sortOrder inválido
         if (step.sortOrder === undefined || step.sortOrder === null) {
             issues.push({

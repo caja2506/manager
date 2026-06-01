@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     Timer, Plus, Trash2, Copy, RefreshCw, Save, AlertTriangle, CheckCircle, XCircle,
-    ChevronUp, ChevronDown, ChevronRight, Sparkles, Settings, Eye, Info, Clock, Play, List, HelpCircle, Download,
+    ChevronUp, ChevronDown, Sparkles, Settings, Eye, Info, Clock, Play, List, HelpCircle, Download,
     Target, Activity, Award, TrendingUp, ArrowRight, Palette
 } from 'lucide-react';
 import {
@@ -133,220 +133,8 @@ function TableInput({ value, onBlur, type = 'text', className = '', placeholder 
     );
 }
 
-const DEFAULT_KPI_COLORS = {
-    'card-objDia': { light: 'purple', dark: 'purple' },
-    'card-objHora': { light: 'blue', dark: 'blue' },
-    'card-ppmObj': { light: 'indigo', dark: 'indigo' },
-    'card-cicloTarget': { light: 'fuchsia', dark: 'fuchsia' },
-    'card-cicloReal': { light: 'cyan', dark: 'cyan' },
-    'card-ppmReal': { light: 'teal', dark: 'teal' },
-    'card-bottleneck': { light: 'amber', dark: 'amber' },
-    'card-realHora': { light: 'emerald', dark: 'emerald' },
-    'card-status': { light: 'emerald', dark: 'emerald' },
-    'card-piezasDia': { light: 'slate', dark: 'slate' },
-    'card-piezasSem': { light: 'slate', dark: 'slate' },
-    'card-piezasAno': { light: 'amber', dark: 'amber' },
-    'visual-active': { light: 'cyan', dark: 'cyan' },
-    'visual-relatedInput': { light: 'indigo', dark: 'indigo' },
-    'visual-relatedResult': { light: 'emerald', dark: 'emerald' }
-};
-
-const LIGHT_TEXT_CLASSES = {
-    slate: 'text-slate-600',
-    red: 'text-rose-600',
-    orange: 'text-orange-600',
-    amber: 'text-amber-600',
-    green: 'text-green-600',
-    emerald: 'text-emerald-600',
-    teal: 'text-teal-600',
-    cyan: 'text-cyan-600',
-    blue: 'text-blue-600',
-    indigo: 'text-indigo-650',
-    purple: 'text-purple-600',
-    fuchsia: 'text-fuchsia-600',
-    rose: 'text-rose-600'
-};
-
-const DARK_TEXT_CLASSES = {
-    slate: 'dark:text-slate-200',
-    red: 'dark:text-rose-400',
-    orange: 'dark:text-orange-400',
-    amber: 'dark:text-amber-400',
-    green: 'dark:text-green-400',
-    emerald: 'dark:text-emerald-400',
-    teal: 'dark:text-teal-400',
-    cyan: 'dark:text-cyan-400',
-    blue: 'dark:text-blue-400',
-    indigo: 'dark:text-indigo-400',
-    purple: 'dark:text-purple-400',
-    fuchsia: 'dark:text-fuchsia-400',
-    rose: 'dark:text-rose-400'
-};
-
-const LIGHT_BG_CLASSES = {
-    slate: 'bg-slate-500/10',
-    red: 'bg-rose-500/10',
-    orange: 'bg-orange-500/10',
-    amber: 'bg-amber-500/10',
-    green: 'bg-green-500/10',
-    emerald: 'bg-emerald-500/10',
-    teal: 'bg-teal-500/10',
-    cyan: 'bg-cyan-500/10',
-    blue: 'bg-blue-500/10',
-    indigo: 'bg-indigo-500/10',
-    purple: 'bg-purple-500/10',
-    fuchsia: 'bg-fuchsia-500/10',
-    rose: 'bg-rose-500/10'
-};
-
-const DARK_BG_CLASSES = {
-    slate: 'dark:bg-slate-500/10',
-    red: 'dark:bg-rose-500/10',
-    orange: 'dark:bg-orange-500/10',
-    amber: 'dark:bg-amber-500/10',
-    green: 'dark:bg-green-500/10',
-    emerald: 'dark:bg-emerald-500/10',
-    teal: 'dark:bg-teal-500/10',
-    cyan: 'dark:bg-cyan-500/10',
-    blue: 'dark:bg-blue-500/10',
-    indigo: 'dark:bg-indigo-500/10',
-    purple: 'dark:bg-purple-500/10',
-    fuchsia: 'dark:bg-fuchsia-500/10',
-    rose: 'dark:bg-rose-500/10'
-};
-
-const LIGHT_BORDER_CLASSES = {
-    slate: 'border-slate-500/20',
-    red: 'border-rose-500/20',
-    orange: 'border-orange-500/20',
-    amber: 'border-amber-500/20',
-    green: 'border-green-500/20',
-    emerald: 'border-emerald-500/20',
-    teal: 'border-teal-500/20',
-    cyan: 'border-cyan-500/20',
-    blue: 'border-blue-500/20',
-    indigo: 'border-indigo-500/20',
-    purple: 'border-purple-500/20',
-    fuchsia: 'border-fuchsia-500/20',
-    rose: 'border-rose-500/20'
-};
-
-const DARK_BORDER_CLASSES = {
-    slate: 'dark:border-slate-500/20',
-    red: 'dark:border-rose-500/20',
-    orange: 'dark:border-orange-500/20',
-    amber: 'dark:border-amber-450/20',
-    green: 'dark:border-green-500/20',
-    emerald: 'dark:border-emerald-500/20',
-    teal: 'dark:border-teal-500/20',
-    cyan: 'dark:border-cyan-500/20',
-    blue: 'dark:border-blue-500/20',
-    indigo: 'dark:border-indigo-500/20',
-    purple: 'dark:border-purple-500/20',
-    fuchsia: 'dark:border-fuchsia-500/20',
-    rose: 'dark:border-rose-500/20'
-};
-
-const LIGHT_RING_CLASSES = {
-    slate: 'ring-2 ring-slate-500 border-slate-400 bg-slate-50/20 shadow-lg shadow-slate-500/10 scale-[1.01] z-30',
-    red: 'ring-2 ring-rose-500 border-rose-400 bg-rose-50/20 shadow-lg shadow-rose-500/10 scale-[1.01] z-30',
-    orange: 'ring-2 ring-orange-500 border-orange-400 bg-orange-50/20 shadow-lg shadow-orange-500/10 scale-[1.01] z-30',
-    amber: 'ring-2 ring-amber-500 border-amber-400 bg-amber-50/20 shadow-lg shadow-amber-500/10 scale-[1.01] z-30',
-    green: 'ring-2 ring-green-500 border-green-400 bg-green-50/20 shadow-lg shadow-green-500/10 scale-[1.01] z-30',
-    emerald: 'ring-2 ring-emerald-500 border-emerald-400 bg-emerald-50/20 shadow-lg shadow-emerald-500/10 scale-[1.01] z-30',
-    teal: 'ring-2 ring-teal-500 border-teal-400 bg-teal-50/20 shadow-lg shadow-teal-500/10 scale-[1.01] z-30',
-    cyan: 'ring-2 ring-cyan-500 border-cyan-400 bg-cyan-50/20 shadow-lg shadow-cyan-500/10 scale-[1.01] z-30',
-    blue: 'ring-2 ring-blue-500 border-blue-400 bg-blue-50/20 shadow-lg shadow-blue-500/10 scale-[1.01] z-30',
-    indigo: 'ring-2 ring-indigo-500 border-indigo-400 bg-indigo-50/20 shadow-lg shadow-indigo-500/10 scale-[1.01] z-30',
-    purple: 'ring-2 ring-purple-500 border-purple-400 bg-purple-50/20 shadow-lg shadow-purple-500/10 scale-[1.01] z-30',
-    fuchsia: 'ring-2 ring-fuchsia-500 border-fuchsia-400 bg-fuchsia-50/20 shadow-lg shadow-fuchsia-500/10 scale-[1.01] z-30',
-    rose: 'ring-2 ring-rose-500 border-rose-400 bg-rose-50/20 shadow-lg shadow-rose-500/10 scale-[1.01] z-30'
-};
-
-const DARK_RING_CLASSES = {
-    slate: 'dark:ring-slate-500 dark:border-slate-450 dark:bg-slate-950/20 dark:shadow-slate-500/10 scale-[1.01] z-30',
-    red: 'dark:ring-rose-500 dark:border-rose-455 dark:bg-rose-955/20 dark:shadow-rose-500/10 scale-[1.01] z-30',
-    orange: 'dark:ring-orange-500 dark:border-orange-450 dark:bg-orange-950/20 dark:shadow-orange-500/10 scale-[1.01] z-30',
-    amber: 'dark:ring-amber-500 dark:border-amber-450 dark:bg-amber-950/20 dark:shadow-amber-500/10 scale-[1.01] z-30',
-    green: 'dark:ring-green-500 dark:border-green-455 dark:bg-green-955/20 dark:shadow-green-500/10 scale-[1.01] z-30',
-    emerald: 'dark:ring-emerald-500 dark:border-emerald-450 dark:bg-emerald-950/20 dark:shadow-emerald-500/10 scale-[1.01] z-30',
-    teal: 'dark:ring-teal-500 dark:border-teal-450 dark:bg-teal-950/20 dark:shadow-teal-500/10 scale-[1.01] z-30',
-    cyan: 'dark:ring-cyan-500 dark:border-cyan-450 dark:bg-cyan-950/20 dark:shadow-cyan-500/10 scale-[1.01] z-30',
-    blue: 'dark:ring-blue-500 dark:border-blue-450 dark:bg-blue-950/20 dark:shadow-blue-500/10 scale-[1.01] z-30',
-    indigo: 'dark:ring-indigo-500 dark:border-indigo-450 dark:bg-indigo-950/20 dark:shadow-indigo-500/10 scale-[1.01] z-30',
-    purple: 'dark:ring-purple-500 dark:border-purple-450 dark:bg-purple-950/20 dark:shadow-purple-500/10 scale-[1.01] z-30',
-    fuchsia: 'dark:ring-fuchsia-500 dark:border-fuchsia-450 dark:bg-fuchsia-950/20 dark:shadow-fuchsia-500/10 scale-[1.01] z-30',
-    rose: 'dark:ring-rose-500 dark:border-rose-450 dark:bg-rose-950/20 dark:shadow-rose-500/10 scale-[1.01] z-30'
-};
-
-const LIGHT_RING_RELATED_CLASSES = {
-    slate: 'ring-2 ring-slate-500/80 border-slate-400/80 bg-slate-50/5 shadow-md scale-[1.005] z-30',
-    red: 'ring-2 ring-rose-500/80 border-rose-400/80 bg-rose-50/5 shadow-md scale-[1.005] z-30',
-    orange: 'ring-2 ring-orange-500/80 border-orange-400/80 bg-orange-50/5 shadow-md scale-[1.005] z-30',
-    amber: 'ring-2 ring-amber-500/80 border-amber-400/80 bg-amber-50/5 shadow-md scale-[1.005] z-30',
-    green: 'ring-2 ring-green-500/80 border-green-400/80 bg-green-50/5 shadow-md scale-[1.005] z-30',
-    emerald: 'ring-2 ring-emerald-500/80 border-emerald-400/80 bg-emerald-50/5 shadow-md scale-[1.005] z-30',
-    teal: 'ring-2 ring-teal-500/80 border-teal-400/80 bg-teal-50/5 shadow-md scale-[1.005] z-30',
-    cyan: 'ring-2 ring-cyan-500/80 border-cyan-400/80 bg-cyan-50/5 shadow-md scale-[1.005] z-30',
-    blue: 'ring-2 ring-blue-500/80 border-blue-400/80 bg-blue-50/5 shadow-md scale-[1.005] z-30',
-    indigo: 'ring-2 ring-indigo-500/80 border-indigo-400/80 bg-indigo-50/5 shadow-md scale-[1.005] z-30',
-    purple: 'ring-2 ring-purple-500/80 border-purple-400/80 bg-purple-50/5 shadow-md scale-[1.005] z-30',
-    fuchsia: 'ring-2 ring-fuchsia-500/80 border-fuchsia-400/80 bg-fuchsia-50/5 shadow-md scale-[1.005] z-30',
-    rose: 'ring-2 ring-rose-500/80 border-rose-400/80 bg-rose-50/5 shadow-md scale-[1.005] z-30'
-};
-
-const DARK_RING_RELATED_CLASSES = {
-    slate: 'dark:ring-slate-500/80 dark:border-slate-400/80 dark:bg-slate-950/5 dark:shadow-md scale-[1.005] z-30',
-    red: 'dark:ring-rose-500/80 dark:border-rose-450/80 dark:bg-rose-950/5 dark:shadow-md scale-[1.005] z-30',
-    orange: 'dark:ring-orange-500/80 dark:border-orange-400/80 dark:bg-orange-950/5 dark:shadow-md scale-[1.005] z-30',
-    amber: 'dark:ring-amber-500/80 dark:border-amber-400/80 dark:bg-amber-950/5 dark:shadow-md scale-[1.005] z-30',
-    green: 'dark:ring-green-500/80 dark:border-green-450/80 dark:bg-green-950/5 dark:shadow-md scale-[1.005] z-30',
-    emerald: 'dark:ring-emerald-500/80 dark:border-emerald-450/80 dark:bg-emerald-950/5 dark:shadow-md scale-[1.005] z-30',
-    teal: 'dark:ring-teal-500/80 dark:border-teal-450/80 dark:bg-teal-950/5 dark:shadow-md scale-[1.005] z-30',
-    cyan: 'dark:ring-cyan-500/80 dark:border-cyan-450/80 dark:bg-cyan-950/5 dark:shadow-md scale-[1.005] z-30',
-    blue: 'dark:ring-blue-500/80 dark:border-blue-450/80 dark:bg-blue-950/5 dark:shadow-md scale-[1.005] z-30',
-    indigo: 'dark:ring-indigo-500/80 dark:border-indigo-400/80 dark:bg-indigo-950/5 dark:shadow-md scale-[1.005] z-30',
-    purple: 'dark:ring-purple-500/80 dark:border-purple-400/80 dark:bg-purple-950/5 dark:shadow-md scale-[1.005] z-30',
-    fuchsia: 'dark:ring-fuchsia-500/80 dark:border-fuchsia-450 dark:bg-fuchsia-950/5 dark:shadow-md scale-[1.005] z-30',
-    rose: 'dark:ring-rose-500/80 dark:border-rose-450/80 dark:bg-rose-950/5 dark:shadow-md scale-[1.005] z-30'
-};
-
-const COLOR_NAMES_ES = {
-    slate: 'Gris / Slate',
-    red: 'Rojo',
-    orange: 'Naranja',
-    amber: 'Ámbar',
-    green: 'Verde',
-    emerald: 'Esmeralda',
-    teal: 'Teal / Cerceta',
-    cyan: 'Cian',
-    blue: 'Azul',
-    indigo: 'Índigo',
-    purple: 'Morado / Púrpura',
-    fuchsia: 'Fucsia',
-    rose: 'Rosa / Clavel'
-};
-
-const KPI_LABELS_ES = {
-    'card-objDia': 'Objetivo / Día',
-    'card-objHora': 'Objetivo / Hora',
-    'card-ppmObj': 'Ciclos / Min Objetivo',
-    'card-cicloTarget': 'Ciclo Target',
-    'card-cicloReal': 'Ciclo Real',
-    'card-ppmReal': 'Ciclos / Min Real',
-    'card-bottleneck': 'Cuello de Botella (Bottleneck)',
-    'card-realHora': 'Real / Hora',
-    'card-status': 'Status (Estado)',
-    'card-piezasDia': 'Piezas / Día',
-    'card-piezasSem': 'Piezas / Semana',
-    'card-piezasAno': 'Piezas / Año',
-    'visual-active': 'Ayuda Visual: Elemento Activo',
-    'visual-relatedInput': 'Ayuda Visual: Inputs Relacionados',
-    'visual-relatedResult': 'Ayuda Visual: Resultados Relacionados'
-};
-
 export default function TimingStudyManager({ projectId, canEdit = false, userId = null }) {
-    // ── Estados Principales ──
+    // ΓöÇΓöÇ Estados Principales ΓöÇΓöÇ
     const [studies, setStudies] = useState([]);
     const [stations, setStations] = useState([]);
     const [steps, setSteps] = useState([]);
@@ -356,59 +144,10 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(null);
 
-    // ── Estado de Colores Personalizados ──
-    const [customColors, setCustomColors] = useState(() => {
-        try {
-            const saved = localStorage.getItem('timingStudyCustomColors');
-            return saved ? JSON.parse(saved) : DEFAULT_KPI_COLORS;
-        } catch (e) {
-            console.error('Error loading custom colors', e);
-            return DEFAULT_KPI_COLORS;
-        }
-    });
-
-    const [showColorModal, setShowColorModal] = useState(false);
-    const [colorTab, setColorTab] = useState('dark'); // 'light' | 'dark'
-
-    const handleSaveCustomColors = useCallback((newColors) => {
-        setCustomColors(newColors);
-        try {
-            localStorage.setItem('timingStudyCustomColors', JSON.stringify(newColors));
-        } catch (e) {
-            console.error('Error saving custom colors', e);
-        }
-    }, []);
-
-    const handleResetColors = useCallback(() => {
-        handleSaveCustomColors(DEFAULT_KPI_COLORS);
-    }, [handleSaveCustomColors]);
-
-    const getKPIColor = useCallback((kpiId) => {
-        const kpiColors = customColors[kpiId] || DEFAULT_KPI_COLORS[kpiId] || { light: 'slate', dark: 'slate' };
-        const lightClass = LIGHT_TEXT_CLASSES[kpiColors.light] || 'text-slate-600';
-        const darkClass = DARK_TEXT_CLASSES[kpiColors.dark] || 'dark:text-slate-200';
-        return `${lightClass} ${darkClass}`;
-    }, [customColors]);
-
-    const getKPIBgColor = useCallback((kpiId) => {
-        const kpiColors = customColors[kpiId] || DEFAULT_KPI_COLORS[kpiId] || { light: 'slate', dark: 'slate' };
-        const lightClass = LIGHT_BG_CLASSES[kpiColors.light] || 'bg-slate-500/10';
-        const darkClass = DARK_BG_CLASSES[kpiColors.dark] || 'dark:bg-slate-500/10';
-        return `${lightClass} ${darkClass}`;
-    }, [customColors]);
-
-    const getKPIBorderColor = useCallback((kpiId) => {
-        const kpiColors = customColors[kpiId] || DEFAULT_KPI_COLORS[kpiId] || { light: 'slate', dark: 'slate' };
-        const lightClass = LIGHT_BORDER_CLASSES[kpiColors.light] || 'border-slate-500/20';
-        const darkClass = DARK_BORDER_CLASSES[kpiColors.dark] || 'dark:border-slate-500/20';
-        return `${lightClass} ${darkClass}`;
-    }, [customColors]);
-
-    // ── Estado colapsable para configuración ──
+    // ΓöÇΓöÇ Estado colapsable para configuración ΓöÇΓöÇ
     const [showConfig, setShowConfig] = useState(true);
-    const [showNotes, setShowNotes] = useState(false);
 
-    // ── Configuración en edición local ──
+    // ΓöÇΓöÇ Configuración en edición local ΓöÇΓöÇ
     const [studyConfig, setStudyConfig] = useState(null);
     const [hasConfigChanges, setHasConfigChanges] = useState(false);
     const [configAutoSaveStatus, setConfigAutoSaveStatus] = useState('idle'); // idle | saving | saved | error
@@ -417,37 +156,23 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
     const configInitialLoadRef = useRef(true);
     const justSavedConfigRef = useRef(0); // timestamp of last save
 
-    // ── Paso que tiene abierto el selector de dependencias ──
+    // ΓöÇΓöÇ Paso que tiene abierto el selector de dependencias ΓöÇΓöÇ
     const [activeDependencyStepId, setActiveDependencyStepId] = useState(null);
 
-    // ── Resaltado Dinámico de Dependencias (Fórmulas) ──
+    // ΓöÇΓöÇ Resaltado Dinámico de Dependencias (Fórmulas) ΓöÇΓöÇ
     const [hoveredRelation, setHoveredRelation] = useState(null);
-    const [activeTooltipId, setActiveTooltipId] = useState(null);
 
     const handleRelationClick = useCallback((relationId, e) => {
         if (e && typeof e.stopPropagation === 'function') {
             e.stopPropagation();
         }
-        
-        if (hoveredRelation === relationId) {
-            // Estado 2 -> Clic 3: Desactivar todo
-            setHoveredRelation(null);
-            setActiveTooltipId(null);
-        } else if (activeTooltipId === relationId) {
-            // Estado 1 -> Clic 2: Activar ayuda visual, desactivar tooltip
-            setHoveredRelation(relationId);
-            setActiveTooltipId(null);
-        } else {
-            // Estado 0 -> Clic 1: Activar tooltip, desactivar ayuda visual
-            setHoveredRelation(null);
-            setActiveTooltipId(relationId);
-        }
-    }, [hoveredRelation, activeTooltipId]);
+        setHoveredRelation(prev => prev === relationId ? null : relationId);
+    }, []);
 
     // Mapa bidireccional de dependencias
     const DEPENDENCY_RELATIONS = useMemo(() => ({
         // Inputs -> KPIs que afectan
-        'input-piecesPerHour': ['card-objDia', 'card-objHora', 'card-ppmObj', 'card-cicloTarget', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno'],
+        'input-piecesPerHour': ['card-objDia', 'card-objHora', 'card-ppmObj', 'card-cicloTarget'],
         'input-shiftHours': ['card-objDia', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno'],
         'input-oeePenalty': ['card-piezasDia', 'card-piezasSem', 'card-piezasAno', 'input-availability', 'input-efficiency', 'input-yield'],
         'input-availability': ['input-oeePenalty', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno'],
@@ -455,25 +180,26 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         'input-yield': ['input-oeePenalty', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno'],
         'input-workDaysPerWeek': ['card-piezasSem', 'card-piezasAno'],
         'input-country': ['card-piezasAno'],
-        'input-annualDemand': ['card-piezasAno', 'input-piecesPerHour'],
-        'input-machineType': ['card-cicloReal', 'card-ppmReal', 'card-realHora', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno', 'input-indexTime', 'input-dwellTime'],
-        'input-indexTime': ['card-cicloReal', 'card-ppmReal', 'card-realHora', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno'],
-        'input-dwellTime': ['card-cicloReal', 'card-ppmReal', 'card-realHora', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno', 'card-bottleneck'],
-        'input-up': ['card-objDia', 'card-objHora', 'card-ppmObj', 'card-cicloTarget', 'card-realHora', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno'],
+        'input-annualDemand': ['card-piezasAno'],
+        'input-machineType': ['card-cicloReal', 'card-ppmReal', 'card-realHora', 'card-piezasHora', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno', 'input-indexTime', 'input-dwellTime'],
+        'input-indexTime': ['card-cicloReal', 'card-ppmReal', 'card-realHora', 'card-piezasHora', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno'],
+        'input-dwellTime': ['card-cicloReal', 'card-ppmReal', 'card-realHora', 'card-piezasHora', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno', 'card-bottleneck'],
+        'input-up': ['card-objDia', 'card-objHora', 'card-ppmObj', 'card-cicloTarget', 'card-realHora', 'card-piezasHora', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno'],
 
         // KPIs -> Inputs de los que dependen o KPIs relacionados
         'card-objDia': ['input-piecesPerHour', 'input-shiftHours', 'input-up', 'card-ppmObj'],
         'card-objHora': ['input-piecesPerHour', 'input-up', 'card-ppmObj'],
         'card-ppmObj': ['input-piecesPerHour', 'input-up'],
         'card-cicloTarget': ['card-ppmObj'],
-        'card-realHora': ['card-ppmReal', 'input-up', 'input-machineType', 'input-indexTime', 'input-dwellTime'],
+        'card-realHora': ['card-ppmReal', 'input-up', 'input-machineType', 'card-piezasHora'],
         'card-bottleneck': ['input-dwellTime'],
         'card-status': ['card-cicloReal', 'card-cicloTarget'],
-        'card-piezasDia': ['card-realHora', 'input-shiftHours', 'input-oeePenalty', 'input-availability', 'input-efficiency', 'input-yield', 'input-piecesPerHour'],
+        'card-piezasDia': ['card-realHora', 'card-piezasHora', 'input-shiftHours', 'input-oeePenalty', 'input-availability', 'input-efficiency', 'input-yield'],
+        'card-piezasHora': ['card-realHora', 'card-ppmReal', 'input-up'],
         'card-ppmReal': ['card-cicloReal', 'input-machineType', 'input-indexTime', 'input-dwellTime'],
         'card-cicloReal': ['input-dwellTime', 'input-indexTime', 'input-machineType'],
-        'card-piezasSem': ['card-piezasDia', 'input-workDaysPerWeek', 'input-shiftHours', 'input-oeePenalty', 'input-availability', 'input-efficiency', 'input-yield', 'input-piecesPerHour'],
-        'card-piezasAno': ['card-piezasDia', 'input-workDaysPerWeek', 'input-country', 'input-annualDemand', 'input-shiftHours', 'input-oeePenalty', 'input-availability', 'input-efficiency', 'input-yield', 'input-piecesPerHour']
+        'card-piezasSem': ['card-piezasDia', 'input-workDaysPerWeek', 'input-availability', 'input-efficiency', 'input-yield'],
+        'card-piezasAno': ['card-piezasDia', 'input-workDaysPerWeek', 'input-country', 'input-annualDemand', 'input-availability', 'input-efficiency', 'input-yield']
     }), []);
 
     const getHighlightStyles = useCallback((id) => {
@@ -483,11 +209,8 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         const isRelated = DEPENDENCY_RELATIONS[hoveredRelation]?.includes(id);
 
         if (isCurrent) {
-            const visualColors = customColors['visual-active'] || DEFAULT_KPI_COLORS['visual-active'];
-            const lightRing = LIGHT_RING_CLASSES[visualColors.light] || LIGHT_RING_CLASSES.cyan;
-            const darkRing = DARK_RING_CLASSES[visualColors.dark] || DARK_RING_CLASSES.cyan;
             return {
-                wrapperClass: `${lightRing} ${darkRing}`,
+                wrapperClass: 'ring-2 ring-cyan-500 border-cyan-400 bg-cyan-950/20 shadow-lg shadow-cyan-500/10 scale-[1.01] z-30',
                 isDimmed: false,
                 role: 'active'
             };
@@ -495,12 +218,9 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
 
         if (isRelated) {
             const isInput = id.startsWith('input-');
-            const key = isInput ? 'visual-relatedInput' : 'visual-relatedResult';
-            const visualColors = customColors[key] || DEFAULT_KPI_COLORS[key];
-            const lightRing = LIGHT_RING_RELATED_CLASSES[visualColors.light] || LIGHT_RING_RELATED_CLASSES[isInput ? 'indigo' : 'emerald'];
-            const darkRing = DARK_RING_RELATED_CLASSES[visualColors.dark] || DARK_RING_RELATED_CLASSES[isInput ? 'indigo' : 'emerald'];
+            const colorRing = isInput ? 'ring-2 ring-indigo-500/80 border-indigo-400/80 bg-indigo-950/5' : 'ring-2 ring-emerald-500/80 border-emerald-400/80 bg-emerald-950/5';
             return {
-                wrapperClass: `${lightRing} ${darkRing}`,
+                wrapperClass: `${colorRing} shadow-md scale-[1.005] z-30`,
                 isDimmed: false,
                 role: 'related'
             };
@@ -511,7 +231,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
             isDimmed: true,
             role: 'dimmed'
         };
-    }, [hoveredRelation, DEPENDENCY_RELATIONS, customColors]);
+    }, [hoveredRelation, DEPENDENCY_RELATIONS]);
 
     const getHighlightLabel = useCallback((id) => {
         if (!hoveredRelation) return null;
@@ -529,19 +249,19 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         return null;
     }, [hoveredRelation, DEPENDENCY_RELATIONS]);
 
-    // ── Ajustes Estándar por Proyecto (Clasificadores y Tiempos) ──
+    // ΓöÇΓöÇ Ajustes Estándar por Proyecto (Clasificadores y Tiempos) ΓöÇΓöÇ
     const [showStandards, setShowStandards] = useState(false);
     const [standardsConfig, setStandardsConfig] = useState(null);
     const [hasStandardsChanges, setHasStandardsChanges] = useState(false);
     const [standardsActiveTab, setStandardsActiveTab] = useState('classifiers');
     const [actuatorGroups, setActuatorGroups] = useState(null);
 
-    // ── Obtener el estudio seleccionado actualmente ──
+    // ΓöÇΓöÇ Obtener el estudio seleccionado actualmente ΓöÇΓöÇ
     const currentStudy = useMemo(() => {
         return studies.find(s => s.id === selectedStudyId) || null;
     }, [studies, selectedStudyId]);
 
-    // ── Obtener acciones válidas: grupos dinámicos primero, luego clasificadores ──
+    // ΓöÇΓöÇ Obtener acciones válidas: grupos dinámicos primero, luego clasificadores ΓöÇΓöÇ
     const getValidActionsForDevice = useCallback((deviceType) => {
         if (!deviceType) return Object.values(TIMING_ACTIONS);
         // 1. Grupos dinámicos
@@ -563,7 +283,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         return Array.from(new Set(actions));
     }, [standardsConfig, actuatorGroups]);
 
-    // ── Resultados de Validación del Estudio ──
+    // ΓöÇΓöÇ Resultados de Validación del Estudio ΓöÇΓöÇ
     const validationResults = useMemo(() => {
         if (!currentStudy) {
             return {
@@ -577,7 +297,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         return validateTimingStudy(currentStudy, steps, stations);
     }, [currentStudy, steps, stations]);
 
-    // ── Confiabilidad (Data Quality) ──
+    // ΓöÇΓöÇ Confiabilidad (Data Quality) ΓöÇΓöÇ
     const dataQuality = useMemo(() => {
         if (!currentStudy || steps.length === 0) return 'EMPTY';
         if (validationResults.errorCount > 0) return 'BLOCKED';
@@ -585,13 +305,13 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         return 'READY';
     }, [currentStudy, steps, validationResults]);
 
-    // ── Métricas calculadas en memoria local para detectar discrepancias ──
+    // ΓöÇΓöÇ Métricas calculadas en memoria local para detectar discrepancias ΓöÇΓöÇ
     const localMetrics = useMemo(() => {
         if (!studyConfig) return null;
         return calculateTimingStudyMetrics(studyConfig, steps, stations);
     }, [studyConfig, steps, stations]);
 
-    // ── Bandera que detecta si el estudio requiere recálculo ──
+    // ΓöÇΓöÇ Bandera que detecta si el estudio requiere recálculo ΓöÇΓöÇ
     const needsRecalculate = useMemo(() => {
         if (!currentStudy || !localMetrics) return false;
         if (hasConfigChanges) return true;
@@ -621,30 +341,28 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         return cycleDiff || ppmDiff || statusDiff || stepsDiff;
     }, [currentStudy, localMetrics, steps, hasConfigChanges]);
 
-    // ── Métricas a largo plazo (Capacidad Anual, OEE, etc.) ──
+    // ΓöÇΓöÇ Métricas a largo plazo (Capacidad Anual, OEE, etc.) ΓöÇΓöÇ
     const longTermMetrics = useMemo(() => {
         if (!studyConfig || !localMetrics) return null;
 
-        const calcMode = studyConfig.calcMode || 'pph'; // 'pph' | 'demand'
         const workDaysPerWeek = studyConfig.workDaysPerWeek !== undefined ? Number(studyConfig.workDaysPerWeek) : 5;
         const country = studyConfig.country || 'MX';
         const annualDemand = studyConfig.annualDemand !== undefined ? Number(studyConfig.annualDemand) : 18388734;
         const shiftHours = studyConfig.shiftHours !== undefined ? Number(studyConfig.shiftHours) : 8;
+
         const cycleOutputQty = studyConfig.cycleOutputQty !== undefined ? Number(studyConfig.cycleOutputQty) : 1;
 
         const feriados = country === 'MX' ? 7 : (country === 'CR' ? 11 : (country === 'US' ? 11 : 0));
         const diasAnuales = (workDaysPerWeek * 52) - feriados;
 
-        // ── Datos REALES del diagrama (siempre fijos) ──
         const machineCycleMs = localMetrics.machineCycleTimeMs || 0;
         const cicloRealSeg = machineCycleMs / 1000;
         const ppmReal = cicloRealSeg > 0 ? (60 / cicloRealSeg) : 0;
-        const piezasHoraReal = ppmReal * 60 * cycleOutputQty;
-        const cpmReal = ppmReal; // ciclos por minuto real (= PPM sin UP)
 
+        const targetPPM = Number(studyConfig.targetPPM) || 10;
         const linkOeeToStudy = !!studyConfig.linkOeeToStudy;
 
-        // ── OEE y Pérdidas ──
+        // OEE y Pérdidas
         const availability = studyConfig.availability !== undefined ? Number(studyConfig.availability) : 95;
         const yieldVal = studyConfig.yield !== undefined ? Number(studyConfig.yield) : 98;
 
@@ -652,92 +370,33 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         let oeeFactor;
         let oeePenalty;
 
-        // ── Cálculos TARGET según MODO ──
-        let targetPPM;
-        let piezasHoraTarget;
-
-        if (calcMode === 'demand') {
-            // MODO DEMANDA: calcular PPH requerido desde demanda anual
-            // Primero necesitamos OEE para calcular bruto
-            if (linkOeeToStudy) {
-                // Usar PPM target provisional para calcular efficiency
-                const provisionalTargetPPM = Number(studyConfig.targetPPM) || 10;
-                efficiency = provisionalTargetPPM > 0 ? (ppmReal / provisionalTargetPPM) * 100 : 100;
-                oeeFactor = (availability / 100) * (efficiency / 100) * (yieldVal / 100);
-                oeePenalty = 100 - (oeeFactor * 100);
-            } else {
-                oeePenalty = studyConfig.oeePenalty !== undefined ? Number(studyConfig.oeePenalty) : 15;
-                oeeFactor = (100 - oeePenalty) / 100;
-                efficiency = studyConfig.efficiency !== undefined 
-                    ? Number(studyConfig.efficiency) 
-                    : ((oeeFactor * 1000000) / (availability * yieldVal));
-            }
-
-            const piezasDiaReq = diasAnuales > 0 ? annualDemand / diasAnuales : 0;
-            const piezasDiaBrutoReq = oeeFactor > 0 ? piezasDiaReq / oeeFactor : 0;
-            piezasHoraTarget = shiftHours > 0 ? piezasDiaBrutoReq / shiftHours : 0;
-            targetPPM = cycleOutputQty > 0 ? (piezasHoraTarget / 60 / cycleOutputQty) : 0;
+        if (linkOeeToStudy) {
+            efficiency = targetPPM > 0 ? (ppmReal / targetPPM) * 100 : 100;
+            oeeFactor = (availability / 100) * (efficiency / 100) * (yieldVal / 100);
+            oeePenalty = 100 - (oeeFactor * 100);
         } else {
-            // MODO PPH: calcular PPH bruto requerido desde piezas netas ingresadas
-            if (linkOeeToStudy) {
-                // Usar PPM target provisional para calcular efficiency
-                const provisionalTargetPPM = Number(studyConfig.targetPPM) || 10;
-                efficiency = provisionalTargetPPM > 0 ? (ppmReal / provisionalTargetPPM) * 100 : 100;
-                oeeFactor = (availability / 100) * (efficiency / 100) * (yieldVal / 100);
-                oeePenalty = 100 - (oeeFactor * 100);
-            } else {
-                oeePenalty = studyConfig.oeePenalty !== undefined ? Number(studyConfig.oeePenalty) : 15;
-                oeeFactor = (100 - oeePenalty) / 100;
-                efficiency = studyConfig.efficiency !== undefined 
-                    ? Number(studyConfig.efficiency) 
-                    : ((oeeFactor * 1000000) / (availability * yieldVal));
-            }
-
-            const targetPiecesPerShift = studyConfig.targetPiecesPerShift !== undefined ? Number(studyConfig.targetPiecesPerShift) : 8000;
-            const piezasDiaReq = targetPiecesPerShift;
-            const piezasDiaBrutoReq = oeeFactor > 0 ? piezasDiaReq / oeeFactor : 0;
-            piezasHoraTarget = shiftHours > 0 ? piezasDiaBrutoReq / shiftHours : 0;
-            targetPPM = cycleOutputQty > 0 ? (piezasHoraTarget / 60 / cycleOutputQty) : 0;
+            oeePenalty = studyConfig.oeePenalty !== undefined ? Number(studyConfig.oeePenalty) : 15;
+            oeeFactor = (100 - oeePenalty) / 100;
+            efficiency = studyConfig.efficiency !== undefined 
+                ? Number(studyConfig.efficiency) 
+                : ((oeeFactor * 1000000) / (availability * yieldVal));
         }
 
-        // ── PPM y Ciclos Target ──
-        const ppmTarget = targetPPM;
-        const cpmTarget = targetPPM; // ciclos por minuto target (= PPM sin UP)
-        const cicloTargetSeg = targetPPM > 0 ? (60 / targetPPM) : 0;
-
-        // ── Producción calculada (basada en el TARGET, no en el real) ──
-        const piezasDiaSinOEE = piezasHoraTarget * shiftHours;
-        const piezasDia = piezasDiaSinOEE * oeeFactor;
+        const piezasHora = ppmReal * 60 * cycleOutputQty;
+        const piezasDia = piezasHora * shiftHours * oeeFactor;
         const piezasSemana = piezasDia * workDaysPerWeek;
-        const piezasSemanaBruto = piezasDiaSinOEE * workDaysPerWeek;
         const piezasAno = piezasDia * diasAnuales;
-        const piezasAnoBruto = piezasDiaSinOEE * diasAnuales;
-
-        // ── Producción REAL del diagrama (para comparación) ──
-        const piezasDiaReal = piezasHoraReal * shiftHours * oeeFactor;
-        const piezasSemanaReal = piezasDiaReal * workDaysPerWeek;
-        const piezasAnoReal = piezasDiaReal * diasAnuales;
-
         const metaAno = piezasAno;
         const cumplimiento = annualDemand > 0 ? (metaAno / annualDemand) * 100 : 0;
         const cumpleDemanda = metaAno >= annualDemand;
 
-        // Cumplimiento REAL (diagrama vs demanda)
-        const cumplimientoReal = annualDemand > 0 ? (piezasAnoReal / annualDemand) * 100 : 0;
-        const cumpleDemandaReal = piezasAnoReal >= annualDemand;
-
-        // ── Pérdidas OEE (basadas en target) ──
+        const piezasDiaSinOEE = piezasHora * shiftHours;
         const piezasPerdidasDisp = piezasDiaSinOEE * (1 - availability / 100);
         const piezasPerdidasEficiencia = piezasDiaSinOEE * (availability / 100) * (1 - efficiency / 100);
         const piezasPerdidasCalidad = piezasDiaSinOEE * (availability / 100) * (efficiency / 100) * (1 - yieldVal / 100);
 
-        // OEE % para UI (invertido de oeePenalty)
-        const oeePercent = Math.round((100 - oeePenalty) * 10) / 10;
-
         return {
-            calcMode,
             oeePenalty,
-            oeePercent,
             oeeFactor,
             workDaysPerWeek,
             country,
@@ -748,30 +407,14 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
             feriados,
             diasAnuales,
             cicloRealSeg,
-            cicloTargetSeg,
             ppmReal,
-            ppmTarget,
-            cpmReal,
-            cpmTarget,
-            piezasHora: piezasHoraTarget, // backward compat
-            piezasHoraTarget,
-            piezasHoraReal,
+            piezasHora,
             piezasDia,
-            piezasDiaSinOEE,
             piezasSemana,
-            piezasSemanaBruto,
             piezasAno,
-            piezasAnoBruto,
             metaAno,
             cumplimiento,
             cumpleDemanda,
-
-            // Datos REALES del diagrama
-            piezasDiaReal,
-            piezasSemanaReal,
-            piezasAnoReal,
-            cumplimientoReal,
-            cumpleDemandaReal,
 
             // OEE y Pérdidas
             availability,
@@ -785,9 +428,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
     }, [studyConfig, localMetrics]);
 
     const {
-        calcMode = 'pph',
         oeePenalty = 15,
-        oeePercent = 85,
         oeeFactor = 0.85,
         workDaysPerWeek = 5,
         country = 'MX',
@@ -797,30 +438,15 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         feriados = 7,
         diasAnuales = 253,
         cicloRealSeg = 0,
-        cicloTargetSeg = 0,
         ppmReal = 0,
-        ppmTarget = 0,
-        cpmReal = 0,
-        cpmTarget = 0,
         piezasHora = 0,
-        piezasHoraTarget = 0,
-        piezasHoraReal = 0,
         piezasDia = 0,
-        piezasDiaSinOEE = 0,
         piezasSemana = 0,
-        piezasSemanaBruto = 0,
         piezasAno = 0,
-        piezasAnoBruto = 0,
         metaAno = 0,
         cumplimiento = 0,
         cumpleDemanda = false,
         cycleOutputQty = 1,
-
-        piezasDiaReal = 0,
-        piezasSemanaReal = 0,
-        piezasAnoReal = 0,
-        cumplimientoReal = 0,
-        cumpleDemandaReal = false,
 
         availability = 95,
         yieldVal = 98,
@@ -831,8 +457,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         linkOeeToStudy = false
     } = longTermMetrics || {};
 
-
-    // ── Helpers de Exportación a CSV ──
+    // ΓöÇΓöÇ Helpers de Exportación a CSV ΓöÇΓöÇ
     const getYYYYMMDD = () => {
         const now = new Date();
         const yyyy = now.getFullYear();
@@ -1008,7 +633,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         }
     };
 
-    // ── Listeners de datos ──
+    // ΓöÇΓöÇ Listeners de datos ΓöÇΓöÇ
     useEffect(() => {
         if (!projectId) {
             setStudies([]);
@@ -1050,7 +675,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         };
     }, [projectId]);
 
-    // ── Cargar pasos del estudio seleccionado ──
+    // ΓöÇΓöÇ Cargar pasos del estudio seleccionado ΓöÇΓöÇ
     useEffect(() => {
         if (!projectId || !selectedStudyId) {
             setSteps([]);
@@ -1066,7 +691,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         };
     }, [projectId, selectedStudyId]);
 
-    // ── Sincronizar configuración local al cambiar de estudio ──
+    // ΓöÇΓöÇ Sincronizar configuración local al cambiar de estudio ΓöÇΓöÇ
     useEffect(() => {
         if (currentStudy) {
             // Skip sync if we recently saved (prevents onSnapshot from overwriting local edits)
@@ -1119,7 +744,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         }
     }, [currentStudy]);
 
-    // ── Sincronizar ajustes estándar globales (con fallback a locales de estudio si existen) ──
+    // ΓöÇΓöÇ Sincronizar ajustes estándar globales (con fallback a locales de estudio si existen) ΓöÇΓöÇ
     useEffect(() => {
         if (currentStudy) {
             const defaults = {
@@ -1188,7 +813,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         }
     }, [currentStudy]);
 
-    // ── Cargar grupos de actuadores dinámicos desde Firestore ──
+    // ΓöÇΓöÇ Cargar grupos de actuadores dinámicos desde Firestore ΓöÇΓöÇ
     useEffect(() => {
         getActuatorGroups()
             .then(data => {
@@ -1199,7 +824,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
             .catch(err => console.warn('[TimingStudyManager] No se pudieron cargar grupos:', err));
     }, []);
 
-    // ── Mostrar mensajes temporales ──
+    // ΓöÇΓöÇ Mostrar mensajes temporales ΓöÇΓöÇ
     const showMessage = (msg, type = 'success') => {
         if (type === 'success') {
             setSuccess(msg);
@@ -1210,7 +835,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         }
     };
 
-    // ── Configuración Handlers ──
+    // ΓöÇΓöÇ Configuración Handlers ΓöÇΓöÇ
     const handleConfigChanges = useCallback((updates) => {
         setStudyConfig(prev => {
             if (!prev) return prev;
@@ -1515,7 +1140,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         }
     };
 
-    // ── Ajustes Estándar del Proyecto Handlers ──
+    // ΓöÇΓöÇ Ajustes Estándar del Proyecto Handlers ΓöÇΓöÇ
     const handleMotionValueChange = (key, value) => {
         setStandardsConfig(prev => {
             if (!prev) return prev;
@@ -1605,7 +1230,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         }
     };
 
-    // ── CRUD Timing Study Handlers ──
+    // ΓöÇΓöÇ CRUD Timing Study Handlers ΓöÇΓöÇ
     const handleCreateStudy = async (name = '') => {
         if (!projectId || !canEdit) return;
 
@@ -1763,7 +1388,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         }
     };
 
-    // ── CRUD Timing Steps Handlers ──
+    // ΓöÇΓöÇ CRUD Timing Steps Handlers ΓöÇΓöÇ
     const handleAddStep = async (stationId = null) => {
         if (!projectId || !selectedStudyId || !canEdit) return;
         if (stations.length === 0) return;
@@ -2080,7 +1705,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         }
     };
 
-    // ── Manejar dependencias ──
+    // ΓöÇΓöÇ Manejar dependencias ΓöÇΓöÇ
     const handleToggleDependency = async (step, targetId) => {
         if (!projectId || !selectedStudyId || !canEdit) return;
 
@@ -2104,7 +1729,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         }
     };
 
-    // ── Formateo Visual Helpers ──
+    // ΓöÇΓöÇ Formateo Visual Helpers ΓöÇΓöÇ
     const formatTime = (ms) => {
         if (ms === undefined || ms === null) return '0 ms';
         if (ms >= 1000) return `${(ms / 1000).toFixed(2)} s`;
@@ -2124,7 +1749,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
         }
     };
 
-    // ── Renders Secundarios ──
+    // ΓöÇΓöÇ Renders Secundarios ΓöÇΓöÇ
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center py-16 bg-slate-900/40 rounded-2xl border border-slate-800/80">
@@ -2136,7 +1761,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
 
     return (
         <div className="space-y-6">
-            {/* ── Banners de Alertas y ├ëxito ── */}
+            {/* ΓöÇΓöÇ Banners de Alertas y ├ëxito ΓöÇΓöÇ */}
             {error && (
                 <div className="flex items-center gap-3 px-4 py-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs animate-in fade-in duration-200">
                     <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -2151,7 +1776,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
             )}
 
 
-            {/* ── Alerta si no hay estaciones en el proyecto ── */}
+            {/* ΓöÇΓöÇ Alerta si no hay estaciones en el proyecto ΓöÇΓöÇ */}
             {stations.length === 0 && (
                 <div className="flex items-start gap-4 p-4 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-2xl">
                     <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-amber-400" />
@@ -2164,7 +1789,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                 </div>
             )}
 
-            {/* ── HEADER PRINCIPAL ── */}
+            {/* ΓöÇΓöÇ HEADER PRINCIPAL ΓöÇΓöÇ */}
             <div className="bg-slate-900/70 p-6 rounded-2xl border border-slate-800 backdrop-blur-md flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
                 <div>
                     <h2 className="text-lg font-black text-white flex items-center gap-2 tracking-wide">
@@ -2212,14 +1837,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
 
                     {currentStudy && (
                         <>
-                            <button
-                                onClick={() => setShowColorModal(true)}
-                                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition cursor-pointer border border-slate-700"
-                                title="Personalizar paleta de colores de KPIs y ayudas visuales"
-                            >
-                                <Palette className="w-3.5 h-3.5 text-cyan-400" />
-                                Colores
-                            </button>
+
 
                             <button
                                 onClick={handleExportStepsCSV}
@@ -2253,7 +1871,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                 </div>
             </div>
 
-            {/* ── ESTADO VAC├ìO DE ESTUDIOS ── */}
+            {/* ΓöÇΓöÇ ESTADO VAC├ìO DE ESTUDIOS ΓöÇΓöÇ */}
             {studies.length === 0 ? (
                 <div className="bg-slate-900/50 p-12 text-center rounded-2xl border border-slate-800 shadow-lg">
                     <Clock className="w-12 h-12 text-slate-600 mx-auto mb-4" />
@@ -2283,459 +1901,10 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
             ) : (
                 currentStudy && (
                     <div className="space-y-6 animate-in fade-in duration-200">
-                        {/* ── SECCIÓN CONFIGURACIÓN DEL ESTUDIO (arriba de las tarjetas) ── */}
-                        <div className="bg-slate-900/70 rounded-xl border border-slate-800 overflow-hidden relative z-10">
-                            <button
-                                onClick={() => setShowConfig(!showConfig)}
-                                className="w-full px-5 py-3 flex items-center justify-between hover:bg-slate-850/30 transition text-left cursor-pointer focus:outline-none"
-                            >
-                                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                                    <Settings className="w-3.5 h-3.5 text-slate-400" />
-                                    Configuración General del Estudio
-                                </span>
-                                <span className="text-xs text-cyan-400 font-bold">
-                                    {showConfig ? 'Ocultar' : 'Mostrar'}
-                                </span>
-                            </button>
-
-                            {showConfig && studyConfig && (
-                                <div className="p-4 border-t border-slate-800/60 space-y-3 bg-slate-950/20">
-                                    {/* Toggle Modo de Cálculo */}
-                                    <div className="flex items-center gap-2 p-2 bg-slate-900/60 rounded-xl border border-slate-800/60">
-                                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mr-1">Modo:</span>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleConfigChange('calcMode', 'pph')}
-                                            disabled={!canEdit}
-                                            className={`flex-1 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer border ${
-                                                (studyConfig.calcMode || 'pph') === 'pph'
-                                                    ? 'bg-cyan-600 border-cyan-500 text-white shadow-lg shadow-cyan-900/30'
-                                                    : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:bg-slate-850 hover:border-slate-700'
-                                            } disabled:opacity-50`}
-                                        >
-                                            📊 Desde PPH
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleConfigChange('calcMode', 'demand')}
-                                            disabled={!canEdit}
-                                            className={`flex-1 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer border ${
-                                                studyConfig.calcMode === 'demand'
-                                                    ? 'bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-900/30'
-                                                    : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:bg-slate-850 hover:border-slate-700'
-                                            } disabled:opacity-50`}
-                                        >
-                                            📈 Desde Demanda
-                                        </button>
-                                        <span className="text-[8px] text-slate-600 ml-1 hidden md:inline">
-                                            {(studyConfig.calcMode || 'pph') === 'pph' ? 'PPH → Piezas/Año' : 'Demanda → PPH requerido'}
-                                        </span>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-2.5">
-                                    {/* Nombre */}
-                                    <div 
-                                        onClick={(e) => handleRelationClick('input-name', e)}
-                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-name').wrapperClass}`}
-                                    >
-                                        {getHighlightLabel('input-name') && (
-                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                hoveredRelation === 'input-name' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                            }`}>
-                                                {getHighlightLabel('input-name')}
-                                            </span>
-                                        )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Nombre</label>
-                                        <input
-                                            value={studyConfig.name || ''}
-                                            onChange={e => handleConfigChange('name', e.target.value)}
-                                            disabled={!canEdit}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
-                                        />
-                                    </div>
-
-                                    {/* Piezas por Hora */}
-                                    <div 
-                                        onClick={(e) => handleRelationClick('input-piecesPerHour', e)}
-                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-piecesPerHour').wrapperClass}`}
-                                    >
-                                        {getHighlightLabel('input-piecesPerHour') && (
-                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                hoveredRelation === 'input-piecesPerHour' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                            }`}>
-                                                {getHighlightLabel('input-piecesPerHour')}
-                                            </span>
-                                        )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">
-                                            Piezas por Hora {calcMode === 'demand' && <span className="text-violet-400 text-[7px] normal-case">(calculado)</span>}
-                                        </label>
-                                        {calcMode === 'demand' ? (
-                                            <div className="w-full bg-violet-950/30 border border-violet-600/40 rounded-lg px-2.5 py-1 text-xs text-violet-300 font-bold font-mono">
-                                                {piezasHoraTarget > 0 ? Math.round(piezasHoraTarget).toLocaleString() : '—'}
-                                            </div>
-                                        ) : (
-                                            <input
-                                                type="number" min="1" step="1"
-                                                value={studyConfig.targetPiecesPerShift && studyConfig.shiftHours ? Math.round(studyConfig.targetPiecesPerShift / studyConfig.shiftHours) : ''}
-                                                onChange={e => {
-                                                    const piecesPerHour = Number(e.target.value) || 0;
-                                                    const hours = Number(studyConfig.shiftHours) || 8;
-                                                    const up = Number(studyConfig.cycleOutputQty) || 1;
-                                                    const targetPiecesPerShift = piecesPerHour * hours;
-                                                    const targetPPM = piecesPerHour / 60 / up;
-                                                    handleConfigChanges({ 
-                                                        targetPiecesPerShift, 
-                                                        targetPPM: Math.round(targetPPM * 100) / 100 
-                                                    });
-                                                }}
-                                                disabled={!canEdit}
-                                                placeholder="ej. 1200"
-                                                className="w-full bg-slate-900 border border-cyan-700/40 rounded-lg px-2.5 py-1 text-xs text-cyan-300 font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
-                                            />
-                                        )}
-                                    </div>
-
-                                    {/* Horas por Día */}
-                                    <div 
-                                        onClick={(e) => handleRelationClick('input-shiftHours', e)}
-                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-shiftHours').wrapperClass}`}
-                                    >
-                                        {getHighlightLabel('input-shiftHours') && (
-                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                hoveredRelation === 'input-shiftHours' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                            }`}>
-                                                {getHighlightLabel('input-shiftHours')}
-                                            </span>
-                                        )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Horas / Día</label>
-                                        <input
-                                            type="number" min="0.1" max="24" step="0.1"
-                                            value={studyConfig.shiftHours || 8}
-                                            onChange={e => {
-                                                const hours = Number(e.target.value) || 8;
-                                                const currentHours = Number(studyConfig.shiftHours) || 8;
-                                                const currentPieces = Number(studyConfig.targetPiecesPerShift) || 0;
-                                                const piecesPerHour = currentHours ? (currentPieces / currentHours) : 0;
-                                                const targetPiecesPerShift = Math.round(piecesPerHour * hours);
-                                                handleConfigChanges({ 
-                                                    shiftHours: hours, 
-                                                    targetPiecesPerShift 
-                                                });
-                                            }}
-                                            disabled={!canEdit}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
-                                        />
-                                    </div>
-
-                                    {/* OEE (%) */}
-                                    <div 
-                                        onClick={(e) => handleRelationClick('input-oeePenalty', e)}
-                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-oeePenalty').wrapperClass}`}
-                                    >
-                                        {getHighlightLabel('input-oeePenalty') && (
-                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                hoveredRelation === 'input-oeePenalty' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                            }`}>
-                                                {getHighlightLabel('input-oeePenalty')}
-                                            </span>
-                                        )}
-                                        <div className="flex items-center justify-between mb-0.5">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase block">OEE (%)</label>
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleConfigChange('linkOeeToStudy', !studyConfig?.linkOeeToStudy);
-                                                }}
-                                                disabled={!canEdit}
-                                                className={`px-1.5 py-0.5 rounded text-[7px] font-bold border transition-all ${
-                                                    linkOeeToStudy
-                                                        ? 'bg-cyan-950/80 border-cyan-800 text-cyan-400 hover:bg-cyan-900/50'
-                                                        : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:bg-slate-850'
-                                                }`}
-                                            >
-                                                {linkOeeToStudy ? 'Vincular a Estudio' : 'Fijar OEE'}
-                                            </button>
-                                        </div>
-                                        <input
-                                            type="number" min="0" max="100" step="1"
-                                            value={Math.round(100 - oeePenalty)}
-                                            onChange={e => handleConfigChange('oeePenalty', 100 - Number(e.target.value))}
-                                            disabled={!canEdit || linkOeeToStudy}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
-                                            title={linkOeeToStudy ? "Calculado automáticamente en base al ciclo de máquina real" : "OEE (%)"}
-                                        />
-                                    </div>
-
-                                    {/* Días / Semana */}
-                                    <div 
-                                        onClick={(e) => handleRelationClick('input-workDaysPerWeek', e)}
-                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-workDaysPerWeek').wrapperClass}`}
-                                    >
-                                        {getHighlightLabel('input-workDaysPerWeek') && (
-                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                hoveredRelation === 'input-workDaysPerWeek' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                            }`}>
-                                                {getHighlightLabel('input-workDaysPerWeek')}
-                                            </span>
-                                        )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Días Laborales / Sem</label>
-                                        <input
-                                            type="number" min="1" max="7" step="1"
-                                            value={studyConfig.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5}
-                                            onChange={e => handleConfigChange('workDaysPerWeek', Number(e.target.value))}
-                                            disabled={!canEdit}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
-                                        />
-                                    </div>
-
-                                    {/* País (Feriados) */}
-                                    <div 
-                                        onClick={(e) => handleRelationClick('input-country', e)}
-                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-country').wrapperClass}`}
-                                    >
-                                        {getHighlightLabel('input-country') && (
-                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                hoveredRelation === 'input-country' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                            }`}>
-                                                {getHighlightLabel('input-country')}
-                                            </span>
-                                        )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">País (Feriados)</label>
-                                        <select
-                                            value={studyConfig.country || 'MX'}
-                                            onChange={e => handleConfigChange('country', e.target.value)}
-                                            disabled={!canEdit}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
-                                        >
-                                            <option value="MX">México (7 días feriados)</option>
-                                            <option value="CR">Costa Rica (11 días feriados)</option>
-                                            <option value="US">USA (11 días feriados)</option>
-                                            <option value="NONE">Ninguno (0 días feriados)</option>
-                                        </select>
-                                    </div>
-
-                                    {/* Demanda Anual */}
-                                    <div 
-                                        onClick={(e) => handleRelationClick('input-annualDemand', e)}
-                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-annualDemand').wrapperClass}`}
-                                    >
-                                        {getHighlightLabel('input-annualDemand') && (
-                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                hoveredRelation === 'input-annualDemand' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                            }`}>
-                                                {getHighlightLabel('input-annualDemand')}
-                                            </span>
-                                        )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">
-                                            Demanda Anual {calcMode === 'demand' && <span className="text-violet-400 text-[7px] normal-case">(input primario)</span>}
-                                        </label>
-                                        <input
-                                            type="number" min="1" step="1"
-                                            value={studyConfig.annualDemand !== undefined ? studyConfig.annualDemand : 18388734}
-                                            onChange={e => handleConfigChange('annualDemand', Number(e.target.value))}
-                                            disabled={!canEdit}
-                                            className={`w-full bg-slate-900 rounded-lg px-2.5 py-1 text-xs focus:outline-none disabled:opacity-50 ${
-                                                calcMode === 'demand'
-                                                    ? 'border border-violet-600/40 text-violet-300 font-bold focus:border-violet-500/50'
-                                                    : 'border border-slate-800 text-slate-200 focus:border-cyan-500/50'
-                                            }`}
-                                        />
-                                    </div>
-
-                                    {/* Tipo de Máquina */}
-                                    <div 
-                                        onClick={(e) => handleRelationClick('input-machineType', e)}
-                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-machineType').wrapperClass}`}
-                                    >
-                                        {getHighlightLabel('input-machineType') && (
-                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                hoveredRelation === 'input-machineType' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                            }`}>
-                                                {getHighlightLabel('input-machineType')}
-                                            </span>
-                                        )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Tipo de Máquina</label>
-                                        <select
-                                            value={studyConfig.mainIndexEnabled ? 'indexer' : 'robot'}
-                                            onChange={e => {
-                                                const isIndexer = e.target.value === 'indexer';
-                                                const updates = { mainIndexEnabled: isIndexer };
-                                                if (!isIndexer) updates.mainIndexTimeMs = 0;
-                                                handleConfigChanges(updates);
-                                            }}
-                                            disabled={!canEdit}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
-                                        >
-                                            <option value="indexer">🔄 Indexer (Mesa / Dial)</option>
-                                            <option value="robot">🤖 Robot Transfer</option>
-                                        </select>
-                                    </div>
-
-                                    {/* Index Time - solo si Indexer */}
-                                    {studyConfig.mainIndexEnabled && (
-                                        <div 
-                                            onClick={(e) => handleRelationClick('input-indexTime', e)}
-                                            className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-indexTime').wrapperClass}`}
-                                        >
-                                            {getHighlightLabel('input-indexTime') && (
-                                                <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                    hoveredRelation === 'input-indexTime' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                                }`}>
-                                                    {getHighlightLabel('input-indexTime')}
-                                                </span>
-                                            )}
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Tiempo de Index (ms)</label>
-                                            <input
-                                                type="number" min="0"
-                                                value={studyConfig.mainIndexTimeMs || 0}
-                                                onChange={e => handleConfigChange('mainIndexTimeMs', e.target.value)}
-                                                disabled={!canEdit}
-                                                className="w-full bg-slate-900 border border-amber-700/40 rounded-lg px-2.5 py-1 text-xs text-amber-300 focus:outline-none focus:border-amber-500/50 disabled:opacity-50"
-                                            />
-                                        </div>
-                                    )}
-
-                                    {/* Dwell calculado - solo si Indexer */}
-                                    {studyConfig.mainIndexEnabled && (
-                                        <div 
-                                            onClick={(e) => handleRelationClick('input-dwellTime', e)}
-                                            className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 ${getHighlightStyles('input-dwellTime').wrapperClass}`}
-                                        >
-                                            {getHighlightLabel('input-dwellTime') && (
-                                                <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                    hoveredRelation === 'input-dwellTime' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                                }`}>
-                                                    {getHighlightLabel('input-dwellTime')}
-                                                </span>
-                                            )}
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Tiempo de Dwell (ms)</label>
-                                            <div className="w-full bg-emerald-950/30 border border-emerald-600/40 rounded-lg px-2.5 py-1 text-xs text-emerald-400 font-mono font-bold flex items-center justify-between">
-                                                <span>{currentStudy?.dwellTimeMs || 0} ms</span>
-                                                <span className="text-[8px] text-emerald-600/60 font-normal">auto</span>
-                                            </div>
-                                            <span className="text-[8px] text-slate-600 mt-0.5 block">= Estación bottleneck (más lenta)</span>
-                                        </div>
-                                    )}
-
-
-                                    {/* Configuración UP */}
-                                    <div 
-                                        onClick={(e) => handleRelationClick('input-up', e)}
-                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 md:col-span-2 ${getHighlightStyles('input-up').wrapperClass}`}
-                                    >
-                                        {getHighlightLabel('input-up') && (
-                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                hoveredRelation === 'input-up' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                            }`}>
-                                                {getHighlightLabel('input-up')}
-                                            </span>
-                                        )}
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Configuración UP</label>
-                                        <div className="flex gap-1">
-                                            {[1, 2, 4, 6].map(up => (
-                                                <button
-                                                    key={up}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const hours = Number(studyConfig.shiftHours) || 8;
-                                                        const piecesPerHour = (Number(studyConfig.targetPiecesPerShift) || 0) / hours;
-                                                        const updates = { cycleOutputQty: up };
-                                                        if (piecesPerHour > 0) {
-                                                            const ppm = piecesPerHour / 60 / up;
-                                                            updates.targetPPM = Math.round(ppm * 100) / 100;
-                                                        }
-                                                        handleConfigChanges(updates);
-                                                    }}
-                                                    disabled={!canEdit}
-                                                    className={`flex-1 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
-                                                        Number(studyConfig.cycleOutputQty || 1) === up
-                                                            ? 'bg-cyan-600 border-cyan-500 text-white shadow-lg shadow-cyan-900/30'
-                                                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-850 hover:border-slate-700'
-                                                    } disabled:opacity-50`}
-                                                >
-                                                    {up}-UP
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Notas */}
-                                    <div 
-                                        onClick={(e) => handleRelationClick('input-notes', e)}
-                                        className={`relative p-1 border border-transparent rounded-lg cursor-pointer transition-all duration-200 md:col-span-4 ${getHighlightStyles('input-notes').wrapperClass}`}
-                                    >
-                                        {getHighlightLabel('input-notes') && (
-                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                hoveredRelation === 'input-notes' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
-                                            }`}>
-                                                {getHighlightLabel('input-notes')}
-                                            </span>
-                                        )}
-                                        <div className="flex items-center justify-between mb-0.5">
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setShowNotes(!showNotes);
-                                                }}
-                                                className="text-[10px] font-bold text-slate-500 hover:text-slate-300 uppercase flex items-center gap-1 focus:outline-none"
-                                            >
-                                                {showNotes ? <ChevronDown className="w-3 h-3 text-slate-400" /> : <ChevronRight className="w-3 h-3 text-slate-400" />}
-                                                <span>Notas del Estudio</span>
-                                            </button>
-                                            {studyConfig.notes && !showNotes && (
-                                                <span className="bg-cyan-950/80 border border-cyan-800 text-cyan-400 text-[8px] font-bold px-1.5 py-0.5 rounded shadow-sm animate-fade-in">
-                                                    Contiene Notas
-                                                </span>
-                                            )}
-                                        </div>
-                                        {showNotes && (
-                                            <textarea
-                                                value={studyConfig.notes || ''}
-                                                onChange={e => handleConfigChange('notes', e.target.value)}
-                                                disabled={!canEdit}
-                                                rows="2"
-                                                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50 resize-none mt-1 animate-fade-in"
-                                            />
-                                        )}
-                                    </div>
-
-                                    </div>
-                                    {/* end grid */}
-
-                                    {/* Auto-save indicator */}
-                                    {canEdit && (
-                                        <div className="md:col-span-4 flex justify-end pt-2">
-                                            <div className="flex items-center gap-1.5 text-[10px] font-semibold">
-                                                {configAutoSaveStatus === 'saving' && (
-                                                    <>
-                                                        <div className="w-3 h-3 rounded-full border-2 border-cyan-500 border-t-transparent animate-spin" />
-                                                        <span className="text-cyan-500">Guardando...</span>
-                                                    </>
-                                                )}
-                                                {configAutoSaveStatus === 'saved' && (
-                                                    <>
-                                                        <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
-                                                        <span className="text-emerald-500">Guardado</span>
-                                                    </>
-                                                )}
-                                                {configAutoSaveStatus === 'error' && (
-                                                    <>
-                                                        <XCircle className="w-3.5 h-3.5 text-rose-500" />
-                                                        <span className="text-rose-500">Error al guardar: {configAutoSaveError}</span>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* ── KPI PANELS: GRUPOS LÓGICOS DE MÉTRICAS ── */}
-                        <div className="grid grid-cols-1 xl:grid-cols-7 gap-4 relative z-[35]">
+                        {/* ΓöÇΓöÇ KPI PANELS: GRUPOS LÓGICOS DE M├ëTRICAS ΓöÇΓöÇ */}
+                        <div className="grid grid-cols-1 xl:grid-cols-7 gap-4">
                             {/* 1. METAS DE DEMANDA (COMERCIAL) */}
-                            <div className={`xl:col-span-2 bg-slate-900/40 border border-slate-800 border-t-cyan-500/80 border-t-[3px] rounded-2xl p-4 flex flex-col gap-3 shadow-xl backdrop-blur-md transition-all duration-300 hover:border-slate-700/80 relative ${['card-objDia', 'card-objHora', 'card-ppmObj'].includes(activeTooltipId) ? 'z-[45]' : 'z-10'}`}>
+                            <div className="xl:col-span-2 bg-slate-900/40 border border-slate-800 border-t-cyan-500/80 border-t-[3px] rounded-2xl p-4 flex flex-col gap-3 shadow-xl backdrop-blur-md transition-all duration-300 hover:border-slate-700/80">
                                 <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
                                     <div className="p-1 bg-cyan-500/10 rounded-lg">
                                         <Target className="w-4 h-4 text-cyan-400" />
@@ -2749,7 +1918,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {/* Piezas Objetivo / Día */}
                                     <div 
                                         onClick={(e) => handleRelationClick('card-objDia', e)}
-                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${activeTooltipId === 'card-objDia' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-objDia').wrapperClass}`}
+                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-objDia').wrapperClass}`}
                                     >
                                         {getHighlightLabel('card-objDia') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2759,56 +1928,40 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                             </span>
                                         )}
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Objetivo / Día</span>
-                                        <span className={`text-lg font-black block mt-1 ${getKPIColor('card-objDia')}`}>
-                                            {piezasDia ? Math.round(piezasDia).toLocaleString() : '—'}
+                                        <span className="text-lg font-black text-slate-200 block mt-1">
+                                            {studyConfig?.targetPiecesPerShift ? Number(studyConfig.targetPiecesPerShift).toLocaleString() : '—'}
                                         </span>
                                         <span className="text-[8px] text-slate-600 block">piezas/día</span>
- 
+
                                         {/* Tooltip */}
-                                        <div className={`absolute top-full left-0 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-objDia' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
+                                        <div className="absolute top-full left-0 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
                                             <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
-                                                <Info className="w-3.5 h-3.5 text-blue-400" />
+                                                <Info className="w-3.5 h-3.5 text-cyan-400" />
                                                 <span>Objetivo / Día</span>
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
-                                                <p className="text-slate-400 text-[10px]">Meta de producción neta (piezas buenas) requerida por día de trabajo.</p>
-                                                <div className="space-y-1.5">
+                                                <p className="text-slate-400 text-[10px]">Meta de producción requerida por día de trabajo.</p>
+                                                <div className="space-y-1">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                        {calcMode === 'demand' ? (
-                                                            <>
-                                                                <span className={getKPIColor('card-objDia')}>Obj/Día (Neto)</span> = <span className={getKPIColor('visual-relatedInput')}>Demanda</span> ÷ <span className={getKPIColor('visual-relatedInput')}>Días/Año</span>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <span className={getKPIColor('card-objDia')}>Obj/Día (Neto)</span> = <span className={getKPIColor('visual-relatedInput')}>Meta de Turno</span>
-                                                            </>
-                                                        )}
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[11px] leading-normal">
+                                                        <span className="text-cyan-400">PPM_obj</span> × 60 × <span className="text-indigo-400">Horas/Día</span> × <span className="text-fuchsia-400">UP</span>
                                                     </p>
                                                 </div>
-                                                <div className="space-y-1.5">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                        {calcMode === 'demand' ? (
-                                                            <>
-                                                                <span className={getKPIColor('visual-relatedInput')}>{Math.round(annualDemand).toLocaleString()}</span> ÷ <span className={getKPIColor('visual-relatedInput')}>{diasAnuales}</span> = <span className={getKPIColor('card-objDia')}>{Math.round(piezasDia || 0).toLocaleString()} pzas/día</span>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <span className={getKPIColor('card-objDia')}>{Math.round(piezasDia || 0).toLocaleString()} pzas/día</span> <span className="text-slate-500">(definido por usuario)</span>
-                                                            </>
-                                                        )}
+                                                <div className="space-y-1">
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Valores actuales:</p>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center text-[10px] leading-normal">
+                                                        <span className="text-cyan-400">{studyConfig?.targetPPM || 0}</span> × 60 × <span className="text-indigo-400">{studyConfig?.shiftHours || 8}</span> × <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-white font-bold">{Math.round((studyConfig?.targetPPM || 0) * 60 * (studyConfig?.shiftHours || 8) * (studyConfig?.cycleOutputQty || 1)).toLocaleString()} pzas/día</span>
                                                     </p>
                                                 </div>
                                             </div>
                                             <div className="absolute bottom-full left-6 border-4 border-transparent border-b-slate-950/95" />
                                         </div>
                                     </div>
- 
+
                                     {/* Piezas/Hora Objetivo */}
                                     <div 
                                         onClick={(e) => handleRelationClick('card-objHora', e)}
-                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${activeTooltipId === 'card-objHora' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-objHora').wrapperClass}`}
+                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-objHora').wrapperClass}`}
                                     >
                                         {getHighlightLabel('card-objHora') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2818,40 +1971,40 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                             </span>
                                         )}
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Objetivo / Hora</span>
-                                        <span className={`text-lg font-black block mt-1 ${getKPIColor('card-objHora')}`}>
-                                            {piezasHoraTarget ? Math.round(piezasHoraTarget).toLocaleString() : '—'}
+                                        <span className="text-lg font-black text-blue-400 block mt-1">
+                                            {studyConfig?.targetPPM ? Math.round(studyConfig.targetPPM * 60 * (studyConfig.cycleOutputQty || 1)).toLocaleString() : '—'}
                                         </span>
                                         <span className="text-[8px] text-slate-600 block">pzas/hr</span>
- 
+
                                         {/* Tooltip */}
-                                        <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-objHora' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
+                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
                                             <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                 <Info className="w-3.5 h-3.5 text-blue-400" />
                                                 <span>Objetivo / Hora</span>
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
-                                                <p className="text-slate-400 text-[10px]">Meta de producción de piezas por hora de trabajo (Bruta, considerando pérdidas por OEE).</p>
-                                                <div className="space-y-1.5">
+                                                <p className="text-slate-400 text-[10px]">Meta de producción de piezas por hora de trabajo.</p>
+                                                <div className="space-y-1">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                        <span className={getKPIColor('card-objHora')}>Obj/Hora (Bruto)</span> = <span className={getKPIColor('card-objDia')}>Obj/Día (Neto)</span> ÷ <span className={getKPIColor('visual-relatedInput')}>OEE</span> ÷ <span className={getKPIColor('visual-relatedInput')}>Hrs/Día</span>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[11px] leading-normal">
+                                                        <span className="text-cyan-400">PPM_obj</span> × 60 × <span className="text-fuchsia-400">UP</span>
                                                     </p>
                                                 </div>
-                                                <div className="space-y-1.5">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                        <span className={getKPIColor('card-objDia')}>{Math.round(piezasDia || 0).toLocaleString()}</span> ÷ <span className={getKPIColor('visual-relatedInput')}>{oeePercent}%</span> ÷ <span className={getKPIColor('visual-relatedInput')}>{shiftHours}</span> = <span className={getKPIColor('card-objHora')}>{Math.round(piezasHoraTarget).toLocaleString()} pzas/hr</span>
+                                                <div className="space-y-1">
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Valores actuales:</p>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center text-[10px] leading-normal">
+                                                        <span className="text-cyan-400">{studyConfig?.targetPPM || 0}</span> × 60 × <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-blue-400 font-bold">{Math.round((studyConfig?.targetPPM || 0) * 60 * (studyConfig?.cycleOutputQty || 1)).toLocaleString()} pzas/hr</span>
                                                     </p>
                                                 </div>
                                             </div>
                                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-slate-950/95" />
                                         </div>
                                     </div>
- 
+
                                     {/* Ciclos / Min Objetivo */}
                                     <div 
                                         onClick={(e) => handleRelationClick('card-ppmObj', e)}
-                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${activeTooltipId === 'card-ppmObj' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-ppmObj').wrapperClass}`}
+                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-ppmObj').wrapperClass}`}
                                     >
                                         {getHighlightLabel('card-ppmObj') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2862,40 +2015,42 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         )}
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Ciclos / Min</span>
                                         <span className="text-[10px] text-slate-500 block font-mono mt-0.5">Objetivo</span>
-                                        <span className={`text-lg font-black block mt-0.5 ${getKPIColor('card-ppmObj')}`}>
-                                            {ppmTarget ? ppmTarget.toFixed(2) : '—'}
+                                        <span className="text-lg font-black text-blue-400 block mt-0.5">
+                                            {studyConfig?.targetPPM || '—'}
                                         </span>
                                         <span className="text-[8px] text-slate-600 block">PPM Obj</span>
- 
+
                                         {/* Tooltip */}
-                                        <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-ppmObj' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
+                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
                                             <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                 <Info className="w-3.5 h-3.5 text-blue-400" />
                                                 <span>Ciclos / Min Objetivo (PPM)</span>
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
-                                                <p className="text-slate-400 text-[10px]">Meta de velocidad bruta en ciclos por minuto (PPM) a la que debe operar la máquina.</p>
-                                                <div className="space-y-1.5">
+                                                <p className="text-slate-400 text-[10px]">Meta de ciclos por minuto (PPM) definida en la configuración del estudio.</p>
+                                                <div className="space-y-1">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                        <span className={getKPIColor('card-ppmObj')}>CPM_obj</span> = <span className={getKPIColor('card-objHora')}>Obj/Hora (Bruto)</span> ÷ 60 ÷ <span className={getKPIColor('visual-relatedInput')}>UP</span>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[11px] leading-normal">
+                                                        <span className="text-blue-400">PPM</span> = 60 / <span className="text-cyan-400">Ciclo Target (s)</span>
                                                     </p>
                                                 </div>
-                                                <div className="space-y-1.5">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                        <span className={getKPIColor('card-ppmObj')}>CPM_obj</span> = <span className={getKPIColor('card-objHora')}>{Math.round(piezasHoraTarget).toLocaleString()}</span> ÷ 60 ÷ <span className={getKPIColor('visual-relatedInput')}>{cycleOutputQty}</span> = <span className={getKPIColor('card-ppmObj')}>{ppmTarget ? ppmTarget.toFixed(2) : 0} CPM</span>
+                                                <div className="space-y-1">
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Valores actuales:</p>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center text-[10px] leading-normal">
+                                                        PPM Objetivo: <span className="text-blue-400 font-bold">{studyConfig?.targetPPM || 0}</span><br />
+                                                        Ciclo Target: 60 / <span className="text-blue-400">{studyConfig?.targetPPM || 0}</span> = <span className="text-white font-bold">{studyConfig?.targetPPM ? (60 / studyConfig.targetPPM).toFixed(2) : 0} s</span><br />
+                                                        PPM Real: <span className="text-cyan-400 font-bold">{ppmReal.toFixed(1)}</span>
                                                     </p>
                                                 </div>
                                             </div>
                                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-slate-950/95" />
                                         </div>
                                     </div>
- 
+
                                     {/* Ciclo Target */}
                                     <div 
                                         onClick={(e) => handleRelationClick('card-cicloTarget', e)}
-                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${activeTooltipId === 'card-cicloTarget' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-cicloTarget').wrapperClass}`}
+                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-cicloTarget').wrapperClass}`}
                                     >
                                         {getHighlightLabel('card-cicloTarget') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2905,32 +2060,29 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                             </span>
                                         )}
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Ciclo Target</span>
-                                        <span className={`text-lg font-black block mt-1 ${getKPIColor('card-cicloTarget')}`}>
-                                            {cicloTargetSeg ? formatTime(cicloTargetSeg * 1000) : '—'}
+                                        <span className="text-lg font-black text-slate-200 block mt-1">
+                                            {studyConfig?.targetPPM ? formatTime((60 / studyConfig.targetPPM) * 1000) : '—'}
                                         </span>
                                         <span className="text-[8px] text-slate-600 block">segundos</span>
-                                        <span className={`text-[8px] block mt-0.5 font-bold ${cicloRealSeg <= cicloTargetSeg ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                            vs Real: {cicloRealSeg.toFixed(2)}s {cicloRealSeg <= cicloTargetSeg ? '✅' : '⚠️'}
-                                        </span>
- 
+
                                         {/* Tooltip */}
-                                        <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-cicloTarget' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
+                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
                                             <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
-                                                <Info className="w-3.5 h-3.5 text-blue-400" />
+                                                <Info className="w-3.5 h-3.5 text-slate-300" />
                                                 <span>Ciclo Target</span>
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
-                                                <p className="text-slate-400 text-[10px]">Tiempo máximo permitido por ciclo de máquina (en segundos) para cumplir la meta bruta.</p>
-                                                <div className="space-y-1.5">
+                                                <p className="text-slate-400 text-[10px]">Tiempo máximo permitido por ciclo de máquina para cumplir la meta.</p>
+                                                <div className="space-y-1">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                        <span className={getKPIColor('card-cicloTarget')}>Ciclo Target (s)</span> = 60 / <span className={getKPIColor('card-ppmObj')}>CPM_obj</span>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[11px] leading-normal">
+                                                        60 / <span className="text-cyan-400">PPM_obj</span>
                                                     </p>
                                                 </div>
-                                                <div className="space-y-1.5">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                        <span className={getKPIColor('card-cicloTarget')}>Ciclo Target</span> = 60 / <span className={getKPIColor('card-ppmObj')}>{ppmTarget ? ppmTarget.toFixed(2) : 0}</span> = <span className={getKPIColor('card-cicloTarget')}>{cicloTargetSeg.toFixed(2)} s</span>
+                                                <div className="space-y-1">
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Valores actuales:</p>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center text-[10px] leading-normal">
+                                                        60 / <span className="text-cyan-400">{studyConfig?.targetPPM || 0}</span> = <span className="text-white font-bold">{studyConfig?.targetPPM ? (60 / studyConfig.targetPPM).toFixed(2) : 0} s</span>
                                                     </p>
                                                 </div>
                                             </div>
@@ -2940,8 +2092,8 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                 </div>
                             </div>
 
-                            {/* 2. CAPACIDAD FÍSICA REAL (AUTOMATIZACIÓN) */}
-                            <div className={`xl:col-span-2 bg-slate-900/40 border border-slate-800 border-t-amber-500/80 border-t-[3px] rounded-2xl p-4 flex flex-col gap-3 shadow-xl backdrop-blur-md transition-all duration-300 hover:border-slate-700/80 relative ${['card-cicloTarget', 'card-cicloReal', 'card-ppmReal', 'card-bottleneck', 'card-realHora'].includes(activeTooltipId) ? 'z-[45]' : 'z-10'}`}>
+                            {/* 2. CAPACIDAD F├ìSICA REAL (AUTOMATIZACIÓN) */}
+                            <div className="xl:col-span-2 bg-slate-900/40 border border-slate-800 border-t-amber-500/80 border-t-[3px] rounded-2xl p-4 flex flex-col gap-3 shadow-xl backdrop-blur-md transition-all duration-300 hover:border-slate-700/80">
                                 <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
                                     <div className="p-1 bg-amber-500/10 rounded-lg">
                                         <Activity className="w-4 h-4 text-amber-400" />
@@ -2955,7 +2107,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {/* Ciclo Real */}
                                     <div 
                                         onClick={(e) => handleRelationClick('card-cicloReal', e)}
-                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-cyan-700/20 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${activeTooltipId === 'card-cicloReal' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-cicloReal').wrapperClass}`}
+                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-cyan-700/20 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-cicloReal').wrapperClass}`}
                                     >
                                         {getHighlightLabel('card-cicloReal') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -2966,47 +2118,32 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         )}
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Ciclo Real</span>
                                         <span className="text-[10px] text-slate-500 block font-mono mt-0.5">
-                                            Obj: {cicloTargetSeg ? `${cicloTargetSeg.toFixed(2)}s` : '—'}
+                                            Obj: {studyConfig?.targetPPM ? `${(60 / studyConfig.targetPPM).toFixed(2)}s` : '—'}
                                         </span>
-                                        <span className={`text-lg font-black block mt-0.5 ${getKPIColor('card-cicloReal')}`}>
+                                        <span className="text-lg font-black text-cyan-400 block mt-0.5">
                                             {formatTime(localMetrics?.machineCycleTimeMs)}
                                         </span>
                                         <span className="text-[8px] text-slate-600 block">segundos (Real)</span>
 
                                         {/* Tooltip */}
-                                        <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-cicloReal' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
+                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
                                             <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                 <Info className="w-3.5 h-3.5 text-cyan-400" />
                                                 <span>Ciclo Real</span>
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
                                                 <p className="text-slate-400 text-[10px]">Duración calculada del ciclo completo actual de la máquina.</p>
-                                                <div className="space-y-1.5">
+                                                <div className="space-y-1">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                        {studyConfig?.mainIndexEnabled ? (
-                                                            <>
-                                                                <span className={getKPIColor('card-cicloReal')}>Ciclo Real</span> = <span className={getKPIColor('visual-relatedInput')}>Dwell</span> + <span className={getKPIColor('visual-relatedInput')}>Index</span>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <span className={getKPIColor('card-cicloReal')}>Ciclo Real</span> = <span className={getKPIColor('visual-relatedInput')}>Dwell</span>
-                                                            </>
-                                                        )}
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[11px] leading-normal">
+                                                        <span className="text-emerald-400">Dwell</span> + <span className="text-orange-400">Index</span>
                                                     </p>
                                                 </div>
-                                                <div className="space-y-1.5">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                        {studyConfig?.mainIndexEnabled ? (
-                                                            <>
-                                                                <span className={getKPIColor('card-cicloReal')}>Ciclo Real</span> = <span className={getKPIColor('visual-relatedInput')}>{localMetrics?.dwellTimeMs || 0}ms</span> + <span className={getKPIColor('visual-relatedInput')}>{studyConfig?.mainIndexTimeMs || 0}ms</span> = <span className={getKPIColor('card-cicloReal')}>{localMetrics?.machineCycleTimeMs || 0}ms ({((localMetrics?.machineCycleTimeMs || 0) / 1000).toFixed(2)}s)</span>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <span className={getKPIColor('card-cicloReal')}>Ciclo Real</span> = <span className={getKPIColor('visual-relatedInput')}>{localMetrics?.dwellTimeMs || 0}ms</span> = <span className={getKPIColor('card-cicloReal')}>{localMetrics?.machineCycleTimeMs || 0}ms ({((localMetrics?.machineCycleTimeMs || 0) / 1000).toFixed(2)}s)</span>
-                                                            </>
-                                                        )}
+                                                <div className="space-y-1">
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Valores actuales:</p>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-normal">
+                                                        Objetivo: <span className="text-white font-bold">{studyConfig?.targetPPM ? (60 / studyConfig.targetPPM).toFixed(2) : 0}s</span><br />
+                                                        Real: <span className="text-emerald-400">{localMetrics?.dwellTimeMs || 0} ms</span> + <span className="text-orange-400">{studyConfig?.mainIndexEnabled ? (studyConfig?.mainIndexTimeMs || 0) : 0} ms</span> = <span className="text-cyan-400 font-bold">{localMetrics?.machineCycleTimeMs || 0} ms ({((localMetrics?.machineCycleTimeMs || 0) / 1000).toFixed(2)} s)</span>
                                                     </p>
                                                 </div>
                                             </div>
@@ -3017,7 +2154,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {/* Ciclos / Min Real */}
                                     <div 
                                         onClick={(e) => handleRelationClick('card-ppmReal', e)}
-                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${activeTooltipId === 'card-ppmReal' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-ppmReal').wrapperClass}`}
+                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-ppmReal').wrapperClass}`}
                                     >
                                         {getHighlightLabel('card-ppmReal') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -3028,32 +2165,30 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         )}
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Ciclos / Min</span>
                                         <span className="text-[10px] text-slate-500 block font-mono mt-0.5">Real</span>
-                                        <span className={`text-lg font-black block mt-0.5 ${getKPIColor('card-ppmReal')}`}>
-                                            {cpmReal > 0 ? `${cpmReal.toFixed(1)}` : '—'}
+                                        <span className="text-lg font-black text-cyan-400 block mt-0.5">
+                                            {ppmReal > 0 ? `${ppmReal.toFixed(1)}` : '—'}
                                         </span>
-                                        <span className="text-[8px] text-slate-600 block">CPM Real</span>
-                                        <span className="text-[8px] text-slate-500 block mt-0.5 font-mono">PPM: {ppmReal.toFixed(2)} · UP: {cycleOutputQty}</span>
+                                        <span className="text-[8px] text-slate-600 block">PPM Real</span>
 
                                         {/* Tooltip */}
-                                        <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-ppmReal' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
+                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
                                             <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                 <Info className="w-3.5 h-3.5 text-cyan-400" />
                                                 <span>Ciclos / Min Real (PPM)</span>
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
                                                 <p className="text-slate-400 text-[10px]">Cantidad de ciclos ejecutados por minuto a velocidad real.</p>
-                                                <div className="space-y-1.5">
+                                                <div className="space-y-1">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal text-slate-300">
-                                                        <span className={getKPIColor('card-ppmReal')}>CPM_real</span> = 60 / <span className={getKPIColor('card-cicloReal')}>Ciclo Real (s)</span><br/>
-                                                        <span className={getKPIColor('card-ppmReal')}>PPM_real</span> = <span className={getKPIColor('card-ppmReal')}>CPM_real</span> × <span className={getKPIColor('visual-relatedInput')}>UP</span>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[11px] leading-normal">
+                                                        60 / <span className="text-sky-400">Ciclo Real s</span>
                                                     </p>
                                                 </div>
-                                                <div className="space-y-1.5">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal text-slate-300">
-                                                        <span className={getKPIColor('card-ppmReal')}>CPM_real</span> = 60 / <span className={getKPIColor('card-cicloReal')}>{cicloRealSeg.toFixed(2)}s</span> = <span className={getKPIColor('card-ppmReal')}>{cpmReal.toFixed(1)} CPM</span><br/>
-                                                        <span className={getKPIColor('card-ppmReal')}>PPM_real</span> = <span className={getKPIColor('card-ppmReal')}>{cpmReal.toFixed(1)}</span> × <span className={getKPIColor('visual-relatedInput')}>{studyConfig?.cycleOutputQty || 1}</span> = <span className={getKPIColor('card-ppmReal')}>{ppmReal.toFixed(2)} PPM</span>
+                                                <div className="space-y-1">
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Valores actuales:</p>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center text-[10px] leading-normal">
+                                                        Objetivo: <span className="text-white font-bold">{studyConfig?.targetPPM || 0} PPM</span><br />
+                                                        Real: 60 / <span className="text-sky-400">{cicloRealSeg.toFixed(2)}</span> = <span className="text-cyan-400 font-bold">{ppmReal.toFixed(1)} PPM</span>
                                                     </p>
                                                 </div>
                                             </div>
@@ -3064,7 +2199,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                     {/* Bottleneck Station */}
                                     <div 
                                         onClick={(e) => handleRelationClick('card-bottleneck', e)}
-                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${activeTooltipId === 'card-bottleneck' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-bottleneck').wrapperClass}`}
+                                        className={`relative group bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 hover:border-cyan-500/30 text-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-bottleneck').wrapperClass}`}
                                     >
                                         {getHighlightLabel('card-bottleneck') && (
                                             <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -3075,29 +2210,30 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         )}
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Bottleneck</span>
                                         <span className="text-[10px] text-slate-500 block font-mono mt-0.5">estación</span>
-                                        <span className={`text-sm font-black block truncate mt-1 font-sans ${getKPIColor('card-bottleneck')}`} title={localMetrics?.bottleneckStationLabel || '—'}>
+                                        <span className="text-sm font-black text-amber-500 block truncate mt-1 font-sans" title={localMetrics?.bottleneckStationLabel || '—'}>
                                             {localMetrics?.bottleneckStationLabel || '—'}
                                         </span>
                                         <span className="text-[8px] text-slate-600 block">estación</span>
 
                                         {/* Tooltip */}
-                                        <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-bottleneck' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
+                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
                                             <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                 <Info className="w-3.5 h-3.5 text-amber-500" />
                                                 <span>Bottleneck (Cuello de Botella)</span>
                                             </div>
                                             <div className="text-[11px] leading-relaxed space-y-1.5">
                                                 <p className="text-slate-400 text-[10px]">Estación de trabajo más lenta de la secuencia que limita la velocidad de producción.</p>
-                                                <div className="space-y-1.5">
+                                                <div className="space-y-1">
                                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                        <span className={getKPIColor('card-bottleneck')}>Bottleneck</span> = max(<span className={getKPIColor('visual-relatedInput')}>T_estación_i</span>)
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[11px] leading-normal">
+                                                        Max(<span className="text-emerald-400">Estaciones</span>)
                                                     </p>
                                                 </div>
-                                                <div className="space-y-1.5">
-                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
-                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                        <span className={getKPIColor('card-bottleneck')}>Bottleneck</span> = max(<span className={getKPIColor('visual-relatedInput')}>{localMetrics?.bottleneckStationLabel || '—'}</span>) = <span className={getKPIColor('visual-relatedInput')}>{localMetrics?.dwellTimeMs || 0}ms ({((localMetrics?.dwellTimeMs || 0) / 1000).toFixed(2)}s)</span>
+                                                <div className="space-y-1">
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Valores actuales:</p>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center text-[10px] leading-normal">
+                                                        Estación: <span className="text-amber-500 font-bold">{localMetrics?.bottleneckStationLabel || '—'}</span><br />
+                                                        Duración: <span className="text-emerald-400 font-bold">{localMetrics?.dwellTimeMs || 0} ms ({((localMetrics?.dwellTimeMs || 0) / 1000).toFixed(2)} s)</span>
                                                     </p>
                                                 </div>
                                             </div>
@@ -3107,15 +2243,13 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
 
                                     {/* Real / Hora */}
                                     {(() => {
-                                        const targetPPH = calcMode === 'demand' 
-                                            ? Math.round(piezasHoraTarget)
-                                            : (studyConfig?.targetPPM ? Math.round(studyConfig.targetPPM * 60 * (studyConfig.cycleOutputQty || 1)) : 0);
+                                        const targetPPH = studyConfig?.targetPPM ? Math.round(studyConfig.targetPPM * 60 * (studyConfig.cycleOutputQty || 1)) : 0;
                                         const realPPH = piezasHora || 0;
                                         const onTarget = targetPPH > 0 && realPPH >= targetPPH;
                                         return (
                                             <div 
                                                 onClick={(e) => handleRelationClick('card-realHora', e)}
-                                                className={`relative group bg-slate-955/40 p-3 rounded-xl border text-center cursor-pointer transition-all duration-200 overflow-visible ${onTarget ? 'border-emerald-600/40 hover:border-emerald-500/60 font-bold' : 'border-red-650/30 hover:border-red-500/50'} ${activeTooltipId === 'card-realHora' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-realHora').wrapperClass}`}
+                                                className={`relative group bg-slate-955/40 p-3 rounded-xl border text-center cursor-pointer transition-all duration-200 overflow-visible ${onTarget ? 'border-emerald-600/40 hover:border-emerald-500/60 font-bold' : 'border-red-650/30 hover:border-red-500/50'} ${getHighlightStyles('card-realHora').wrapperClass}`}
                                             >
                                                 {getHighlightLabel('card-realHora') && (
                                                     <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -3128,29 +2262,30 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 <span className="text-[10px] text-slate-500 block font-mono mt-0.5">
                                                     Obj: {targetPPH > 0 ? targetPPH.toLocaleString() : '—'}
                                                 </span>
-                                                <span className={`text-lg font-black block mt-0.5 ${onTarget ? getKPIColor('card-realHora') : 'text-rose-600 dark:text-rose-450'}`}>
+                                                <span className={`text-lg font-black block mt-0.5 ${onTarget ? 'text-emerald-400' : 'text-red-400'}`}>
                                                     {realPPH > 0 ? Math.round(realPPH).toLocaleString() : '—'}
                                                 </span>
                                                 <span className="text-[8px] text-slate-600 block">pzas/hr</span>
 
                                                 {/* Tooltip */}
-                                                <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-realHora' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
+                                                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
                                                     <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                         <Info className={`w-3.5 h-3.5 ${onTarget ? 'text-emerald-400' : 'text-red-400'}`} />
                                                         <span>Real / Hora</span>
                                                     </div>
                                                     <div className="text-[11px] leading-relaxed space-y-1.5">
                                                         <p className="text-slate-400 text-[10px]">Producción horaria proyectada con el ciclo real medido.</p>
-                                                        <div className="space-y-1.5">
-                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+                                                        <div className="space-y-1">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula Real:</p>
                                                             <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                                <span className={getKPIColor('card-realHora')}>PPH_real</span> = (3,600,000 / <span className={getKPIColor('card-cicloReal')}>Ciclo Real (ms)</span>) × <span className={getKPIColor('visual-relatedInput')}>UP</span>
+                                                                (3.600.000 / <span className="text-sky-400">Ciclo Real ms</span>) × <span className="text-fuchsia-400">UP</span>
                                                             </p>
                                                         </div>
-                                                        <div className="space-y-1.5">
-                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
-                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                                <span className={getKPIColor('card-realHora')}>PPH_real</span> = (3,600,000 / <span className={getKPIColor('card-cicloReal')}>{localMetrics?.machineCycleTimeMs || 1}ms</span>) × <span className={getKPIColor('visual-relatedInput')}>{studyConfig?.cycleOutputQty || 1}</span> = <span className={`font-bold ${onTarget ? getKPIColor('card-realHora') : 'text-rose-600 dark:text-rose-450'}`}>{Math.round(realPPH).toLocaleString()} pzas/hr</span>
+                                                        <div className="space-y-1">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Valores actuales:</p>
+                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-normal">
+                                                                Objetivo: <span className="text-white font-bold">{targetPPH.toLocaleString()} pzas/hr</span><br />
+                                                                Real: (3.600.000 / <span className="text-sky-400">{localMetrics?.machineCycleTimeMs || 1}</span>) × <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-cyan-400 font-bold">{Math.round(realPPH).toLocaleString()} pzas/hr</span>
                                                             </p>
                                                         </div>
                                                     </div>
@@ -3159,54 +2294,18 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                             </div>
                                         );
                                     })()}
-
                                 </div>
                             </div>
 
                             {/* 3. VIABILIDAD Y DESEMPEÑO (OEE) */}
-                            <div className={`xl:col-span-3 bg-slate-900/40 border border-slate-800 border-t-emerald-500/80 border-t-[3px] rounded-2xl p-4 flex flex-col gap-3 shadow-xl backdrop-blur-md transition-all duration-300 hover:border-slate-700/80 relative ${['card-status', 'card-piezasDia', 'card-piezasSem', 'card-piezasAno'].includes(activeTooltipId) ? 'z-[45]' : 'z-10'}`}>
-                                <div 
-                                    className={`flex items-center gap-2 border-b border-slate-800 pb-2 cursor-pointer overflow-visible relative group ${activeTooltipId === 'card-status' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-status').wrapperClass}`}
-                                    onClick={(e) => handleRelationClick('card-status', e)}
-                                	>
-                                    {getHighlightLabel('card-status') && (
-                                        <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                            hoveredRelation === 'card-status' ? 'bg-cyan-500 text-slate-950' : 'bg-emerald-500 text-slate-950'
-                                        }`}>
-                                            {getHighlightLabel('card-status')}
-                                        </span>
-                                    )}
+                            <div className="xl:col-span-3 bg-slate-900/40 border border-slate-800 border-t-emerald-500/80 border-t-[3px] rounded-2xl p-4 flex flex-col gap-3 shadow-xl backdrop-blur-md transition-all duration-300 hover:border-slate-700/80">
+                                <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
                                     <div className="p-1 bg-emerald-500/10 rounded-lg">
                                         <Award className="w-4 h-4 text-emerald-400" />
                                     </div>
-                                    <div className="flex-1">
+                                    <div>
                                         <h4 className="text-xs font-black text-slate-200 uppercase tracking-wider">Viabilidad y Desempeño</h4>
                                         <p className="text-[9px] text-slate-500 font-semibold font-mono">Resultados OEE & Calendario</p>
-                                    </div>
-                                    {getStatusBadge(localMetrics?.status)}
-
-                                    {/* Tooltip Status */}
-                                    <div className={`absolute top-full right-0 left-auto mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-status' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
-                                        <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
-                                            <Info className="w-3.5 h-3.5 text-slate-400" />
-                                            <span>Status (Estado del Estudio)</span>
-                                        </div>
-                                        <div className="text-[11px] leading-relaxed space-y-1.5">
-                                            <p className="text-slate-400 text-[10px]">Indica si el ciclo real de la máquina cumple la meta requerida.</p>
-                                            <div className="space-y-1.5">
-                                                <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                                <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                    <span className={getKPIColor('card-status')}>Status</span> = <span className={getKPIColor('card-cicloReal')}>Ciclo Real (s)</span> ≤ <span className={getKPIColor('card-cicloTarget')}>Ciclo Target (s)</span>
-                                                </p>
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
-                                                <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
-                                                    <span className={getKPIColor('card-cicloReal')}>{((localMetrics?.machineCycleTimeMs || 0) / 1000).toFixed(2)}s</span> ≤ <span className={getKPIColor('card-cicloTarget')}>{cicloTargetSeg.toFixed(2)}s</span> ⇒ <span className={getKPIColor('card-status')}>{localMetrics?.status === 'OK' ? 'OK' : 'KO'}</span>
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="absolute bottom-full right-6 border-4 border-transparent border-b-slate-955/95" />
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2.5 flex-1">
@@ -3217,7 +2316,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                         return (
                                             <div 
                                                 onClick={(e) => handleRelationClick('card-piezasDia', e)}
-                                                className={`relative group bg-slate-955/40 p-3 rounded-xl border border-slate-800/80 hover:border-emerald-500/30 transition-all duration-200 overflow-visible col-span-2 flex gap-3 text-left cursor-pointer ${activeTooltipId === 'card-piezasDia' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-piezasDia').wrapperClass}`}
+                                                className={`relative group bg-slate-955/40 p-3 rounded-xl border border-slate-800/80 hover:border-emerald-500/30 transition-all duration-200 overflow-visible col-span-2 flex gap-3 text-left cursor-pointer ${getHighlightStyles('card-piezasDia').wrapperClass}`}
                                             >
                                                 {getHighlightLabel('card-piezasDia') && (
                                                     <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
@@ -3254,13 +2353,10 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                         </span>
                                                     </div>
                                                     <div className="mt-1">
-                                                        <span className={`text-lg font-black block leading-tight ${getKPIColor('card-piezasDia')}`}>
+                                                        <span className="text-lg font-black text-slate-200 block leading-tight">
                                                             {piezasDia > 0 ? Math.round(piezasDia).toLocaleString() : '—'}
                                                         </span>
-                                                        <span className="text-[8px] text-slate-600 block mt-0.5">piezas (con OEE: {oeePercent}%{linkOeeToStudy ? ' real' : ''})</span>
-                                                        <span className={`text-[8px] block mt-0.5 font-bold ${piezasDiaReal >= piezasDia ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                                            vs Real: {Math.round(piezasDiaReal).toLocaleString()} {piezasDiaReal >= piezasDia ? '✅' : '⚠️'}
-                                                        </span>
+                                                        <span className="text-[8px] text-slate-600 block mt-0.5">piezas (con OEE: {Math.round((100 - oeePenalty) * 10) / 10}%{linkOeeToStudy ? ' real' : ''})</span>
                                                     </div>
                                                 </div>
 
@@ -3269,20 +2365,20 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                     {/* Disp */}
                                                     <div 
                                                         onClick={(e) => handleRelationClick('input-availability', e)}
-                                                        className={`flex items-center justify-between gap-1 relative cursor-pointer p-0.5 rounded transition-all duration-200 ${getHighlightStyles('input-availability').wrapperClass}`}
+                                                        className="flex items-center justify-between gap-1 relative cursor-pointer"
                                                     >
                                                         <span className="text-[8px] font-bold text-slate-500 uppercase w-7" title="Disponibilidad (Paros/Setups)">Disp:</span>
                                                         <div className="flex items-center gap-1">
                                                             <input 
-                                                                 type="number" min="0.1" max="100" step="0.1"
-                                                                 value={studyConfig?.availability !== undefined ? studyConfig.availability : 95}
-                                                                 onChange={e => handleConfigChange('availability', Number(e.target.value))}
-                                                                 disabled={!canEdit}
-                                                                 className="w-11 bg-slate-955 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 font-mono text-center font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                                                type="number" min="0.1" max="100" step="0.1"
+                                                                value={studyConfig?.availability !== undefined ? studyConfig.availability : 95}
+                                                                onChange={e => handleConfigChange('availability', Number(e.target.value))}
+                                                                disabled={!canEdit}
+                                                                className="w-11 bg-slate-955 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 font-mono text-center font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
                                                             />
                                                             <span className="text-[8px] text-slate-600 font-bold">%</span>
                                                         </div>
-                                                        <span className="text-[9px] text-rose-405 font-mono font-medium min-w-10 text-right" title="Pérdidas de disponibilidad">
+                                                        <span className="text-[9px] text-rose-400 font-mono font-medium min-w-10 text-right" title="Pérdidas de disponibilidad">
                                                             -{Math.round(piezasPerdidasDisp || 0).toLocaleString()}
                                                         </span>
                                                     </div>
@@ -3290,17 +2386,17 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                     {/* Efec */}
                                                     <div 
                                                         onClick={(e) => handleRelationClick('input-efficiency', e)}
-                                                        className={`flex items-center justify-between gap-1 relative cursor-pointer p-0.5 rounded transition-all duration-200 ${getHighlightStyles('input-efficiency').wrapperClass}`}
+                                                        className="flex items-center justify-between gap-1 relative cursor-pointer"
                                                     >
                                                         <span className="text-[8px] font-bold text-slate-500 uppercase w-7" title="Eficiencia (Velocidad/Microparos)">Efec:</span>
                                                         <div className="flex items-center gap-1">
                                                             <input 
-                                                                 type="number" min="0.1" max="100" step="0.1"
-                                                                 value={Math.round(efficiency * 10) / 10}
-                                                                 onChange={e => handleConfigChange('efficiency', Number(e.target.value))}
-                                                                 disabled={!canEdit || linkOeeToStudy}
-                                                                 className="w-11 bg-slate-955 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 font-mono text-center font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
-                                                                 title={linkOeeToStudy ? "Calculado automáticamente: PPM Real / PPM Target" : "Eficiencia (Velocidad/Microparos)"}
+                                                                type="number" min="0.1" max="100" step="0.1"
+                                                                value={Math.round(efficiency * 10) / 10}
+                                                                onChange={e => handleConfigChange('efficiency', Number(e.target.value))}
+                                                                disabled={!canEdit || linkOeeToStudy}
+                                                                className="w-11 bg-slate-955 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 font-mono text-center font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                                                title={linkOeeToStudy ? "Calculado automáticamente: PPM Real / PPM Target" : "Eficiencia (Velocidad/Microparos)"}
                                                             />
                                                             <span className="text-[8px] text-slate-600 font-bold">%</span>
                                                         </div>
@@ -3312,16 +2408,16 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                     {/* Cal / Yield */}
                                                     <div 
                                                         onClick={(e) => handleRelationClick('input-yield', e)}
-                                                        className={`flex items-center justify-between gap-1 relative cursor-pointer p-0.5 rounded transition-all duration-200 ${getHighlightStyles('input-yield').wrapperClass}`}
+                                                        className="flex items-center justify-between gap-1 relative cursor-pointer"
                                                     >
                                                         <span className="text-[8px] font-bold text-slate-500 uppercase w-7" title="Calidad / Yield (Scrap/Rechazos)">Cal:</span>
                                                         <div className="flex items-center gap-1">
                                                             <input 
-                                                                 type="number" min="0.1" max="100" step="0.1"
-                                                                 value={studyConfig?.yield !== undefined ? studyConfig.yield : 98}
-                                                                 onChange={e => handleConfigChange('yield', Number(e.target.value))}
-                                                                 disabled={!canEdit}
-                                                                 className="w-11 bg-slate-955 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 font-mono text-center font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                                                type="number" min="0.1" max="100" step="0.1"
+                                                                value={studyConfig?.yield !== undefined ? studyConfig.yield : 98}
+                                                                onChange={e => handleConfigChange('yield', Number(e.target.value))}
+                                                                disabled={!canEdit}
+                                                                className="w-11 bg-slate-955 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 font-mono text-center font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
                                                             />
                                                             <span className="text-[8px] text-slate-600 font-bold">%</span>
                                                         </div>
@@ -3332,7 +2428,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                 </div>
 
                                                 {/* Tooltip */}
-                                                <div className={`absolute top-full left-0 mt-2 w-72 p-3 bg-slate-955/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-piezasDia' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
+                                                <div className="absolute top-full left-0 mt-2 w-72 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
                                                     <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
                                                         <Info className="w-3.5 h-3.5 text-cyan-400" />
                                                         <span>Piezas / Día — Desglose de Pérdidas OEE</span>
@@ -3342,36 +2438,10 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                             El OEE ({Math.round((100 - oeePenalty) * 10) / 10}%) simula las pérdidas reales de producción por paros no planeados, 
                                                             rechazos de calidad y velocidad reducida.
                                                         </p>
-                                                        <div className="space-y-1.5">
+                                                        <div className="space-y-1">
                                                             <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
                                                             <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
-                                                                {calcMode === 'demand' ? (
-                                                                    <>
-                                                                        <span className={getKPIColor('card-objDia')}>Demanda/Día</span> = <span className={getKPIColor('visual-relatedInput')}>Demanda Anual</span> ÷ <span className={getKPIColor('visual-relatedInput')}>Días Anuales</span><br/>
-                                                                        <span className={getKPIColor('card-piezasDia')}>Neta/Día</span> = <span className={getKPIColor('card-objHora')}>PPH_obj</span> × <span className={getKPIColor('visual-relatedInput')}>Hrs/Día</span> × <span className={getKPIColor('visual-relatedInput')}>OEE</span>
-                                                                    </>
-                                                                ) : (
-                                                                    <>
-                                                                        <span className={getKPIColor('card-piezasDia')}>Bruta/Día</span> = <span className={getKPIColor('card-objHora')}>PPH_obj</span> × <span className={getKPIColor('visual-relatedInput')}>Hrs/Día</span><br/>
-                                                                        <span className={getKPIColor('card-piezasDia')}>Neta/Día</span> = <span className={getKPIColor('card-piezasDia')}>Bruta/Día</span> × <span className={getKPIColor('visual-relatedInput')}>OEE</span>
-                                                                    </>
-                                                                )}
-                                                            </p>
-                                                        </div>
-                                                        <div className="space-y-1.5">
-                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
-                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
-                                                                {calcMode === 'demand' ? (
-                                                                    <>
-                                                                        <span className={getKPIColor('card-objDia')}>Demanda/Día</span> = <span className={getKPIColor('visual-relatedInput')}>{Math.round(annualDemand).toLocaleString()}</span> ÷ <span className={getKPIColor('visual-relatedInput')}>{diasAnuales}</span> = <span className={getKPIColor('card-objDia')}>{Math.round(piezasDia).toLocaleString()} pzas</span><br/>
-                                                                        <span className={getKPIColor('card-piezasDia')}>Neta/Día</span> = <span className={getKPIColor('card-objHora')}>{Math.round(piezasHora).toLocaleString()}</span> × <span className={getKPIColor('visual-relatedInput')}>{shiftHours}</span> × <span className={getKPIColor('visual-relatedInput')}>{oeePercent}%</span> = <span className={getKPIColor('card-piezasDia')}>{Math.round(piezasDia).toLocaleString()} pzas</span>
-                                                                    </>
-                                                                ) : (
-                                                                    <>
-                                                                        <span className={getKPIColor('card-piezasDia')}>Bruta/Día</span> = <span className={getKPIColor('card-objHora')}>{Math.round(piezasHora).toLocaleString()}</span> × <span className={getKPIColor('visual-relatedInput')}>{shiftHours}</span> = <span className={getKPIColor('card-piezasDia')}>{Math.round(piezasDiaSinOEE).toLocaleString()} pzas</span><br/>
-                                                                        <span className={getKPIColor('card-piezasDia')}>Neta/Día</span> = <span className={getKPIColor('card-piezasDia')}>{Math.round(piezasDiaSinOEE).toLocaleString()}</span> × <span className={getKPIColor('visual-relatedInput')}>{oeePercent}%</span> = <span className={getKPIColor('card-piezasDia')}>{Math.round(piezasDia).toLocaleString()} pzas</span>
-                                                                    </>
-                                                                )}
+                                                                OEE = Disp ({availability}%) × Efec ({Math.round(efficiency * 10) / 10}%) × Cal ({yieldVal}%)
                                                             </p>
                                                         </div>
                                                         <div className="space-y-1">
@@ -3382,211 +2452,455 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                                     <span className="text-white font-bold">{Math.round(piezasDiaSinOEE).toLocaleString()} pzas</span>
                                                                 </p>
                                                                 <p className="text-rose-400">
-                                                                    <span>Pérdida Disp ({studyConfig?.availability !== undefined ? studyConfig.availability : 95}%):</span>{' '}
+                                                                    <span>Pérdida Disp:</span>{' '}
                                                                     <span className="font-bold">−{Math.round(piezasPerdidasDisp).toLocaleString()} pzas</span>
                                                                 </p>
                                                                 <p className="text-amber-500">
-                                                                    <span>Pérdida Efec ({Math.round(efficiency * 10) / 10}%):</span>{' '}
+                                                                    <span>Pérdida Efec:</span>{' '}
                                                                     <span className="font-bold">−{Math.round(piezasPerdidasEficiencia).toLocaleString()} pzas</span>
                                                                 </p>
                                                                 <p className="text-rose-500">
-                                                                    <span>Pérdida Calidad ({studyConfig?.yield !== undefined ? studyConfig.yield : 98}%):</span>{' '}
+                                                                    <span>Pérdida Calidad (Scrap):</span>{' '}
                                                                     <span className="font-bold">−{Math.round(piezasPerdidasCalidad).toLocaleString()} pzas</span>
                                                                 </p>
                                                                 <div className="border-t border-slate-700 pt-1">
                                                                     <span className="text-slate-500">Capacidad Neta (OEE):</span>{' '}
-                                                                    <span className={`font-bold ${getKPIColor('card-piezasDia')}`}>{Math.round(piezasDia).toLocaleString()} pzas/día</span>
+                                                                    <span className="text-cyan-400 font-bold">{Math.round(piezasDia).toLocaleString()} pzas/día</span>
                                                                 </div>
                                                             </div>
                                                         </div>
-
                                                     </div>
-                                                    <div className="absolute bottom-full left-6 border-4 border-transparent border-b-slate-955/95" />
+                                                    <div className="absolute bottom-full left-6 border-4 border-transparent border-b-slate-950/95" />
                                                 </div>
                                             </div>
                                         );
                                     })()}
-                                    {/* Piezas / Semana */}
-                                    {(() => {
-                                        const pzSemBruto = piezasSemanaBruto;
-                                        const perdidaSem = pzSemBruto - piezasSemana;
-                                        return (
-                                            <div 
-                                                onClick={(e) => handleRelationClick('card-piezasSem', e)}
-                                                className={`relative group bg-slate-955/40 p-3 rounded-xl border border-slate-800/80 hover:border-emerald-500/30 transition-all duration-200 overflow-visible cursor-pointer ${activeTooltipId === 'card-piezasSem' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-piezasSem').wrapperClass}`}
+
+                                    {/* Estatus */}
+                                    <div 
+                                        onClick={(e) => handleRelationClick('card-status', e)}
+                                        className={`relative group bg-slate-955/40 p-3 rounded-xl border border-slate-800 hover:border-emerald-500/30 text-center flex flex-col justify-center items-center cursor-pointer transition-all duration-200 overflow-visible ${getHighlightStyles('card-status').wrapperClass}`}
+                                    >
+                                        {getHighlightLabel('card-status') && (
+                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                hoveredRelation === 'card-status' ? 'bg-cyan-500 text-slate-950' : 'bg-emerald-500 text-slate-950'
+                                            }`}>
+                                                {getHighlightLabel('card-status')}
+                                            </span>
+                                        )}
+                                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-1 font-sans">Status</span>
+                                        {getStatusBadge(localMetrics?.status)}
+
+                                        {/* Tooltip */}
+                                        <div className="absolute top-full right-0 left-auto mt-2 w-64 p-3 bg-slate-955 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
+                                            <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
+                                                <Info className="w-3.5 h-3.5 text-slate-400" />
+                                                <span>Status (Estado del Estudio)</span>
+                                            </div>
+                                            <div className="text-[11px] leading-relaxed space-y-1.5">
+                                                <p className="text-slate-400 text-[10px]">Indica si el ciclo real de la máquina cumple la meta requerida.</p>
+                                                <div className="space-y-1">
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Criterio de Evaluación:</p>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                        <span className="text-emerald-500">OK</span> si <span className="text-sky-400">Ciclo Real</span> ≤ <span className="text-cyan-400">Ciclo Target</span>
+                                                    </p>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Comparación actual:</p>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center text-[10px] leading-normal">
+                                                        Real: <span className="text-sky-400">{((localMetrics?.machineCycleTimeMs || 0) / 1000).toFixed(2)} s</span><br />
+                                                        Límite: <span className="text-white font-bold">{(studyConfig?.targetPPM ? (60 / studyConfig.targetPPM) : 0).toFixed(2)} s</span>
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="absolute bottom-full right-6 left-auto border-4 border-transparent border-b-slate-950/95" />
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                        {/* ΓöÇΓöÇ SECCIÓN CONFIGURACIÓN DEL ESTUDIO (arriba del Gantt) ΓöÇΓöÇ */}
+                        <div className="bg-slate-900/70 rounded-xl border border-slate-800 overflow-hidden">
+                            <button
+                                onClick={() => setShowConfig(!showConfig)}
+                                className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-850/30 transition text-left cursor-pointer focus:outline-none"
+                            >
+                                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                                    <Settings className="w-4 h-4 text-slate-400" />
+                                    Configuración General del Estudio
+                                </span>
+                                <span className="text-xs text-cyan-400 font-bold">
+                                    {showConfig ? 'Ocultar' : 'Mostrar'}
+                                </span>
+                            </button>
+
+                            {showConfig && studyConfig && (
+                                <div className="p-6 border-t border-slate-800/60 grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-950/20">
+                                    {/* Nombre */}
+                                    <div 
+                                        onClick={(e) => handleRelationClick('input-name', e)}
+                                        className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-name').wrapperClass}`}
+                                    >
+                                        {getHighlightLabel('input-name') && (
+                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                hoveredRelation === 'input-name' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                            }`}>
+                                                {getHighlightLabel('input-name')}
+                                            </span>
+                                        )}
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Nombre</label>
+                                        <input
+                                            value={studyConfig.name || ''}
+                                            onChange={e => handleConfigChange('name', e.target.value)}
+                                            disabled={!canEdit}
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                        />
+                                    </div>
+
+                                    {/* Piezas por Hora */}
+                                    <div 
+                                        onClick={(e) => handleRelationClick('input-piecesPerHour', e)}
+                                        className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-piecesPerHour').wrapperClass}`}
+                                    >
+                                        {getHighlightLabel('input-piecesPerHour') && (
+                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                hoveredRelation === 'input-piecesPerHour' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                            }`}>
+                                                {getHighlightLabel('input-piecesPerHour')}
+                                            </span>
+                                        )}
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Piezas por Hora</label>
+                                        <input
+                                            type="number" min="1" step="1"
+                                            value={studyConfig.targetPiecesPerShift && studyConfig.shiftHours ? Math.round(studyConfig.targetPiecesPerShift / studyConfig.shiftHours) : ''}
+                                            onChange={e => {
+                                                const piecesPerHour = Number(e.target.value) || 0;
+                                                const hours = Number(studyConfig.shiftHours) || 8;
+                                                const up = Number(studyConfig.cycleOutputQty) || 1;
+                                                const targetPiecesPerShift = piecesPerHour * hours;
+                                                const targetPPM = piecesPerHour / 60 / up;
+                                                handleConfigChanges({ 
+                                                    targetPiecesPerShift, 
+                                                    targetPPM: Math.round(targetPPM * 100) / 100 
+                                                });
+                                            }}
+                                            disabled={!canEdit}
+                                            placeholder="ej. 1200"
+                                            className="w-full bg-slate-900 border border-cyan-700/40 rounded-lg px-3 py-1.5 text-xs text-cyan-300 font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                        />
+                                    </div>
+
+                                    {/* Horas por Día */}
+                                    <div 
+                                        onClick={(e) => handleRelationClick('input-shiftHours', e)}
+                                        className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-shiftHours').wrapperClass}`}
+                                    >
+                                        {getHighlightLabel('input-shiftHours') && (
+                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                hoveredRelation === 'input-shiftHours' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                            }`}>
+                                                {getHighlightLabel('input-shiftHours')}
+                                            </span>
+                                        )}
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Horas / Día</label>
+                                        <input
+                                            type="number" min="0.1" max="24" step="0.1"
+                                            value={studyConfig.shiftHours || 8}
+                                            onChange={e => {
+                                                const hours = Number(e.target.value) || 8;
+                                                const currentHours = Number(studyConfig.shiftHours) || 8;
+                                                const currentPieces = Number(studyConfig.targetPiecesPerShift) || 0;
+                                                const piecesPerHour = currentHours ? (currentPieces / currentHours) : 0;
+                                                const targetPiecesPerShift = Math.round(piecesPerHour * hours);
+                                                handleConfigChanges({ 
+                                                    shiftHours: hours, 
+                                                    targetPiecesPerShift 
+                                                });
+                                            }}
+                                            disabled={!canEdit}
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                        />
+                                    </div>
+
+                                    {/* Castigo OEE (%) */}
+                                    <div 
+                                        onClick={(e) => handleRelationClick('input-oeePenalty', e)}
+                                        className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-oeePenalty').wrapperClass}`}
+                                    >
+                                        {getHighlightLabel('input-oeePenalty') && (
+                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                hoveredRelation === 'input-oeePenalty' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                            }`}>
+                                                {getHighlightLabel('input-oeePenalty')}
+                                            </span>
+                                        )}
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase block">Castigo OEE (%)</label>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleConfigChange('linkOeeToStudy', !studyConfig?.linkOeeToStudy);
+                                                }}
+                                                disabled={!canEdit}
+                                                className={`px-1.5 py-0.5 rounded text-[7px] font-bold border transition-all ${
+                                                    linkOeeToStudy
+                                                        ? 'bg-cyan-950/80 border-cyan-800 text-cyan-400 hover:bg-cyan-900/50'
+                                                        : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:bg-slate-850'
+                                                }`}
                                             >
-                                                {getHighlightLabel('card-piezasSem') && (
-                                                    <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                        hoveredRelation === 'card-piezasSem' ? 'bg-cyan-500 text-slate-950' : 'bg-emerald-500 text-slate-950'
-                                                    }`}>
-                                                        {getHighlightLabel('card-piezasSem')}
-                                                    </span>
-                                                )}
-                                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Piezas / Sem</span>
-                                                <span className={`text-lg font-black block leading-tight mt-0.5 ${getKPIColor('card-piezasSem')}`}>
-                                                    {piezasSemana > 0 ? Math.round(piezasSemana).toLocaleString() : '—'}
-                                                </span>
-                                                <span className="text-[8px] text-slate-600 block mt-0.5">neto (OEE {oeePercent}%)</span>
-                                                <span className={`text-[8px] block mt-0.5 font-bold ${piezasSemanaReal >= piezasSemana ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                                    vs Real: {Math.round(piezasSemanaReal).toLocaleString()} {piezasSemanaReal >= piezasSemana ? '✅' : '⚠️'}
-                                                </span>
+                                                {linkOeeToStudy ? 'Vincular a Estudio' : 'Fijar OEE'}
+                                            </button>
+                                        </div>
+                                        <input
+                                            type="number" min="0" max="100" step="1"
+                                            value={Math.round(oeePenalty)}
+                                            onChange={e => handleConfigChange('oeePenalty', Number(e.target.value))}
+                                            disabled={!canEdit || linkOeeToStudy}
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                            title={linkOeeToStudy ? "Calculado automáticamente en base al ciclo de máquina real" : "Castigo OEE (%)"}
+                                        />
+                                    </div>
 
-                                                {/* Tooltip */}
-                                                <div className={`absolute top-full left-0 mt-2 w-64 p-3 bg-slate-955/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-piezasSem' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
-                                                    <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
-                                                        <Info className="w-3.5 h-3.5 text-violet-400" />
-                                                        <span>Piezas / Semana — Bruto vs Neto</span>
-                                                    </div>
-                                                    <div className="text-[11px] leading-relaxed space-y-1.5">
-                                                        <p className="text-slate-400 text-[10px]">Producción semanal proyectada neta versus objetivo semanal.</p>
-                                                        <div className="space-y-1.5">
-                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
-                                                                {calcMode === 'demand' ? (
-                                                                    <>
-                                                                        <span className={getKPIColor('card-piezasSem')}>Demanda/Sem</span> = <span className={getKPIColor('card-objDia')}>Demanda/Día</span> × <span className={getKPIColor('visual-relatedInput')}>Días/Sem</span><br/>
-                                                                        <span className={getKPIColor('card-piezasSem')}>Neta/Sem</span> = <span className={getKPIColor('card-piezasDia')}>Neta/Día</span> × <span className={getKPIColor('visual-relatedInput')}>Días/Sem</span>
-                                                                    </>
-                                                                ) : (
-                                                                    <>
-                                                                        <span className={getKPIColor('card-piezasSem')}>Bruta/Sem</span> = <span className={getKPIColor('card-objHora')}>PPH_obj</span> × <span className={getKPIColor('visual-relatedInput')}>Hrs/Día</span> × <span className={getKPIColor('visual-relatedInput')}>Días/Sem</span><br/>
-                                                                        <span className={getKPIColor('card-piezasSem')}>Neta/Sem</span> = <span className={getKPIColor('card-piezasSem')}>Bruta/Sem</span> × <span className={getKPIColor('visual-relatedInput')}>OEE</span>
-                                                                    </>
-                                                                )}
-                                                            </p>
-                                                        </div>
-                                                        <div className="space-y-1.5">
-                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
-                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
-                                                                {calcMode === 'demand' ? (
-                                                                    <>
-                                                                        <span className={getKPIColor('card-piezasSem')}>Demanda/Sem</span> = <span className={getKPIColor('card-objDia')}>{Math.round(piezasDia).toLocaleString()}</span> × <span className={getKPIColor('visual-relatedInput')}>{studyConfig?.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5}</span> = <span className={getKPIColor('card-piezasSem')}>{Math.round(piezasSemana).toLocaleString()} pzas</span><br/>
-                                                                        <span className={getKPIColor('card-piezasSem')}>Neta/Sem</span> = <span className={getKPIColor('card-piezasDia')}>{Math.round(piezasDia).toLocaleString()}</span> × <span className={getKPIColor('visual-relatedInput')}>{studyConfig?.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5}</span> = <span className={getKPIColor('card-piezasSem')}>{Math.round(piezasSemana).toLocaleString()} pzas</span>
-                                                                    </>
-                                                                ) : (
-                                                                    <>
-                                                                        <span className={getKPIColor('card-piezasSem')}>Bruta/Sem</span> = <span className={getKPIColor('card-objHora')}>{Math.round(piezasHora).toLocaleString()}</span> × <span className={getKPIColor('visual-relatedInput')}>{shiftHours}</span> × <span className={getKPIColor('visual-relatedInput')}>{studyConfig?.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5}</span> = <span className={getKPIColor('card-piezasSem')}>{Math.round(pzSemBruto).toLocaleString()} pzas</span><br/>
-                                                                        <span className={getKPIColor('card-piezasSem')}>Neta/Sem</span> = <span className={getKPIColor('card-piezasSem')}>{Math.round(pzSemBruto).toLocaleString()}</span> × <span className={getKPIColor('visual-relatedInput')}>{oeePercent}%</span> = <span className={getKPIColor('card-piezasSem')}>{Math.round(piezasSemana).toLocaleString()} pzas</span>
-                                                                    </>
-                                                                )}
-                                                            </p>
-                                                        </div>
-                                                        <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-0.5">
-                                                            <p><span className="text-slate-500">Bruto Semanal:</span> <span className={`font-bold ${getKPIColor('card-piezasSem')}`}>{Math.round(pzSemBruto).toLocaleString()} pzas</span></p>
-                                                            <p className="text-rose-400">Pérdida OEE: <span className="font-bold">−{Math.round(perdidaSem).toLocaleString()} pzas</span></p>
-                                                            <div className="border-t border-slate-700 pt-0.5">
-                                                                <span className="text-slate-500">Neto Semanal:</span> <span className={`font-bold ${getKPIColor('card-piezasSem')}`}>{Math.round(piezasSemana).toLocaleString()} pzas/sem</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="absolute bottom-full left-6 border-4 border-transparent border-b-slate-955/95" />
-                                                </div>
-                                            </div>
-                                        );
-                                    })()}
+                                    {/* Días / Semana */}
+                                    <div 
+                                        onClick={(e) => handleRelationClick('input-workDaysPerWeek', e)}
+                                        className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-workDaysPerWeek').wrapperClass}`}
+                                    >
+                                        {getHighlightLabel('input-workDaysPerWeek') && (
+                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                hoveredRelation === 'input-workDaysPerWeek' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                            }`}>
+                                                {getHighlightLabel('input-workDaysPerWeek')}
+                                            </span>
+                                        )}
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Días Laborales / Sem</label>
+                                        <input
+                                            type="number" min="1" max="7" step="1"
+                                            value={studyConfig.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5}
+                                            onChange={e => handleConfigChange('workDaysPerWeek', Number(e.target.value))}
+                                            disabled={!canEdit}
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                        />
+                                    </div>
 
-                                    {/* Piezas / Año */}
-                                    {(() => {
-                                        const pzAnoBruto = piezasAnoBruto;
-                                        const perdidaAno = pzAnoBruto - piezasAno;
-                                        return (
-                                            <div 
-                                                onClick={(e) => handleRelationClick('card-piezasAno', e)}
-                                                className={`relative group bg-slate-955/40 p-3 rounded-xl border border-slate-800/80 hover:border-emerald-500/30 transition-all duration-200 overflow-visible cursor-pointer ${activeTooltipId === 'card-piezasAno' ? 'z-[60]' : 'hover:z-50'} ${getHighlightStyles('card-piezasAno').wrapperClass}`}
-                                            >
-                                                {getHighlightLabel('card-piezasAno') && (
-                                                    <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
-                                                        hoveredRelation === 'card-piezasAno' ? 'bg-cyan-500 text-slate-950' : 'bg-emerald-500 text-slate-950'
-                                                    }`}>
-                                                        {getHighlightLabel('card-piezasAno')}
-                                                    </span>
-                                                )}
-                                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-sans">Piezas / Año</span>
-                                                <span className={`text-lg font-black block leading-tight mt-0.5 ${getKPIColor('card-piezasAno')}`}>
-                                                    {piezasAno > 0 ? Math.round(piezasAno).toLocaleString() : '—'}
+                                    {/* País (Feriados) */}
+                                    <div 
+                                        onClick={(e) => handleRelationClick('input-country', e)}
+                                        className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-country').wrapperClass}`}
+                                    >
+                                        {getHighlightLabel('input-country') && (
+                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                hoveredRelation === 'input-country' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                            }`}>
+                                                {getHighlightLabel('input-country')}
+                                            </span>
+                                        )}
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">País (Feriados)</label>
+                                        <select
+                                            value={studyConfig.country || 'MX'}
+                                            onChange={e => handleConfigChange('country', e.target.value)}
+                                            disabled={!canEdit}
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                        >
+                                            <option value="MX">México (7 días feriados)</option>
+                                            <option value="CR">Costa Rica (11 días feriados)</option>
+                                            <option value="US">USA (11 días feriados)</option>
+                                            <option value="NONE">Ninguno (0 días feriados)</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Demanda Anual */}
+                                    <div 
+                                        onClick={(e) => handleRelationClick('input-annualDemand', e)}
+                                        className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-annualDemand').wrapperClass}`}
+                                    >
+                                        {getHighlightLabel('input-annualDemand') && (
+                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                hoveredRelation === 'input-annualDemand' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                            }`}>
+                                                {getHighlightLabel('input-annualDemand')}
+                                            </span>
+                                        )}
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Demanda Anual</label>
+                                        <input
+                                            type="number" min="1" step="1"
+                                            value={studyConfig.annualDemand !== undefined ? studyConfig.annualDemand : 18388734}
+                                            onChange={e => handleConfigChange('annualDemand', Number(e.target.value))}
+                                            disabled={!canEdit}
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                        />
+                                    </div>
+
+                                    {/* Tipo de Máquina */}
+                                    <div 
+                                        onClick={(e) => handleRelationClick('input-machineType', e)}
+                                        className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-machineType').wrapperClass}`}
+                                    >
+                                        {getHighlightLabel('input-machineType') && (
+                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                hoveredRelation === 'input-machineType' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                            }`}>
+                                                {getHighlightLabel('input-machineType')}
+                                            </span>
+                                        )}
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Tipo de Máquina</label>
+                                        <select
+                                            value={studyConfig.mainIndexEnabled ? 'indexer' : 'robot'}
+                                            onChange={e => {
+                                                const isIndexer = e.target.value === 'indexer';
+                                                const updates = { mainIndexEnabled: isIndexer };
+                                                if (!isIndexer) updates.mainIndexTimeMs = 0;
+                                                handleConfigChanges(updates);
+                                            }}
+                                            disabled={!canEdit}
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                        >
+                                            <option value="indexer">≡ƒöä Indexer (Mesa / Dial)</option>
+                                            <option value="robot">≡ƒñû Robot Transfer</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Index Time - solo si Indexer */}
+                                    {studyConfig.mainIndexEnabled && (
+                                        <div 
+                                            onClick={(e) => handleRelationClick('input-indexTime', e)}
+                                            className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-indexTime').wrapperClass}`}
+                                        >
+                                            {getHighlightLabel('input-indexTime') && (
+                                                <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                    hoveredRelation === 'input-indexTime' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                                }`}>
+                                                    {getHighlightLabel('input-indexTime')}
                                                 </span>
-                                                <span className={`text-[8px] block mt-0.5 ${cumpleDemanda ? 'text-emerald-500' : 'text-rose-400'}`}>
-                                                    {cumpleDemanda ? '✓ Cumple' : '✗ No cumple'} demanda ({Math.round(cumplimiento)}%)
+                                            )}
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Tiempo de Index (ms)</label>
+                                            <input
+                                                type="number" min="0"
+                                                value={studyConfig.mainIndexTimeMs || 0}
+                                                onChange={e => handleConfigChange('mainIndexTimeMs', e.target.value)}
+                                                disabled={!canEdit}
+                                                className="w-full bg-slate-900 border border-amber-700/40 rounded-lg px-3 py-1.5 text-xs text-amber-300 focus:outline-none focus:border-amber-500/50 disabled:opacity-50"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* Dwell calculado - solo si Indexer */}
+                                    {studyConfig.mainIndexEnabled && (
+                                        <div 
+                                            onClick={(e) => handleRelationClick('input-dwellTime', e)}
+                                            className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 ${getHighlightStyles('input-dwellTime').wrapperClass}`}
+                                        >
+                                            {getHighlightLabel('input-dwellTime') && (
+                                                <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                    hoveredRelation === 'input-dwellTime' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                                }`}>
+                                                    {getHighlightLabel('input-dwellTime')}
                                                 </span>
-                                                <span className={`text-[8px] block mt-0.5 font-bold ${piezasAnoReal >= annualDemand ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                                    vs Real: {Math.round(piezasAnoReal).toLocaleString()} ({Math.round(cumplimientoReal)}%) {cumpleDemandaReal ? '✅' : '⚠️'}
-                                                </span>
-                                                <div className={`absolute top-full right-0 left-auto mt-2 w-72 p-3 bg-slate-955/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-piezasAno' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
-                                                    <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
-                                                        <Info className="w-3.5 h-3.5 text-amber-400" />
-                                                        <span>Piezas / Año — Bruto vs Neto</span>
-                                                    </div>
-                                                    <div className="text-[11px] leading-relaxed space-y-1.5">
-                                                        <p className="text-slate-400 text-[10px]">
-                                                            Proyección anual: {diasAnuales} días laborales ({workDaysPerWeek} días/sem × 52 − {feriados} feriados {country}).
-                                                        </p>
-                                                        <div className="space-y-1.5">
-                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
-                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
-                                                                {calcMode === 'demand' ? (
-                                                                    <>
-                                                                        <span className={getKPIColor('visual-relatedInput')}>Demanda Anual</span> = (input primario)<br/>
-                                                                        <span className={getKPIColor('card-piezasAno')}>Neta/Año</span> = <span className={getKPIColor('card-piezasDia')}>Neta/Día</span> × <span className={getKPIColor('visual-relatedInput')}>{diasAnuales} días</span>
-                                                                    </>
-                                                                ) : (
-                                                                    <>
-                                                                        <span className={getKPIColor('card-piezasAno')}>Bruta/Año</span> = <span className={getKPIColor('card-objHora')}>PPH_obj</span> × <span className={getKPIColor('visual-relatedInput')}>Hrs/Día</span> × <span className={getKPIColor('visual-relatedInput')}>{diasAnuales} días</span><br/>
-                                                                        <span className={getKPIColor('card-piezasAno')}>Neta/Año</span> = <span className={getKPIColor('card-piezasAno')}>Bruta/Año</span> × <span className={getKPIColor('visual-relatedInput')}>OEE</span>
-                                                                    </>
-                                                                )}
-                                                            </p>
-                                                        </div>
-                                                        <div className="space-y-1.5">
-                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
-                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
-                                                                {calcMode === 'demand' ? (
-                                                                    <>
-                                                                        <span className={getKPIColor('visual-relatedInput')}>Demanda Anual</span> = <span className={getKPIColor('visual-relatedInput')}>{Math.round(annualDemand).toLocaleString()} pzas</span><br/>
-                                                                        <span className={getKPIColor('card-piezasAno')}>Neta/Año</span> = <span className={getKPIColor('card-piezasDia')}>{Math.round(piezasDia).toLocaleString()}</span> × <span className={getKPIColor('visual-relatedInput')}>{diasAnuales}</span> = <span className={getKPIColor('card-piezasAno')}>{Math.round(piezasAno).toLocaleString()} pzas</span>
-                                                                    </>
-                                                                ) : (
-                                                                    <>
-                                                                        <span className={getKPIColor('card-piezasAno')}>Bruta/Año</span> = <span className={getKPIColor('card-objHora')}>{Math.round(piezasHora).toLocaleString()}</span> × <span className={getKPIColor('visual-relatedInput')}>{shiftHours}</span> × <span className={getKPIColor('visual-relatedInput')}>{diasAnuales}</span> = <span className={getKPIColor('card-piezasAno')}>{Math.round(pzAnoBruto).toLocaleString()} pzas</span><br/>
-                                                                        <span className={getKPIColor('card-piezasAno')}>Neta/Año</span> = <span className={getKPIColor('card-piezasAno')}>{Math.round(pzAnoBruto).toLocaleString()}</span> × <span className={getKPIColor('visual-relatedInput')}>{oeePercent}%</span> = <span className={getKPIColor('card-piezasAno')}>{Math.round(piezasAno).toLocaleString()} pzas</span>
-                                                                    </>
-                                                                )}
-                                                            </p>
-                                                        </div>
-                                                        <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-0.5">
-                                                            <p><span className="text-slate-500">Bruto Anual:</span> <span className={`font-bold ${getKPIColor('card-piezasAno')}`}>{Math.round(pzAnoBruto).toLocaleString()} pzas</span></p>
-                                                            <p className="text-rose-400">Pérdida OEE: <span className="font-bold">−{Math.round(perdidaAno).toLocaleString()} pzas</span></p>
-                                                            <div className="border-t border-slate-700 pt-0.5">
-                                                                <span className="text-slate-500">Neto Anual:</span> <span className={`font-bold ${getKPIColor('card-piezasAno')}`}>{Math.round(piezasAno).toLocaleString()} pzas/año</span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cumplimiento vs Demanda:</p>
-                                                            <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-0.5">
-                                                                <p><span className="text-slate-500">Neto/Año:</span> <span className={`font-bold ${getKPIColor('card-piezasAno')}`}>{Math.round(piezasAno).toLocaleString()}</span></p>
-                                                                <p><span className="text-slate-500">Demanda:</span> <span className={`font-bold ${getKPIColor('visual-relatedInput')}`}>{Math.round(annualDemand).toLocaleString()}</span></p>
-                                                                <div className="border-t border-slate-700 pt-0.5">
-                                                                    <span className="text-slate-500">Resultado:</span>{' '}
-                                                                    <span className={`font-bold ${cumpleDemanda ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                                                        {cumplimiento.toFixed(1)}% {cumpleDemanda ? '✓ Cumple' : '✗ No cumple'}
-                                                                    </span>
-                                                                </div>
-                                                                {!cumpleDemanda && annualDemand > 0 && piezasAno > 0 && (
-                                                                    <p className="text-rose-400/70 mt-0.5">Faltan {Math.round(annualDemand - piezasAno).toLocaleString()} pzas/año</p>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="absolute bottom-full right-6 left-auto border-4 border-transparent border-b-slate-950/95" />
-                                                </div>
+                                            )}
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Tiempo de Dwell (ms)</label>
+                                            <div className="w-full bg-emerald-950/30 border border-emerald-600/40 rounded-lg px-3 py-1.5 text-xs text-emerald-400 font-mono font-bold flex items-center justify-between">
+                                                <span>{currentStudy?.dwellTimeMs || 0} ms</span>
+                                                <span className="text-[8px] text-emerald-600/60 font-normal">auto</span>
                                             </div>
-                                        );
-                                    })()}
-</div>
-                            </div>
+                                            <span className="text-[8px] text-slate-600 mt-0.5 block">= Estación bottleneck (más lenta)</span>
+                                        </div>
+                                    )}
+
+
+                                    {/* Configuración UP */}
+                                    <div 
+                                        onClick={(e) => handleRelationClick('input-up', e)}
+                                        className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 md:col-span-2 ${getHighlightStyles('input-up').wrapperClass}`}
+                                    >
+                                        {getHighlightLabel('input-up') && (
+                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                hoveredRelation === 'input-up' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                            }`}>
+                                                {getHighlightLabel('input-up')}
+                                            </span>
+                                        )}
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Configuración UP</label>
+                                        <div className="flex gap-1.5">
+                                            {[1, 2, 4, 6].map(up => (
+                                                <button
+                                                    key={up}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const hours = Number(studyConfig.shiftHours) || 8;
+                                                        const piecesPerHour = (Number(studyConfig.targetPiecesPerShift) || 0) / hours;
+                                                        const updates = { cycleOutputQty: up };
+                                                        if (piecesPerHour > 0) {
+                                                            const ppm = piecesPerHour / 60 / up;
+                                                            updates.targetPPM = Math.round(ppm * 100) / 100;
+                                                        }
+                                                        handleConfigChanges(updates);
+                                                    }}
+                                                    disabled={!canEdit}
+                                                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                                                        Number(studyConfig.cycleOutputQty || 1) === up
+                                                            ? 'bg-cyan-600 border-cyan-500 text-white shadow-lg shadow-cyan-900/30'
+                                                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-850 hover:border-slate-700'
+                                                    } disabled:opacity-50`}
+                                                >
+                                                    {up}-UP
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Notas */}
+                                    <div 
+                                        onClick={(e) => handleRelationClick('input-notes', e)}
+                                        className={`relative p-2 border border-transparent rounded-xl cursor-pointer transition-all duration-200 md:col-span-4 ${getHighlightStyles('input-notes').wrapperClass}`}
+                                    >
+                                        {getHighlightLabel('input-notes') && (
+                                            <span className={`absolute -top-2 right-2 px-1.5 py-0.5 text-[8px] font-bold rounded shadow-sm z-20 animate-fade-in ${
+                                                hoveredRelation === 'input-notes' ? 'bg-cyan-500 text-slate-950' : 'bg-indigo-500 text-white'
+                                            }`}>
+                                                {getHighlightLabel('input-notes')}
+                                            </span>
+                                        )}
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Notas del Estudio</label>
+                                        <textarea
+                                            value={studyConfig.notes || ''}
+                                            onChange={e => handleConfigChange('notes', e.target.value)}
+                                            disabled={!canEdit}
+                                            rows="2"
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50 resize-none"
+                                        />
+                                    </div>
+
+                                    {/* Auto-save indicator */}
+                                    {canEdit && (
+                                        <div className="md:col-span-4 flex justify-end pt-2">
+                                            <div className="flex items-center gap-1.5 text-[10px] font-semibold">
+                                                {configAutoSaveStatus === 'saving' && (
+                                                    <>
+                                                        <div className="w-3 h-3 rounded-full border-2 border-cyan-500 border-t-transparent animate-spin" />
+                                                        <span className="text-cyan-500">Guardando...</span>
+                                                    </>
+                                                )}
+                                                {configAutoSaveStatus === 'saved' && (
+                                                    <>
+                                                        <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                                                        <span className="text-emerald-500">Guardado</span>
+                                                    </>
+                                                )}
+                                                {configAutoSaveStatus === 'error' && (
+                                                    <>
+                                                        <XCircle className="w-3.5 h-3.5 text-rose-500" />
+                                                        <span className="text-rose-500">Error al guardar: {configAutoSaveError}</span>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
-
-                        {/* ── GANTT INTERACTIVO DE PASOS ── */}
+                        {/* ΓöÇΓöÇ GANTT INTERACTIVO DE PASOS ΓöÇΓöÇ */}
                         <TimingStudyGantt
                             currentStudy={currentStudy}
                             steps={steps}
@@ -3606,7 +2920,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                             getValidActionsForDevice={getValidActionsForDevice}
                         />
 
-                        {/* ── PANEL DE VALIDACIÓN DEL ESTUDIO ── */}
+                        {/* ΓöÇΓöÇ PANEL DE VALIDACIÓN DEL ESTUDIO ΓöÇΓöÇ */}
                         <TimingStudyValidationPanel
                             validationResults={validationResults}
                             onSelectStep={(stepId) => {
@@ -3621,7 +2935,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                             }}
                         />
 
-                        {/* ── SECCIÓN AJUSTES EST├üNDAR DEL PROYECTO ── */}
+                        {/* ΓöÇΓöÇ SECCIÓN AJUSTES EST├üNDAR DEL PROYECTO ΓöÇΓöÇ */}
                         <div className="bg-slate-900/70 rounded-xl border border-slate-800 overflow-hidden">
                             <button
                                 onClick={() => setShowStandards(!showStandards)}
@@ -4085,7 +3399,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                             )}
                         </div>
 
-                        {/* ── TABLA DE SECUENCIA / PASOS (OCULTA POR GANTT) ── */}
+                        {/* ΓöÇΓöÇ TABLA DE SECUENCIA / PASOS (OCULTA POR GANTT) ΓöÇΓöÇ */}
                         {false && (
                         <div className="bg-slate-900/70 rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
                             <div className="px-6 py-4 border-b border-slate-800/80 bg-slate-950/20 flex items-center justify-between">
@@ -4510,185 +3824,6 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                         )}
                     </div>
                 )
-            )}
-            {/* Modal de Configuración de Colores */}
-            {showColorModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-                    <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden font-sans">
-                        {/* Header */}
-                        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
-                            <div className="flex items-center gap-2.5">
-                                <Palette className="w-5 h-5 text-cyan-400" />
-                                <div>
-                                    <h3 className="text-sm font-black text-white uppercase tracking-wider">Configuración de Colores</h3>
-                                    <p className="text-[10px] text-slate-400 mt-0.5">Personaliza los colores de cada métrica y ayuda visual para el modo claro y oscuro.</p>
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => setShowColorModal(false)}
-                                className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl transition cursor-pointer"
-                            >
-                                <XCircle className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        {/* Tabs */}
-                        <div className="px-6 py-2 border-b border-slate-800 bg-slate-955/40 flex items-center justify-between">
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => setColorTab('dark')}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                                        colorTab === 'dark' 
-                                            ? 'bg-slate-800 text-cyan-400 border border-cyan-500/20' 
-                                            : 'text-slate-400 hover:text-slate-200'
-                                    }`}
-                                >
-                                    Modo Oscuro (Dark Mode)
-                                </button>
-                                <button
-                                    onClick={() => setColorTab('light')}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                                        colorTab === 'light' 
-                                            ? 'bg-slate-100 text-slate-900 border border-slate-200' 
-                                            : 'text-slate-400 hover:text-slate-200'
-                                    }`}
-                                >
-                                    Modo Claro (Light Mode)
-                                </button>
-                            </div>
-                            <button
-                                onClick={handleResetColors}
-                                className="flex items-center gap-1 px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-[10px] font-bold transition border border-red-500/25 cursor-pointer"
-                                title="Restablecer todos los colores a los valores por defecto"
-                            >
-                                <RefreshCw className="w-3 h-3" /> Restablecer por defecto
-                            </button>
-                        </div>
-
-                        {/* Contenido / Lista de KPIs */}
-                        <div className="p-6 overflow-y-auto space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {Object.keys(KPI_LABELS_ES).map((kpiId) => {
-                                    const label = KPI_LABELS_ES[kpiId];
-                                    const currentKpiColors = customColors[kpiId] || DEFAULT_KPI_COLORS[kpiId] || { light: 'slate', dark: 'slate' };
-                                    const activeColor = colorTab === 'dark' ? currentKpiColors.dark : currentKpiColors.light;
-
-                                    // Vista previa interactiva
-                                    let previewElement;
-                                    if (kpiId.startsWith('visual-')) {
-                                        // Visual aid preview
-                                        const isRing = kpiId === 'visual-active' || kpiId === 'visual-relatedInput' || kpiId === 'visual-relatedResult';
-                                        if (isRing) {
-                                            const lightRingClass = LIGHT_RING_CLASSES[currentKpiColors.light] || '';
-                                            const darkRingClass = DARK_RING_CLASSES[currentKpiColors.dark] || '';
-                                            previewElement = (
-                                                <div className={`p-2 rounded-lg text-[10px] font-bold text-center border transition-all ${
-                                                    colorTab === 'dark' 
-                                                        ? `bg-slate-955 text-slate-300 border-slate-800 ${darkRingClass}` 
-                                                        : `bg-white text-slate-700 border-slate-200 ${lightRingClass}`
-                                                }`}>
-                                                    Borde / Resaltado
-                                                </div>
-                                            );
-                                        }
-                                    } else {
-                                        // KPI Card preview
-                                        const textClass = colorTab === 'dark' 
-                                            ? (DARK_TEXT_CLASSES[currentKpiColors.dark] || 'dark:text-slate-200')
-                                            : (LIGHT_TEXT_CLASSES[currentKpiColors.light] || 'text-slate-600');
-                                        
-                                        previewElement = (
-                                            <div className={`p-2 rounded-lg text-center border font-mono font-bold text-xs ${
-                                                colorTab === 'dark' 
-                                                    ? 'bg-slate-955 border-slate-800 text-slate-200' 
-                                                    : 'bg-slate-50 border-slate-200 text-slate-800'
-                                            }`}>
-                                                Valor: <span className={textClass}>12,345</span>
-                                            </div>
-                                        );
-                                    }
-
-                                    return (
-                                        <div key={kpiId} className="bg-slate-955/30 p-3 rounded-2xl border border-slate-800/80 flex flex-col justify-between gap-3">
-                                            <div className="flex items-start justify-between gap-2">
-                                                <div>
-                                                    <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider block">ID: {kpiId}</span>
-                                                    <span className="text-xs font-bold text-white block mt-0.5">{label}</span>
-                                                </div>
-                                                <div className="w-28 shrink-0">
-                                                    {previewElement}
-                                                </div>
-                                            </div>
-                                            
-                                            {/* Selector de color */}
-                                            <div className="flex flex-wrap gap-1">
-                                                {Object.keys(COLOR_NAMES_ES).map((colorKey) => {
-                                                    const colorName = COLOR_NAMES_ES[colorKey];
-                                                    const isSelected = activeColor === colorKey;
-                                                    
-                                                    // Clases para colorear las pelotitas de selección
-                                                    let colorDotClass = '';
-                                                    switch (colorKey) {
-                                                        case 'slate': colorDotClass = 'bg-slate-500'; break;
-                                                        case 'red': colorDotClass = 'bg-rose-500'; break;
-                                                        case 'orange': colorDotClass = 'bg-orange-500'; break;
-                                                        case 'amber': colorDotClass = 'bg-amber-500'; break;
-                                                        case 'green': colorDotClass = 'bg-green-500'; break;
-                                                        case 'emerald': colorDotClass = 'bg-emerald-500'; break;
-                                                        case 'teal': colorDotClass = 'bg-teal-500'; break;
-                                                        case 'cyan': colorDotClass = 'bg-cyan-500'; break;
-                                                        case 'blue': colorDotClass = 'bg-blue-500'; break;
-                                                        case 'indigo': colorDotClass = 'bg-indigo-500'; break;
-                                                        case 'purple': colorDotClass = 'bg-purple-500'; break;
-                                                        case 'fuchsia': colorDotClass = 'bg-fuchsia-500'; break;
-                                                        case 'rose': colorDotClass = 'bg-rose-500'; break;
-                                                        default: colorDotClass = 'bg-slate-500';
-                                                    }
-
-                                                    return (
-                                                        <button
-                                                            key={colorKey}
-                                                            onClick={() => {
-                                                                const updated = {
-                                                                    ...customColors,
-                                                                    [kpiId]: {
-                                                                        ...currentKpiColors,
-                                                                        [colorTab]: colorKey
-                                                                    }
-                                                                };
-                                                                handleSaveCustomColors(updated);
-                                                            }}
-                                                            className={`w-5 h-5 rounded-full relative transition flex items-center justify-center shrink-0 cursor-pointer ${colorDotClass} ${
-                                                                isSelected 
-                                                                    ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-900 scale-110 z-10' 
-                                                                    : 'hover:scale-105 opacity-80 hover:opacity-100'
-                                                            }`}
-                                                            title={colorName}
-                                                        >
-                                                            {isSelected && (
-                                                                <span className="w-1.5 h-1.5 bg-white rounded-full" />
-                                                            )}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Footer */}
-                        <div className="px-6 py-4 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-3">
-                            <button
-                                onClick={() => setShowColorModal(false)}
-                                className="px-5 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-lg shadow-cyan-650/15"
-                            >
-                                Aceptar y Guardar
-                            </button>
-                        </div>
-                    </div>
-                </div>
             )}
         </div>
     );

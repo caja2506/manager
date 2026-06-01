@@ -512,41 +512,51 @@ export default function TimingStudyGantt({
                             const dwellPx = dwellMs * pxPerMs;
 
                             return (
-                                <div className="absolute inset-y-0 left-0 right-0 pointer-events-none z-[1]" style={{ top: 48 }}>
-                                    {/* DWELL zone (0 → dwellMs) — mesa quieta, operaciones */}
-                                    {dwellPx > 0 && (
-                                        <div
-                                            className="absolute inset-y-0"
-                                            style={{ left: 0, width: dwellPx, background: 'linear-gradient(180deg, rgba(16,185,129,0.07) 0%, rgba(16,185,129,0.02) 100%)' }}
-                                        >
-                                            {/* Borde derecho */}
-                                            <div className="absolute right-0 inset-y-0 w-px bg-emerald-500/20" />
-                                            {/* Label */}
-                                            <div className="sticky top-0 flex items-center justify-center pt-2">
-                                                <span className="bg-emerald-950/80 text-emerald-400 border border-emerald-800/50 text-[7px] font-black px-2 py-0.5 rounded-full uppercase tracking-[0.15em]">
-                                                    🔵 DWELL · {dwellMs}ms
-                                                </span>
+                                <>
+                                    {/* 1. Fondos Translúcidos de Zonas (detrás de las barras, z-[1]) */}
+                                    <div className="absolute inset-y-0 left-0 right-0 pointer-events-none z-[1]" style={{ top: 48 }}>
+                                        {dwellPx > 0 && (
+                                            <div
+                                                className="absolute inset-y-0"
+                                                style={{ left: 0, width: dwellPx, background: 'linear-gradient(180deg, rgba(16,185,129,0.07) 0%, rgba(16,185,129,0.02) 100%)' }}
+                                            >
+                                                {/* Borde derecho */}
+                                                <div className="absolute right-0 inset-y-0 w-px bg-emerald-500/20" />
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
+                                        {indexPx > 0 && (
+                                            <div
+                                                className="absolute inset-y-0"
+                                                style={{ left: dwellPx, width: indexPx, background: 'linear-gradient(180deg, rgba(245,158,11,0.08) 0%, rgba(245,158,11,0.03) 100%)' }}
+                                            >
+                                                {/* Borde derecho */}
+                                                <div className="absolute right-0 inset-y-0 w-px bg-amber-500/20" />
+                                            </div>
+                                        )}
+                                    </div>
 
-                                    {/* INDEX zone (dwellMs → dwellMs + indexMs) — mesa en movimiento */}
-                                    {indexPx > 0 && (
-                                        <div
-                                            className="absolute inset-y-0"
-                                            style={{ left: dwellPx, width: indexPx, background: 'linear-gradient(180deg, rgba(245,158,11,0.08) 0%, rgba(245,158,11,0.03) 100%)' }}
-                                        >
-                                            {/* Borde derecho */}
-                                            <div className="absolute right-0 inset-y-0 w-px bg-amber-500/20" />
-                                            {/* Label */}
-                                            <div className="sticky top-0 flex items-center justify-center pt-2">
-                                                <span className="bg-amber-950/80 text-amber-400 border border-amber-800/50 text-[7px] font-black px-2 py-0.5 rounded-full uppercase tracking-[0.15em]">
-                                                    ⚡ INDEX · {indexMs}ms
-                                                </span>
+                                    {/* 2. Etiquetas Flotantes Sólidas (delante de las líneas de tracks, z-[12]) */}
+                                    <div className="absolute left-0 right-0 pointer-events-none z-[12]" style={{ top: 48, height: 32 }}>
+                                        {dwellPx > 0 && (
+                                            <div className="absolute" style={{ left: 0, width: dwellPx }}>
+                                                <div className="flex items-center justify-center pt-2">
+                                                    <span className="bg-slate-950 text-emerald-400 border border-emerald-500/40 text-[7px] font-black px-2 py-0.5 rounded-full uppercase tracking-[0.15em] shadow-md shadow-black/60">
+                                                        🔵 DWELL · {dwellMs}ms
+                                                    </span>
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
-                                </div>
+                                        )}
+                                        {indexPx > 0 && (
+                                            <div className="absolute" style={{ left: dwellPx, width: indexPx }}>
+                                                <div className="flex items-center justify-center pt-2">
+                                                    <span className="bg-slate-950 text-amber-400 border border-amber-500/40 text-[7px] font-black px-2 py-0.5 rounded-full uppercase tracking-[0.15em] shadow-md shadow-black/60">
+                                                        ⚡ INDEX · {indexMs}ms
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
                             );
                         })()}
 

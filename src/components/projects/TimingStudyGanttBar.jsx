@@ -163,8 +163,8 @@ export default function TimingStudyGanttBar({
     let progressBg = 'bg-slate-700';
 
     if (profileWarning) {
-        barBgBorder = 'bg-orange-950/60 border-orange-500/80 border-dashed text-orange-200 shadow-[0_0_14px_rgba(249,115,22,0.35)]';
-        progressBg = 'bg-orange-800/40';
+        barBgBorder = 'bg-red-950/80 border-red-500/80 border-2 text-red-200 shadow-[0_0_16px_rgba(239,68,68,0.6)] animate-pulse';
+        progressBg = 'bg-red-800/40';
     } else if (step.isCriticalPath) {
         barBgBorder = 'bg-red-950/80 border-red-500/80 text-red-200 shadow-[0_0_12px_rgba(239,68,68,0.3)]';
         progressBg = 'bg-red-800/60';
@@ -260,16 +260,16 @@ Cuello de Botella: ${step.isBottleneck ? 'Sí' : 'No'}`;
             {/* Profile warning icon */}
             {profileWarning && !isZeroDur && (
                 <div className="absolute -top-2.5 -right-2.5 z-20 flex items-center gap-0.5" title={profileWarning.message}>
-                    <div className="w-5 h-5 rounded-full bg-orange-600 border-2 border-orange-400 flex items-center justify-center animate-pulse shadow-lg shadow-orange-500/40">
-                        <AlertTriangle className="w-3 h-3 text-white" />
+                    <div className="w-5 h-5 rounded-full bg-red-650 border-2 border-red-400 flex items-center justify-center animate-pulse shadow-lg shadow-red-500/50">
+                        <AlertTriangle className="w-3 h-3 text-white animate-pulse" />
                     </div>
                 </div>
             )}
 
             {/* Label inside the bar */}
             {!isZeroDur && displayWidth > 45 && (
-                <span className={`absolute inset-0 flex items-center px-2 text-[9px] font-black truncate select-none pointer-events-none drop-shadow-md ${profileWarning ? 'text-orange-200' : ''}`}>
-                    {profileWarning && <AlertTriangle className="w-3 h-3 mr-1 text-orange-400 shrink-0" />}
+                <span className={`absolute inset-0 flex items-center px-2 text-[9px] font-black truncate select-none pointer-events-none drop-shadow-md ${profileWarning ? 'text-red-250' : ''}`}>
+                    {profileWarning && <AlertTriangle className="w-3 h-3 mr-1 text-red-450 shrink-0 animate-pulse" />}
                     {innerLabel}
                 </span>
             )}

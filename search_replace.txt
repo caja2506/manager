@@ -1,0 +1,349 @@
+                                        {/* Tooltip */}
+                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
+                                            <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
+                                                <Info className="w-3.5 h-3.5 text-amber-500" />
+                                                <span>Bottleneck (Cuello de Botella)</span>
+                                            </div>
+                                            <div className="text-[11px] leading-relaxed space-y-1.5">
+                                                <p className="text-slate-400 text-[10px]">Estación de trabajo más lenta de la secuencia que limita la velocidad de producción.</p>
+                                                <div className="space-y-1">
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[11px] leading-normal">
+                                                        Max(<span className="text-emerald-400">Estaciones</span>)
+                                                    </p>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Valores actuales:</p>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center text-[10px] leading-normal">
+                                                        Estación: <span className="text-amber-500 font-bold">{localMetrics?.bottleneckStationLabel || '—'}</span><br />
+                                                        Duración: <span className="text-emerald-400 font-bold">{localMetrics?.dwellTimeMs || 0} ms ({((localMetrics?.dwellTimeMs || 0) / 1000).toFixed(2)} s)</span>
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-slate-950/95" />
+                                        </div>
+====== DELIMITER ======
+                                        {/* Tooltip */}
+                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left font-sans">
+                                            <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
+                                                <Info className="w-3.5 h-3.5 text-amber-500" />
+                                                <span>Bottleneck (Cuello de Botella)</span>
+                                            </div>
+                                            <div className="text-[11px] leading-relaxed space-y-1.5">
+                                                <p className="text-slate-400 text-[10px]">Estación de trabajo más lenta de la secuencia que limita la velocidad de producción.</p>
+                                                <div className="space-y-1.5">
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                        <span className="text-amber-500">Bottleneck</span> = max(<span className="text-emerald-400">T_estación_i</span>)
+                                                    </p>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+                                                    <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                        <span className="text-amber-500">Bottleneck</span> = max(<span className="text-slate-300">{localMetrics?.bottleneckStationLabel || '—'}</span>) = <span className="text-emerald-400">{localMetrics?.dwellTimeMs || 0}ms ({((localMetrics?.dwellTimeMs || 0) / 1000).toFixed(2)}s)</span>
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-slate-950/95" />
+                                        </div>
+====== DELIMITER ======
+                                                        <div className="space-y-1">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula Real:</p>
+                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                                (3.600.000 / <span className="text-sky-400">Ciclo Real ms</span>) × <span className="text-fuchsia-400">UP</span>
+                                                            </p>
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Valores actuales:</p>
+                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-normal">
+                                                                Objetivo: <span className="text-white font-bold">{targetPPH.toLocaleString()} pzas/hr</span><br />
+                                                                Real: (3.600.000 / <span className="text-sky-400">{localMetrics?.machineCycleTimeMs || 1}</span>) × <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-cyan-400 font-bold">{Math.round(realPPH).toLocaleString()} pzas/hr</span>
+                                                            </p>
+                                                        </div>
+====== DELIMITER ======
+                                                        <div className="space-y-1.5">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                                <span className="text-cyan-400">PPH_real</span> = (3,600,000 / <span className="text-cyan-400">Ciclo Real (ms)</span>) × <span className="text-fuchsia-400">UP</span>
+                                                            </p>
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                                <span className="text-cyan-400">PPH_real</span> = (3,600,000 / <span className="text-cyan-400">{localMetrics?.machineCycleTimeMs || 1}ms</span>) × <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className={`font-bold ${onTarget ? 'text-emerald-400' : 'text-cyan-400'}`}>{Math.round(realPPH).toLocaleString()} pzas/hr</span>
+                                                            </p>
+                                                        </div>
+====== DELIMITER ======
+                                            <div className="space-y-1">
+                                                <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Criterio de Evaluación:</p>
+                                                <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                    <span className="text-emerald-500">OK</span> si <span className="text-sky-400">Ciclo Real</span> ≤ <span className="text-cyan-400">Ciclo Target</span>
+                                                </p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Comparación actual:</p>
+                                                <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center text-[10px] leading-normal">
+                                                    Real: <span className="text-sky-400">{((localMetrics?.machineCycleTimeMs || 0) / 1000).toFixed(2)} s</span><br />
+                                                    Límite: <span className="text-white font-bold">{(studyConfig?.targetPPM ? (60 / studyConfig.targetPPM) : 0).toFixed(2)} s</span>
+                                                </p>
+                                            </div>
+====== DELIMITER ======
+                                            <div className="space-y-1.5">
+                                                <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+                                                <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                    <span className="text-emerald-500">Status</span> = <span className="text-cyan-400">Ciclo Real (s)</span> ≤ <span className="text-blue-400">Ciclo Target (s)</span>
+                                                </p>
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+                                                <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+                                                    <span className="text-cyan-400">{((localMetrics?.machineCycleTimeMs || 0) / 1000).toFixed(2)}s</span> ≤ <span className="text-blue-400">{(studyConfig?.targetPPM ? (60 / studyConfig.targetPPM) : 0).toFixed(2)}s</span> ⇒ <span className={`font-bold ${localMetrics?.status === 'OK' ? 'text-emerald-400' : 'text-rose-400'}`}>{localMetrics?.status || '—'}</span>
+                                                </p>
+                                            </div>
+====== DELIMITER ======
+                                                        <div className="space-y-1">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
+                                                                OEE = Disp ({availability}%) × Efec ({Math.round(efficiency * 10) / 10}%) × Cal ({yieldVal}%)
+                                                            </p>
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Desglose de Pérdidas:</p>
+                                                            <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-1">
+                                                                <p>
+                                                                    <span className="text-slate-500">Capacidad Bruta:</span>{' '}
+                                                                    <span className="text-white font-bold">{Math.round(piezasDiaSinOEE).toLocaleString()} pzas</span>
+                                                                </p>
+                                                                <p className="text-rose-400">
+                                                                    <span>Pérdida Disp:</span>{' '}
+                                                                    <span className="font-bold">−{Math.round(piezasPerdidasDisp).toLocaleString()} pzas</span>
+                                                                </p>
+                                                                <p className="text-amber-500">
+                                                                    <span>Pérdida Efec:</span>{' '}
+                                                                    <span className="font-bold">−{Math.round(piezasPerdidasEficiencia).toLocaleString()} pzas</span>
+                                                                </p>
+                                                                <p className="text-rose-500">
+                                                                    <span>Pérdida Calidad (Scrap):</span>{' '}
+                                                                    <span className="font-bold">−{Math.round(piezasPerdidasCalidad).toLocaleString()} pzas</span>
+                                                                </p>
+                                                                <div className="border-t border-slate-700 pt-1">
+                                                                    <span className="text-slate-500">Capacidad Neta (OEE):</span>{' '}
+                                                                    <span className="text-cyan-400 font-bold">{Math.round(piezasDia).toLocaleString()} pzas/día</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+====== DELIMITER ======
+                                                        <div className="space-y-1.5">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal text-slate-300">
+                                                                {calcMode === 'demand' ? (
+                                                                    <>
+                                                                        <span className="text-violet-400">Demanda/Día</span> = <span className="text-violet-400">Demanda Anual</span> ÷ <span className="text-indigo-400">Días Anuales</span><br/>
+                                                                        <span className="text-cyan-400">Neta/Día</span> = <span className="text-cyan-400">PPH_real</span> × <span className="text-slate-400">Hrs/Día</span> × <span className="text-emerald-400">OEE</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <span className="text-slate-300">Bruta/Día</span> = <span className="text-cyan-400">PPH_real</span> × <span className="text-slate-400">Hrs/Día</span><br/>
+                                                                        <span className="text-cyan-400">Neta/Día</span> = <span className="text-slate-300">Bruta/Día</span> × <span className="text-emerald-400">OEE</span>
+                                                                    </>
+                                                                )}
+                                                            </p>
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal text-slate-300">
+                                                                {calcMode === 'demand' ? (
+                                                                    <>
+                                                                        <span className="text-violet-400">Demanda/Día</span> = <span className="text-violet-400">{Math.round(annualDemand).toLocaleString()}</span> ÷ <span className="text-indigo-400">{diasAnuales}</span> = <span className="text-violet-400">{Math.round(studyConfig?.targetPiecesPerShift || 0).toLocaleString()} pzas</span><br/>
+                                                                        <span className="text-cyan-400">Neta/Día</span> = <span className="text-cyan-400">{Math.round(piezasHora).toLocaleString()}</span> × <span className="text-slate-400">{shiftHours}</span> × <span className="text-emerald-400">{oeePercent}%</span> = <span className="text-cyan-400">{Math.round(piezasDia).toLocaleString()} pzas</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <span className="text-slate-300">Bruta/Día</span> = <span className="text-cyan-400">{Math.round(piezasHora).toLocaleString()}</span> × <span className="text-slate-400">{shiftHours}</span> = <span className="text-slate-300">{Math.round(piezasDiaSinOEE).toLocaleString()} pzas</span><br/>
+                                                                        <span className="text-cyan-400">Neta/Día</span> = <span className="text-slate-300">{Math.round(piezasDiaSinOEE).toLocaleString()}</span> × <span className="text-emerald-400">{oeePercent}%</span> = <span className="text-cyan-400">{Math.round(piezasDia).toLocaleString()} pzas</span>
+                                                                    </>
+                                                                )}
+                                                            </p>
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Desglose de Pérdidas:</p>
+                                                            <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-1">
+                                                                <p>
+                                                                    <span className="text-slate-500">Capacidad Bruta:</span>{' '}
+                                                                    <span className="text-white font-bold">{Math.round(piezasDiaSinOEE).toLocaleString()} pzas</span>
+                                                                </p>
+                                                                <p className="text-rose-400">
+                                                                    <span>Pérdida Disp ({studyConfig?.availability !== undefined ? studyConfig.availability : 95}%):</span>{' '}
+                                                                    <span className="font-bold">−{Math.round(piezasPerdidasDisp).toLocaleString()} pzas</span>
+                                                                </p>
+                                                                <p className="text-amber-500">
+                                                                    <span>Pérdida Efec ({Math.round(efficiency * 10) / 10}%):</span>{' '}
+                                                                    <span className="font-bold">−{Math.round(piezasPerdidasEficiencia).toLocaleString()} pzas</span>
+                                                                </p>
+                                                                <p className="text-rose-500">
+                                                                    <span>Pérdida Calidad ({studyConfig?.yield !== undefined ? studyConfig.yield : 98}%):</span>{' '}
+                                                                    <span className="font-bold">−{Math.round(piezasPerdidasCalidad).toLocaleString()} pzas</span>
+                                                                </p>
+                                                                <div className="border-t border-slate-700 pt-1">
+                                                                    <span className="text-slate-500">Capacidad Neta (OEE):</span>{' '}
+                                                                    <span className="text-cyan-400 font-bold">{Math.round(piezasDia).toLocaleString()} pzas/día</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+====== DELIMITER ======
+                                                    <div className="text-[11px] leading-relaxed space-y-1.5">
+                                                        <div className="space-y-1">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
+                                                                Bruto = PPH × Hrs/Turno × Días/Sem<br/>
+                                                                Neto = Bruto × OEE ({Math.round((100 - oeePenalty) * 10) / 10}%)
+                                                            </p>
+                                                        </div>
+                                                        <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-0.5">
+                                                            <p><span className="text-slate-500">Bruto:</span> <span className="text-white font-bold">{Math.round(pzSemBruto).toLocaleString()} pzas</span></p>
+                                                            <p className="text-rose-400">Pérdida OEE: <span className="font-bold">−{Math.round(perdidaSem).toLocaleString()} pzas</span></p>
+                                                            <div className="border-t border-slate-700 pt-0.5">
+                                                                <span className="text-slate-500">Neto:</span> <span className="text-violet-400 font-bold">{Math.round(piezasSemana).toLocaleString()} pzas/sem</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+====== DELIMITER ======
+                                                    <div className="text-[11px] leading-relaxed space-y-1.5">
+                                                        <p className="text-slate-400 text-[10px]">Producción semanal proyectada neta versus objetivo semanal.</p>
+                                                        <div className="space-y-1.5">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal text-slate-300">
+                                                                {calcMode === 'demand' ? (
+                                                                    <>
+                                                                        <span className="text-violet-400">Demanda/Sem</span> = <span className="text-violet-400">Demanda/Día</span> × <span className="text-slate-400">Días/Sem</span><br/>
+                                                                        <span className="text-cyan-400">Neta/Sem</span> = <span className="text-cyan-400">Neta/Día</span> × <span className="text-slate-400">Días/Sem</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <span className="text-slate-300">Bruta/Sem</span> = <span className="text-cyan-400">PPH_real</span> × <span className="text-slate-400">Hrs/Día</span> × <span className="text-slate-400">Días/Sem</span><br/>
+                                                                        <span className="text-cyan-400">Neta/Sem</span> = <span className="text-slate-300">Bruta/Sem</span> × <span className="text-emerald-400">OEE</span>
+                                                                    </>
+                                                                )}
+                                                            </p>
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal text-slate-300">
+                                                                {calcMode === 'demand' ? (
+                                                                    <>
+                                                                        <span className="text-violet-400">Demanda/Sem</span> = <span className="text-violet-400">{Math.round(studyConfig?.targetPiecesPerShift || 0).toLocaleString()}</span> × <span className="text-slate-400">{studyConfig.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5}</span> = <span className="text-violet-400">{Math.round((studyConfig?.targetPiecesPerShift || 0) * (studyConfig.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5)).toLocaleString()} pzas</span><br/>
+                                                                        <span className="text-cyan-400">Neta/Sem</span> = <span className="text-cyan-400">{Math.round(piezasDia).toLocaleString()}</span> × <span className="text-slate-400">{studyConfig.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5}</span> = <span className="text-cyan-400">{Math.round(piezasSemana).toLocaleString()} pzas</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <span className="text-slate-300">Bruta/Sem</span> = <span className="text-cyan-400">{Math.round(piezasHora).toLocaleString()}</span> × <span className="text-slate-400">shiftHours</span> × <span className="text-slate-400">{studyConfig.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5}</span> = <span className="text-slate-300">{Math.round(pzSemBruto).toLocaleString()} pzas</span><br/>
+                                                                        <span className="text-cyan-400">Neta/Sem</span> = <span className="text-slate-300">{Math.round(pzSemBruto).toLocaleString()}</span> × <span className="text-emerald-400">{oeePercent}%</span> = <span className="text-cyan-400">{Math.round(piezasSemana).toLocaleString()} pzas</span>
+                                                                    </>
+                                                                )}
+                                                            </p>
+                                                        </div>
+                                                        <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-0.5">
+                                                            <p><span className="text-slate-500">Bruto Semanal:</span> <span className="text-white font-bold">{Math.round(pzSemBruto).toLocaleString()} pzas</span></p>
+                                                            <p className="text-rose-400">Pérdida OEE: <span className="font-bold">−{Math.round(perdidaSem).toLocaleString()} pzas</span></p>
+                                                            <div className="border-t border-slate-700 pt-0.5">
+                                                                <span className="text-slate-500">Neto Semanal:</span> <span className="text-violet-400 font-bold">{Math.round(piezasSemana).toLocaleString()} pzas/sem</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+====== DELIMITER ======
+                                                    <div className="text-[11px] leading-relaxed space-y-1.5">
+                                                        <p className="text-slate-400 text-[10px]">
+                                                            Proyección anual: {diasAnuales} días laborales ({workDaysPerWeek} días/sem × 52 − {feriados} feriados {country}).
+                                                        </p>
+                                                        <div className="space-y-1">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
+                                                                Bruto = PPH × Hrs/Turno × {diasAnuales} días<br/>
+                                                                Neto = Bruto × OEE ({Math.round((100 - oeePenalty) * 10) / 10}%)
+                                                            </p>
+                                                        </div>
+                                                        <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-0.5">
+                                                            <p><span className="text-slate-500">Bruto:</span> <span className="text-white font-bold">{Math.round(pzAnoBruto).toLocaleString()} pzas</span></p>
+                                                            <p className="text-rose-400">Pérdida OEE: <span className="font-bold">−{Math.round(perdidaAno).toLocaleString()} pzas</span></p>
+                                                            <div className="border-t border-slate-700 pt-0.5">
+                                                                <span className="text-slate-500">Neto:</span> <span className="text-amber-400 font-bold">{Math.round(piezasAno).toLocaleString()} pzas/año</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cumplimiento vs Demanda:</p>
+                                                            <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-0.5">
+                                                                <p><span className="text-slate-500">Neto/Año:</span> <span className="text-amber-400 font-bold">{Math.round(piezasAno).toLocaleString()}</span></p>
+                                                                <p><span className="text-slate-500">Demanda:</span> <span className="text-white font-bold">{Math.round(annualDemand).toLocaleString()}</span></p>
+                                                                <div className="border-t border-slate-700 pt-0.5">
+                                                                    <span className="text-slate-500">Resultado:</span>{' '}
+                                                                    <span className={`font-bold ${cumpleDemanda ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                                        {cumplimiento.toFixed(1)}% {cumpleDemanda ? '✓ Cumple' : '✗ No cumple'}
+                                                                    </span>
+                                                                </div>
+                                                                {!cumpleDemanda && annualDemand > 0 && piezasAno > 0 && (
+                                                                    <p className="text-rose-400/70">Faltan {Math.round(annualDemand - piezasAno).toLocaleString()} pzas/año</p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+====== DELIMITER ======
+                                                    <div className="text-[11px] leading-relaxed space-y-1.5">
+                                                        <p className="text-slate-400 text-[10px]">
+                                                            Proyección anual: {diasAnuales} días laborales ({workDaysPerWeek} días/sem × 52 − {feriados} feriados {country}).
+                                                        </p>
+                                                        <div className="space-y-1.5">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal text-slate-300">
+                                                                {calcMode === 'demand' ? (
+                                                                    <>
+                                                                        <span className="text-violet-400">Demanda Anual</span> = (input primario)<br/>
+                                                                        <span className="text-cyan-400">Neta/Año</span> = <span className="text-cyan-400">Neta/Día</span> × <span className="text-indigo-400">{diasAnuales} días</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <span className="text-slate-300">Bruta/Año</span> = <span className="text-cyan-400">PPH_real</span> × <span className="text-slate-400">Hrs/Día</span> × <span className="text-indigo-400">{diasAnuales} días</span><br/>
+                                                                        <span className="text-cyan-400">Neta/Año</span> = <span className="text-slate-300">Bruta/Año</span> × <span className="text-emerald-400">OEE</span>
+                                                                    </>
+                                                                )}
+                                                            </p>
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+                                                            <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal text-slate-300">
+                                                                {calcMode === 'demand' ? (
+                                                                    <>
+                                                                        <span className="text-violet-400">Demanda Anual</span> = <span className="text-violet-400">{Math.round(annualDemand).toLocaleString()} pzas</span><br/>
+                                                                        <span className="text-cyan-400">Neta/Año</span> = <span className="text-cyan-400">{Math.round(piezasDia).toLocaleString()}</span> × <span className="text-indigo-400">{diasAnuales}</span> = <span className="text-cyan-400">{Math.round(piezasAno).toLocaleString()} pzas</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <span className="text-slate-300">Bruta/Año</span> = <span className="text-cyan-400">{Math.round(piezasHora).toLocaleString()}</span> × <span className="text-slate-400">shiftHours</span> × <span className="text-indigo-400">{diasAnuales}</span> = <span className="text-slate-300">{Math.round(pzAnoBruto).toLocaleString()} pzas</span><br/>
+                                                                        <span className="text-cyan-400">Neta/Año</span> = <span className="text-slate-300">{Math.round(pzAnoBruto).toLocaleString()}</span> × <span className="text-emerald-400">{oeePercent}%</span> = <span className="text-cyan-400">{Math.round(piezasAno).toLocaleString()} pzas</span>
+                                                                    </>
+                                                                )}
+                                                            </p>
+                                                        </div>
+                                                        <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-0.5">
+                                                            <p><span className="text-slate-500">Bruto Anual:</span> <span className="text-white font-bold">{Math.round(pzAnoBruto).toLocaleString()} pzas</span></p>
+                                                            <p className="text-rose-400">Pérdida OEE: <span className="font-bold">−{Math.round(perdidaAno).toLocaleString()} pzas</span></p>
+                                                            <div className="border-t border-slate-700 pt-0.5">
+                                                                <span className="text-slate-500">Neto Anual:</span> <span className="text-amber-400 font-bold">{Math.round(piezasAno).toLocaleString()} pzas/año</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cumplimiento vs Demanda:</p>
+                                                            <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-0.5">
+                                                                <p><span className="text-slate-500">Neto/Año:</span> <span className="text-amber-400 font-bold">{Math.round(piezasAno).toLocaleString()}</span></p>
+                                                                <p><span className="text-slate-500">Demanda:</span> <span className="text-white font-bold">{Math.round(annualDemand).toLocaleString()}</span></p>
+                                                                <div className="border-t border-slate-700 pt-0.5">
+                                                                    <span className="text-slate-500">Resultado:</span>{' '}
+                                                                    <span className={`font-bold ${cumpleDemanda ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                                        {cumplimiento.toFixed(1)}% {cumpleDemanda ? '✓ Cumple' : '✗ No cumple'}
+                                                                    </span>
+                                                                </div>
+                                                                {!cumpleDemanda && annualDemand > 0 && piezasAno > 0 && (
+                                                                    <p className="text-rose-400/70">Faltan {Math.round(annualDemand - piezasAno).toLocaleString()} pzas/año</p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>

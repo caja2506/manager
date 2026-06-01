@@ -1,0 +1,219 @@
+Card ID: card-objDia
+Líneas: 2544 - 2582
+   <div className={`absolute top-full left-0 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-objDia' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
+   <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
+   <Info className="w-3.5 h-3.5 text-violet-400" />
+   <div className="text-[11px] leading-relaxed space-y-1.5">
+   <p className="text-slate-400 text-[10px]">Meta de producción neta (piezas buenas) requerida por día de trabajo.</p>
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+   <span className="text-violet-400">Obj/Día (Neto)</span> = <span className="text-violet-400">Demanda Anual</span> ÷ <span className="text-slate-400">Días/Año</span>
+   <span className="text-violet-400">Obj/Día (Neto)</span> = <span className="text-blue-400">PPH_neto</span> × <span className="text-slate-400">Hrs/Día</span>
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+   <span className="text-violet-400">{Math.round(annualDemand).toLocaleString()}</span> ÷ <span className="text-slate-400">{diasAnuales}</span> = <span className="text-violet-400">{Math.round(piezasDia || 0).toLocaleString()} pzas/día</span>
+   <span className="text-blue-400">{Math.round(shiftHours > 0 ? (Number(studyConfig?.targetPiecesPerShift || 0) / shiftHours) : 0).toLocaleString()}</span> × <span className="text-slate-400">{shiftHours}</span> = <span className="text-violet-400">{Math.round(piezasDia || 0).toLocaleString()} pzas/día</span>
+
+Card ID: card-objHora
+Líneas: 2603 - 2641
+   <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-objHora' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
+   <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
+   <Info className="w-3.5 h-3.5 text-blue-400" />
+   <div className="text-[11px] leading-relaxed space-y-1.5">
+   <p className="text-slate-400 text-[10px]">Meta de producción de piezas por hora de trabajo (Bruta, considerando pérdidas por OEE).</p>
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+   <span className="text-blue-400">Obj/Hora (Bruto)</span> = <span className="text-violet-400">Obj/Día (Neto)</span> ÷ <span className="text-amber-500">OEE</span> ÷ <span className="text-slate-400">Hrs/Día</span>
+   <span className="text-blue-400">Obj/Hora (Bruto)</span> = <span className="text-blue-400">PPH_neto</span> ÷ <span className="text-amber-500">OEE</span>
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+   <span className="text-violet-400">{Math.round(piezasDia || 0).toLocaleString()}</span> ÷ <span className="text-amber-500">{oeePercent}%</span> ÷ <span className="text-slate-400">{shiftHours}</span> = <span className="text-blue-400">{Math.round(piezasHoraTarget).toLocaleString()} pzas/hr</span>
+   <span className="text-blue-400">{Math.round(shiftHours > 0 ? (piezasDia / shiftHours) : 0).toLocaleString()}</span> ÷ <span className="text-amber-500">{oeePercent}%</span> = <span className="text-blue-400">{Math.round(piezasHoraTarget).toLocaleString()} pzas/hr</span>
+
+Card ID: card-ppmObj
+Líneas: 2664 - 2688
+   <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-ppmObj' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
+   <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
+   <Info className="w-3.5 h-3.5 text-cyan-400" />
+   <div className="text-[11px] leading-relaxed space-y-1.5">
+   <p className="text-slate-400 text-[10px]">Meta de velocidad bruta en ciclos por minuto (CPM) a la que debe operar la máquina.</p>
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+   <span className="text-cyan-400">CPM_obj</span> = <span className="text-blue-400">Obj/Hora (Bruto)</span> ÷ <span className="text-slate-400">60</span> ÷ <span className="text-fuchsia-400">UP</span><br/>
+   <span className="text-emerald-400">PPM_obj</span> = <span className="text-cyan-400">CPM_obj</span> × <span className="text-fuchsia-400">UP</span>
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+   <span className="text-cyan-400">CPM_obj</span> = <span className="text-blue-400">{Math.round(piezasHoraTarget).toLocaleString()}</span> ÷ <span className="text-slate-400">60</span> ÷ <span className="text-fuchsia-400">{cycleOutputQty}</span> = <span className="text-cyan-400">{cpmTarget ? cpmTarget.toFixed(2) : 0} CPM</span><br/>
+   <span className="text-emerald-400">PPM_obj</span> = <span className="text-cyan-400">{cpmTarget ? cpmTarget.toFixed(2) : 0}</span> × <span className="text-fuchsia-400">{cycleOutputQty}</span> = <span className="text-emerald-400">{(cpmTarget * cycleOutputQty).toFixed(1)} PPM</span>
+
+Card ID: card-cicloTarget
+Líneas: 2712 - 2734
+   <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-cicloTarget' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
+   <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
+   <Info className="w-3.5 h-3.5 text-cyan-400" />
+   <div className="text-[11px] leading-relaxed space-y-1.5">
+   <p className="text-slate-400 text-[10px]">Tiempo máximo permitido por ciclo de máquina (en segundos) para cumplir la meta bruta.</p>
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+   <span className="text-cyan-400">Ciclo Target (s)</span> = <span className="text-slate-400">60</span> / <span className="text-cyan-400">CPM_obj</span>
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+   <span className="text-cyan-400">Ciclo Target</span> = <span className="text-slate-400">60</span> / <span className="text-cyan-400">{cpmTarget ? cpmTarget.toFixed(2) : 0}</span> = <span className="text-cyan-400">{cicloTargetSeg ? cicloTargetSeg.toFixed(2) : 0} s</span>
+
+Card ID: card-cicloReal
+Líneas: 2772 - 2810
+   <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-cicloReal' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
+   <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
+   <Info className="w-3.5 h-3.5 text-cyan-400" />
+   <div className="text-[11px] leading-relaxed space-y-1.5">
+   <p className="text-slate-400 text-[10px]">Duración calculada del ciclo completo actual de la máquina.</p>
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+   <span className="text-cyan-400">Ciclo Real</span> = <span className="text-cyan-400">Dwell</span> + <span className="text-cyan-400">Index</span>
+   <span className="text-cyan-400">Ciclo Real</span> = <span className="text-cyan-400">Dwell</span>
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+   <span className="text-cyan-400">Ciclo Real</span> = <span className="text-cyan-400">{localMetrics?.dwellTimeMs || 0}ms</span> + <span className="text-cyan-400">{studyConfig?.mainIndexTimeMs || 0}ms</span> = <span className="text-cyan-400">{localMetrics?.machineCycleTimeMs || 0}ms ({((localMetrics?.machineCycleTimeMs || 0) / 1000).toFixed(2)}s)</span>
+   <span className="text-cyan-400">Ciclo Real</span> = <span className="text-cyan-400">{localMetrics?.dwellTimeMs || 0}ms</span> = <span className="text-cyan-400">{localMetrics?.machineCycleTimeMs || 0}ms ({((localMetrics?.machineCycleTimeMs || 0) / 1000).toFixed(2)}s)</span>
+
+Card ID: card-ppmReal
+Líneas: 2833 - 2857
+   <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-ppmReal' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
+   <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
+   <Info className="w-3.5 h-3.5 text-cyan-400" />
+   <div className="text-[11px] leading-relaxed space-y-1.5">
+   <p className="text-slate-400 text-[10px]">Cantidad de ciclos ejecutados por minuto a velocidad real.</p>
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+   <span className="text-cyan-400">CPM_real</span> = <span className="text-slate-400">60</span> / <span className="text-cyan-400">Ciclo Real (s)</span><br/>
+   <span className="text-emerald-400">PPM_real</span> = <span className="text-cyan-400">CPM_real</span> × <span className="text-fuchsia-400">UP</span>
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+   <span className="text-cyan-400">CPM_real</span> = <span className="text-slate-400">60</span> / <span className="text-cyan-400">{cicloRealSeg.toFixed(2)}s</span> = <span className="text-cyan-400">{cpmReal.toFixed(1)} CPM</span><br/>
+   <span className="text-emerald-400">PPM_real</span> = <span className="text-cyan-400">{cpmReal.toFixed(1)}</span> × <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-emerald-400">{ppmReal.toFixed(1)} PPM</span>
+
+Card ID: card-bottleneck
+Líneas: 2879 - 2901
+   <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-bottleneck' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
+   <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
+   <Info className="w-3.5 h-3.5 text-amber-500" />
+   <div className="text-[11px] leading-relaxed space-y-1.5">
+   <p className="text-slate-400 text-[10px]">Estación de trabajo más lenta de la secuencia que limita la velocidad de producción.</p>
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+   <span className="text-cyan-400">Bottleneck</span> = max(<span className="text-cyan-400">T_estación_i</span>)
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+   <span className="text-cyan-400">Bottleneck</span> = max(<span className="text-amber-500">{localMetrics?.bottleneckStationLabel || '—'}</span>) = <span className="text-cyan-400">{localMetrics?.dwellTimeMs || 0}ms ({((localMetrics?.dwellTimeMs || 0) / 1000).toFixed(2)}s)</span>
+
+Card ID: card-realHora
+Líneas: 2932 - 2954
+   <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-realHora' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
+   <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
+   <Info className={`w-3.5 h-3.5 ${onTarget ? 'text-emerald-400' : 'text-red-400'}`} />
+   <div className="text-[11px] leading-relaxed space-y-1.5">
+   <p className="text-slate-400 text-[10px]">Producción horaria proyectada con el ciclo real medido.</p>
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+   <span className="text-emerald-400">PPH_real</span> = (<span className="text-slate-400">3,600,000</span> / <span className="text-cyan-400">Ciclo Real (ms)</span>) × <span className="text-fuchsia-400">UP</span>
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+   <span className="text-emerald-400">PPH_real</span> = (<span className="text-slate-400">3,600,000</span> / <span className="text-cyan-400">{localMetrics?.machineCycleTimeMs || 1}ms</span>) × <span className="text-fuchsia-400">{studyConfig?.cycleOutputQty || 1}</span> = <span className="text-emerald-400 font-bold">{Math.round(realPPH).toLocaleString()} pzas/hr</span>
+
+Card ID: card-status
+Líneas: 2984 - 3006
+   <div className={`absolute top-full right-0 left-auto mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-status' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
+   <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
+   <Info className="w-3.5 h-3.5 text-cyan-400" />
+   <div className="text-[11px] leading-relaxed space-y-1.5">
+   <p className="text-slate-400 text-[10px]">Indica si el ciclo real de la máquina cumple la meta requerida.</p>
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+   <span className="text-cyan-400">Status</span> = <span className="text-cyan-400">Ciclo Real (s)</span> ≤ <span className="text-cyan-400">Ciclo Target (s)</span>
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[10px] leading-normal">
+   <span className="text-cyan-400">{((localMetrics?.machineCycleTimeMs || 0) / 1000).toFixed(2)}s</span> ≤ <span className="text-cyan-400">{cicloTargetSeg.toFixed(2)}s</span> ⇒ <span className={`font-bold ${localMetrics?.status === 'OK' ? 'text-emerald-400' : 'text-rose-400'}`}>{localMetrics?.status || '—'}</span>
+
+Card ID: card-piezasDia
+Líneas: 3130 - 3201
+   <div className={`absolute top-full left-0 mt-2 w-72 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-piezasDia' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
+   <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
+   <Info className="w-3.5 h-3.5 text-blue-400" />
+   <div className="text-[11px] leading-relaxed space-y-1.5">
+   <p className="text-slate-400 text-[10px]">
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
+   <span className="text-violet-400">Demanda/Día</span> = <span className="text-violet-400">Demanda Anual</span> ÷ <span className="text-slate-400">Días Anuales</span><br/>
+   <span className="text-blue-400">Neta/Día (Target)</span> = <span className="text-blue-400">Obj/Hora (Bruto)</span> × <span className="text-slate-400">Hrs/Día</span> × <span className="text-amber-500">OEE</span>
+   <span className="text-blue-400">Bruta/Día (Target)</span> = <span className="text-blue-400">Obj/Hora (Bruto)</span> × <span className="text-slate-400">Hrs/Día</span><br/>
+   <span className="text-blue-400">Neta/Día (Target)</span> = <span className="text-blue-400">Bruta/Día (Target)</span> × <span className="text-amber-500">OEE</span>
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
+   <span className="text-violet-400">Demanda/Día</span> = <span className="text-violet-400">{Math.round(annualDemand).toLocaleString()}</span> ÷ <span className="text-slate-400">{diasAnuales}</span> = <span className="text-violet-400">{Math.round(piezasDia).toLocaleString()} pzas</span><br/>
+   <span className="text-blue-400">Neta/Día (Target)</span> = <span className="text-blue-400">{Math.round(piezasHoraTarget).toLocaleString()}</span> × <span className="text-slate-400">{shiftHours}</span> × <span className="text-amber-500">{oeePercent}%</span> = <span className="text-blue-400">{Math.round(piezasDia).toLocaleString()} pzas</span>
+   <span className="text-blue-400">Bruta/Día (Target)</span> = <span className="text-blue-400">{Math.round(piezasHoraTarget).toLocaleString()}</span> × <span className="text-slate-400">{shiftHours}</span> = <span className="text-blue-400">{Math.round(piezasDiaSinOEE).toLocaleString()} pzas</span><br/>
+   <span className="text-blue-400">Neta/Día (Target)</span> = <span className="text-blue-400">{Math.round(piezasDiaSinOEE).toLocaleString()}</span> × <span className="text-amber-500">{oeePercent}%</span> = <span className="text-blue-400">{Math.round(piezasDia).toLocaleString()} pzas</span>
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Desglose de Pérdidas:</p>
+   <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-1">
+   <span className="text-slate-500">Capacidad Bruta:</span>{' '}
+   <span className="text-blue-400 font-bold">{Math.round(piezasDiaSinOEE).toLocaleString()} pzas</span>
+   <p className="text-amber-500">
+   <p className="text-amber-500">
+   <p className="text-amber-500">
+   <span className="text-slate-500">Capacidad Neta (OEE):</span>{' '}
+   <span className="text-blue-400 font-bold">{Math.round(piezasDia).toLocaleString()} pzas/día</span>
+
+Card ID: card-piezasSem
+Líneas: 3231 - 3280
+   <div className={`absolute top-full left-0 mt-2 w-64 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-piezasSem' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
+   <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
+   <Info className="w-3.5 h-3.5 text-blue-400" />
+   <div className="text-[11px] leading-relaxed space-y-1.5">
+   <p className="text-slate-400 text-[10px]">Producción semanal proyectada neta versus objetivo semanal.</p>
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
+   <span className="text-violet-400">Demanda/Sem</span> = <span className="text-violet-400">Demanda/Día</span> × <span className="text-slate-400">Días/Sem</span><br/>
+   <span className="text-blue-400">Neta/Sem (Target)</span> = <span className="text-blue-400">Neta/Día (Target)</span> × <span className="text-slate-400">Días/Sem</span>
+   <span className="text-blue-400">Bruta/Sem (Target)</span> = <span className="text-blue-400">Obj/Hora (Bruto)</span> × <span className="text-slate-400">Hrs/Día</span> × <span className="text-slate-400">Días/Sem</span><br/>
+   <span className="text-blue-400">Neta/Sem (Target)</span> = <span className="text-blue-400">Bruta/Sem (Target)</span> × <span className="text-amber-500">OEE</span>
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
+   <span className="text-violet-400">Demanda/Sem</span> = <span className="text-violet-400">{Math.round(piezasDia).toLocaleString()}</span> × <span className="text-slate-400">{studyConfig?.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5}</span> = <span className="text-violet-400">{Math.round(piezasSemana).toLocaleString()} pzas</span><br/>
+   <span className="text-blue-400">Neta/Sem (Target)</span> = <span className="text-blue-400">{Math.round(piezasDia).toLocaleString()}</span> × <span className="text-slate-400">{studyConfig?.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5}</span> = <span className="text-blue-400">{Math.round(piezasSemana).toLocaleString()} pzas</span>
+   <span className="text-blue-400">Bruta/Sem (Target)</span> = <span className="text-blue-400">{Math.round(piezasHoraTarget).toLocaleString()}</span> × <span className="text-slate-400">{shiftHours}</span> × <span className="text-slate-400">{studyConfig?.workDaysPerWeek !== undefined ? studyConfig.workDaysPerWeek : 5}</span> = <span className="text-blue-400">{Math.round(pzSemBruto).toLocaleString()} pzas</span><br/>
+   <span className="text-blue-400">Neta/Sem (Target)</span> = <span className="text-blue-400">{Math.round(pzSemBruto).toLocaleString()}</span> × <span className="text-amber-500">{oeePercent}%</span> = <span className="text-blue-400">{Math.round(piezasSemana).toLocaleString()} pzas</span>
+   <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-0.5">
+   <p><span className="text-slate-500">Bruto Semanal:</span> <span className="text-blue-400 font-bold">{Math.round(pzSemBruto).toLocaleString()} pzas</span></p>
+   <p className="text-amber-500">Pérdida OEE: <span className="font-bold">−{Math.round(perdidaSem).toLocaleString()} pzas</span></p>
+   <span className="text-slate-500">Neto Semanal:</span> <span className="text-violet-400 font-bold">{Math.round(piezasSemana).toLocaleString()} pzas/sem</span>
+
+Card ID: card-piezasAno
+Líneas: 3310 - 3377
+   <div className={`absolute top-full right-0 left-auto mt-2 w-72 p-3 bg-slate-950/95 text-slate-200 text-xs rounded-xl border border-slate-800/80 shadow-2xl backdrop-blur-md transition-all duration-200 z-50 text-left font-sans ${activeTooltipId === 'card-piezasAno' ? 'opacity-100 pointer-events-auto translate-y-0 scale-100' : 'opacity-0 pointer-events-none -translate-y-1 scale-95'}`}>
+   <div className="font-bold text-white mb-1.5 border-b border-slate-800 pb-1 flex items-center gap-1.5">
+   <Info className="w-3.5 h-3.5 text-blue-400" />
+   <div className="text-[11px] leading-relaxed space-y-1.5">
+   <p className="text-slate-400 text-[10px]">
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fórmula:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
+   <span className="text-violet-400">Demanda Anual</span> = (input primario)<br/>
+   <span className="text-blue-400">Neta/Año (Target)</span> = <span className="text-blue-400">Neta/Día (Target)</span> × <span className="text-slate-400">{diasAnuales} días</span>
+   <span className="text-blue-400">Bruta/Año (Target)</span> = <span className="text-blue-400">Obj/Hora (Bruto)</span> × <span className="text-slate-400">Hrs/Día</span> × <span className="text-slate-400">{diasAnuales} días</span><br/>
+   <span className="text-blue-400">Neta/Año (Target)</span> = <span className="text-blue-400">Bruta/Año (Target)</span> × <span className="text-amber-500">OEE</span>
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cálculo con valores:</p>
+   <p className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-center font-bold text-[9px] leading-normal">
+   <span className="text-violet-400">Demanda Anual</span> = <span className="text-violet-400">{Math.round(annualDemand).toLocaleString()} pzas</span><br/>
+   <span className="text-blue-400">Neta/Año (Target)</span> = <span className="text-blue-400">{Math.round(piezasDia).toLocaleString()}</span> × <span className="text-slate-400">{diasAnuales}</span> = <span className="text-blue-400">{Math.round(piezasAno).toLocaleString()} pzas</span>
+   <span className="text-blue-400">Bruta/Año (Target)</span> = <span className="text-blue-400">{Math.round(piezasHoraTarget).toLocaleString()}</span> × <span className="text-slate-400">{shiftHours}</span> × <span className="text-slate-400">{diasAnuales}</span> = <span className="text-blue-400">{Math.round(pzAnoBruto).toLocaleString()} pzas</span><br/>
+   <span className="text-blue-400">Neta/Año (Target)</span> = <span className="text-blue-400">{Math.round(pzAnoBruto).toLocaleString()}</span> × <span className="text-amber-500">{oeePercent}%</span> = <span className="text-blue-400">{Math.round(piezasAno).toLocaleString()} pzas</span>
+   <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-0.5">
+   <p><span className="text-slate-500">Bruto Anual:</span> <span className="text-blue-400 font-bold">{Math.round(pzAnoBruto).toLocaleString()} pzas</span></p>
+   <p className="text-amber-500">Pérdida OEE: <span className="font-bold">−{Math.round(perdidaAno).toLocaleString()} pzas</span></p>
+   <span className="text-slate-500">Neto Anual:</span> <span className="text-blue-400 font-bold">{Math.round(piezasAno).toLocaleString()} pzas/año</span>
+   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Cumplimiento vs Demanda:</p>
+   <div className="bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono text-[10px] leading-relaxed space-y-0.5">
+   <p><span className="text-slate-500">Neto/Año:</span> <span className="text-blue-400 font-bold">{Math.round(piezasAno).toLocaleString()}</span></p>
+   <p><span className="text-slate-500">Demanda:</span> <span className="text-violet-400 font-bold">{Math.round(annualDemand).toLocaleString()}</span></p>
+   <span className="text-slate-500">Resultado:</span>{' '}
+   <span className={`font-bold ${cumpleDemanda ? 'text-emerald-400' : 'text-rose-400'}`}>
+   <p className="text-rose-400/70">Faltan {Math.round(annualDemand - piezasAno).toLocaleString()} pzas/año</p>
