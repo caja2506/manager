@@ -3278,7 +3278,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                                  value={studyConfig?.availability !== undefined ? studyConfig.availability : 95}
                                                                  onChange={e => handleConfigChange('availability', Number(e.target.value))}
                                                                  disabled={!canEdit}
-                                                                 className="w-11 bg-slate-955 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 font-mono text-center font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                                                 className="w-14 bg-slate-955 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 font-mono text-center font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
                                                             />
                                                             <span className="text-[8px] text-slate-600 font-bold">%</span>
                                                         </div>
@@ -3299,7 +3299,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                                  value={Math.round(efficiency * 10) / 10}
                                                                  onChange={e => handleConfigChange('efficiency', Number(e.target.value))}
                                                                  disabled={!canEdit || linkOeeToStudy}
-                                                                 className="w-11 bg-slate-955 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 font-mono text-center font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                                                 className="w-14 bg-slate-955 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 font-mono text-center font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
                                                                  title={linkOeeToStudy ? "Calculado automáticamente: PPM Real / PPM Target" : "Eficiencia (Velocidad/Microparos)"}
                                                             />
                                                             <span className="text-[8px] text-slate-600 font-bold">%</span>
@@ -3321,7 +3321,7 @@ export default function TimingStudyManager({ projectId, canEdit = false, userId 
                                                                  value={studyConfig?.yield !== undefined ? studyConfig.yield : 98}
                                                                  onChange={e => handleConfigChange('yield', Number(e.target.value))}
                                                                  disabled={!canEdit}
-                                                                 className="w-11 bg-slate-955 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 font-mono text-center font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                                                                 className="w-14 bg-slate-955 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 font-mono text-center font-bold focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
                                                             />
                                                             <span className="text-[8px] text-slate-600 font-bold">%</span>
                                                         </div>
