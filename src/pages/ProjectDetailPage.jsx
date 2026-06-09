@@ -49,7 +49,7 @@ export default function ProjectDetailPage() {
     const [loadingMs, setLoadingMs] = useState(true);
     const [deleteTarget, setDeleteTarget] = useState(null); // { id, name }
     const [deleting, setDeleting] = useState(false);
-    const [activeTab, setActiveTab] = useState('obeya'); // 'obeya' | 'milestones' | 'stations' | 'table' | 'gantt'
+    const [activeTab, setActiveTab] = useState('table'); // 'obeya' | 'milestones' | 'stations' | 'table' | 'gantt'
 
     const project = useMemo(
         () => engProjects.find(p => p.id === projectId),
