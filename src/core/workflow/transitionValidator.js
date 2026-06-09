@@ -118,7 +118,7 @@ export function validateTransition(task, newStatus, context = {}) {
     }
 
     // Reopening from COMPLETED: warn about impact
-    if (currentStatus === WORKFLOW_STATUS.COMPLETED && newStatus === WORKFLOW_STATUS.IN_PROGRESS) {
+    if (currentStatus === WORKFLOW_STATUS.COMPLETED && newStatus !== WORKFLOW_STATUS.COMPLETED) {
         result.warnings.push({
             code: 'TASK_REOPENED',
             message: 'Reabrir una tarea completada afectará las métricas de cumplimiento',

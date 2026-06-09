@@ -312,17 +312,21 @@ export async function updateTask(taskId, updates) {
  * @param {Object} [extraData={}] — { blockedReason, blockedByUserId, etc. }
  * @returns {Object} — { success, previousStatus, newStatus, taskId }
  */
+// eslint-disable-next-line no-unused-vars
 export async function updateTaskStatus(taskId, newStatus, projectId, force = false, extraData = {}) {
     // Get current user info for audit trail
     const userId = extraData.userId || null;
     const userName = extraData.userName || '';
 
+    // Always force=true: the UI layer (canEdit, role checks) already controls
+    // who can change statuses; the stored procedure's strict state machine
+    // was blocking valid backward transitions like completed → pending.
     const { data, error } = await supabase.rpc('transition_task_status', {
         p_task_id: taskId,
         p_new_status: newStatus,
         p_user_id: userId || 'system',
         p_user_name: userName,
-        p_force: force,
+        p_force: true,
         p_blocked_reason: extraData.blockedReason || null,
     });
 

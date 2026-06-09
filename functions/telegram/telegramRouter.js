@@ -35,6 +35,30 @@ const { CONFIRMATION_MESSAGE } = require("../ai/aiPromptRegistry");
 const { loadAIConfig } = require("../ai/aiBriefingService");
 
 /**
+ * Analiza respuestas de texto o voz para detectar confirmaciones (sí/no).
+ * Soporta respuestas naturales en español.
+ * 
+ * @param {string} text
+ * @returns {"yes"|"no"|null}
+ */
+function parseConfirmationResponse(text) {
+    if (!text) return null;
+    const lower = text.toLowerCase().trim().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "");
+    
+    const yesWords = ["sí", "si", "yes", "ok", "confirmo", "correcto", "hacerlo", "dale", "procede", "adelante", "ejecuta", "1", "hazlo"];
+    const noWords = ["no", "nope", "negativo", "incorrecto", "cancela", "cancelar", "0", "para", "detén", "deten"];
+    
+    if (yesWords.includes(lower)) return "yes";
+    if (noWords.includes(lower)) return "no";
+    
+    // Fuzzy matching para oraciones más largas
+    if (noWords.some(w => lower.includes(w))) return "no";
+    if (yesWords.some(w => lower.includes(w))) return "yes";
+    
+    return null;
+}
+
+/**
  * Main routing function for inbound Telegram messages.
  *
  * @param {FirebaseFirestore.Firestore} adminDb
@@ -198,6 +222,38 @@ async function routeInboundMessage(adminDb, token, chatId, text, rawMessage, ext
                 }
             }
 
+            // ── Interceptar confirmación de escritura pendiente (texto o voz transcrita) ──
+            const pendingAriaAction = session.metadata?.pendingAriaAction;
+            if (pendingAriaAction && text) {
+                const conf = parseConfirmationResponse(text);
+                if (conf === "yes") {
+                    await sendMessage(token, chatIdStr, "🔄 <i>Procesando confirmación...</i>");
+                    const { executeWriteTool } = require("../agent/writeTools");
+                    const execResult = await executeWriteTool(pendingAriaAction.toolName, pendingAriaAction.params);
+                    if (execResult.success) {
+                        await sendMessage(token, chatIdStr, "✅ ¡Acción ejecutada correctamente!");
+                    } else {
+                        await sendMessage(token, chatIdStr, `❌ Ocurrió un error al ejecutar la acción: ${execResult.error}`);
+                    }
+                    
+                    // Limpiar acción pendiente
+                    await adminDb.collection(paths.TELEGRAM_SESSIONS).doc(session.id).update({
+                        "metadata.pendingAriaAction": null,
+                        updatedAt: new Date().toISOString(),
+                    });
+                    return;
+                } else if (conf === "no") {
+                    await sendMessage(token, chatIdStr, "❌ Acción cancelada.");
+                    
+                    // Limpiar acción pendiente
+                    await adminDb.collection(paths.TELEGRAM_SESSIONS).doc(session.id).update({
+                        "metadata.pendingAriaAction": null,
+                        updatedAt: new Date().toISOString(),
+                    });
+                    return;
+                }
+            }
+
             // ── ARIA Conversation Engine ──
             // Route free-text messages through the AI agent for natural conversation
             try {
@@ -218,7 +274,26 @@ async function routeInboundMessage(adminDb, token, chatId, text, rawMessage, ext
                     },
                 });
 
-                await sendMessage(token, chatIdStr, ariaResult.response);
+                if (ariaResult.pendingWrite) {
+                    // Guardar en la sesión de Firestore
+                    await adminDb.collection(paths.TELEGRAM_SESSIONS).doc(session.id).update({
+                        "metadata.pendingAriaAction": ariaResult.pendingWrite,
+                        updatedAt: new Date().toISOString(),
+                    });
+
+                    // Obtener teclado inline de confirmación
+                    const { getConfirmKeyboard } = require("../agent/writeTools");
+                    const keyboard = getConfirmKeyboard(ariaResult.pendingWrite.toolName, ariaResult.pendingWrite.params);
+                    
+                    if (keyboard) {
+                        await sendMessageWithKeyboard(token, chatIdStr, ariaResult.response, keyboard);
+                    } else {
+                        await sendMessage(token, chatIdStr, ariaResult.response);
+                    }
+                } else {
+                    await sendMessage(token, chatIdStr, ariaResult.response);
+                }
+
                 console.log(`[telegramRouter] ARIA response sent (${ariaResult.latencyMs}ms, provider=${ariaResult.provider}, tools=[${ariaResult.toolsUsed.join(",")}])`);
             } catch (ariaErr) {
                 console.error("[telegramRouter] ARIA engine error:", ariaErr);
@@ -834,6 +909,37 @@ async function routeCallbackQuery(adminDb, token, chatId, callbackData, callback
 
     if (!userId) {
         await sendMessage(token, chatIdStr, "⚠️ No estás vinculado. Usa /link para conectar tu cuenta.");
+        return;
+    }
+
+    // ── ARIA pending write confirmation clicks ──
+    if (callbackData.startsWith("write_confirm:")) {
+        const confirmAction = callbackData.split(":")[1]; // "yes" or "no"
+        const pendingAriaAction = session.metadata?.pendingAriaAction;
+
+        if (!pendingAriaAction) {
+            await sendMessage(token, chatIdStr, "⚠️ No hay ninguna acción pendiente de confirmación.");
+            return;
+        }
+
+        if (confirmAction === "yes") {
+            await sendMessage(token, chatIdStr, "🔄 <i>Procesando confirmación...</i>");
+            const { executeWriteTool } = require("../agent/writeTools");
+            const execResult = await executeWriteTool(pendingAriaAction.toolName, pendingAriaAction.params);
+            if (execResult.success) {
+                await sendMessage(token, chatIdStr, "✅ ¡Acción ejecutada correctamente!");
+            } else {
+                await sendMessage(token, chatIdStr, `❌ Ocurrió un error al ejecutar la acción: ${execResult.error}`);
+            }
+        } else {
+            await sendMessage(token, chatIdStr, "❌ Acción cancelada.");
+        }
+
+        // Limpiar acción pendiente en sesión
+        await adminDb.collection(paths.TELEGRAM_SESSIONS).doc(session.id).update({
+            "metadata.pendingAriaAction": null,
+            updatedAt: new Date().toISOString(),
+        });
         return;
     }
 

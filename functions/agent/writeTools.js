@@ -51,6 +51,15 @@ const WRITE_TOOL_REGISTRY = {
             return lines.join("\n");
         },
 
+        buildConfirmKeyboard(params) {
+            return [
+                [
+                    { text: "👍 Sí, crear", callback_data: "write_confirm:yes" },
+                    { text: "👎 No, cancelar", callback_data: "write_confirm:no" }
+                ]
+            ];
+        },
+
         /**
          * Execute the write operation.
          * @param {Object} params - { title, projectId, assignedTo, priority, dueDate, userId }
@@ -100,6 +109,15 @@ const WRITE_TOOL_REGISTRY = {
             return lines.join("\n");
         },
 
+        buildConfirmKeyboard(params) {
+            return [
+                [
+                    { text: "👍 Sí, comentar", callback_data: "write_confirm:yes" },
+                    { text: "👎 No, cancelar", callback_data: "write_confirm:no" }
+                ]
+            ];
+        },
+
         async execute(params) {
             const { taskId, text, userId, userName } = params;
             const now = new Date().toISOString();
@@ -125,6 +143,46 @@ const WRITE_TOOL_REGISTRY = {
                 return { success: true, commentId: data?.id || null };
             } catch (err) {
                 console.error("[writeTools] addTaskComment error:", err.message);
+                return { success: false, error: err.message };
+            }
+        },
+    },
+
+    updateTaskPriority: {
+        name: "updateTaskPriority",
+        description: "Actualiza la prioridad de una tarea existente.",
+        requiresConfirmation: true,
+        parameters: "taskId (string), priority (string: low/medium/high/critical)",
+
+        buildConfirmMessage(params) {
+            const lines = [
+                "⚠️ <b>Voy a cambiar la prioridad de esta tarea:</b>\n",
+                `▪️ Tarea: <b>${params.taskTitle || params.taskId}</b>`,
+                `▪️ Nueva prioridad: <b>${(params.priority || "medium").toUpperCase()}</b>`,
+                "\n¿Confirmas? Responde <b>Sí</b> o <b>No</b>",
+            ];
+            return lines.join("\n");
+        },
+
+        buildConfirmKeyboard(params) {
+            return [
+                [
+                    { text: "👍 Sí, cambiar", callback_data: "write_confirm:yes" },
+                    { text: "👎 No, cancelar", callback_data: "write_confirm:no" }
+                ]
+            ];
+        },
+
+        async execute(params) {
+            const { taskId, priority } = params;
+            try {
+                const result = await coreReader.updateTask(taskId, { priority });
+                if (!result) {
+                    return { success: false, error: "updateTask returned null" };
+                }
+                return { success: true, taskId: result.id, updatedPriority: result.priority };
+            } catch (err) {
+                console.error("[writeTools] updateTaskPriority error:", err.message);
                 return { success: false, error: err.message };
             }
         },
@@ -197,6 +255,18 @@ function getConfirmMessage(toolName, params) {
 }
 
 /**
+ * Get a write tool's confirmation keyboard.
+ * @param {string} toolName
+ * @param {Object} params
+ * @returns {Array|null}
+ */
+function getConfirmKeyboard(toolName, params) {
+    const tool = WRITE_TOOL_REGISTRY[toolName];
+    if (!tool || !tool.buildConfirmKeyboard) return null;
+    return tool.buildConfirmKeyboard(params);
+}
+
+/**
  * Get write tool descriptions for the LLM system prompt.
  * @returns {string}
  */
@@ -211,6 +281,7 @@ module.exports = {
     WRITE_TOOL_REGISTRY,
     executeWriteTool,
     getConfirmMessage,
+    getConfirmKeyboard,
     getWriteToolDescriptionsForPrompt,
     logWriteOperation,
 };

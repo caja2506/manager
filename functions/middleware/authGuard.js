@@ -3,26 +3,27 @@
  * ========================================================
  * 
  * Unified RBAC check for Cloud Functions.
- * Reads from `users/{uid}.rbacRole` as the single source of truth.
+ * Reads from Supabase `users` table via coreDataReader as the single source of truth.
  * 
  * Usage:
  *   const { requireAdmin, requireEditor } = require("../middleware/authGuard");
  *   await requireAdmin(adminDb, request);
  */
 const { HttpsError } = require("firebase-functions/v2/https");
+const { loadUser } = require("../db/coreDataReader");
 
 /**
- * Get RBAC role from users/{uid}.rbacRole.
+ * Get RBAC role from Supabase users table.
  * Returns "viewer" if no role is found.
  * 
- * @param {FirebaseFirestore.Firestore} adminDb
+ * @param {FirebaseFirestore.Firestore} _adminDb - Kept for backward compatibility (unused)
  * @param {string} uid
  * @returns {Promise<string>}
  */
-async function getUserRbacRole(adminDb, uid) {
-    const userDoc = await adminDb.collection("users").doc(uid).get();
-    if (userDoc.exists && userDoc.data().rbacRole) {
-        return userDoc.data().rbacRole;
+async function getUserRbacRole(_adminDb, uid) {
+    const user = await loadUser(uid);
+    if (user && user.rbacRole) {
+        return user.rbacRole;
     }
     return "viewer";
 }

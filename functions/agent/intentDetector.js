@@ -20,16 +20,21 @@ const coreReader = require("../db/coreDataReader");
  * of Spanish verb conjugations and natural phrasing.
  */
 const WRITE_PATTERNS = {
-    createTask: {
-        // Matches: crea, créame, crear, quiero crear, necesito crear, podrías crear, etc.
-        regex: /\b(?:cre(?:a|á|ar|éa(?:me|la)?)|nueva|nuevo|agrega(?:r)?|añad(?:e|ir)|haz(?:me)?|genera(?:r)?|registra(?:r)?|mete(?:r)?|pon(?:me|er)?)\b.*\btarea\b|\btarea\b.*\b(?:nueva|nuevo)\b|\b(?:create|new)\s+task\b|\b(?:quiero|necesito|podr[ií]as?|puedes?|hay\s+que)\b.*\b(?:crear?|hacer|agregar|añadir|generar|registrar)\b.*\btarea\b/i,
-        extract: extractCreateTaskParams,
+    updateTaskPriority: {
+        // Matches: cambia la prioridad de la tarea X a alta, pon la tarea Y en prioridad critica, etc.
+        regex: /\b(?:cambia(?:r)?|pon(?:er)?|actualiza(?:r)?|establece(?:r)?)\b.*\bprioridad\b|\bprioridad\b.*\b(?:cambia(?:r)?|pon(?:er)?|actualiza(?:r)?|establece(?:r)?)\b/i,
+        extract: extractUpdatePriorityParams,
     },
     addTaskComment: {
         // Stricter: requires both an action verb AND "comentario/nota/comment" in the same message
         // Won't match casual follow-ups like "listo", "ok", etc.
         regex: /\b(?:agrega|añad(?:e|ir)|pon(?:er|me)?|escrib(?:e|ir)|deja(?:r)?)\b[^.]*\b(?:comentario|nota|comment)\b|\b(?:comenta(?:r)?)\s+(?:en|sobre)\s+(?:la\s+)?tarea\b|\badd\s+(?:a\s+)?comment\b|\b(?:quiero|necesito|podr[ií]as?|puedes?)\b[^.]*\b(?:comentar|agregar|añadir|dejar)\b[^.]*\b(?:comentario|nota)\b/i,
         extract: extractAddCommentParams,
+    },
+    createTask: {
+        // Matches: crea, créame, crear, quiero crear, necesito crear, podrías crear, etc.
+        regex: /\b(?:cre(?:a|á|ar|éa(?:me|la)?)|nueva|nuevo|agrega(?:r)?|añad(?:e|ir)|haz(?:me)?|genera(?:r)?|registra(?:r)?|mete(?:r)?|pon(?:me|er)?)\b.*\btarea\b|\btarea\b.*\b(?:nueva|nuevo)\b|\b(?:create|new)\s+task\b|\b(?:quiero|necesito|podr[ií]as?|puedes?|hay\s+que)\b.*\b(?:crear?|hacer|agregar|añadir|generar|registrar)\b.*\btarea\b/i,
+        extract: extractCreateTaskParams,
     },
 };
 
@@ -239,6 +244,93 @@ async function extractAddCommentParams(message, userId) {
     }
 
     console.log("[intentDetector] Comment params:", JSON.stringify(params));
+    return params;
+}
+
+/**
+ * Extrae parámetros para updateTaskPriority del lenguaje natural.
+ *
+ * @param {string} message
+ * @param {string} userId
+ * @returns {Promise<Object>}
+ */
+async function extractUpdatePriorityParams(message, userId) {
+    const params = { userId };
+
+    // 1. Extraer prioridad
+    const priorityMatch = message.match(/\b(alta|media|baja|cr[ií]tica|critical|high|medium|low)\b/i);
+    if (priorityMatch) {
+        const map = {
+            "crítica": "critical", "critica": "critical", "critical": "critical",
+            "alta": "high", "high": "high",
+            "media": "medium", "medium": "medium",
+            "baja": "low", "low": "low",
+        };
+        params.priority = map[priorityMatch[1].toLowerCase()];
+    }
+
+    // 2. Extraer nombre de la tarea
+    const taskPatterns = [
+        /(?:la\s+tarea|de\s+la\s+tarea|tarea)\s+["'“”]?(.+?)["'“”]?\s+(?:a|en|con|de\s+prioridad|prioridad)\s+/i,
+        /(?:la\s+tarea|de\s+la\s+tarea|tarea)\s+["'“”]?(.+?)["'“”]?\s*$/i,
+        /\b(?:cambia(?:r)?|pon(?:er)?|actualiza(?:r)?|establece(?:r)?)\s+["'“”]?(.+?)["'“”]?\s+(?:a|en|con|de\s+prioridad|prioridad)\s+/i,
+        /\b(?:cambia(?:r)?|pon(?:er)?|actualiza(?:r)?|establece(?:r)?)\s+["'“”]?(.+?)["'“”]?\s*$/i
+    ];
+
+    let taskName = "";
+    for (const pattern of taskPatterns) {
+        const match = message.match(pattern);
+        if (match && match[1]) {
+            taskName = match[1].trim();
+            if (params.priority) {
+                const priorityWordsRegex = new RegExp(`\\b(alta|media|baja|cr[ií]tica|critical|high|medium|low|prioridad)\\b`, 'gi');
+                taskName = taskName.replace(priorityWordsRegex, "").trim();
+                taskName = taskName.replace(/\s+(?:a|en|con|de|la)$/i, "").trim();
+            }
+            // Limpiar conectores y artículos al inicio de la tarea
+            taskName = taskName.replace(/^(?:de\s+|del\s+|para\s+|sobre\s+|la\s+|el\s+)/i, "").trim();
+            if (taskName) {
+                break;
+            }
+        }
+    }
+
+    if (taskName) {
+        try {
+            const tasks = await coreReader.loadAllTasks();
+            const found = tasks.find(t =>
+                (t.title || "").toLowerCase().includes(taskName.toLowerCase())
+            );
+            if (found) {
+                params.taskId = found.id;
+                params.taskTitle = found.title;
+                console.log(`[intentDetector] Task matched: "${found.title}" (${found.id})`);
+            } else {
+                const words = taskName.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+                if (words.length > 0) {
+                    const fuzzy = tasks.find(t =>
+                        words.every(w => (t.title || "").toLowerCase().includes(w))
+                    );
+                    if (fuzzy) {
+                        params.taskId = fuzzy.id;
+                        params.taskTitle = fuzzy.title;
+                        console.log(`[intentDetector] Task fuzzy-matched: "${fuzzy.title}" (${fuzzy.id})`);
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn("[intentDetector] Task lookup error during priority extraction:", err.message);
+        }
+    }
+
+    if (!params.taskId) {
+        const uuidMatch = message.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+        if (uuidMatch) {
+            params.taskId = uuidMatch[0];
+        }
+    }
+
+    console.log("[intentDetector] Update priority params:", JSON.stringify(params));
     return params;
 }
 

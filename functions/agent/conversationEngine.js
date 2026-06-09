@@ -133,7 +133,8 @@ async function processMessage(params) {
             // to the normal conversation engine so ARIA can use chat context.
             const hasMinParams =
                 (writeIntent.action === "createTask" && extractedParams.title) ||
-                (writeIntent.action === "addTaskComment" && extractedParams.taskId && extractedParams.text);
+                (writeIntent.action === "addTaskComment" && extractedParams.taskId && extractedParams.text) ||
+                (writeIntent.action === "updateTaskPriority" && extractedParams.taskId && extractedParams.priority);
 
             if (hasMinParams) {
                 const confirmMessage = getConfirmMessage(writeIntent.action, extractedParams);
