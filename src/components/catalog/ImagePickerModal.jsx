@@ -185,6 +185,7 @@ const ImagePickerModal = ({ isOpen, onClose, onSelect, itemName, partNumber }) =
                                                 <img
                                                     src={img.thumbnail}
                                                     alt={img.title}
+                                                    referrerPolicy="no-referrer"
                                                     className="w-full h-full object-contain p-1.5"
                                                     loading="lazy"
                                                     onError={e => { e.target.src = ''; e.target.alt = '⚠️'; }}
@@ -277,7 +278,7 @@ const ImagePickerModal = ({ isOpen, onClose, onSelect, itemName, partNumber }) =
                                         </div>
                                     ) : (
                                         <div className="flex justify-center">
-                                            <img src={customUrl} alt="Preview" className="max-h-48 max-w-full rounded-xl object-contain shadow-md" onError={() => setPreviewError(true)} onLoad={() => setPreviewError(false)} />
+                                            <img src={customUrl} alt="Preview" referrerPolicy="no-referrer" className="max-h-48 max-w-full rounded-xl object-contain shadow-md" onError={() => setPreviewError(true)} onLoad={() => setPreviewError(false)} />
                                         </div>
                                     )}
                                 </div>

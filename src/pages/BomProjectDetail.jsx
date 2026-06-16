@@ -567,6 +567,7 @@ export default function BomProjectDetail() {
                                                                                     <img
                                                                                         src={imgUrl}
                                                                                         alt=""
+                                                                                        referrerPolicy="no-referrer"
                                                                                         onClick={() => setZoomedImageUrl(imgUrl)}
                                                                                         className="w-full h-full object-contain rounded-xl border-2 border-slate-200 bg-white transition-all duration-300 cursor-zoom-in hover:border-indigo-400 hover:shadow-lg p-1"
                                                                                         onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}

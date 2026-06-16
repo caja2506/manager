@@ -150,6 +150,7 @@ export default function AppLayout() {
                     <img
                         src={zoomedImageUrl}
                         alt="Imagen ampliada"
+                        referrerPolicy="no-referrer"
                         className="max-w-[90vw] max-h-[90vh] object-contain rounded-2xl shadow-2xl animate-in zoom-in-95 duration-300"
                         onClick={(e) => e.stopPropagation()}
                     />

@@ -123,7 +123,7 @@ const CatalogPickerModal = ({ onClose, catalogo, managedLists, onAddItems, exist
                                                 {isSelected && <Check className="w-3.5 h-3.5" />}
                                             </div>
                                             {item.imageUrl ? (
-                                                <img src={item.imageUrl} className="w-16 h-16 rounded-xl object-contain border border-slate-700 bg-slate-900 shrink-0 p-0.5" alt="" onError={e => e.target.style.display = 'none'} />
+                                                <img src={item.imageUrl} referrerPolicy="no-referrer" className="w-16 h-16 rounded-xl object-contain border border-slate-700 bg-slate-900 shrink-0 p-0.5" alt="" onError={e => e.target.style.display = 'none'} />
                                             ) : (
                                                 <div className="w-16 h-16 rounded-xl border border-dashed border-slate-700 bg-slate-800 flex items-center justify-center shrink-0">
                                                     <Camera className="w-5 h-5 text-slate-300" />

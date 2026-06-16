@@ -153,6 +153,7 @@ export default function Catalog() {
                                                         <img
                                                             src={item.imageUrl}
                                                             alt=""
+                                                            referrerPolicy="no-referrer"
                                                             onClick={() => setZoomedImageUrl(item.imageUrl)}
                                                             className="w-full h-full object-contain rounded-xl border-2 border-slate-700 bg-slate-800 transition-all duration-300 cursor-zoom-in hover:border-indigo-400 hover:shadow-lg p-1"
                                                             onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
