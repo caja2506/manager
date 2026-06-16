@@ -51,7 +51,7 @@ const MasterRecordModal = ({ isOpen, onClose, onSave, initialData, managedLists,
         >
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
-            <div className="relative w-full max-w-[1050px] max-h-[92vh] bg-slate-900 rounded-2xl border border-slate-700/50 shadow-2xl shadow-black/50 overflow-hidden flex flex-col animate-in zoom-in-95 slide-in-from-bottom-4 duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]">
+            <div className="relative w-full max-w-[1050px] max-h-[92vh] bg-slate-900 rounded-2xl border border-slate-700/50 shadow-2xl shadow-black/50 flex flex-col animate-in zoom-in-95 slide-in-from-bottom-4 duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]">
 
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800 bg-slate-900 shrink-0">
@@ -66,7 +66,7 @@ const MasterRecordModal = ({ isOpen, onClose, onSave, initialData, managedLists,
 
                 {/* Body */}
                 <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-                    <div className="p-5 space-y-4">
+                    <div className="p-5 space-y-4 pb-40">
 
                         {/* Row 1: Descripción — full width */}
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
