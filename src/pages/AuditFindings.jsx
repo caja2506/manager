@@ -7,6 +7,7 @@ import { useRole } from '../contexts/RoleContext';
 import ComplianceScoresPanel from '../components/audit/ComplianceScoresPanel';
 import { FindingCardList, FindingSeverityBadge } from '../components/audit/FindingCard';
 import { RULE_CATALOG, RULE_CATEGORY, getRulesByCategory } from '../core/rules/ruleCatalog';
+import { calculateAllScores } from '../core/audit/complianceScorer';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
 
 // ============================================================
@@ -211,6 +212,60 @@ export default function AuditFindings() {
         return Object.values(statsMap).sort((a, b) => b.count - a.count);
     }, [auditResult]);
 
+    // Per-person recalculated scores
+    const personFilteredData = useMemo(() => {
+        if (personFilter === 'all' || !auditResult?.findings) return null;
+
+        // Get findings for this person
+        const personFindings = auditResult.findings.filter(f => {
+            if (f.entityType === 'task' && f.entityId) return taskAssigneeMap[f.entityId] === personFilter;
+            if (f.entityType === 'user' && f.entityId) return f.entityId === personFilter;
+            return false;
+        });
+
+        // Count person's tasks
+        const personTasks = engTasks.filter(t => t.assignedTo === personFilter);
+        const personCompletedTasks = personTasks.filter(t => t.status === 'done' || t.status === 'completed');
+        const personProjects = [...new Set(personTasks.map(t => t.projectId).filter(Boolean))];
+
+        // Recalculate scores with only this person's data
+        const recalcScores = calculateAllScores(
+            { findings: personFindings },
+            {
+                totalTasks: personTasks.length || 1,
+                totalProjects: personProjects.length || 1,
+                totalUsers: 1,
+                completedTasks: personCompletedTasks,
+            }
+        );
+
+        // Summary for this person
+        const personSummaryCalc = {
+            totalFindings: personFindings.length,
+            totalScoreImpact: personFindings.reduce((sum, f) => sum + Math.abs(f.scoreImpact || 0), 0),
+            bySeverity: {
+                critical: personFindings.filter(f => f.severity === 'critical').length,
+                warning: personFindings.filter(f => f.severity === 'warning').length,
+                info: personFindings.filter(f => f.severity === 'info').length,
+            },
+        };
+
+        const member = teamMembers.find(m => m.uid === personFilter);
+
+        return {
+            scores: recalcScores,
+            summary: personSummaryCalc,
+            findings: personFindings,
+            memberName: member?.displayName || member?.email || personFilter,
+            taskCount: personTasks.length,
+        };
+    }, [personFilter, auditResult, engTasks, teamMembers, taskAssigneeMap]);
+
+    // Use person-filtered data if a person is selected
+    const displayScores = personFilteredData?.scores || scores;
+    const displaySummary = personFilteredData?.summary || summary;
+    const displayFindings = personFilteredData?.findings || (auditResult?.findings || []);
+
     return (
         <div className="space-y-6 animate-in fade-in duration-300">
             
@@ -235,13 +290,30 @@ export default function AuditFindings() {
                 </button>
             </div>
 
+            {/* Person Filter Banner */}
+            {personFilteredData && (
+                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-violet-500/10 border border-violet-500/30">
+                    <User className="w-5 h-5 text-violet-400" />
+                    <div className="flex-1">
+                        <span className="text-sm font-black text-violet-300">Filtrando por: {personFilteredData.memberName}</span>
+                        <span className="text-xs text-violet-400/70 ml-2">({personFilteredData.taskCount} tareas asignadas)</span>
+                    </div>
+                    <button
+                        onClick={() => setPersonFilter('all')}
+                        className="text-xs font-bold text-violet-400 hover:text-violet-300 px-2 py-1 rounded-lg hover:bg-violet-500/20 transition-colors"
+                    >
+                        ✕ Quitar filtro
+                    </button>
+                </div>
+            )}
+
             {/* Compliance Scores Panel */}
             <ComplianceScoresPanel
-                scores={scores}
-                summary={summary}
+                scores={displayScores}
+                summary={displaySummary}
                 isAuditing={isAuditing}
                 onRunAudit={runClientAudit}
-                findings={auditResult?.findings || []}
+                findings={displayFindings}
                 tasks={engTasks} projects={engProjects} teamMembers={teamMembers}
             />
 
