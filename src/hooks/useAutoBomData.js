@@ -103,6 +103,19 @@ export function useAutoBomData() {
             fetchAll();
 
             // Realtime for key tables
+            const refreshLists = async () => {
+                const [cat, prov, br] = await Promise.all([
+                    supabase.from('categorias').select('*').order('name'),
+                    supabase.from('proveedores').select('*').order('name'),
+                    supabase.from('marcas').select('*').order('name'),
+                ]);
+                setManagedLists({
+                    categories: (cat.data || []).filter(d => d.name),
+                    providers: (prov.data || []).filter(d => d.name),
+                    brands: (br.data || []).filter(d => d.name),
+                });
+            };
+
             const ch = supabase.channel('autobom-realtime')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'proyectos_bom' }, () => {
                     supabase.from('proyectos_bom').select('*').order('created_at', { ascending: false }).then(({ data }) => data && setProyectos(data.map(mapProject)));
@@ -113,6 +126,9 @@ export function useAutoBomData() {
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'items_bom' }, () => {
                     supabase.from('items_bom').select('*').then(({ data }) => data && setBomItems(data.map(mapBomItem)));
                 })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'categorias' }, refreshLists)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'proveedores' }, refreshLists)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'marcas' }, refreshLists)
                 .subscribe();
 
             return () => supabase.removeChannel(ch);
