@@ -274,6 +274,9 @@ export default function AuditFindings() {
                 emptyMessage={auditResult ? 'No se encontraron hallazgos con los filtros seleccionados' : 'Ejecuta una auditoría para ver hallazgos'}
                 maxItems={100}
                 onOpenTask={handleOpenTask}
+                tasks={engTasks}
+                projects={engProjects}
+                teamMembers={teamMembers}
             />
 
             {/* Task Detail Modal */}

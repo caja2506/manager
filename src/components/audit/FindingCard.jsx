@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertOctagon, AlertTriangle, Info, ChevronRight, ExternalLink } from 'lucide-react';
+import { AlertOctagon, AlertTriangle, Info, ChevronRight, ExternalLink, User, FolderOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 // ============================================================
@@ -61,8 +61,35 @@ export function EntityTypeBadge({ entityType }) {
 // FINDING CARD
 // ============================================================
 
-export function FindingCard({ finding, showEntityLink = true, onOpenTask }) {
+export function FindingCard({ finding, showEntityLink = true, onOpenTask, tasks = [], projects = [], teamMembers = [] }) {
     const navigate = useNavigate();
+
+    // Resolve assignee + project for task findings
+    const taskInfo = React.useMemo(() => {
+        if (finding.entityType !== 'task' || !finding.entityId) return null;
+        const task = tasks.find(t => t.id === finding.entityId);
+        if (!task) return null;
+        const assignee = teamMembers.find(u => u.uid === task.assignedTo);
+        const project = projects.find(p => p.id === task.projectId);
+        return {
+            assigneeName: assignee?.displayName || assignee?.email || null,
+            projectName: project?.name || null,
+        };
+    }, [finding.entityId, finding.entityType, tasks, projects, teamMembers]);
+
+    // Resolve user name for user findings
+    const userName = React.useMemo(() => {
+        if (finding.entityType !== 'user' || !finding.entityId) return null;
+        const user = teamMembers.find(u => u.uid === finding.entityId);
+        return user?.displayName || user?.email || null;
+    }, [finding.entityId, finding.entityType, teamMembers]);
+
+    // Resolve project name for project findings
+    const projectName = React.useMemo(() => {
+        if (finding.entityType !== 'project' || !finding.entityId) return null;
+        const project = projects.find(p => p.id === finding.entityId);
+        return project?.name || null;
+    }, [finding.entityId, finding.entityType, projects]);
 
     const getEntityRoute = () => {
         switch (finding.entityType) {
@@ -107,9 +134,39 @@ export function FindingCard({ finding, showEntityLink = true, onOpenTask }) {
                     {/* Message */}
                     <p className="text-xs text-slate-400 mt-1 leading-relaxed">{finding.message}</p>
 
+                    {/* Entity context: assignee + project */}
+                    {(taskInfo || userName || projectName) && (
+                        <div className="mt-1.5 flex items-center gap-3 flex-wrap">
+                            {/* Assignee for tasks */}
+                            {taskInfo?.assigneeName && (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-violet-400">
+                                    <User className="w-3 h-3 opacity-70" /> {taskInfo.assigneeName}
+                                </span>
+                            )}
+                            {/* Project for tasks */}
+                            {taskInfo?.projectName && (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-400">
+                                    <FolderOpen className="w-3 h-3 opacity-70" /> {taskInfo.projectName}
+                                </span>
+                            )}
+                            {/* User name for user findings */}
+                            {userName && (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-violet-400">
+                                    <User className="w-3 h-3 opacity-70" /> {userName}
+                                </span>
+                            )}
+                            {/* Project name for project findings */}
+                            {projectName && finding.entityType === 'project' && (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400">
+                                    <FolderOpen className="w-3 h-3 opacity-70" /> {projectName}
+                                </span>
+                            )}
+                        </div>
+                    )}
+
                     {/* Entity ID (Firebase) */}
                     {finding.entityId && (
-                        <div className="mt-1.5 flex items-center gap-1.5">
+                        <div className="mt-1 flex items-center gap-1.5">
                             <span className="text-[9px] font-black text-slate-600 uppercase">ID:</span>
                             <code className="text-[9px] font-mono text-indigo-400/80 bg-indigo-500/10 px-1.5 py-0.5 rounded select-all">{finding.entityId}</code>
                         </div>
@@ -200,7 +257,7 @@ export function FindingCard({ finding, showEntityLink = true, onOpenTask }) {
 // FINDING CARD LIST (simple wrapper)
 // ============================================================
 
-export function FindingCardList({ findings, emptyMessage = 'Sin hallazgos', maxItems = 50, onOpenTask }) {
+export function FindingCardList({ findings, emptyMessage = 'Sin hallazgos', maxItems = 50, onOpenTask, tasks = [], projects = [], teamMembers = [] }) {
     if (!findings || findings.length === 0) {
         return (
             <div className="text-center py-8 border border-dashed border-slate-700 rounded-xl">
@@ -213,7 +270,7 @@ export function FindingCardList({ findings, emptyMessage = 'Sin hallazgos', maxI
     return (
         <div className="space-y-3">
             {findings.slice(0, maxItems).map((finding, index) => (
-                <FindingCard key={`${finding.ruleId}-${finding.entityId}-${index}`} finding={finding} onOpenTask={onOpenTask} />
+                <FindingCard key={`${finding.ruleId}-${finding.entityId}-${index}`} finding={finding} onOpenTask={onOpenTask} tasks={tasks} projects={projects} teamMembers={teamMembers} />
             ))}
             {findings.length > maxItems && (
                 <p className="text-center text-xs font-bold text-slate-500 py-2">
