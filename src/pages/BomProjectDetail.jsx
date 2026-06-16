@@ -548,9 +548,20 @@ export default function BomProjectDetail() {
                                                             <td className="p-3 text-center">
                                                                 {(() => {
                                                                     const masterPart = item.masterPartRef ? catalogo.find(p => p.id === item.masterPartRef.id) : null;
-                                                                    const imgUrl = masterPart?.imageUrl;
+                                                                    const imgUrl = masterPart?.imageUrl || item.imageUrl;
+                                                                    
+                                                                    const openImagePicker = () => {
+                                                                        if (masterPart) {
+                                                                            // Linked to catalog — save to catalog
+                                                                            setImagePickerItem({ id: masterPart.id, name: masterPart.name, partNumber: masterPart.partNumber });
+                                                                        } else {
+                                                                            // Standalone BOM item — save to BOM item directly
+                                                                            setImagePickerItem({ id: item.id, name: item.name, partNumber: item.partNumber, _isBomItem: true });
+                                                                        }
+                                                                    };
+                                                                    
                                                                     return (
-                                                                        <div className="w-[120px] h-[120px] mx-auto relative" onDoubleClick={() => masterPart && setImagePickerItem({ id: masterPart.id, name: masterPart.name, partNumber: masterPart.partNumber })} title="Doble clic para cambiar">
+                                                                        <div className="w-[120px] h-[120px] mx-auto relative" onDoubleClick={openImagePicker} title="Doble clic para cambiar">
                                                                             {imgUrl ? (
                                                                                 <>
                                                                                     <img
@@ -564,7 +575,7 @@ export default function BomProjectDetail() {
                                                                                 </>
                                                                             ) : (
                                                                                 <button
-                                                                                    onClick={() => masterPart && setImagePickerItem({ id: masterPart.id, name: masterPart.name, partNumber: masterPart.partNumber })}
+                                                                                    onClick={openImagePicker}
                                                                                     className="w-full h-full rounded-xl border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50 transition-all flex items-center justify-center text-slate-300 hover:text-indigo-500"
                                                                                     title="Agregar imagen"
                                                                                 >

@@ -33,32 +33,61 @@ export default function DependencyArrows({ dependencies, taskRowMap, rowHeight, 
         const midY = rowHeight / 2;
         let x1, y1, x2, y2;
 
-        if (dep.type === 'SS') {
+        const type = dep.type || 'FS';
+        let d;
+
+        if (type === 'SS') {
             // Start-to-Start: from left edge of predecessor to left edge of successor
             x1 = pred.left;
             y1 = pred.top + midY;
             x2 = succ.left;
             y2 = succ.top + midY;
+
+            const leftX = x2 > x1 ? x1 - 10 : x2 - 10;
+            d = `M ${x1} ${y1} H ${leftX} V ${y2} H ${x2}`;
+        } else if (type === 'FF') {
+            // Finish-to-Finish: from right edge of predecessor to right edge of successor
+            x1 = pred.left + pred.width;
+            y1 = pred.top + midY;
+            x2 = succ.left + succ.width;
+            y2 = succ.top + midY;
+
+            const rightX = x2 > x1 ? x2 + 10 : x1 + 10;
+            d = `M ${x1} ${y1} H ${rightX} V ${y2} H ${x2}`;
+        } else if (type === 'SF') {
+            // Start-to-Finish: from left edge of predecessor to right edge of successor
+            x1 = pred.left;
+            y1 = pred.top + midY;
+            x2 = succ.left + succ.width;
+            y2 = succ.top + midY;
+
+            if (x2 > x1 + 15) {
+                const rightX = x2 + 10;
+                d = `M ${x1} ${y1} H ${rightX} V ${y2} H ${x2}`;
+            } else {
+                const leftX = x1 - 10;
+                const rightX = x2 + 10;
+                const midY2 = (y1 + y2) / 2;
+                d = `M ${x1} ${y1} H ${leftX} V ${midY2} H ${rightX} V ${y2} H ${x2}`;
+            }
         } else {
             // Finish-to-Start (default): from right edge of predecessor to left edge of successor
             x1 = pred.left + pred.width;
             y1 = pred.top + midY;
             x2 = succ.left;
             y2 = succ.top + midY;
+
+            if (x2 > x1 + 15) {
+                const midX = (x1 + x2) / 2;
+                d = `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`;
+            } else {
+                const rightX = x1 + 10;
+                const leftX = x2 - 10;
+                const midY2 = (y1 + y2) / 2;
+                d = `M ${x1} ${y1} H ${rightX} V ${midY2} H ${leftX} V ${y2} H ${x2}`;
+            }
         }
 
-        const gap = 10;
-        // Build an L-shaped or S-shaped path
-        let d;
-        if (x2 > x1 + gap * 2) {
-            // Simple elbow: right → down/up → right
-            const midX = x1 + gap;
-            d = `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`;
-        } else {
-            // U-shape: go right a bit, loop around
-            const loopX = Math.max(x1, x2) + 20;
-            d = `M ${x1} ${y1} H ${loopX} V ${y2} H ${x2}`;
-        }
 
         paths.push(
             <path

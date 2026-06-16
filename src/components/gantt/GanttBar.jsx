@@ -283,13 +283,8 @@ export default function GanttBar({
         userSelect: 'none',
     };
 
-    if (hasDelay && totalDays > plannedDays) {
-        const colorHex = HEX_COLOR_MAP[color] || HEX_COLOR_MAP.indigo;
-        const delayColorHex = HEX_COLOR_MAP.red;
-        const pctSplit = (plannedDays / totalDays) * 100;
-        barStyle.background = `linear-gradient(to right, ${colorHex} ${pctSplit}%, ${delayColorHex} ${pctSplit}%)`;
-        barStyle.borderColor = colorHex;
-    }
+    // Red lateness gradient styling removed as requested.
+
 
     return (
         <div

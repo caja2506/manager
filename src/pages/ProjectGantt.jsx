@@ -109,6 +109,7 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
     const [taskModalInitialData, setTaskModalInitialData] = useState({});
+    const [pendingLink, setPendingLink] = useState(null); // { predecessorId, successorId }
 
     const openNew = () => { setSelectedTask(null); setTaskModalInitialData({}); setIsModalOpen(true); };
     const openTask = (task) => { setSelectedTask(task); setTaskModalInitialData({}); setIsModalOpen(true); };
@@ -391,23 +392,74 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
 
     const cascadeSuccessors = useCallback(async (predecessorId, predEndDate) => {
         const affectedDeps = dependencies.filter(d => d.predecessorTaskId === predecessorId);
+        const predecessor = tasks.find(t => t.id === predecessorId);
+        if (!predecessor) return;
+
         for (const dep of affectedDeps) {
             const successor = tasks.find(t => t.id === dep.successorTaskId);
             if (!successor || !successor.plannedStartDate) continue;
-            const succStart = new Date(successor.plannedStartDate + 'T12:00:00');
-            const predEnd = new Date(predEndDate + 'T12:00:00');
-            // If successor starts before predecessor ends, push it forward
-            if (succStart <= predEnd) {
-                const nextDay = new Date(predEnd);
-                nextDay.setDate(nextDay.getDate() + 1);
-                const newStart = toLocalDateStr(nextDay);
-                // Keep same duration
-                const duration = successor.plannedEndDate
-                    ? Math.round((new Date(successor.plannedEndDate + 'T12:00:00') - new Date(successor.plannedStartDate + 'T12:00:00')) / (24 * 60 * 60 * 1000))
-                    : 0;
-                const newEndD = new Date(nextDay);
-                newEndD.setDate(newEndD.getDate() + duration);
-                const newEnd = toLocalDateStr(newEndD);
+
+            const duration = successor.plannedEndDate
+                ? Math.round((new Date(successor.plannedEndDate + 'T12:00:00') - new Date(successor.plannedStartDate + 'T12:00:00')) / (24 * 60 * 60 * 1000))
+                : 0;
+
+            let needsUpdate = false;
+            let newStart = successor.plannedStartDate;
+            let newEnd = successor.plannedEndDate;
+
+            const type = dep.type || 'FS';
+
+            if (type === 'FS') {
+                const succStart = new Date(successor.plannedStartDate + 'T12:00:00');
+                const predEnd = new Date(predEndDate + 'T12:00:00');
+                if (succStart <= predEnd) {
+                    const nextDay = new Date(predEnd);
+                    nextDay.setDate(nextDay.getDate() + 1);
+                    newStart = toLocalDateStr(nextDay);
+                    
+                    const newEndD = new Date(nextDay);
+                    newEndD.setDate(newEndD.getDate() + duration);
+                    newEnd = toLocalDateStr(newEndD);
+                    needsUpdate = true;
+                }
+            } else if (type === 'SS') {
+                const succStart = new Date(successor.plannedStartDate + 'T12:00:00');
+                const predStart = new Date(predecessor.plannedStartDate + 'T12:00:00');
+                if (succStart < predStart) {
+                    newStart = predecessor.plannedStartDate;
+                    
+                    const newEndD = new Date(predStart);
+                    newEndD.setDate(newEndD.getDate() + duration);
+                    newEnd = toLocalDateStr(newEndD);
+                    needsUpdate = true;
+                }
+            } else if (type === 'FF') {
+                const succEnd = new Date(successor.plannedEndDate + 'T12:00:00');
+                const predEnd = new Date(predEndDate + 'T12:00:00');
+                if (succEnd < predEnd) {
+                    newEnd = predEndDate;
+                    
+                    const newStartD = new Date(predEnd);
+                    newStartD.setDate(newStartD.getDate() - duration);
+                    newStart = toLocalDateStr(newStartD);
+                    needsUpdate = true;
+                }
+            } else if (type === 'SF') {
+                const succEnd = new Date(successor.plannedEndDate + 'T12:00:00');
+                const predStart = new Date(predecessor.plannedStartDate + 'T12:00:00');
+                if (succEnd <= predStart) {
+                    const nextDay = new Date(predStart);
+                    nextDay.setDate(nextDay.getDate() + 1);
+                    newEnd = toLocalDateStr(nextDay);
+                    
+                    const newStartD = new Date(nextDay);
+                    newStartD.setDate(newStartD.getDate() - duration);
+                    newStart = toLocalDateStr(newStartD);
+                    needsUpdate = true;
+                }
+            }
+
+            if (needsUpdate) {
                 await updateTaskGanttFields(dep.successorTaskId, {
                     plannedStartDate: newStart,
                     plannedEndDate: newEnd,
@@ -415,24 +467,38 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                 setTasks(prev => prev.map(t =>
                     t.id === dep.successorTaskId ? { ...t, plannedStartDate: newStart, plannedEndDate: newEnd } : t
                 ));
-                // Recurse for chained deps
+                // Recurse for chained successors
                 await cascadeSuccessors(dep.successorTaskId, newEnd);
+                
+                // Sync to Weekly Planner
+                syncGanttToPlanner({ taskId: dep.successorTaskId, startDate: newStart, endDate: newEnd, task: successor, userId: user?.uid }).catch(console.warn);
             }
         }
-    }, [dependencies, tasks]);
+    }, [dependencies, tasks, user, toLocalDateStr]);
 
     // ---- Link created handler ----
-    const handleLinkCreated = useCallback(async (predecessorId, successorId) => {
-        // Don't create duplicate or self-links
+    const handleLinkCreated = useCallback((predecessorId, successorId) => {
         if (predecessorId === successorId) return;
-        if (dependencies.some(d => d.predecessorTaskId === predecessorId && d.successorTaskId === successorId)) return;
+        if (dependencies.some(d => d.predecessorTaskId === predecessorId && d.successorTaskId === successorId)) {
+            alert('Esta dependencia ya existe.');
+            return;
+        }
+        setPendingLink({ predecessorId, successorId });
+    }, [dependencies]);
+
+    // ---- Link confirmed handler ----
+    const handleConfirmPendingLink = async (type) => {
+        if (!pendingLink) return;
+        const { predecessorId, successorId } = pendingLink;
+        setPendingLink(null);
+        setLoading(true);
         try {
             const pred = tasks.find(t => t.id === predecessorId);
             const succ = tasks.find(t => t.id === successorId);
             const newDep = await createDependency({
                 predecessorTaskId: predecessorId,
                 successorTaskId: successorId,
-                type: 'FS',
+                type: type,
                 projectId: pred?.projectId || null,
                 createdBy: user?.uid || null,
             });
@@ -440,43 +506,78 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                 id: newDep,
                 predecessorTaskId: predecessorId,
                 successorTaskId: successorId,
-                type: 'FS',
+                type: type,
             };
             setDependencies(prev => [...prev, depObj]);
 
-            // Enforce FS: successor starts day after predecessor ends
-            if (pred?.plannedEndDate && succ) {
-                const predEnd = new Date(pred.plannedEndDate + 'T12:00:00');
-                const nextDay = new Date(predEnd);
-                nextDay.setDate(nextDay.getDate() + 1);
-                const newStart = toLocalDateStr(nextDay);
+            // Enforce selected relation dates
+            if (pred && succ) {
+                let newStart = succ.plannedStartDate;
+                let newEnd = succ.plannedEndDate;
 
-                // Keep same duration
                 const duration = (succ.plannedStartDate && succ.plannedEndDate)
                     ? Math.round((new Date(succ.plannedEndDate + 'T12:00:00') - new Date(succ.plannedStartDate + 'T12:00:00')) / (24 * 60 * 60 * 1000))
                     : 0;
-                const newEndD = new Date(nextDay);
-                newEndD.setDate(newEndD.getDate() + duration);
-                const newEnd = toLocalDateStr(newEndD);
 
-                await updateTaskGanttFields(successorId, {
-                    plannedStartDate: newStart,
-                    plannedEndDate: newEnd,
-                });
+                if (type === 'FS' && pred.plannedEndDate) {
+                    const predEnd = new Date(pred.plannedEndDate + 'T12:00:00');
+                    const nextDay = new Date(predEnd);
+                    nextDay.setDate(nextDay.getDate() + 1);
+                    newStart = toLocalDateStr(nextDay);
 
-                // Cascade any chained successors
-                await cascadeSuccessors(successorId, newEnd);
+                    const newEndD = new Date(nextDay);
+                    newEndD.setDate(newEndD.getDate() + duration);
+                    newEnd = toLocalDateStr(newEndD);
+                } else if (type === 'SS' && pred.plannedStartDate) {
+                    newStart = pred.plannedStartDate;
 
-                // Sync successor to Weekly Planner
-                syncGanttToPlanner({ taskId: successorId, startDate: newStart, endDate: newEnd, task: succ, userId: user?.uid }).catch(console.warn);
+                    const newEndD = new Date(newStart + 'T12:00:00');
+                    newEndD.setDate(newEndD.getDate() + duration);
+                    newEnd = toLocalDateStr(newEndD);
+                } else if (type === 'FF' && pred.plannedEndDate) {
+                    newEnd = pred.plannedEndDate;
+
+                    const newStartD = new Date(newEnd + 'T12:00:00');
+                    newStartD.setDate(newStartD.getDate() - duration);
+                    newStart = toLocalDateStr(newStartD);
+                } else if (type === 'SF' && pred.plannedStartDate) {
+                    const predStart = new Date(pred.plannedStartDate + 'T12:00:00');
+                    const nextDay = new Date(predStart);
+                    nextDay.setDate(nextDay.getDate() + 1);
+                    newEnd = toLocalDateStr(nextDay);
+
+                    const newStartD = new Date(nextDay);
+                    newStartD.setDate(newStartD.getDate() - duration);
+                    newStart = toLocalDateStr(newStartD);
+                }
+
+                if (newStart !== succ.plannedStartDate || newEnd !== succ.plannedEndDate) {
+                    await updateTaskGanttFields(successorId, {
+                        plannedStartDate: newStart,
+                        plannedEndDate: newEnd,
+                    });
+
+                    setTasks(prev => prev.map(t =>
+                        t.id === successorId ? { ...t, plannedStartDate: newStart, plannedEndDate: newEnd } : t
+                    ));
+
+                    // Cascade any chained successors
+                    await cascadeSuccessors(successorId, newEnd);
+
+                    // Sync successor to Weekly Planner
+                    syncGanttToPlanner({ taskId: successorId, startDate: newStart, endDate: newEnd, task: succ, userId: user?.uid }).catch(console.warn);
+                }
             }
 
-            // Reload tasks to reflect updated positions
             await loadData();
         } catch (e) {
             console.error('Error creating dependency:', e);
+            alert('Error al crear la dependencia: ' + e.message);
+        } finally {
+            setLoading(false);
         }
-    }, [dependencies, tasks, user, cascadeSuccessors, loadData]);
+    };
+
 
     // ---- Delete dependency handler ----
     const handleDeleteDependency = useCallback(async (depId) => {
@@ -724,10 +825,7 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                     <div className="w-2.5 h-2.5 rounded bg-emerald-500" />
                     <span>Completada</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded bg-red-500" />
-                    <span>Vencida / Atraso</span>
-                </div>
+
                 <div className="flex items-center gap-1.5">
                     <div className="w-2.5 h-2.5 rounded bg-amber-400" />
                     <span>En Riesgo (&lt;=3d, &lt;75% avance)</span>

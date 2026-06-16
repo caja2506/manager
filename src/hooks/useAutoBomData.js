@@ -72,6 +72,9 @@ export function useAutoBomData() {
         proveedor: r.proveedor_id ? { id: r.proveedor_id } : r.proveedor || null,
         addedAt: r.added_at || r.addedAt || r.created_at || '',
         leadTimeWeeks: r.lead_time_weeks ?? r.leadTimeWeeks ?? null,
+        imageUrl: r.image_url || r.imageUrl || '',
+        partNumber: r.part_number || r.partNumber || '',
+        name: r.name || '',
     });
 
     // ── Data Subscriptions ──
@@ -630,23 +633,40 @@ export function useAutoBomData() {
     const handleImageSelect = async (url) => {
         if (!imagePickerItem) return;
         const itemId = imagePickerItem.id;
+        const isBomItem = imagePickerItem._isBomItem; // Flag to distinguish BOM items from catalog items
         try {
-            if (USE_SUPABASE) {
-                await supabase.from('catalogo_maestro').update({ image_url: url }).eq('id', itemId);
+            if (isBomItem) {
+                // Save image directly to the BOM item (items_bom collection)
+                if (USE_SUPABASE) {
+                    await supabase.from('items_bom').update({ image_url: url }).eq('id', itemId);
+                } else {
+                    const { doc, updateDoc } = await import('firebase/firestore');
+                    const { db } = await import('../firebase');
+                    await updateDoc(doc(db, 'items_bom', itemId), { imageUrl: url });
+                }
+                // Optimistic update for BOM items
+                setBomItems(prev => prev.map(item =>
+                    item.id === itemId ? { ...item, imageUrl: url } : item
+                ));
             } else {
-                const { doc, updateDoc } = await import('firebase/firestore');
-                const { db } = await import('../firebase');
-                await updateDoc(doc(db, 'catalogo_maestro', itemId), { imageUrl: url });
+                // Save image to catalogo_maestro (existing behavior)
+                if (USE_SUPABASE) {
+                    await supabase.from('catalogo_maestro').update({ image_url: url }).eq('id', itemId);
+                } else {
+                    const { doc, updateDoc } = await import('firebase/firestore');
+                    const { db } = await import('../firebase');
+                    await updateDoc(doc(db, 'catalogo_maestro', itemId), { imageUrl: url });
+                }
+                // Optimistic update for catalog items
+                setCatalogo(prev => prev.map(item =>
+                    item.id === itemId ? { ...item, imageUrl: url } : item
+                ));
             }
-            // Optimistic update — refresh local state immediately
-            setCatalogo(prev => prev.map(item =>
-                item.id === itemId ? { ...item, imageUrl: url } : item
-            ));
         } catch (err) {
             console.error('Error saving image:', err);
             const errMsg = err.message || '';
             if (errMsg.includes('permission-denied') || errMsg.includes('insufficient permissions') || err.code === 'permission-denied') {
-                alert('No tienes permisos suficientes para modificar el catálogo. Se requiere rol de Editor o Administrador.');
+                alert('No tienes permisos suficientes para modificar este registro. Se requiere rol de Editor o Administrador.');
             } else {
                 alert(`Error al guardar la imagen: ${err.message || err}`);
             }
