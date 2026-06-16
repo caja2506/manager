@@ -103,6 +103,7 @@ export async function copyBomProject(sourceProject, sourceItems) {
         if (projErr) throw new Error(`Error creando proyecto: ${projErr.message}`);
 
         // 2. Duplicate all BOM items
+        console.log(`[copyBomProject] Copiando ${sourceItems.length} items al proyecto ${newProj.id}...`);
         if (sourceItems.length > 0) {
             const rows = sourceItems.map(item => ({
                 project_id: newProj.id,
@@ -116,8 +117,13 @@ export async function copyBomProject(sourceProject, sourceItems) {
                 prcr: item.prcr || null,
                 added_at: now,
             }));
-            const { error: itemsErr } = await supabase.from('items_bom').insert(rows);
-            if (itemsErr) throw new Error(`Error copiando items: ${itemsErr.message}`);
+            console.log(`[copyBomProject] Primer item a insertar:`, JSON.stringify(rows[0]));
+            const { data: insertedData, error: itemsErr } = await supabase.from('items_bom').insert(rows).select('id');
+            if (itemsErr) {
+                console.error(`[copyBomProject] Error insertando items:`, itemsErr);
+                throw new Error(`Error copiando items: ${itemsErr.message}`);
+            }
+            console.log(`[copyBomProject] ✅ ${insertedData?.length || 0} items insertados`);
         }
 
         return newProj.id;
