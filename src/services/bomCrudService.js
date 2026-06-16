@@ -104,14 +104,18 @@ export async function copyBomProject(sourceProject, sourceItems) {
 
         // 2. Duplicate all BOM items
         if (sourceItems.length > 0) {
-            const rows = sourceItems.map(item => {
-                const { id, project_id, projectId, added_at, addedAt, created_at, ...rest } = item;
-                return {
-                    ...rest,
-                    project_id: newProj.id,
-                    added_at: now,
-                };
-            });
+            const rows = sourceItems.map(item => ({
+                project_id: newProj.id,
+                master_part_ref_id: item.master_part_ref_id || item.masterPartRef?.id || null,
+                quantity: Number(item.quantity || 0),
+                unit_price: Number(item.unit_price ?? item.unitPrice ?? 0),
+                total_price: Number(item.total_price ?? item.totalPrice ?? 0),
+                proveedor_id: item.proveedor_id || item.proveedor?.id || null,
+                status: item.status || 'Requerido',
+                lead_time_weeks: item.lead_time_weeks ?? item.leadTimeWeeks ?? null,
+                prcr: item.prcr || null,
+                added_at: now,
+            }));
             const { error: itemsErr } = await supabase.from('items_bom').insert(rows);
             if (itemsErr) throw new Error(`Error copiando items: ${itemsErr.message}`);
         }

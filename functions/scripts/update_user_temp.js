@@ -31,12 +31,15 @@ async function main() {
     const accessToken = await exchangeRefreshToken(refreshToken);
     admin.initializeApp({ projectId: 'bom-ame-cr', credential: { getAccessToken: () => Promise.resolve({ access_token: accessToken, expires_in: 3600 }) } });
 
-    const USER = { uid: 'tp5uEA6o5JZrS45tsyEXl6Sp6OI3', newEmail: 'jose.piedra@icumed.com', displayName: 'Jose A Piedra Venegas', password: '88667667' };
+    const USER = { uid: 'E8HtB4YAPLNlyogj9qNr07k6Q192', newEmail: 'jorge.arce2@icumed.com', displayName: 'Jorge Arce', password: '60401213' };
 
     const record = await admin.auth().getUser(USER.uid);
     console.log(`Estado actual: ${record.email}`);
-    await admin.auth().updateUser(USER.uid, { password: USER.password });
-    console.log(`\n✅ Password corregido: ${USER.password}`);
+    await admin.auth().updateUser(USER.uid, { email: USER.newEmail, password: USER.password, emailVerified: false, displayName: USER.displayName });
+    const updated = await admin.auth().getUser(USER.uid);
+    console.log(`\n✅ Email:    ${updated.email}`);
+    console.log(`✅ Password: ${USER.password}`);
+    console.log(`✅ Nombre:   ${updated.displayName}`);
 }
 
 main().catch(err => { console.error('ERROR:', err.message); process.exit(1); });
