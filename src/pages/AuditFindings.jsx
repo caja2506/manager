@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { Shield, Filter, Download, RefreshCw, Search, ChevronDown } from 'lucide-react';
+import { Shield, Filter, Download, RefreshCw, Search, ChevronDown, User, Users } from 'lucide-react';
 import { useAuditData } from '../hooks/useAuditData';
 import { useEngineeringData } from '../hooks/useEngineeringData';
 import { useAuth } from '../contexts/AuthContext';
@@ -72,7 +72,63 @@ export default function AuditFindings() {
     const [severityFilter, setSeverityFilter] = useState('all');
     const [entityFilter, setEntityFilter] = useState('all');
     const [categoryFilter, setCategoryFilter] = useState('all');
+    const [personFilter, setPersonFilter] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
+
+    // Build a lookup: taskId -> assignedTo uid
+    const taskAssigneeMap = useMemo(() => {
+        const map = {};
+        engTasks.forEach(t => { if (t.assignedTo) map[t.id] = t.assignedTo; });
+        return map;
+    }, [engTasks]);
+
+    // Person options for the dropdown
+    const personOptions = useMemo(() => {
+        if (!auditResult?.findings || teamMembers.length === 0) return [];
+        const personIds = new Set();
+        auditResult.findings.forEach(f => {
+            if (f.entityType === 'task' && f.entityId) {
+                const uid = taskAssigneeMap[f.entityId];
+                if (uid) personIds.add(uid);
+            }
+            if (f.entityType === 'user' && f.entityId) {
+                personIds.add(f.entityId);
+            }
+        });
+        return teamMembers
+            .filter(m => personIds.has(m.uid))
+            .sort((a, b) => (a.displayName || a.email || '').localeCompare(b.displayName || b.email || ''));
+    }, [auditResult, teamMembers, taskAssigneeMap]);
+
+    // Per-person impact summary
+    const personSummary = useMemo(() => {
+        if (!auditResult?.findings || teamMembers.length === 0) return [];
+        const summaryMap = {};
+        auditResult.findings.forEach(f => {
+            let uid = null;
+            if (f.entityType === 'task' && f.entityId) uid = taskAssigneeMap[f.entityId];
+            if (f.entityType === 'user' && f.entityId) uid = f.entityId;
+            if (!uid) return;
+            if (!summaryMap[uid]) {
+                const member = teamMembers.find(m => m.uid === uid);
+                summaryMap[uid] = {
+                    uid,
+                    name: member?.displayName || member?.email || uid,
+                    total: 0,
+                    critical: 0,
+                    warning: 0,
+                    info: 0,
+                    scoreImpact: 0,
+                };
+            }
+            summaryMap[uid].total++;
+            if (f.severity === 'critical') summaryMap[uid].critical++;
+            else if (f.severity === 'warning') summaryMap[uid].warning++;
+            else summaryMap[uid].info++;
+            summaryMap[uid].scoreImpact += Math.abs(f.scoreImpact || 0);
+        });
+        return Object.values(summaryMap).sort((a, b) => b.scoreImpact - a.scoreImpact || b.total - a.total);
+    }, [auditResult, teamMembers, taskAssigneeMap]);
 
     // Auto-run audit when data is ready (not on mount with empty data)
     useEffect(() => {
@@ -103,6 +159,19 @@ export default function AuditFindings() {
             filtered = filtered.filter(f => categoryRuleIds.includes(f.ruleId));
         }
 
+        // Person filter
+        if (personFilter !== 'all') {
+            filtered = filtered.filter(f => {
+                if (f.entityType === 'task' && f.entityId) {
+                    return taskAssigneeMap[f.entityId] === personFilter;
+                }
+                if (f.entityType === 'user' && f.entityId) {
+                    return f.entityId === personFilter;
+                }
+                return false;
+            });
+        }
+
         // Search
         if (searchQuery.trim()) {
             const q = searchQuery.toLowerCase();
@@ -118,7 +187,7 @@ export default function AuditFindings() {
         filtered.sort((a, b) => (severityOrder[a.severity] || 2) - (severityOrder[b.severity] || 2));
 
         return filtered;
-    }, [auditResult, severityFilter, entityFilter, categoryFilter, searchQuery]);
+    }, [auditResult, severityFilter, entityFilter, categoryFilter, personFilter, searchQuery, taskAssigneeMap]);
 
     // Rule statistics
     const ruleStats = useMemo(() => {
@@ -207,6 +276,50 @@ export default function AuditFindings() {
                 </div>
             )}
 
+            {/* Person Impact Summary */}
+            {personSummary.length > 0 && (
+                <div className="bg-slate-900/70 backdrop-blur-sm rounded-2xl border border-slate-800 shadow-lg p-6">
+                    <h3 className="font-bold text-sm text-white mb-4 flex items-center gap-2">
+                        <Users className="w-4 h-4 text-violet-400" /> Impacto por Colaborador
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {personSummary.map(p => (
+                            <button
+                                key={p.uid}
+                                onClick={() => {
+                                    setPersonFilter(prev => prev === p.uid ? 'all' : p.uid);
+                                    setSeverityFilter('all');
+                                    setEntityFilter('all');
+                                    setCategoryFilter('all');
+                                    setSearchQuery('');
+                                }}
+                                className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
+                                    personFilter === p.uid
+                                        ? 'bg-violet-500/15 border-violet-500/40 ring-1 ring-violet-500/30'
+                                        : 'bg-slate-800/50 border-slate-700/50 hover:border-violet-500/30 hover:bg-slate-800'
+                                }`}
+                            >
+                                <div className="w-8 h-8 rounded-full bg-violet-500/20 flex items-center justify-center shrink-0">
+                                    <User className="w-4 h-4 text-violet-400" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <span className="text-[11px] font-bold text-slate-200 block truncate">{p.name}</span>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                        {p.critical > 0 && <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/30">{p.critical} crít</span>}
+                                        {p.warning > 0 && <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30">{p.warning} adv</span>}
+                                        {p.info > 0 && <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">{p.info} info</span>}
+                                    </div>
+                                </div>
+                                <div className="text-right shrink-0">
+                                    <span className="text-sm font-black text-white block">{p.total}</span>
+                                    <span className="text-[9px] font-bold text-rose-400">-{p.scoreImpact}</span>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Filters */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                 <div className="relative flex-1">
@@ -219,6 +332,17 @@ export default function AuditFindings() {
                         className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
                     />
                 </div>
+
+                <select
+                    value={personFilter}
+                    onChange={(e) => setPersonFilter(e.target.value)}
+                    className="px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors appearance-none cursor-pointer"
+                >
+                    <option value="all">Todas las personas</option>
+                    {personOptions.map(m => (
+                        <option key={m.uid} value={m.uid}>{m.displayName || m.email}</option>
+                    ))}
+                </select>
 
                 <select
                     value={severityFilter}
