@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRole } from '../contexts/RoleContext';
 import { useAppData } from '../contexts/AppDataContext';
-import { deleteBomProject } from '../services/bomCrudService';
+import { deleteBomProject, copyBomProject } from '../services/bomCrudService';
 import {
-    FolderGit2, Plus, Trash2, ChevronRight, DollarSign, Edit3, X
+    FolderGit2, Plus, Trash2, ChevronRight, DollarSign, Edit3, X, Copy, Loader2
 } from 'lucide-react';
 
 export default function BomProjects() {
@@ -16,6 +16,22 @@ export default function BomProjects() {
     const [editingProjectId, setEditingProjectId] = useState(null);
     const [newProjectName, setNewProjectName] = useState('');
     const [newProjectDesc, setNewProjectDesc] = useState('');
+    const [copyingId, setCopyingId] = useState(null);
+
+    const handleCopyProject = async (e, project) => {
+        e.stopPropagation();
+        if (copyingId) return;
+        setCopyingId(project.id);
+        try {
+            const projectItems = bomItems.filter(item => item.projectId === project.id || item.project_id === project.id);
+            const newId = await copyBomProject(project, projectItems);
+            navigate(`/bom/projects/${newId}`);
+        } catch (err) {
+            console.error('Error copiando proyecto:', err);
+            alert('Error al copiar el proyecto: ' + (err.message || err));
+        }
+        setCopyingId(null);
+    };
 
     const onSaveProject = async (e) => {
         e.preventDefault();
@@ -64,6 +80,16 @@ export default function BomProjects() {
                             </div>
                             {(canEdit || canDelete) && (
                                 <div className="absolute top-4 right-4 flex space-x-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                                    {canEdit && (
+                                        <button
+                                            onClick={(e) => handleCopyProject(e, p)}
+                                            disabled={copyingId === p.id}
+                                            className="p-2 text-indigo-500 bg-indigo-50 rounded-lg hover:bg-indigo-100 disabled:opacity-50 transition-all"
+                                            title="Copiar proyecto"
+                                        >
+                                            {copyingId === p.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
+                                        </button>
+                                    )}
                                     {canEdit && (
                                         <button
                                             onClick={(e) => { e.stopPropagation(); setEditingProjectId(p.id); setNewProjectName(p.name); setNewProjectDesc(p.description); setIsProjectModalOpen(true); }}

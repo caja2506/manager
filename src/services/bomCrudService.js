@@ -86,6 +86,65 @@ export async function duplicateBomItems(items, targetProjectId) {
 }
 
 /**
+ * Copy (duplicate) an entire BOM project — metadata + all items.
+ * Returns the new project ID.
+ */
+export async function copyBomProject(sourceProject, sourceItems) {
+    const newName = `${sourceProject.name} (Copia)`;
+    const now = new Date().toISOString();
+
+    if (USE_SUPABASE) {
+        // 1. Create the new project
+        const { data: newProj, error: projErr } = await supabase
+            .from('proyectos_bom')
+            .insert({ name: newName, description: sourceProject.description || '', created_at: now })
+            .select('id')
+            .single();
+        if (projErr) throw new Error(`Error creando proyecto: ${projErr.message}`);
+
+        // 2. Duplicate all BOM items
+        if (sourceItems.length > 0) {
+            const rows = sourceItems.map(item => {
+                const { id, project_id, projectId, added_at, addedAt, created_at, ...rest } = item;
+                return {
+                    ...rest,
+                    project_id: newProj.id,
+                    added_at: now,
+                };
+            });
+            const { error: itemsErr } = await supabase.from('items_bom').insert(rows);
+            if (itemsErr) throw new Error(`Error copiando items: ${itemsErr.message}`);
+        }
+
+        return newProj.id;
+    } else {
+        const { doc, setDoc, collection, writeBatch } = await import('firebase/firestore');
+        const { db } = await import('../firebase');
+
+        // 1. Create new project
+        const newProjectRef = doc(collection(db, 'proyectos_bom'));
+        await setDoc(newProjectRef, {
+            name: newName,
+            description: sourceProject.description || '',
+            createdAt: now,
+        });
+
+        // 2. Duplicate items in batch
+        if (sourceItems.length > 0) {
+            const batch = writeBatch(db);
+            sourceItems.forEach(item => {
+                const newRef = doc(collection(db, 'items_bom'));
+                const { id, ...data } = item;
+                batch.set(newRef, { ...data, projectId: newProjectRef.id, addedAt: now });
+            });
+            await batch.commit();
+        }
+
+        return newProjectRef.id;
+    }
+}
+
+/**
  * Delete multiple BOM items in a batch.
  */
 export async function deleteBomItemsBatch(itemIds) {
