@@ -98,7 +98,7 @@ export default function BomProjects() {
                                             <Edit3 className="w-4 h-4" />
                                         </button>
                                     )}
-                                    {canDelete && (
+                                    {canEdit && (
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
