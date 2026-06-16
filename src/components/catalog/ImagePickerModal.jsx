@@ -14,6 +14,8 @@ const ImagePickerModal = ({ isOpen, onClose, onSelect, itemName, partNumber }) =
     const [images, setImages] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
     const [selectedUrl, setSelectedUrl] = useState(null);
+    const [selectedThumbnail, setSelectedThumbnail] = useState(null);
+    const [testedUrl, setTestedUrl] = useState(null); // The URL that actually loads
     const [customUrl, setCustomUrl] = useState('');
     const [previewError, setPreviewError] = useState(false);
     const [error, setError] = useState(null);
@@ -25,6 +27,8 @@ const ImagePickerModal = ({ isOpen, onClose, onSelect, itemName, partNumber }) =
             setSearchQuery(defaultQuery);
             setImages([]);
             setSelectedUrl(null);
+            setSelectedThumbnail(null);
+            setTestedUrl(null);
             setCustomUrl('');
             setPreviewError(false);
             setError(null);
@@ -80,6 +84,23 @@ const ImagePickerModal = ({ isOpen, onClose, onSelect, itemName, partNumber }) =
         } catch (err) { /* Clipboard API may not be available */ }
     };
 
+    // Test if the full-res image URL loads; fall back to thumbnail if blocked
+    const handleSelectImage = (img) => {
+        setSelectedUrl(img.url);
+        setSelectedThumbnail(img.thumbnail);
+        setTestedUrl(null); // reset while testing
+        
+        // Test if the full-res URL loads
+        const testImg = new window.Image();
+        testImg.referrerPolicy = 'no-referrer';
+        testImg.onload = () => setTestedUrl(img.url);
+        testImg.onerror = () => {
+            console.warn('Full-res image blocked, using thumbnail:', img.url);
+            setTestedUrl(img.thumbnail);
+        };
+        testImg.src = img.url;
+    };
+
     const handleConfirmWithUrl = (url) => {
         if (url) {
             onSelect(url);
@@ -88,8 +109,12 @@ const ImagePickerModal = ({ isOpen, onClose, onSelect, itemName, partNumber }) =
     };
 
     const handleConfirm = () => {
-        const url = mode === 'url' ? customUrl : selectedUrl;
-        handleConfirmWithUrl(url);
+        if (mode === 'url') {
+            handleConfirmWithUrl(customUrl);
+        } else {
+            // Use the tested URL (full-res if it loaded, thumbnail otherwise)
+            handleConfirmWithUrl(testedUrl || selectedUrl);
+        }
     };
 
     if (!isOpen) return null;
@@ -178,7 +203,7 @@ const ImagePickerModal = ({ isOpen, onClose, onSelect, itemName, partNumber }) =
                                             {/* Clickable Image Container */}
                                             <button
                                                 type="button"
-                                                onClick={() => setSelectedUrl(img.url)}
+                                                onClick={() => handleSelectImage(img)}
                                                 onDoubleClick={() => handleConfirmWithUrl(img.url)}
                                                 className={`relative w-full aspect-square rounded-xl overflow-hidden border-2 bg-white transition-all flex items-center justify-center cursor-pointer ${selectedUrl === img.url ? 'border-indigo-500' : 'border-slate-200 hover:border-indigo-300'}`}
                                             >
@@ -228,6 +253,14 @@ const ImagePickerModal = ({ isOpen, onClose, onSelect, itemName, partNumber }) =
                                             </div>
                                         </div>
                                     ))}
+                                </div>
+                            )}
+
+                            {/* URL fallback indicator */}
+                            {selectedUrl && testedUrl && testedUrl !== selectedUrl && (
+                                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs">
+                                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                    <span className="text-amber-300">La imagen original está bloqueada por el servidor. Se guardará la versión en caché de Google.</span>
                                 </div>
                             )}
 
