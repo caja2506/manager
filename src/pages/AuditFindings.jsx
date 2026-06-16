@@ -172,6 +172,8 @@ export default function AuditFindings() {
                 summary={summary}
                 isAuditing={isAuditing}
                 onRunAudit={runClientAudit}
+                findings={auditResult?.findings || []}
+                tasks={engTasks} projects={engProjects} teamMembers={teamMembers}
             />
 
             {/* Rule Statistics Grid */}

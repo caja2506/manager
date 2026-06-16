@@ -129,6 +129,8 @@ export default function ControlTower() {
                 summary={summary}
                 isAuditing={isAuditing}
                 onRunAudit={runClientAudit}
+                findings={auditResult?.findings || []}
+                tasks={engTasks} projects={engProjects} teamMembers={teamMembers}
             />
 
             {/* ── MAIN SPLIT: AI (Fibonacci left) + Issues ── */}
