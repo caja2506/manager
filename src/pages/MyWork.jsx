@@ -25,6 +25,7 @@ import { useMyWorkData } from '../hooks/useMyWorkData';
 
 // Planner service
 import { plannerService } from '../services/plannerService';
+import { supabase } from '../supabase';
 
 // Time service helpers
 import { updateTaskStatus } from '../services/taskService';
@@ -44,6 +45,7 @@ export default function MyWork() {
     const {
         engTasks, engProjects, engSubtasks,
         taskTypes, teamMembers, timeLogs, delayCauses,
+        refetchTable,
     } = useEngineeringData();
 
     // ── Weekly plan items (fetched for current week) ──
@@ -56,6 +58,85 @@ export default function MyWork() {
             .then(setWeekPlanItems)
             .catch(console.error);
     }, [weekStartStr]);
+
+    // ── Autocuración de Borradores de Tiempos Faltantes ──
+    useEffect(() => {
+        if (!user?.uid || !weekPlanItems.length || !timeLogs || !timeLogs.length) return;
+
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        
+        // Obtener plan items de hoy para este usuario
+        const todayUserPlanItems = weekPlanItems.filter(pi => 
+            pi.date === todayStr && 
+            pi.assignedTo === user.uid &&
+            pi.startDateTime &&
+            pi.endDateTime
+        );
+
+        // Identificar cuáles no tienen borrador ni ningún log asociado
+        const missingItems = todayUserPlanItems.filter(pi => {
+            const hasLog = timeLogs.some(log => log.planItemId === pi.id);
+            return !hasLog;
+        });
+
+        if (missingItems.length > 0) {
+            console.log(`[MyWork] Autocuración: Detectados ${missingItems.length} bloques planificados sin logs. Creándolos...`);
+            
+            const createMissingDrafts = async () => {
+                const { getEffectiveHours } = await import('../utils/breakTimeUtils');
+                
+                let createdAny = false;
+                for (const item of missingItems) {
+                    const start = new Date(item.startDateTime);
+                    const end = new Date(item.endDateTime);
+                    const totalMs = end - start;
+                    const totalHoursGross = parseFloat((totalMs / 3600000).toFixed(6));
+                    let totalHours = getEffectiveHours(start, end);
+                    if (totalHours < 0.016666) totalHours = 0.016666;
+                    const breakHoursDeducted = parseFloat((totalHoursGross - totalHours).toFixed(4));
+
+                    try {
+                        const { error } = await supabase
+                            .from('time_logs')
+                            .insert({
+                                task_id: item.taskId || null,
+                                project_id: item.projectId || null,
+                                user_id: item.assignedTo || null,
+                                start_time: item.startDateTime,
+                                end_time: item.endDateTime,
+                                total_hours: totalHours,
+                                total_hours_gross: totalHoursGross,
+                                break_hours_deducted: breakHoursDeducted,
+                                overtime: false,
+                                overtime_hours: 0,
+                                notes: item.notes || 'Sugerido desde el planificador',
+                                task_title: item.taskTitleSnapshot || item.taskTitle || '',
+                                project_name: item.projectNameSnapshot || item.projectName || '',
+                                display_name: item.assignedToName || '',
+                                source: 'planner_suggestion',
+                                plan_item_id: item.id,
+                                status: 'draft',
+                            });
+                        
+                        if (!error) {
+                            createdAny = true;
+                            console.log(`[MyWork] Borrador autocreado para item: ${item.id}`);
+                        } else {
+                            console.error(`[MyWork] Error al insertar borrador:`, error.message);
+                        }
+                    } catch (err) {
+                        console.error(`[MyWork] Error en insert de autocuración:`, err);
+                    }
+                }
+
+                if (createdAny) {
+                    refetchTable('time_logs');
+                }
+            };
+
+            createMissingDrafts();
+        }
+    }, [user, weekPlanItems, timeLogs, refetchTable]);
 
     // ── Derived data via hook ──
     const data = useMyWorkData({
