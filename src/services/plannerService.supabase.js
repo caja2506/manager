@@ -70,7 +70,7 @@ export const plannerService = {
 
             const itemId = result.id;
 
-            // ── Insert physical draft log in time_logs ──
+            // ── Insert physical confirmed log in time_logs ──
             if (data.startDateTime && data.endDateTime) {
                 const start = new Date(data.startDateTime);
                 const end = new Date(data.endDateTime);
@@ -101,7 +101,7 @@ export const plannerService = {
                         display_name: data.assignedToName || '',
                         source: 'planner_suggestion',
                         plan_item_id: itemId,
-                        status: 'draft',
+                        status: 'confirmed',
                     });
             }
 
@@ -163,7 +163,7 @@ export const plannerService = {
 
             if (error) throw error;
 
-            // ── Update draft log in time_logs ──
+            // ── Update confirmed log in time_logs ──
             if (updates.startDateTime !== undefined || updates.endDateTime !== undefined || updates.notes !== undefined || updates.taskId !== undefined || updates.projectId !== undefined) {
                 const { data: currentItem } = await supabase
                     .from('weekly_plan_items')
@@ -204,7 +204,7 @@ export const plannerService = {
                             .from('time_logs')
                             .update(logUpdates)
                             .eq('plan_item_id', itemId)
-                            .eq('status', 'draft');
+                            .eq('status', 'confirmed');
                     }
                 }
             }
@@ -225,12 +225,12 @@ export const plannerService = {
             // Stop active timer if any before deleting
             await stopActiveTimerForPlanItem(itemId);
 
-            // ── Delete draft log in time_logs ──
+            // ── Delete confirmed log in time_logs ──
             await supabase
                 .from('time_logs')
                 .delete()
                 .eq('plan_item_id', itemId)
-                .eq('status', 'draft');
+                .eq('status', 'confirmed');
 
             const { error } = await supabase
                 .from('weekly_plan_items')
