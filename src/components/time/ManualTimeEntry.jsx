@@ -68,6 +68,8 @@ export default function ManualTimeEntry({
     const [selectedUserId, setSelectedUserId] = useState(userId || '');
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
+    const [taskQuery, setTaskQuery] = useState('');
+    const [tempBlockPos, setTempBlockPos] = useState(null); // { id, startHour, endHour }
 
     // Sincronizadores bidireccionales
     const handleStartHourChange = (newStart) => {
@@ -126,6 +128,10 @@ export default function ManualTimeEntry({
             setWorkedHours(1);
             setSelectedUserId(userId || '');
             setSelectedDraftId(null);
+        }
+        if (isOpen) {
+            setTaskQuery('');
+            setTempBlockPos(null);
         }
     }, [editLog, isOpen, userId]);
 
@@ -192,15 +198,31 @@ export default function ManualTimeEntry({
         setSelectedDraftId(draft.id);
     };
 
-    // Filter tasks by selected project
+    // Filter tasks by selected project and user assignment
     const filteredTasks = useMemo(() => {
         if (!tasks) return [];
         return tasks.filter(t => {
             if (t.status === 'completed' || t.status === 'cancelled') return false;
-            if (!form.projectId) return !t.projectId;
-            return t.projectId === form.projectId;
+            
+            // If a project is selected, show tasks belonging to that project
+            if (form.projectId) {
+                return t.projectId === form.projectId;
+            }
+            
+            // If no project is selected, show all tasks assigned to the user
+            return t.assignedTo === selectedUserId;
         });
-    }, [tasks, form.projectId]);
+    }, [tasks, form.projectId, selectedUserId]);
+
+    // Apply text search on top of filtered tasks
+    const searchedTasks = useMemo(() => {
+        const query = taskQuery.toLowerCase().trim();
+        if (!query) return filteredTasks;
+        return filteredTasks.filter(t => 
+            (t.title || '').toLowerCase().includes(query) || 
+            (t.description || '').toLowerCase().includes(query)
+        );
+    }, [filteredTasks, taskQuery]);
 
     if (!isOpen) return null;
 
@@ -385,6 +407,126 @@ export default function ManualTimeEntry({
         const handleMouseUp = () => {
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup',   handleMouseUp);
+    };
+
+    const handleExistingBlockDragStart = (e, log) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const initialY = e.clientY;
+        const startDt = new Date(log.startTime);
+        const endDt = new Date(log.endTime);
+        const durationMins = Math.round((endDt - startDt) / 60000);
+        const initialStartMins = startDt.getHours() * 60 + startDt.getMinutes();
+
+        const handleMouseMove = (mv) => {
+            const deltaY = mv.clientY - initialY;
+            const deltaMins = (deltaY / ROW_HEIGHT) * 60;
+            const snappedDeltaMins = Math.round(deltaMins / 15) * 15;
+            let newStartMins = initialStartMins + snappedDeltaMins;
+
+            // Limitar al rango laboral (8 a 17)
+            const minAllowedMins = START_HOUR * 60;
+            const maxAllowedMins = END_HOUR * 60 - durationMins;
+            newStartMins = Math.max(minAllowedMins, Math.min(maxAllowedMins, newStartMins));
+
+            const newStartStr = minutesToTime(newStartMins);
+            const newEndMins = (newStartMins + durationMins) % 1440;
+            const newEndStr = minutesToTime(newEndMins);
+
+            setTempBlockPos({
+                id: log.id,
+                startHour: newStartStr,
+                endHour: newEndStr
+            });
+        };
+
+        const handleMouseUp = async () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup',   handleMouseUp);
+
+            if (tempBlockPos && tempBlockPos.id === log.id) {
+                const [sh, sm] = tempBlockPos.startHour.split(':').map(Number);
+                const [eh, em] = tempBlockPos.endHour.split(':').map(Number);
+                
+                const baseStart = new Date(log.startTime);
+                const newStartDt = new Date(baseStart.getFullYear(), baseStart.getMonth(), baseStart.getDate(), sh, sm, 0);
+                const newEndDt = new Date(baseStart.getFullYear(), baseStart.getMonth(), baseStart.getDate(), eh, em, 0);
+
+                try {
+                    await updateTimeLog(log.id, {
+                        startTime: newStartDt.toISOString(),
+                        endTime: newEndDt.toISOString()
+                    });
+                    console.log(`[ManualTimeEntry] Dragged existing log ${log.id} successfully.`);
+                } catch (err) {
+                    console.error("[ManualTimeEntry] Error dragging existing log:", err);
+                    setError("Error al reposicionar registro");
+                }
+            }
+            setTempBlockPos(null);
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup',   handleMouseUp);
+    };
+
+    const handleExistingBlockResizeStart = (e, log) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const initialY = e.clientY;
+        const startDt = new Date(log.startTime);
+        const endDt = new Date(log.endTime);
+        const initialDurationMins = Math.round((endDt - startDt) / 60000);
+        const startMins = startDt.getHours() * 60 + startDt.getMinutes();
+
+        const handleMouseMove = (mv) => {
+            const deltaY = mv.clientY - initialY;
+            const deltaMins = (deltaY / ROW_HEIGHT) * 60;
+            const snappedDeltaMins = Math.round(deltaMins / 15) * 15;
+            let newDurationMins = initialDurationMins + snappedDeltaMins;
+
+            // Mínimo 15 minutos, máximo hasta el final del rango laboral
+            const minDurationMins = 15;
+            const maxDurationMins = (END_HOUR * 60) - startMins;
+            newDurationMins = Math.max(minDurationMins, Math.min(maxDurationMins, newDurationMins));
+
+            const newEndMins = (startMins + newDurationMins) % 1440;
+            const newEndStr = minutesToTime(newEndMins);
+
+            setTempBlockPos({
+                id: log.id,
+                startHour: minutesToTime(startMins),
+                endHour: newEndStr
+            });
+        };
+
+        const handleMouseUp = async () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup',   handleMouseUp);
+
+            if (tempBlockPos && tempBlockPos.id === log.id) {
+                const [eh, em] = tempBlockPos.endHour.split(':').map(Number);
+                const baseStart = new Date(log.startTime);
+                const newEndDt = new Date(baseStart.getFullYear(), baseStart.getMonth(), baseStart.getDate(), eh, em, 0);
+
+                try {
+                    await updateTimeLog(log.id, {
+                        startTime: baseStart.toISOString(),
+                        endTime: newEndDt.toISOString()
+                    });
+                    console.log(`[ManualTimeEntry] Resized existing log ${log.id} successfully.`);
+                } catch (err) {
+                    console.error("[ManualTimeEntry] Error resizing existing log:", err);
+                    setError("Error al redimensionar registro");
+                }
+            }
+            setTempBlockPos(null);
         };
 
         document.addEventListener('mousemove', handleMouseMove);
@@ -582,18 +724,39 @@ export default function ManualTimeEntry({
 
                                     {/* Lista de Tareas Disponibles (Arrastrables / Clickeables) */}
                                     <div className="space-y-1.5 pt-1">
-                                        <div className="text-[10px] font-black text-slate-450 dark:text-slate-500 uppercase tracking-wider ml-1 mb-1 flex items-center justify-between">
-                                            <span>Tareas Disponibles ({filteredTasks.length})</span>
+                                        <div className="text-[10px] font-black text-slate-450 dark:text-slate-500 uppercase tracking-wider ml-1 mb-1.5 flex items-center justify-between">
+                                            <span>Tareas Disponibles ({searchedTasks.length})</span>
                                             <span className="text-[8px] text-indigo-500 dark:text-indigo-400 normal-case font-bold animate-pulse">Arrastra al Timeline ➔</span>
                                         </div>
+                                        
+                                        {/* Input de Búsqueda de Tareas */}
+                                        <div className="relative mb-2">
+                                            <input
+                                                type="text"
+                                                placeholder="Buscar tarea..."
+                                                value={taskQuery}
+                                                onChange={e => setTaskQuery(e.target.value)}
+                                                className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-xl text-[11px] outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 placeholder-slate-450 dark:placeholder-slate-600 transition-all font-medium"
+                                            />
+                                            {taskQuery && (
+                                                <button
+                                                    onClick={() => setTaskQuery('')}
+                                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-250 text-xs font-bold"
+                                                >
+                                                    ✕
+                                                </button>
+                                            )}
+                                        </div>
+
                                         <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 scrollbar-track-transparent">
-                                            {filteredTasks.length === 0 ? (
+                                            {searchedTasks.length === 0 ? (
                                                 <div className="text-[10px] text-slate-500 dark:text-slate-600 py-4 text-center font-bold bg-slate-50/30 dark:bg-slate-950/25 border border-dashed border-slate-200 dark:border-slate-850 rounded-xl">
                                                     No hay tareas activas
                                                 </div>
                                             ) : (
-                                                filteredTasks.map(t => {
+                                                searchedTasks.map(t => {
                                                     const isSelected = form.taskId === t.id;
+                                                    const projectObj = projects.find(p => p.id === t.projectId);
                                                     const priorityColors = {
                                                         critical: 'bg-red-500/10 border-red-500/20 text-red-650 dark:text-red-400',
                                                         high: 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400',
@@ -610,7 +773,7 @@ export default function ManualTimeEntry({
                                                                 e.dataTransfer.effectAllowed = 'copy';
                                                             }}
                                                             onClick={() => {
-                                                                setForm(f => ({ ...f, taskId: t.id, projectId: t.projectId || f.projectId }));
+                                                                setForm(f => ({ ...f, taskId: t.id, projectId: t.projectId || '' }));
                                                             }}
                                                             className={`p-2 rounded-lg border transition-all duration-150 cursor-grab active:cursor-grabbing flex items-center justify-between gap-2 text-left select-none ${
                                                                 isSelected
@@ -620,6 +783,11 @@ export default function ManualTimeEntry({
                                                         >
                                                             <div className="flex-1 min-w-0 pr-1">
                                                                 <div className="text-xs font-bold truncate">{t.title}</div>
+                                                                {projectObj && (
+                                                                    <div className="text-[9px] text-purple-600 dark:text-purple-400 font-bold truncate mt-0.5">
+                                                                        📁 {projectObj.name}
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                             <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0 ${pColor}`}>
                                                                 {t.priority}
@@ -884,7 +1052,7 @@ export default function ManualTimeEntry({
                                                         return {
                                                             ...f,
                                                             taskId: droppedTaskId,
-                                                            projectId: selectedTaskObj?.projectId || f.projectId,
+                                                            projectId: selectedTaskObj?.projectId || '',
                                                             startHour: newStart,
                                                             endHour: minutesToTime(endMins)
                                                         };
@@ -902,22 +1070,42 @@ export default function ManualTimeEntry({
 
                                                 {/* Bloques confirmados reales */}
                                                 {currentConfirmed.map(log => {
-                                                    const style = getBlockStyle(log.startTime, log.endTime);
-                                                    const startDisp = isoToLocalTimeStr(log.startTime);
-                                                    const endDisp = isoToLocalTimeStr(log.endTime);
+                                                    const isTemp = tempBlockPos && tempBlockPos.id === log.id;
+                                                    const startVal = isTemp ? tempBlockPos.startHour : log.startTime;
+                                                    const endVal = isTemp ? tempBlockPos.endHour : log.endTime;
+                                                    const style = getBlockStyle(startVal, endVal);
+                                                    const startDisp = isTemp ? tempBlockPos.startHour : isoToLocalTimeStr(log.startTime);
+                                                    const endDisp = isTemp ? tempBlockPos.endHour : isoToLocalTimeStr(log.endTime);
+                                                    
+                                                    // Calculate display hours
+                                                    let displayHrs = log.totalHours || 0;
+                                                    if (isTemp) {
+                                                        displayHrs = calculateDuration(tempBlockPos.startHour, tempBlockPos.endHour);
+                                                    }
+
                                                     return (
                                                         <div
                                                             key={log.id}
-                                                            className="absolute left-0.5 right-0.5 rounded-lg bg-indigo-500/10 border-l-4 border-indigo-500 text-indigo-800 dark:text-indigo-200 text-[9px] px-2 py-1 overflow-hidden select-none z-5 shadow-sm shadow-indigo-950/10"
+                                                            onMouseDown={(e) => handleExistingBlockDragStart(e, log)}
+                                                            className="absolute left-0.5 right-0.5 rounded-lg bg-indigo-500/10 border-l-4 border-indigo-500 text-indigo-800 dark:text-indigo-200 text-[9px] px-2 py-1 overflow-hidden select-none z-[15] shadow-sm shadow-indigo-950/10 cursor-grab active:cursor-grabbing group/confirmed"
                                                             style={style}
-                                                            title={`${log.taskTitle || 'Sin título'} (${log.totalHours.toFixed(1)}h)`}
+                                                            title={`${log.taskTitle || 'Sin título'} (${displayHrs.toFixed(2)}h)`}
                                                         >
-                                                            <div className="font-bold truncate flex items-center gap-1">
+                                                            <div className="font-bold truncate flex items-center gap-1 pointer-events-none">
                                                                 <span className="text-emerald-500 font-bold">✓</span>
                                                                 <span className="truncate">{log.taskTitle || 'Registro Manual'}</span>
                                                             </div>
-                                                            <div className="text-[8px] text-indigo-650/80 dark:text-indigo-400/80 font-mono font-medium truncate mt-0.5">
-                                                                {startDisp} - {endDisp} ({log.totalHours.toFixed(1)}h)
+                                                            <div className="text-[8px] text-indigo-650/80 dark:text-indigo-400/80 font-mono font-medium truncate mt-0.5 pointer-events-none">
+                                                                {startDisp} - {endDisp} ({displayHrs.toFixed(2)}h)
+                                                            </div>
+
+                                                            {/* Manilla para estirar (borde inferior) */}
+                                                            <div 
+                                                                onMouseDown={(e) => handleExistingBlockResizeStart(e, log)}
+                                                                className="absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize flex items-center justify-center bg-indigo-500/20 border-t border-indigo-500/30 opacity-0 group-hover/confirmed:opacity-100 transition-opacity"
+                                                                title="Arrastra para cambiar duración"
+                                                            >
+                                                                <div className="w-6 h-0.5 rounded-full bg-indigo-400" />
                                                             </div>
                                                         </div>
                                                     );
@@ -925,31 +1113,58 @@ export default function ManualTimeEntry({
 
                                                 {/* Bloques sugeridos en borrador */}
                                                 {currentDrafts.map(draft => {
-                                                    const style = getBlockStyle(draft.startTime, draft.endTime);
-                                                    const startDisp = isoToLocalTimeStr(draft.startTime);
-                                                    const endDisp = isoToLocalTimeStr(draft.endTime);
+                                                    const isTemp = tempBlockPos && tempBlockPos.id === draft.id;
+                                                    const startVal = isTemp ? tempBlockPos.startHour : draft.startTime;
+                                                    const endVal = isTemp ? tempBlockPos.endHour : draft.endTime;
+                                                    const style = getBlockStyle(startVal, endVal);
+                                                    const startDisp = isTemp ? tempBlockPos.startHour : isoToLocalTimeStr(draft.startTime);
+                                                    const endDisp = isTemp ? tempBlockPos.endHour : isoToLocalTimeStr(draft.endTime);
                                                     const isSelected = selectedDraftId === draft.id;
+
+                                                    // Calculate display hours
+                                                    let displayHrs = draft.totalHours || 0;
+                                                    if (isTemp) {
+                                                        displayHrs = calculateDuration(tempBlockPos.startHour, tempBlockPos.endHour);
+                                                    }
+
                                                     return (
-                                                        <button
+                                                        <div
                                                             key={draft.id}
-                                                            type="button"
-                                                            onClick={() => applyDraftSuggestion(draft)}
-                                                            className={`absolute left-0.5 right-0.5 rounded-lg text-left text-[9px] px-2 py-1 overflow-hidden transition-all duration-200 z-5 border ${
+                                                            onMouseDown={(e) => handleExistingBlockDragStart(e, draft)}
+                                                            className={`absolute left-0.5 right-0.5 rounded-lg text-left text-[9px] px-2 py-1 overflow-hidden transition-all duration-200 z-[15] border cursor-grab active:cursor-grabbing group/draft ${
                                                                 isSelected
                                                                     ? 'bg-indigo-600/10 border-2 border-indigo-500 text-slate-800 dark:text-white shadow-[0_0_10px_rgba(99,102,241,0.2)]'
                                                                     : 'bg-amber-500/5 border-l-4 border-dashed border-amber-500/60 hover:bg-amber-500/10 text-amber-800 dark:text-amber-250 border-y-slate-200 dark:border-y-slate-850/40 border-r-slate-200 dark:border-r-slate-850/40'
                                                             }`}
                                                             style={style}
-                                                            title={`Sugerencia: ${draft.taskTitle || 'Planificación libre'} (${draft.totalHours ? draft.totalHours.toFixed(1) : 0}h)`}
+                                                            title={`Sugerencia: ${draft.taskTitle || 'Planificación libre'} (${displayHrs.toFixed(2)}h)`}
                                                         >
-                                                            <div className="font-bold truncate flex items-center gap-1">
-                                                                <span className="text-amber-600 dark:text-amber-500">⏱️</span>
-                                                                <span className="truncate text-amber-700 dark:text-amber-300">{draft.taskTitle || 'Planificación libre'}</span>
+                                                            <div 
+                                                                onClick={(e) => {
+                                                                    if (!tempBlockPos) {
+                                                                        applyDraftSuggestion(draft);
+                                                                    }
+                                                                }}
+                                                                className="h-full w-full pointer-events-auto"
+                                                            >
+                                                                <div className="font-bold truncate flex items-center gap-1 pointer-events-none">
+                                                                    <span className="text-amber-600 dark:text-amber-500">⏱️</span>
+                                                                    <span className="truncate text-amber-700 dark:text-amber-300">{draft.taskTitle || 'Planificación libre'}</span>
+                                                                </div>
+                                                                <div className="text-[8px] text-amber-750/80 dark:text-amber-400/70 font-mono font-medium truncate mt-0.5 pointer-events-none">
+                                                                    {startDisp} - {endDisp} ({displayHrs.toFixed(2)}h)
+                                                                </div>
                                                             </div>
-                                                            <div className="text-[8px] text-amber-750/80 dark:text-amber-400/70 font-mono font-medium truncate mt-0.5">
-                                                                {startDisp} - {endDisp} ({draft.totalHours ? draft.totalHours.toFixed(1) : 0}h)
+
+                                                            {/* Manilla para estirar (borde inferior) */}
+                                                            <div 
+                                                                onMouseDown={(e) => handleExistingBlockResizeStart(e, draft)}
+                                                                className="absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize flex items-center justify-center bg-amber-500/20 border-t border-amber-500/30 opacity-0 group-hover/draft:opacity-100 transition-opacity"
+                                                                title="Arrastra para cambiar duración"
+                                                            >
+                                                                <div className="w-6 h-0.5 rounded-full bg-amber-400" />
                                                             </div>
-                                                        </button>
+                                                        </div>
                                                     );
                                                 })}
 
@@ -959,7 +1174,7 @@ export default function ManualTimeEntry({
                                                     const style = getBlockStyle(form.startHour, form.endHour);
                                                     return (
                                                         <div
-                                                            className="absolute left-0.5 right-0.5 rounded-lg bg-emerald-500/15 border-2 border-emerald-500 text-emerald-800 dark:text-emerald-100 text-[9px] px-2 py-1 overflow-hidden select-none z-10 shadow-lg shadow-emerald-950/20 ring-2 ring-emerald-500/5 dark:ring-2 dark:ring-emerald-500/10 cursor-grab active:cursor-grabbing group/ghost"
+                                                            className="absolute left-0.5 right-0.5 rounded-lg bg-emerald-500/15 border-2 border-emerald-500 text-emerald-800 dark:text-emerald-100 text-[9px] px-2 py-1 overflow-hidden select-none z-[16] shadow-lg shadow-emerald-950/20 ring-2 ring-emerald-500/5 dark:ring-2 dark:ring-emerald-500/10 cursor-grab active:cursor-grabbing group/ghost"
                                                             style={style}
                                                             onMouseDown={handleGhostDragStart}
                                                         >
@@ -975,13 +1190,17 @@ export default function ManualTimeEntry({
                                                             </div>
 
                                                             {/* Manilla para estirar (borde inferior) */}
-                                                            <div 
-                                                                onMouseDown={handleGhostResizeStart}
-                                                                className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize flex items-center justify-center bg-emerald-500/10 opacity-0 group-hover/ghost:opacity-100 transition-opacity"
-                                                                title="Arrastra para cambiar duración"
-                                                            >
-                                                                <div className="w-8 h-0.5 rounded-full bg-emerald-400" />
-                                                            </div>
+                                                             <div 
+                                                                 onMouseDown={handleGhostResizeStart}
+                                                                 className="absolute bottom-0 left-0 right-0 h-4 cursor-ns-resize flex items-center justify-center bg-emerald-500/20 border-t border-emerald-500/30 opacity-40 group-hover/ghost:opacity-100 transition-all duration-150"
+                                                                 title="Arrastra para cambiar duración"
+                                                             >
+                                                                 <div className="flex gap-1 items-center justify-center pointer-events-none">
+                                                                     <span className="w-1 h-1 rounded-full bg-emerald-400" />
+                                                                     <span className="w-4 h-0.5 rounded-full bg-emerald-400" />
+                                                                     <span className="w-1 h-1 rounded-full bg-emerald-400" />
+                                                                 </div>
+                                                             </div>
                                                         </div>
                                                     );
                                                 })()}
