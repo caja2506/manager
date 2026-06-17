@@ -99,196 +99,211 @@
    ══════════════════════════════════════════════ */
 
 /* ── Backgrounds: wildcard to catch all opacity variants ── */
-[data-theme="light"] main :is([class^="bg-slate-950"], [class*=" bg-slate-950"]) {
+[data-theme="light"][data-theme="light"] main :is([class^="bg-slate-950"], [class*=" bg-slate-950"]) {
   background-color: #f1f5f9 !important;
 }
 
-[data-theme="light"] main :is([class^="from-slate-900"], [class*=" from-slate-900"]) {
+[data-theme="light"][data-theme="light"] main :is([class^="from-slate-900"], [class*=" from-slate-900"]) {
   background-image: none !important;
   background-color: #ffffff !important;
 }
 
-[data-theme="light"] main :is([class^="bg-slate-900"], [class*=" bg-slate-900"]) {
+[data-theme="light"][data-theme="light"] main :is([class^="bg-slate-900"], [class*=" bg-slate-900"]),
+[data-theme="light"][data-theme="light"] main [class*="bg-slate-900\\/"] {
   background-color: #ffffff !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
 
-[data-theme="light"] main :is([class^="bg-slate-800"], [class*=" bg-slate-800"]) {
+[data-theme="light"][data-theme="light"] main :is([class^="bg-slate-800"], [class*=" bg-slate-800"]),
+[data-theme="light"][data-theme="light"] main [class*="bg-slate-800\\/"] {
   background-color: #ffffff !important;
 }
 
-[data-theme="light"] main :is([class^="bg-slate-700"], [class*=" bg-slate-700"]):not(.h-px):not([class*="bg-slate-700 rounded"]) {
+[data-theme="light"][data-theme="light"] main :is([class^="bg-slate-700"], [class*=" bg-slate-700"]):not(.h-px):not([class*="bg-slate-700 rounded"]) {
   background-color: #e2e8f0 !important;
 }
 
 
 /* ── Special backgrounds ── */
-[data-theme="light"] main .bg-indigo-950\/80,
-[data-theme="light"] main .bg-indigo-950\/30 {
+[data-theme="light"][data-theme="light"] main .bg-indigo-950\/80,
+[data-theme="light"][data-theme="light"] main .bg-indigo-950\/30 {
   background-color: rgba(99, 102, 241, 0.08) !important;
 }
 
-[data-theme="light"] main .bg-indigo-600\/15,
-[data-theme="light"] main .bg-indigo-600\/10 {
+[data-theme="light"][data-theme="light"] main .bg-indigo-600\/15,
+[data-theme="light"][data-theme="light"] main .bg-indigo-600\/10 {
   background-color: rgba(99, 102, 241, 0.08) !important;
 }
 
-[data-theme="light"] main .bg-red-950\/50,
-[data-theme="light"] main .bg-red-950\/30 {
+[data-theme="light"][data-theme="light"] main .bg-red-950\/50,
+[data-theme="light"][data-theme="light"] main .bg-red-950\/30 {
   background-color: rgba(239, 68, 68, 0.06) !important;
 }
 
-[data-theme="light"] main .bg-amber-950\/30 {
+[data-theme="light"][data-theme="light"] main .bg-amber-950\/30 {
   background-color: rgba(245, 158, 11, 0.06) !important;
 }
 
-[data-theme="light"] main .bg-emerald-950\/30 {
+[data-theme="light"][data-theme="light"] main .bg-emerald-950\/30 {
   background-color: rgba(16, 185, 129, 0.06) !important;
 }
 
 /* ── Text colors ── 
    ALL text-white in main becomes dark in light mode.
-   Then restore white for elements on accent-colored backgrounds. */
-[data-theme="light"] main .text-white {
+   Then restore white for elements on accent-colored backgrounds.
+   Double [data-theme] selector ensures higher specificity over Tailwind v4 utilities. */
+[data-theme="light"][data-theme="light"] main .text-white {
   color: #0f172a !important;
 }
 
 /* Restore white text on/inside accent-colored backgrounds */
-[data-theme="light"] main [class*="bg-indigo-6"] .text-white,
-[data-theme="light"] main [class*="bg-indigo-5"] .text-white,
-[data-theme="light"] main [class*="bg-violet-6"] .text-white,
-[data-theme="light"] main [class*="bg-emerald-6"] .text-white,
-[data-theme="light"] main [class*="bg-emerald-5"] .text-white,
-[data-theme="light"] main [class*="bg-rose-6"] .text-white,
-[data-theme="light"] main [class*="bg-rose-5"] .text-white,
-[data-theme="light"] main [class*="bg-amber-6"] .text-white,
-[data-theme="light"] main [class*="bg-blue-6"] .text-white,
-[data-theme="light"] main [class*="bg-orange-6"] .text-white,
-[data-theme="light"] main [class*="bg-red-6"] .text-white,
-[data-theme="light"] main [class*="bg-red-5"] .text-white,
-[data-theme="light"] main [class*="bg-indigo-6"].text-white,
-[data-theme="light"] main [class*="bg-indigo-5"].text-white,
-[data-theme="light"] main [class*="bg-violet-6"].text-white,
-[data-theme="light"] main [class*="bg-emerald-6"].text-white,
-[data-theme="light"] main [class*="bg-rose-6"].text-white,
-[data-theme="light"] main [class*="bg-amber-6"].text-white,
-[data-theme="light"] main [class*="bg-red-6"].text-white,
-[data-theme="light"] main [class*="from-indigo-6"].text-white,
-[data-theme="light"] main [class*="from-purple-6"].text-white,
-[data-theme="light"] main [class*="from-blue-6"].text-white,
-[data-theme="light"] main [class*="from-emerald-6"].text-white,
-[data-theme="light"] main [class*="from-rose-6"].text-white,
-[data-theme="light"] main [class*="from-indigo-6"] .text-white,
-[data-theme="light"] main [class*="from-purple-6"] .text-white {
+[data-theme="light"][data-theme="light"] main [class*="bg-indigo-6"] .text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-indigo-5"] .text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-violet-6"] .text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-emerald-6"] .text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-emerald-5"] .text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-green-5"] .text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-rose-6"] .text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-rose-5"] .text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-amber-6"] .text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-amber-5"] .text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-blue-6"] .text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-orange-6"] .text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-red-6"] .text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-red-5"] .text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-indigo-6"].text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-indigo-5"].text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-violet-6"].text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-emerald-6"].text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-emerald-5"].text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-green-5"].text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-rose-6"].text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-amber-6"].text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-amber-5"].text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-red-6"].text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-red-5"].text-white,
+[data-theme="light"][data-theme="light"] main [class*="from-indigo-6"].text-white,
+[data-theme="light"][data-theme="light"] main [class*="from-purple-6"].text-white,
+[data-theme="light"][data-theme="light"] main [class*="from-blue-6"].text-white,
+[data-theme="light"][data-theme="light"] main [class*="from-emerald-6"].text-white,
+[data-theme="light"][data-theme="light"] main [class*="from-rose-6"].text-white,
+[data-theme="light"][data-theme="light"] main [class*="from-indigo-6"] .text-white,
+[data-theme="light"][data-theme="light"] main [class*="from-purple-6"] .text-white,
+[data-theme="light"][data-theme="light"] main [class*="from-green-5"] .text-white,
+[data-theme="light"][data-theme="light"] main [class*="bg-green-5"].text-white {
   color: #ffffff !important;
 }
 
 
 
-
-[data-theme="light"] main .text-slate-100,
-[data-theme="light"] main .text-slate-200 {
+[data-theme="light"][data-theme="light"] main .text-slate-100,
+[data-theme="light"][data-theme="light"] main .text-slate-200 {
   color: #1e293b !important;
 }
 
-[data-theme="light"] main .text-slate-300 {
+[data-theme="light"][data-theme="light"] main .text-slate-300 {
   color: #334155 !important;
 }
 
-[data-theme="light"] main .text-slate-400 {
+[data-theme="light"][data-theme="light"] main .text-slate-400 {
   color: #475569 !important;
 }
 
-[data-theme="light"] main .text-slate-500 {
+[data-theme="light"][data-theme="light"] main .text-slate-500 {
   color: #64748b !important;
 }
 
-[data-theme="light"] main .text-slate-600 {
+[data-theme="light"][data-theme="light"] main .text-slate-600 {
   color: #94a3b8 !important;
 }
 
 /* ── Status Colors ── */
-[data-theme="light"] main .text-red-400 { color: #dc2626 !important; }
-[data-theme="light"] main .text-amber-400 { color: #d97706 !important; }
-[data-theme="light"] main .text-indigo-400 { color: #4f46e5 !important; }
-[data-theme="light"] main .text-emerald-400 { color: #059669 !important; }
-[data-theme="light"] main .text-purple-400 { color: #7e22ce !important; }
-[data-theme="light"] main .text-blue-400 { color: #2563eb !important; }
+[data-theme="light"][data-theme="light"] main .text-red-400 { color: #dc2626 !important; }
+[data-theme="light"][data-theme="light"] main .text-amber-400 { color: #d97706 !important; }
+[data-theme="light"][data-theme="light"] main .text-amber-500 { color: #b45309 !important; }
+[data-theme="light"][data-theme="light"] main .text-indigo-400 { color: #4f46e5 !important; }
+[data-theme="light"][data-theme="light"] main .text-indigo-600 { color: #4338ca !important; }
+[data-theme="light"][data-theme="light"] main .text-emerald-400 { color: #059669 !important; }
+[data-theme="light"][data-theme="light"] main .text-green-400 { color: #16a34a !important; }
+[data-theme="light"][data-theme="light"] main .text-purple-400 { color: #7e22ce !important; }
+[data-theme="light"][data-theme="light"] main .text-purple-500 { color: #7e22ce !important; }
+[data-theme="light"][data-theme="light"] main .text-blue-400 { color: #2563eb !important; }
+[data-theme="light"][data-theme="light"] main .text-sky-600 { color: #0284c7 !important; }
 
 
 /* ── Border colors ── */
-[data-theme="light"] main [class*="border-slate-800"] {
+[data-theme="light"][data-theme="light"] main [class*="border-slate-800"] {
   border-color: #e2e8f0 !important;
 }
 
-[data-theme="light"] main [class*="border-slate-700"] {
+[data-theme="light"][data-theme="light"] main [class*="border-slate-700"] {
   border-color: #cbd5e1 !important;
 }
 
-[data-theme="light"] main [class*="border-indigo-500"] {
+[data-theme="light"][data-theme="light"] main [class*="border-indigo-500"] {
   border-color: rgba(99, 102, 241, 0.2) !important;
 }
 
 
 /* ── Ring colors ── */
-[data-theme="light"] main .ring-slate-800 {
+[data-theme="light"][data-theme="light"] main .ring-slate-800 {
   --tw-ring-color: #e2e8f0 !important;
 }
 
 /* ── Placeholder text ── */
-[data-theme="light"] main .placeholder\:text-slate-600::placeholder {
+[data-theme="light"][data-theme="light"] main .placeholder\:text-slate-600::placeholder {
   color: #94a3b8 !important;
 }
 
 /* ── Shadows ── */
-[data-theme="light"] main .shadow-lg,
-[data-theme="light"] main .shadow-2xl,
-[data-theme="light"] main .shadow-xl {
+[data-theme="light"][data-theme="light"] main .shadow-lg,
+[data-theme="light"][data-theme="light"] main .shadow-2xl,
+[data-theme="light"][data-theme="light"] main .shadow-xl {
   --tw-shadow-color: rgba(0, 0, 0, 0.06) !important;
 }
 
 /* ── Hover state overrides ── */
-[data-theme="light"] main [class*="hover:bg-slate-800"]:hover {
+[data-theme="light"][data-theme="light"] main [class*="hover:bg-slate-800"]:hover {
   background-color: #e2e8f0 !important;
 }
 
-[data-theme="light"] main .hover\:text-white:hover {
+[data-theme="light"][data-theme="light"] main .hover\:text-white:hover {
   color: #0f172a !important;
 }
 
-[data-theme="light"] main .hover\:text-slate-200:hover {
+[data-theme="light"][data-theme="light"] main .hover\:text-slate-200:hover {
   color: #1e293b !important;
 }
 
 /* ── Dividers (h-px bg-slate-*) ── */
-[data-theme="light"] main .h-px.bg-slate-800,
-[data-theme="light"] main .bg-slate-800.h-px {
+[data-theme="light"][data-theme="light"] main .h-px.bg-slate-800,
+[data-theme="light"][data-theme="light"] main .bg-slate-800.h-px {
   background-color: #e2e8f0 !important;
 }
 
 /* ── Cards: add subtle shadow in light mode ── */
-[data-theme="light"] main .backdrop-blur-sm {
+[data-theme="light"][data-theme="light"] main .backdrop-blur-sm {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04) !important;
 }
 
 /* ── Hide dark-mode animated glow blobs ── */
-[data-theme="light"] main .bg-indigo-600\/5,
-[data-theme="light"] main .bg-violet-600\/5,
-[data-theme="light"] main .bg-emerald-600\/5,
-[data-theme="light"] main .bg-amber-600\/4 {
+[data-theme="light"][data-theme="light"] main .bg-indigo-600\/5,
+[data-theme="light"][data-theme="light"] main .bg-violet-600\/5,
+[data-theme="light"][data-theme="light"] main .bg-emerald-600\/5,
+[data-theme="light"][data-theme="light"] main .bg-amber-600\/4 {
   opacity: 0 !important;
 }
 
 /* ── Progress bar backgrounds ── */
-[data-theme="light"] main .bg-slate-700 {
+[data-theme="light"][data-theme="light"] main .bg-slate-700 {
   background-color: #e2e8f0 !important;
 }
 
 /* ── Input focus ring lighter ── */
-[data-theme="light"] main .focus\:ring-indigo-500\/50:focus {
+[data-theme="light"][data-theme="light"] main .focus\:ring-indigo-500\/50:focus {
   --tw-ring-color: rgba(99, 102, 241, 0.25) !important;
 }
 
@@ -299,22 +314,26 @@
 }
 
 /* ── Planner Grid: sticky header above break bands (z-index fix) ── */
-[data-theme="light"] main .sticky.top-0[class*="bg-slate-9"] {
+[data-theme="light"][data-theme="light"] main .sticky.top-0[class*="bg-slate-9"] {
   z-index: 30 !important;
 }
 
 /* ── Planner weekend columns: convert amber-900 to light ── */
-[data-theme="light"] main [class*="bg-amber-900"] {
+[data-theme="light"][data-theme="light"] main [class*="bg-amber-900"] {
   background-color: rgba(254, 243, 199, 0.5) !important;
 }
 
 /* ── BOM table: thead sticky stays distinguishable in light mode ── */
-[data-theme="light"] main thead[class*="bg-slate-8"],
-[data-theme="light"] main thead [class*="bg-slate-8"] {
+[data-theme="light"][data-theme="light"] main thead[class*="bg-slate-8"],
+[data-theme="light"][data-theme="light"] main thead [class*="bg-slate-8"] {
   background-color: #f1f5f9 !important;
   border-bottom-color: #cbd5e1 !important;
 }
 
+/* ── Divide colors for light mode ── */
+[data-theme="light"][data-theme="light"] main [class*="divide-slate-800"] > * + * {
+  border-color: #e2e8f0 !important;
+}
 
 /* ── Peer Review Task Card Glow ── */
 @keyframes pr-glow {
@@ -326,7 +345,7 @@
   box-shadow: 0 0 12px 3px rgba(147, 51, 234, 0.3);
   animation: pr-glow 2.5s ease-in-out infinite;
 }
-[data-theme="light"] main .peer-review-glow {
+[data-theme="light"][data-theme="light"] main .peer-review-glow {
   background-color: rgba(147, 51, 234, 0.06) !important;
   border-left: 4px solid #9333ea !important;
   box-shadow: 0 0 12px 4px rgba(147, 51, 234, 0.2), 0 2px 8px rgba(147, 51, 234, 0.15);
