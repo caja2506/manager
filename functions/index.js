@@ -121,3 +121,9 @@ exports.exportTasksForExcel = dataExportExports.exportTasksForExcel;
 // Sets `role: 'authenticated'` custom claim on all Firebase users for Supabase Third-Party Auth
 const supabaseAuthExports = require("./exports/supabaseAuth");
 exports.setSupabaseClaims = supabaseAuthExports.setSupabaseClaims;
+
+// ── Domain: Timer Auto-Close (scheduled + manual) ──
+const { createTimerAutoCloseExports } = require("./exports/timerAutoClose");
+const timerAutoCloseExports = createTimerAutoCloseExports(adminDb, secrets);
+exports.scheduledTimerAutoClose = timerAutoCloseExports.scheduledTimerAutoClose;
+exports.manualTimerAutoClose = timerAutoCloseExports.manualTimerAutoClose;

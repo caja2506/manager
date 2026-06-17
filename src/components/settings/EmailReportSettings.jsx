@@ -94,7 +94,7 @@ export default function EmailReportSettings() {
             });
         })();
         return () => unsub?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     }, []);
 
     const handleAddEmail = () => {
