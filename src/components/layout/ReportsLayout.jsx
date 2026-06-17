@@ -28,7 +28,7 @@ export default function ReportsLayout() {
     const selectedMember = teamMembers.find(m => m.uid === selectedUser);
 
     return (
-        <div className="-m-4 md:-m-8 flex flex-col bg-slate-950 text-white animate-in fade-in duration-300" style={{ minHeight: '100vh' }}>
+        <div className="-m-4 md:-m-8 flex flex-col bg-slate-950 animate-in fade-in duration-300" style={{ minHeight: '100vh', color: 'var(--text-primary)' }}>
             {/* ── Main Banner Row — same style as TaskModuleBanner ── */}
             <div className="shrink-0">
                 {/* ── Tab Navigation + User Filter in same row ── */}
@@ -42,9 +42,10 @@ export default function ReportsLayout() {
                                     key={tab.to}
                                     to={tab.to}
                                     className={`relative flex items-center gap-1.5 px-2.5 md:px-4 py-2.5 md:py-3 text-[11px] md:text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${isActive
-                                        ? 'text-white'
+                                        ? ''
                                         : 'text-slate-500 hover:text-slate-300'
                                         }`}
+                                    style={isActive ? { color: 'var(--text-primary)' } : undefined}
                                 >
                                     <Icon className="w-3.5 h-3.5" />
                                     {tab.label}

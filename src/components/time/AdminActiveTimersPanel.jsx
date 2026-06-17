@@ -270,7 +270,7 @@ function ActiveTimerRow({ log, teamMembers, tasks, projects }) {
                 {/* Info */}
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-black text-white truncate">{userName}</span>
+                        <span className="text-sm font-black truncate" style={{ color: 'var(--text-primary)' }}>{userName}</span>
                         <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5">
@@ -328,7 +328,8 @@ function ActiveTimerRow({ log, teamMembers, tasks, projects }) {
                         type="datetime-local"
                         value={editStartTime}
                         onChange={e => setEditStartTime(e.target.value)}
-                        className="flex-1 px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="flex-1 px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                        style={{ color: 'var(--text-primary)' }}
                     />
                     <button
                         onClick={handleSaveStartTime}
