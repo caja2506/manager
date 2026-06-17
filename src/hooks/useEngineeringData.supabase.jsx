@@ -356,6 +356,8 @@ function mapTimeLog(r) {
         projectName: r.project_name, displayName: r.display_name,
         source: r.source, autoStopped: r.auto_stopped,
         createdAt: r.created_at,
+        status: r.status || 'confirmed',
+        planItemId: r.plan_item_id || null,
     };
 }
 
