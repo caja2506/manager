@@ -71,7 +71,7 @@ export default function MyWork() {
         myTasks, focusTask, todayTasks, blockedTasks, urgentTasks,
         overdueTasks, nextUpTasks, myTodayLogs, todayHours,
         todayOvertimeHours, weeklyStats, unplannedTasks,
-        weekStart: ws, weekEnd: we,
+        weekStart: ws, weekEnd: we, todayPlanItems,
     } = data;
 
     // ── Task Detail Modal state ──
