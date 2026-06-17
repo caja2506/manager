@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useEngineeringData } from '../hooks/useEngineeringData';
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
@@ -59,6 +59,8 @@ export default function MyWork() {
             .catch(console.error);
     }, [weekStartStr]);
 
+    const itemsInCreationRef = useRef(new Set());
+
     // ── Autocuración de Borradores de Tiempos Faltantes ──
     useEffect(() => {
         if (!user?.uid || !weekPlanItems.length || !timeLogs || !timeLogs.length) return;
@@ -73,15 +75,19 @@ export default function MyWork() {
             pi.endDateTime
         );
 
-        // Identificar cuáles no tienen borrador ni ningún log asociado
+        // Identificar cuáles no tienen borrador ni ningún log asociado, y no están en proceso de creación
         const missingItems = todayUserPlanItems.filter(pi => {
             const hasLog = timeLogs.some(log => log.planItemId === pi.id);
-            return !hasLog;
+            const isCreating = itemsInCreationRef.current.has(pi.id);
+            return !hasLog && !isCreating;
         });
 
         if (missingItems.length > 0) {
             console.log(`[MyWork] Autocuración: Detectados ${missingItems.length} bloques planificados sin logs. Creándolos...`);
             
+            // Marcar inmediatamente como en proceso de creación para evitar re-entradas
+            missingItems.forEach(item => itemsInCreationRef.current.add(item.id));
+
             const createMissingDrafts = async () => {
                 const { getEffectiveHours } = await import('../utils/breakTimeUtils');
                 
@@ -123,9 +129,11 @@ export default function MyWork() {
                             console.log(`[MyWork] Borrador autocreado para item: ${item.id}`);
                         } else {
                             console.error(`[MyWork] Error al insertar borrador:`, error.message);
+                            itemsInCreationRef.current.delete(item.id);
                         }
                     } catch (err) {
                         console.error(`[MyWork] Error en insert de autocuración:`, err);
+                        itemsInCreationRef.current.delete(item.id);
                     }
                 }
 
