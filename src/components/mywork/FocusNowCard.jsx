@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Play, Square, ExternalLink, Clock, Flag, Folder, Zap, Target, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { startTimerSafe, stopTimer, getActiveTimerFromLogs, formatElapsed } from '../../services/timeService';
@@ -19,7 +19,7 @@ const PRIORITY_GLOW = {
     low: 'shadow-slate-800/40',
 };
 
-export default function FocusNowCard({ task, userId, engTasks, timeLogs, onOpenTask, onStatusChange }) {
+export default function FocusNowCard({ task, userId, engTasks, timeLogs, onOpenTask, onStatusChange, todayPlanItems = [] }) {
     const activeTimer = getActiveTimerFromLogs(timeLogs, userId);
     const [elapsed, setElapsed] = useState('0:00:00');
     const [isStarting, setIsStarting] = useState(false);
@@ -28,6 +28,19 @@ export default function FocusNowCard({ task, userId, engTasks, timeLogs, onOpenT
 
     const timerIsForThisTask = activeTimer?.taskId === task?.id;
     const anyActiveTimer = !!activeTimer;
+
+    const isPlannedNow = useMemo(() => {
+        if (!task || !todayPlanItems.length) return false;
+        const now = new Date();
+        const taskPlans = todayPlanItems.filter(pi => pi.taskId === task.id);
+        
+        return taskPlans.some(plan => {
+            if (!plan.startDateTime || !plan.endDateTime) return false;
+            const start = new Date(plan.startDateTime);
+            const end = new Date(plan.endDateTime);
+            return now >= start && now <= end;
+        });
+    }, [task, todayPlanItems]);
 
     // Tick elapsed
     useEffect(() => {
@@ -162,6 +175,15 @@ export default function FocusNowCard({ task, userId, engTasks, timeLogs, onOpenT
                 )}
             </div>
 
+            {isPlannedNow && !timerIsForThisTask && (
+                <div className="mb-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-3 flex items-center gap-2.5 animate-in fade-in">
+                    <span className="text-xs">📅</span>
+                    <p className="text-[11px] font-bold text-indigo-300">
+                        Esta tarea está programada en tu planificador en este momento. Inicia el temporizador para registrar tu avance.
+                    </p>
+                </div>
+            )}
+
             {/* Actions */}
             <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2">
                 {timerIsForThisTask ? (
@@ -176,8 +198,7 @@ export default function FocusNowCard({ task, userId, engTasks, timeLogs, onOpenT
                 ) : (
                     <button
                         onClick={handleStartTimer}
-                        disabled={isStarting || anyActiveTimer}
-                        title={anyActiveTimer ? 'Tienes un timer activo en otra tarea' : ''}
+                        disabled={isStarting}
                         className="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-sm shadow-lg shadow-indigo-500/30 active:scale-95 transition-all disabled:opacity-50"
                     >
                         <Play className="w-4 h-4 fill-current" />

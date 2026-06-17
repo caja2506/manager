@@ -8,6 +8,7 @@ import AdminActiveTimersPanel from '../components/time/AdminActiveTimersPanel';
 import ManualTimeEntry from '../components/time/ManualTimeEntry';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
 import { deleteTimeLog, formatDuration, stopTimer, canManageOthersTimers, isSupervisorOf } from '../services/timeService';
+import { plannerService } from '../services/plannerService';
 import { getActiveAssignments } from '../services/resourceAssignmentService';
 import {
     Clock, Plus, Trash2, Zap, Calendar, ListTodo, FolderGit2,
@@ -62,19 +63,76 @@ export default function WorkLogs() {
     const weekStart = weekDates[0];
     const weekEnd = weekDates[6];
 
-    // --- Logs for selected user + current week ---
+    // --- Load Weekly Plan Items to suggest drafts ---
+    const [weekPlanItems, setWeekPlanItems] = useState([]);
+    const weekStartStr = useMemo(() => {
+        const yyyy = weekStart.getFullYear();
+        const mm = String(weekStart.getMonth() + 1).padStart(2, '0');
+        const dd = String(weekStart.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    }, [weekStart]);
+
+    useEffect(() => {
+        plannerService.getWeeklyPlanItems(weekStartStr)
+            .then(setWeekPlanItems)
+            .catch(console.error);
+    }, [weekStartStr]);
+
+    // --- Logs for selected user + current week (Real + Suggestions) ---
     const myWeekLogs = useMemo(() => {
         const uid = selectedUser || user?.uid;
         if (!uid) return [];
-        return timeLogs
+        
+        // Logs reales
+        const real = timeLogs
             .filter(log => {
                 if (log.userId !== uid) return false;
                 if (!log.startTime) return false;
                 const logDate = new Date(log.startTime);
                 return logDate >= weekStart && logDate <= new Date(weekEnd.getTime() + 86400000);
-            })
-            .sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
-    }, [timeLogs, selectedUser, user, weekStart, weekEnd]);
+            });
+
+        // Sugerencias basadas en la planificación semanal
+        const myWeekPlan = weekPlanItems.filter(pi => pi.assignedTo === uid);
+        const suggestions = [];
+
+        for (const plan of myWeekPlan) {
+            if (!plan.startDateTime || !plan.endDateTime) continue;
+
+            const hasAssociated = real.some(log => log.planItemId === plan.id);
+            if (hasAssociated) continue;
+
+            const planStart = new Date(plan.startDateTime);
+            const planEnd = new Date(plan.endDateTime);
+
+            const isOverlap = real.some(log => {
+                const logStart = new Date(log.startTime);
+                const logEnd = log.endTime ? new Date(log.endTime) : new Date();
+                return planStart < logEnd && planEnd > logStart;
+            });
+
+            if (isOverlap) continue;
+
+            suggestions.push({
+                id: `suggested_${plan.id}`,
+                planItemId: plan.id,
+                taskId: plan.taskId,
+                projectId: plan.projectId,
+                userId: plan.assignedTo,
+                startTime: plan.startDateTime,
+                endTime: plan.endDateTime,
+                totalHours: plan.plannedHours || 0,
+                notes: plan.notes || 'Sugerido desde el planificador',
+                taskTitle: plan.taskTitleSnapshot || plan.taskTitle || 'Tarea planeada',
+                projectName: plan.projectNameSnapshot || plan.projectName || '',
+                displayName: plan.assignedToName || '',
+                source: 'planner_suggestion',
+                isDraft: true,
+            });
+        }
+
+        return [...real, ...suggestions].sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+    }, [timeLogs, selectedUser, user, weekStart, weekEnd, weekPlanItems]);
 
     // --- Aggregations ---
     const weekStats = useMemo(() => {
@@ -83,7 +141,7 @@ export default function WorkLogs() {
         const byProject = {};
         const byDay = {};
 
-        myWeekLogs.forEach(log => {
+        myWeekLogs.filter(log => !log.isDraft).forEach(log => {
             totalHours += log.totalHours || 0;
             if (log.overtime) overtimeHours += log.overtimeHours || log.totalHours || 0;
 
@@ -98,7 +156,7 @@ export default function WorkLogs() {
             }
         });
 
-        return { totalHours, overtimeHours, byProject, byDay, logCount: myWeekLogs.length };
+        return { totalHours, overtimeHours, byProject, byDay, logCount: myWeekLogs.filter(log => !log.isDraft).length };
     }, [myWeekLogs]);
 
     // --- Helpers ---
@@ -277,21 +335,68 @@ export default function WorkLogs() {
                         </div>
                     ) : (
                         <div className="space-y-2">
+                            {/* Weekly suggested drafts banner */}
+                            {myWeekLogs.some(log => log.isDraft) && (
+                                <div className="bg-amber-600/10 border border-amber-500/20 rounded-xl p-3 flex items-center justify-between gap-3 text-xs animate-in fade-in">
+                                    <span className="font-bold text-slate-200">
+                                        Tienes bloques planificados sugeridos como borradores esta semana.
+                                    </span>
+                                    <button
+                                        onClick={async () => {
+                                            const drafts = myWeekLogs.filter(log => log.isDraft);
+                                            try {
+                                                const { confirmDraftLogs } = await import('../services/timeService.supabase');
+                                                const result = await confirmDraftLogs(drafts);
+                                                alert(`Se confirmaron ${result.count} bloques planificados.`);
+                                                plannerService.getWeeklyPlanItems(weekStartStr)
+                                                    .then(setWeekPlanItems)
+                                                    .catch(console.error);
+                                            } catch (err) {
+                                                console.error(err);
+                                                alert("Error al confirmar: " + err.message);
+                                            }
+                                        }}
+                                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-black transition-all"
+                                    >
+                                        ✓ Confirmar Todos
+                                    </button>
+                                </div>
+                            )}
+
                             {myWeekLogs.map(log => {
                                 const isRunning = !log.endTime;
+                                const isDraft = log.isDraft;
                                 return (
                                     <div
                                         key={log.id}
-                                        onClick={() => { if (!isRunning) setEditingLog(log); }}
-                                        className={`bg-slate-900/60 rounded-xl border p-4 transition-all hover:shadow-lg group ${!isRunning ? 'cursor-pointer hover:border-indigo-500/40' : ''
-                                            } ${isRunning ? 'border-green-500/50 ring-1 ring-green-500/20' :
-                                                log.overtime ? 'border-amber-500/30' : 'border-slate-800'
-                                            }`}
+                                        onClick={() => {
+                                            if (isDraft) {
+                                                setEditingLog({
+                                                    ...log,
+                                                    id: null,
+                                                    notes: log.notes === 'Sugerido desde el planificador' ? '' : log.notes
+                                                });
+                                            } else if (!isRunning) {
+                                                setEditingLog(log);
+                                            }
+                                        }}
+                                        className={`rounded-xl border p-4 transition-all hover:shadow-lg group ${
+                                            isDraft
+                                                ? 'bg-amber-500/5 border-dashed border-amber-500/40 hover:border-amber-500/70 cursor-pointer'
+                                                : !isRunning
+                                                ? 'bg-slate-900/60 border-slate-800 cursor-pointer hover:border-indigo-500/40'
+                                                : 'bg-slate-900/60 border-green-500/50 ring-1 ring-green-500/20'
+                                        }`}
                                     >
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="flex-1 min-w-0">
                                                 {/* Task + Project */}
                                                 <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                                                    {isDraft && (
+                                                        <span className="text-[9px] font-bold text-amber-500 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30">
+                                                            🔍 SUGERENCIA PLANIFICADA
+                                                        </span>
+                                                    )}
                                                     {isRunning && (
                                                         <span className="text-[9px] font-bold text-green-400 bg-green-500/15 px-2 py-0.5 rounded-full flex items-center gap-1 border border-green-500/30">
                                                             <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" /> EN CURSO
@@ -359,11 +464,36 @@ export default function WorkLogs() {
 
                                             {/* Hours + Actions */}
                                             <div className="flex items-center gap-2 flex-shrink-0">
-                                                <span className={`text-lg font-black tabular-nums ${isRunning ? 'text-green-400' :
+                                                <span className={`text-lg font-black tabular-nums ${
+                                                    isRunning ? 'text-green-400' :
+                                                    isDraft ? 'text-amber-500/70' :
                                                     log.overtime ? 'text-amber-500' : 'text-indigo-600'
-                                                    }`}>
+                                                }`}>
                                                     {isRunning ? '⏱' : formatDurationSec(log.totalHours)}
                                                 </span>
+
+                                                {/* Confirm button for suggested logs */}
+                                                {isDraft && (
+                                                    <button
+                                                        onClick={async (e) => {
+                                                            e.stopPropagation();
+                                                            try {
+                                                                const { confirmDraftLogs } = await import('../services/timeService.supabase');
+                                                                await confirmDraftLogs([log]);
+                                                                plannerService.getWeeklyPlanItems(weekStartStr)
+                                                                    .then(setWeekPlanItems)
+                                                                    .catch(console.error);
+                                                            } catch (err) {
+                                                                console.error("Confirm Draft Error:", err);
+                                                                alert("No se pudo confirmar la sugerencia: " + err.message);
+                                                            }
+                                                        }}
+                                                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg transition-all"
+                                                        title="Confirmar sugerencia"
+                                                    >
+                                                        ✓ Confirmar
+                                                    </button>
+                                                )}
 
                                                 {/* Stop button for running logs */}
                                                 {isRunning && (canEdit || log.userId === user?.uid || isSupervisorOf(user?.uid, log.userId, teamMembers, resourceAssignments)) && (
@@ -391,7 +521,7 @@ export default function WorkLogs() {
                                                 )}
 
                                                 {/* Edit button for completed logs */}
-                                                {!isRunning && (canEdit || log.userId === user?.uid || isSupervisorOf(user?.uid, log.userId, teamMembers, resourceAssignments)) && (
+                                                {!isRunning && !isDraft && (canEdit || log.userId === user?.uid || isSupervisorOf(user?.uid, log.userId, teamMembers, resourceAssignments)) && (
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); setEditingLog(log); }}
                                                         className="p-1.5 rounded-lg transition-all text-indigo-400 hover:bg-indigo-500/15"
@@ -402,7 +532,7 @@ export default function WorkLogs() {
                                                 )}
 
                                                 {/* Delete button — always visible */}
-                                                {(canDelete || log.userId === user?.uid || isSupervisorOf(user?.uid, log.userId, teamMembers, resourceAssignments)) && (
+                                                {!isDraft && (canDelete || log.userId === user?.uid || isSupervisorOf(user?.uid, log.userId, teamMembers, resourceAssignments)) && (
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();

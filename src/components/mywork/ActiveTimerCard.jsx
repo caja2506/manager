@@ -5,7 +5,7 @@ import {
     getActiveTimerFromLogs, clearLegacyTimer
 } from '../../services/timeService';
 
-export default function ActiveTimerCard({ tasks, allTasks, projects, userId, timeLogs, onTimerStop }) {
+export default function ActiveTimerCard({ tasks, allTasks, projects, userId, timeLogs, onTimerStop, todayPlanItems = [] }) {
     // Active timer from Firestore (via timeLogs)
     const activeTimer = getActiveTimerFromLogs(timeLogs, userId);
     const [elapsed, setElapsed] = useState('0:00:00');
@@ -101,6 +101,17 @@ export default function ActiveTimerCard({ tasks, allTasks, projects, userId, tim
     const activeTaskName = activeTimer?.taskId
         ? (lookupTasks?.find(t => t.id === activeTimer.taskId)?.title || activeTimer.taskTitle || 'Tarea desconocida')
         : null;
+
+    const plannedItemNow = useMemo(() => {
+        if (!todayPlanItems || !todayPlanItems.length) return null;
+        const now = new Date();
+        return todayPlanItems.find(pi => {
+            if (!pi.startDateTime || !pi.endDateTime) return false;
+            const start = new Date(pi.startDateTime);
+            const end = new Date(pi.endDateTime);
+            return now >= start && now <= end;
+        });
+    }, [todayPlanItems]);
     const activeProjectName = activeTimer?.projectId
         ? (projects?.find(p => p.id === activeTimer.projectId)?.name || activeTimer.projectName || 'Proyecto')
         : null;
@@ -163,6 +174,41 @@ export default function ActiveTimerCard({ tasks, allTasks, projects, userId, tim
                     </div>
                 ) : !showStartForm ? (
                     <div className="text-center py-4 space-y-3">
+                        {plannedItemNow && (
+                            <div className="bg-indigo-600/10 border border-indigo-500/20 rounded-xl p-3 text-left mb-3 animate-in fade-in">
+                                <span className="text-[10px] font-black uppercase text-indigo-400 tracking-wider flex items-center gap-1 mb-1">
+                                    📅 Sugerencia de Planificador
+                                </span>
+                                <p className="text-xs font-bold text-white mb-2 leading-tight">
+                                    {plannedItemNow.taskTitleSnapshot || plannedItemNow.taskTitle || 'Tarea programada'}
+                                </p>
+                                <button
+                                    onClick={async () => {
+                                        setIsStarting(true);
+                                        try {
+                                            await startTimerSafe({
+                                                taskId: plannedItemNow.taskId || null,
+                                                projectId: plannedItemNow.projectId || null,
+                                                userId,
+                                                notes: 'Iniciado desde sugerencia del planificador',
+                                                source: 'planner_auto',
+                                                taskTitle: plannedItemNow.taskTitleSnapshot || plannedItemNow.taskTitle || '',
+                                                projectName: plannedItemNow.projectNameSnapshot || plannedItemNow.projectName || '',
+                                                onConfirm: ({ activeTaskTitle, newTaskTitle }) =>
+                                                    window.confirm(`Ya tienes un timer activo en "${activeTaskTitle}". ¿Detenerlo e iniciar "${newTaskTitle}"?`),
+                                            });
+                                        } catch (e) {
+                                            console.error(e);
+                                        }
+                                        setIsStarting(false);
+                                    }}
+                                    disabled={isStarting}
+                                    className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-black text-xs transition-all flex items-center justify-center gap-1 active:scale-95"
+                                >
+                                    <Play className="w-3 h-3 fill-current" /> Iniciar sugerido
+                                </button>
+                            </div>
+                        )}
                         <div className="w-14 h-14 rounded-2xl bg-slate-800 flex items-center justify-center mx-auto">
                             <Clock className="w-6 h-6 text-slate-400" />
                         </div>
