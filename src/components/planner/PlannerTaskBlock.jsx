@@ -62,8 +62,9 @@ export default function PlannerTaskBlock({
     let styleClass = baseStyleClass;
 
     if (isDraft) {
-        borderClass = 'border-l-4 border-dashed border-amber-500/80';
-        opacityStyle = 'opacity-[0.80] border-dashed border-slate-700 bg-slate-900/60';
+        borderClass = 'border-l-4 border-dashed border-amber-500';
+        styleClass = 'bg-slate-50/90 dark:bg-slate-900/50 border-slate-250 dark:border-slate-800/80 text-slate-800 dark:text-slate-200 ring-1 ring-amber-500/10';
+        opacityStyle = 'border-dashed';
     } else if (isConfirmed) {
         borderClass = 'border-l-4 border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.25)]';
     }
@@ -210,7 +211,7 @@ export default function PlannerTaskBlock({
                         }}
                     >
                         <span
-                            className="font-black text-[11px] text-white leading-tight"
+                            className={`font-black text-[11px] leading-tight ${isDraft ? 'text-slate-800 dark:text-slate-200' : 'text-white'}`}
                             style={{
                                 overflow:        'hidden',
                                 display:         '-webkit-box',
@@ -236,13 +237,13 @@ export default function PlannerTaskBlock({
                         }}
                     >
                         {item.plannedHours > 0 && (
-                            <span data-duration className="text-[10px] font-black text-white leading-none whitespace-nowrap">
+                            <span data-duration className={`text-[10px] font-black leading-none whitespace-nowrap ${isDraft ? 'text-slate-800 dark:text-slate-200' : 'text-white'}`}>
                                 {item.plannedHours.toFixed(1)}h
                             </span>
                         )}
                         {displayAssignee && (
                             <span
-                                className="text-[9px] font-semibold text-white/80 leading-none"
+                                className={`text-[9px] font-semibold leading-none ${isDraft ? 'text-slate-600 dark:text-slate-400' : 'text-white/80'}`}
                                 style={{
                                     overflow:        'hidden',
                                     display:         '-webkit-box',
@@ -262,7 +263,7 @@ export default function PlannerTaskBlock({
             /* ══════════════════════════════════════════════════
                 COMPACT MODE (2 concurrent blocks)
             ══════════════════════════════════════════════════ */
-                <div className="px-1.5 py-1 flex flex-col h-full overflow-hidden">
+                <div className={`px-1.5 py-1 flex flex-col h-full overflow-hidden ${isDraft ? 'text-slate-800 dark:text-slate-200' : 'text-white'}`}>
                     <div className="flex items-start justify-between gap-0.5">
                         <p className="text-[10px] font-black leading-tight line-clamp-2 flex-1 break-words">
                             {isOrphan && <AlertTriangle className="w-2.5 h-2.5 text-amber-400 inline mr-0.5" />}
@@ -272,20 +273,20 @@ export default function PlannerTaskBlock({
                         </p>
                         <button
                             onClick={e => { e.stopPropagation(); onDelete && onDelete(); }}
-                            className="opacity-0 group-hover:opacity-100 text-white/70 hover:text-white transition-opacity shrink-0"
+                            className={`opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ${isDraft ? 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100' : 'text-white/70 hover:text-white'}`}
                         ><X className="w-2.5 h-2.5" /></button>
                     </div>
 
                     {height > 60 && (
                         <div className="mt-auto space-y-0.5">
                             {displayAssignee && (
-                                <div className="flex items-center gap-0.5 text-[8px] font-bold text-white/80 truncate">
+                                <div className={`flex items-center gap-0.5 text-[8px] font-bold truncate ${isDraft ? 'text-slate-600 dark:text-slate-400' : 'text-white/80'}`}>
                                     <User className="w-2 h-2 shrink-0" />
                                     <span className="truncate">{displayAssignee}</span>
                                 </div>
                             )}
-                            <div className="text-[8px] font-bold text-white/70">{timeLabel}</div>
-                            <span data-duration className="text-[8px] font-black text-white/90">
+                            <div className={`text-[8px] font-bold ${isDraft ? 'text-slate-500 dark:text-slate-500' : 'text-white/70'}`}>{timeLabel}</div>
+                            <span data-duration className={`text-[8px] font-black ${isDraft ? 'text-slate-700 dark:text-slate-300' : 'text-white/90'}`}>
                                 {item.plannedHours?.toFixed(1)}h
                             </span>
                         </div>
@@ -296,7 +297,7 @@ export default function PlannerTaskBlock({
             /* ══════════════════════════════════════════════════
                 NORMAL MODE (single column, full width)
             ══════════════════════════════════════════════════ */
-                <div className="px-2 py-1.5 flex flex-col h-full overflow-hidden">
+                <div className={`px-2 py-1.5 flex flex-col h-full overflow-hidden ${isDraft ? 'text-slate-800 dark:text-slate-200' : 'text-white'}`}>
                     <div className="flex items-start justify-between gap-1">
                         <p className="text-[11px] font-black leading-tight line-clamp-2 flex-1">
                             {isOrphan && <AlertTriangle className="w-3 h-3 text-amber-400 inline mr-0.5" />}
@@ -306,23 +307,23 @@ export default function PlannerTaskBlock({
                         </p>
                         <button
                             onClick={e => { e.stopPropagation(); onDelete && onDelete(); }}
-                            className="opacity-0 group-hover:opacity-100 ml-1 text-white/70 hover:text-white transition-opacity shrink-0 mt-0.5"
+                            className={`opacity-0 group-hover:opacity-100 ml-1 transition-opacity shrink-0 mt-0.5 ${isDraft ? 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100' : 'text-white/70 hover:text-white'}`}
                         ><X className="w-3 h-3" /></button>
                     </div>
 
                     {height > 50 && (
                         <div className="mt-auto space-y-0.5">
                             {displayAssignee && (
-                                <div className="flex items-center gap-1 text-[9px] font-bold text-white/80 truncate">
+                                <div className={`flex items-center gap-1 text-[9px] font-bold truncate ${isDraft ? 'text-slate-650 dark:text-slate-400' : 'text-white/80'}`}>
                                     <User className="w-2.5 h-2.5 shrink-0" />
                                     <span className="truncate">{displayAssignee}</span>
                                 </div>
                             )}
                             {timeLabel && (
-                                <div className="text-[9px] font-bold text-white/70">{timeLabel}</div>
+                                <div className={`text-[9px] font-bold ${isDraft ? 'text-slate-500 dark:text-slate-500' : 'text-white/70'}`}>{timeLabel}</div>
                             )}
                             {item.plannedHours > 0 && (
-                                <div data-duration className="text-[9px] font-black text-white/90">
+                                <div data-duration className={`text-[9px] font-black ${isDraft ? 'text-slate-700 dark:text-slate-300' : 'text-white/90'}`}>
                                     {item.plannedHours.toFixed(1)}h
                                 </div>
                             )}
