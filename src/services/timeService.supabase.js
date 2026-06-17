@@ -551,81 +551,35 @@ function mapTimeLogRow(row) {
         source: row.source,
         autoStopped: row.auto_stopped,
         createdAt: row.created_at,
+        status: row.status,
     };
 }
 
 // ── SUGGESTED LOGS AND HYBRID ASSISTED CONFIRMATION ──
 
 /**
- * Obtiene de forma virtual los registros sugeridos basados en el planificador semanal
- * para un día específico, excluyendo aquellos que ya tengan registros de tiempo confirmados
- * o superpuestos.
+ * Obtiene los registros sugeridos basados en el planificador semanal
+ * directamente de la base de datos Supabase en estado 'draft'.
  */
 export async function getSuggestedLogsForDay(userId, dateIso) {
     if (!userId || !dateIso) return [];
     try {
-        // 1. Obtener los bloques del planificador de Supabase para este día
-        const { data: planItems, error: planErr } = await supabase
-            .from('weekly_plan_items')
-            .select('*')
-            .eq('assigned_to', userId)
-            .eq('date', dateIso);
-
-        if (planErr) throw planErr;
-
-        // 2. Obtener los logs de tiempo reales para este día
         const dayStart = `${dateIso}T00:00:00.000Z`;
         const dayEnd = `${dateIso}T23:59:59.999Z`;
-        const { data: realLogs, error: logErr } = await supabase
+        const { data, error } = await supabase
             .from('time_logs')
             .select('*')
             .eq('user_id', userId)
+            .eq('status', 'draft')
             .gte('start_time', dayStart)
             .lte('start_time', dayEnd);
 
-        if (logErr) throw logErr;
+        if (error) throw error;
 
-        // 3. Crear sugerencias virtuales
-        const suggestions = [];
-        for (const plan of planItems) {
-            if (!plan.start_date_time || !plan.end_date_time) continue;
-
-            // Verificar si este bloque del planificador ya tiene un log real asociado
-            const hasAssociatedLog = realLogs.some(log => log.plan_item_id === plan.id);
-            if (hasAssociatedLog) continue;
-
-            // Comprobar superposición horaria con registros confirmados reales
-            const planStart = new Date(plan.start_date_time);
-            const planEnd = new Date(plan.end_date_time);
-
-            const isOverlap = realLogs.some(log => {
-                const logStart = new Date(log.start_time);
-                const logEnd = log.end_time ? new Date(log.end_time) : new Date();
-                return planStart < logEnd && planEnd > logStart;
-            });
-
-            if (isOverlap) continue;
-
-            // Añadir sugerencia
-            suggestions.push({
-                id: `suggested_${plan.id}`,
-                planItemId: plan.id,
-                taskId: plan.task_id,
-                projectId: plan.project_id,
-                userId: plan.assigned_to,
-                startTime: plan.start_date_time,
-                endTime: plan.end_date_time,
-                totalHours: plan.planned_hours || 0,
-                notes: plan.notes || 'Sugerido desde el planificador',
-                taskTitle: plan.task_title_snapshot || plan.task_title || 'Tarea planeada',
-                projectName: plan.project_name_snapshot || plan.project_name || '',
-                displayName: plan.assigned_to_name || '',
-                source: 'planner_suggestion',
-                isDraft: true,
-            });
-        }
-
-        return suggestions;
+        return (data || []).map(row => ({
+            ...mapTimeLogRow(row),
+            isDraft: true,
+        }));
     } catch (err) {
         console.error('[timeService.sb] Error in getSuggestedLogsForDay:', err);
         return [];
@@ -633,8 +587,8 @@ export async function getSuggestedLogsForDay(userId, dateIso) {
 }
 
 /**
- * Confirma un conjunto de borradores de registro virtuales guardándolos físicamente
- * en Supabase y recalculando las horas acumuladas de las tareas.
+ * Confirma un conjunto de borradores de registro guardándolos físicamente
+ * en Supabase (cambiando su estado a 'confirmed') y recalculando las horas acumuladas.
  */
 export async function confirmDraftLogs(logs) {
     if (!logs || !logs.length) return { count: 0 };
@@ -642,37 +596,10 @@ export async function confirmDraftLogs(logs) {
     let confirmedCount = 0;
     for (const log of logs) {
         try {
-            const start = new Date(log.startTime);
-            const end = new Date(log.endTime);
-            const totalMs = end - start;
-            const totalHoursGross = parseFloat((totalMs / 3600000).toFixed(6));
-            let totalHours = getEffectiveHours(start, end);
-            
-            if (totalHours < 0.016666) totalHours = 0.016666;
-            const breakHoursDeducted = parseFloat((totalHoursGross - totalHours).toFixed(4));
-            
-            const { data, error } = await supabase
+            const { error } = await supabase
                 .from('time_logs')
-                .insert({
-                    task_id: log.taskId,
-                    project_id: log.projectId,
-                    user_id: log.userId,
-                    start_time: log.startTime,
-                    end_time: log.endTime,
-                    total_hours: totalHours,
-                    total_hours_gross: totalHoursGross,
-                    break_hours_deducted: breakHoursDeducted,
-                    overtime: false,
-                    overtime_hours: 0,
-                    notes: log.notes || 'Confirmado desde el planificador',
-                    task_title: log.taskTitle || '',
-                    project_name: log.projectName || '',
-                    display_name: log.displayName || '',
-                    source: 'planner_auto',
-                    plan_item_id: log.planItemId,
-                })
-                .select('id')
-                .single();
+                .update({ status: 'confirmed' })
+                .eq('id', log.id);
                 
             if (error) throw error;
             
@@ -681,7 +608,7 @@ export async function confirmDraftLogs(logs) {
             }
             confirmedCount++;
         } catch (err) {
-            console.error(`[timeService.sb] Failed to confirm draft log for plan item ${log.planItemId}:`, err);
+            console.error(`[timeService.sb] Failed to confirm draft log ${log.id}:`, err);
         }
     }
     return { count: confirmedCount };

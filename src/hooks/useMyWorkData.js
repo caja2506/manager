@@ -128,58 +128,30 @@ export function useMyWorkData({ engTasks, engProjects, engSubtasks, timeLogs, we
 
     // ── 7. Time Logs ────────────────────────────────────────────────────
     const myTodayLogs = useMemo(() => {
-        if (!userId) return [];
-        const real = (timeLogs || []).filter(log =>
-            log.userId === userId &&
-            log.startTime?.startsWith(todayStr)
-        );
-
-        const suggestions = [];
-        for (const plan of todayPlanItems) {
-            if (!plan.startDateTime || !plan.endDateTime) continue;
-
-            const hasAssociated = real.some(log => log.planItemId === plan.id);
-            if (hasAssociated) continue;
-
-            const planStart = new Date(plan.startDateTime);
-            const planEnd = new Date(plan.endDateTime);
-
-            const isOverlap = real.some(log => {
-                const logStart = new Date(log.startTime);
-                const logEnd = log.endTime ? new Date(log.endTime) : new Date();
-                return planStart < logEnd && planEnd > logStart;
-            });
-
-            if (isOverlap) continue;
-
-            suggestions.push({
-                id: `suggested_${plan.id}`,
-                planItemId: plan.id,
-                taskId: plan.taskId,
-                projectId: plan.projectId,
-                userId: plan.assignedTo,
-                startTime: plan.startDateTime,
-                endTime: plan.endDateTime,
-                totalHours: plan.plannedHours || 0,
-                notes: plan.notes || 'Sugerido desde el planificador',
-                taskTitle: plan.taskTitleSnapshot || plan.taskTitle || 'Tarea planeada',
-                projectName: plan.projectNameSnapshot || plan.projectName || '',
-                displayName: plan.assignedToName || '',
-                source: 'planner_suggestion',
-                isDraft: true,
-            });
-        }
-
-        return [...real, ...suggestions];
-    }, [timeLogs, userId, todayStr, todayPlanItems]);
+        if (!userId || !timeLogs) return [];
+        return timeLogs
+            .filter(log =>
+                log.userId === userId &&
+                log.startTime?.startsWith(todayStr)
+            )
+            .map(log => ({
+                ...log,
+                isDraft: log.status === 'draft',
+            }));
+    }, [timeLogs, userId, todayStr]);
 
     const myWeekLogs = useMemo(() => {
         if (!timeLogs || !userId) return [];
-        return timeLogs.filter(log => {
-            if (log.userId !== userId || !log.startTime) return false;
-            const d = log.startTime.slice(0, 10);
-            return d >= weekStartStr && d <= weekEndStr;
-        });
+        return timeLogs
+            .filter(log => {
+                if (log.userId !== userId || !log.startTime) return false;
+                const d = log.startTime.slice(0, 10);
+                return d >= weekStartStr && d <= weekEndStr;
+            })
+            .map(log => ({
+                ...log,
+                isDraft: log.status === 'draft',
+            }));
     }, [timeLogs, userId, weekStartStr, weekEndStr]);
 
     const todayHours = useMemo(() =>

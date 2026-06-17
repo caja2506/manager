@@ -63,76 +63,23 @@ export default function WorkLogs() {
     const weekStart = weekDates[0];
     const weekEnd = weekDates[6];
 
-    // --- Load Weekly Plan Items to suggest drafts ---
-    const [weekPlanItems, setWeekPlanItems] = useState([]);
-    const weekStartStr = useMemo(() => {
-        const yyyy = weekStart.getFullYear();
-        const mm = String(weekStart.getMonth() + 1).padStart(2, '0');
-        const dd = String(weekStart.getDate()).padStart(2, '0');
-        return `${yyyy}-${mm}-${dd}`;
-    }, [weekStart]);
-
-    useEffect(() => {
-        plannerService.getWeeklyPlanItems(weekStartStr)
-            .then(setWeekPlanItems)
-            .catch(console.error);
-    }, [weekStartStr]);
-
-    // --- Logs for selected user + current week (Real + Suggestions) ---
+    // --- Logs for selected user + current week (Real + Suggestions from Supabase) ---
     const myWeekLogs = useMemo(() => {
         const uid = selectedUser || user?.uid;
         if (!uid) return [];
-        
-        // Logs reales
-        const real = timeLogs
+        return timeLogs
             .filter(log => {
                 if (log.userId !== uid) return false;
                 if (!log.startTime) return false;
                 const logDate = new Date(log.startTime);
                 return logDate >= weekStart && logDate <= new Date(weekEnd.getTime() + 86400000);
-            });
-
-        // Sugerencias basadas en la planificación semanal
-        const myWeekPlan = weekPlanItems.filter(pi => pi.assignedTo === uid);
-        const suggestions = [];
-
-        for (const plan of myWeekPlan) {
-            if (!plan.startDateTime || !plan.endDateTime) continue;
-
-            const hasAssociated = real.some(log => log.planItemId === plan.id);
-            if (hasAssociated) continue;
-
-            const planStart = new Date(plan.startDateTime);
-            const planEnd = new Date(plan.endDateTime);
-
-            const isOverlap = real.some(log => {
-                const logStart = new Date(log.startTime);
-                const logEnd = log.endTime ? new Date(log.endTime) : new Date();
-                return planStart < logEnd && planEnd > logStart;
-            });
-
-            if (isOverlap) continue;
-
-            suggestions.push({
-                id: `suggested_${plan.id}`,
-                planItemId: plan.id,
-                taskId: plan.taskId,
-                projectId: plan.projectId,
-                userId: plan.assignedTo,
-                startTime: plan.startDateTime,
-                endTime: plan.endDateTime,
-                totalHours: plan.plannedHours || 0,
-                notes: plan.notes || 'Sugerido desde el planificador',
-                taskTitle: plan.taskTitleSnapshot || plan.taskTitle || 'Tarea planeada',
-                projectName: plan.projectNameSnapshot || plan.projectName || '',
-                displayName: plan.assignedToName || '',
-                source: 'planner_suggestion',
-                isDraft: true,
-            });
-        }
-
-        return [...real, ...suggestions].sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
-    }, [timeLogs, selectedUser, user, weekStart, weekEnd, weekPlanItems]);
+            })
+            .map(log => ({
+                ...log,
+                isDraft: log.status === 'draft',
+            }))
+            .sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+    }, [timeLogs, selectedUser, user, weekStart, weekEnd]);
 
     // --- Aggregations ---
     const weekStats = useMemo(() => {
@@ -348,9 +295,6 @@ export default function WorkLogs() {
                                                 const { confirmDraftLogs } = await import('../services/timeService.supabase');
                                                 const result = await confirmDraftLogs(drafts);
                                                 alert(`Se confirmaron ${result.count} bloques planificados.`);
-                                                plannerService.getWeeklyPlanItems(weekStartStr)
-                                                    .then(setWeekPlanItems)
-                                                    .catch(console.error);
                                             } catch (err) {
                                                 console.error(err);
                                                 alert("Error al confirmar: " + err.message);
@@ -480,9 +424,6 @@ export default function WorkLogs() {
                                                             try {
                                                                 const { confirmDraftLogs } = await import('../services/timeService.supabase');
                                                                 await confirmDraftLogs([log]);
-                                                                plannerService.getWeeklyPlanItems(weekStartStr)
-                                                                    .then(setWeekPlanItems)
-                                                                    .catch(console.error);
                                                             } catch (err) {
                                                                 console.error("Confirm Draft Error:", err);
                                                                 alert("No se pudo confirmar la sugerencia: " + err.message);

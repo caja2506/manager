@@ -68,8 +68,44 @@ export const plannerService = {
 
             if (error) throw error;
 
-            // Sync timer immediately
             const itemId = result.id;
+
+            // ── Insert physical draft log in time_logs ──
+            if (data.startDateTime && data.endDateTime) {
+                const start = new Date(data.startDateTime);
+                const end = new Date(data.endDateTime);
+                const totalMs = end - start;
+                const totalHoursGross = parseFloat((totalMs / 3600000).toFixed(6));
+
+                const { getEffectiveHours } = await import('../utils/breakTimeUtils');
+                let totalHours = getEffectiveHours(start, end);
+                if (totalHours < 0.016666) totalHours = 0.016666;
+                const breakHoursDeducted = parseFloat((totalHoursGross - totalHours).toFixed(4));
+
+                await supabase
+                    .from('time_logs')
+                    .insert({
+                        task_id: data.taskId || null,
+                        project_id: data.projectId || null,
+                        user_id: data.assignedTo || null,
+                        start_time: data.startDateTime,
+                        end_time: data.endDateTime,
+                        total_hours: totalHours,
+                        total_hours_gross: totalHoursGross,
+                        break_hours_deducted: breakHoursDeducted,
+                        overtime: false,
+                        overtime_hours: 0,
+                        notes: data.notes || 'Sugerido desde el planificador',
+                        task_title: data.taskTitleSnapshot || data.taskTitle || '',
+                        project_name: data.projectNameSnapshot || data.projectName || '',
+                        display_name: data.assignedToName || '',
+                        source: 'planner_suggestion',
+                        plan_item_id: itemId,
+                        status: 'draft',
+                    });
+            }
+
+            // Sync timer immediately
             const fullData = { id: itemId, ...data };
             syncActivePlannerTimer(itemId, fullData);
 
@@ -127,6 +163,52 @@ export const plannerService = {
 
             if (error) throw error;
 
+            // ── Update draft log in time_logs ──
+            if (updates.startDateTime !== undefined || updates.endDateTime !== undefined || updates.notes !== undefined || updates.taskId !== undefined || updates.projectId !== undefined) {
+                const { data: currentItem } = await supabase
+                    .from('weekly_plan_items')
+                    .select('*')
+                    .eq('id', itemId)
+                    .single();
+
+                if (currentItem) {
+                    const startStr = currentItem.start_date_time;
+                    const endStr = currentItem.end_date_time;
+
+                    if (startStr && endStr) {
+                        const start = new Date(startStr);
+                        const end = new Date(endStr);
+                        const totalMs = end - start;
+                        const totalHoursGross = parseFloat((totalMs / 3600000).toFixed(6));
+
+                        const { getEffectiveHours } = await import('../utils/breakTimeUtils');
+                        let totalHours = getEffectiveHours(start, end);
+                        if (totalHours < 0.016666) totalHours = 0.016666;
+                        const breakHoursDeducted = parseFloat((totalHoursGross - totalHours).toFixed(4));
+
+                        const logUpdates = {
+                            start_time: startStr,
+                            end_time: endStr,
+                            total_hours: totalHours,
+                            total_hours_gross: totalHoursGross,
+                            break_hours_deducted: breakHoursDeducted,
+                        };
+
+                        if (updates.notes !== undefined) logUpdates.notes = updates.notes;
+                        if (updates.taskId !== undefined) logUpdates.task_id = updates.taskId;
+                        if (updates.taskTitle !== undefined) logUpdates.task_title = updates.taskTitle;
+                        if (updates.projectId !== undefined) logUpdates.project_id = updates.projectId;
+                        if (updates.assignedTo !== undefined) logUpdates.user_id = updates.assignedTo;
+
+                        await supabase
+                            .from('time_logs')
+                            .update(logUpdates)
+                            .eq('plan_item_id', itemId)
+                            .eq('status', 'draft');
+                    }
+                }
+            }
+
             // Sync timer immediately
             syncActivePlannerTimer(itemId, null);
         } catch (error) {
@@ -142,6 +224,13 @@ export const plannerService = {
         try {
             // Stop active timer if any before deleting
             await stopActiveTimerForPlanItem(itemId);
+
+            // ── Delete draft log in time_logs ──
+            await supabase
+                .from('time_logs')
+                .delete()
+                .eq('plan_item_id', itemId)
+                .eq('status', 'draft');
 
             const { error } = await supabase
                 .from('weekly_plan_items')
