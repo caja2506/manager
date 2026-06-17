@@ -55,83 +55,115 @@ export default function ManualTimeEntry({
         return (endMins - startMins) / 60;
     };
 
-    const [form, setForm] = useState({
-        taskId: '',
-        projectId: '',
-        date: getLocalDateString(),
-        startHour: '09:00',
-        endHour: '10:00',
-        notes: '',
-        overtime: false,
-    });
-    const [workedHours, setWorkedHours] = useState(1);
+    const [pendingLogs, setPendingLogs] = useState([]);
+    const [activePendingId, setActivePendingId] = useState(null);
+    const [selectedDate, setSelectedDate] = useState(getLocalDateString());
     const [selectedUserId, setSelectedUserId] = useState(userId || '');
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
     const [taskQuery, setTaskQuery] = useState('');
     const [tempBlockPos, setTempBlockPos] = useState(null); // { id, startHour, endHour }
 
+    const activeLog = useMemo(() => {
+        return pendingLogs.find(log => log.id === activePendingId) || null;
+    }, [pendingLogs, activePendingId]);
+
+    const totalPendingHours = useMemo(() => {
+        return pendingLogs.reduce((sum, log) => sum + (log.workedHours || 0), 0);
+    }, [pendingLogs]);
+
+    const updateActiveLog = (updates) => {
+        if (!activePendingId) return;
+        setPendingLogs(prev => prev.map(log => {
+            if (log.id !== activePendingId) return log;
+            const updated = { ...log, ...updates };
+            
+            if (updates.startHour !== undefined || updates.workedHours !== undefined) {
+                const start = updates.startHour !== undefined ? updates.startHour : log.startHour;
+                const hours = updates.workedHours !== undefined ? updates.workedHours : log.workedHours;
+                const startMins = timeToMinutes(start);
+                const endMins = (startMins + Math.round(hours * 60)) % 1440;
+                updated.endHour = minutesToTime(endMins);
+            } else if (updates.endHour !== undefined) {
+                const duration = calculateDuration(log.startHour, updates.endHour);
+                updated.workedHours = duration;
+            }
+            
+            return updated;
+        }));
+    };
+
+    const removePendingLog = (idToRemove) => {
+        if (isEditMode || pendingLogs.length <= 1) return;
+        setPendingLogs(prev => {
+            const filtered = prev.filter(log => log.id !== idToRemove);
+            if (activePendingId === idToRemove && filtered.length > 0) {
+                setActivePendingId(filtered[0].id);
+            }
+            return filtered;
+        });
+    };
+
     // Sincronizadores bidireccionales
     const handleStartHourChange = (newStart) => {
-        const startMins = timeToMinutes(newStart);
-        const endMins = (startMins + Math.round(workedHours * 60)) % 1440;
-        setForm(f => ({
-            ...f,
-            startHour: newStart,
-            endHour: minutesToTime(endMins)
-        }));
+        updateActiveLog({ startHour: newStart });
     };
 
     const handleWorkedHoursChange = (newHours) => {
         const hours = Math.max(0.25, Math.min(24, Number(newHours)));
-        setWorkedHours(hours);
-        const startMins = timeToMinutes(form.startHour);
-        const endMins = (startMins + Math.round(hours * 60)) % 1440;
-        setForm(f => ({
-            ...f,
-            endHour: minutesToTime(endMins)
-        }));
+        updateActiveLog({ workedHours: hours });
     };
 
     const handleEndHourChange = (newEnd) => {
-        const duration = calculateDuration(form.startHour, newEnd);
-        setForm(f => ({ ...f, endHour: newEnd }));
-        setWorkedHours(duration);
+        updateActiveLog({ endHour: newEnd });
     };
 
-    // Populate form when editing
+    // Populate pending logs when modal opens
     useEffect(() => {
-        if (editLog && isOpen) {
-            const start = editLog.startTime ? new Date(editLog.startTime) : null;
-            const end = editLog.endTime ? new Date(editLog.endTime) : null;
-            const startStr = start ? start.toTimeString().slice(0, 5) : '09:00';
-            const endStr = end ? end.toTimeString().slice(0, 5) : '10:00';
-            const duration = calculateDuration(startStr, endStr);
-            setForm({
-                taskId: editLog.taskId || '',
-                projectId: editLog.projectId || '',
-                date: start ? getLocalDateString(start) : getLocalDateString(),
-                startHour: startStr,
-                endHour: endStr,
-                notes: editLog.notes || '',
-                overtime: editLog.overtime || false,
-            });
-            setWorkedHours(duration);
-            setSelectedUserId(editLog.userId || userId || '');
-            setSelectedDraftId(null);
-        } else if (isOpen && !editLog) {
-            setForm({
-                taskId: '', projectId: '',
-                date: getLocalDateString(),
-                startHour: '09:00', endHour: '10:00', notes: '', overtime: false,
-            });
-            setWorkedHours(1);
-            setSelectedUserId(userId || '');
-            setSelectedDraftId(null);
-        }
         if (isOpen) {
             setTaskQuery('');
             setTempBlockPos(null);
+            
+            if (editLog) {
+                const start = editLog.startTime ? new Date(editLog.startTime) : null;
+                const end = editLog.endTime ? new Date(editLog.endTime) : null;
+                const startStr = start ? start.toTimeString().slice(0, 5) : '09:00';
+                const endStr = end ? end.toTimeString().slice(0, 5) : '10:00';
+                const duration = calculateDuration(startStr, endStr);
+                
+                const logToEdit = {
+                    id: editLog.id,
+                    taskId: editLog.taskId || '',
+                    projectId: editLog.projectId || '',
+                    startHour: startStr,
+                    endHour: endStr,
+                    workedHours: duration,
+                    notes: editLog.notes || '',
+                    overtime: editLog.overtime || false,
+                };
+                
+                setPendingLogs([logToEdit]);
+                setActivePendingId(editLog.id);
+                setSelectedDate(start ? getLocalDateString(start) : getLocalDateString());
+                setSelectedUserId(editLog.userId || userId || '');
+                setSelectedDraftId(null);
+            } else {
+                const defaultLog = {
+                    id: `temp_${Date.now()}`,
+                    taskId: '',
+                    projectId: '',
+                    startHour: '09:00',
+                    endHour: '10:00',
+                    workedHours: 1,
+                    notes: '',
+                    overtime: false,
+                };
+                setPendingLogs([defaultLog]);
+                setActivePendingId(defaultLog.id);
+                setSelectedDate(getLocalDateString());
+                setSelectedUserId(userId || '');
+                setSelectedDraftId(null);
+            }
         }
     }, [editLog, isOpen, userId]);
 
@@ -147,22 +179,22 @@ export default function ManualTimeEntry({
     };
 
     const currentDrafts = useMemo(() => {
-        if (!timeLogs || !selectedUserId || !form.date) return [];
+        if (!timeLogs || !selectedUserId || !selectedDate) return [];
         return timeLogs.filter(log => 
             log.userId === selectedUserId &&
             log.status === 'draft' &&
-            getLocalDateOnly(log.startTime) === form.date
+            getLocalDateOnly(log.startTime) === selectedDate
         );
-    }, [timeLogs, selectedUserId, form.date]);
+    }, [timeLogs, selectedUserId, selectedDate]);
 
     const currentConfirmed = useMemo(() => {
-        if (!timeLogs || !selectedUserId || !form.date) return [];
+        if (!timeLogs || !selectedUserId || !selectedDate) return [];
         return timeLogs.filter(log => 
             log.userId === selectedUserId &&
             log.status === 'confirmed' &&
-            getLocalDateOnly(log.startTime) === form.date
+            getLocalDateOnly(log.startTime) === selectedDate
         );
-    }, [timeLogs, selectedUserId, form.date]);
+    }, [timeLogs, selectedUserId, selectedDate]);
 
     const [isConfirmingDrafts, setIsConfirmingDrafts] = useState(false);
 
@@ -171,7 +203,7 @@ export default function ManualTimeEntry({
         setIsConfirmingDrafts(true);
         try {
             const result = await confirmDraftLogs(currentDrafts);
-            console.log(`[ManualTimeEntry] Confirmed ${result.count} drafts for ${selectedUserId} on ${form.date}`);
+            console.log(`[ManualTimeEntry] Confirmed ${result.count} drafts for ${selectedUserId} on ${selectedDate}`);
         } catch (err) {
             console.error('[ManualTimeEntry] Error confirming drafts:', err);
         }
@@ -183,36 +215,34 @@ export default function ManualTimeEntry({
         const endHour = isoToLocalTimeStr(draft.endTime);
         const duration = calculateDuration(startHour, endHour);
         
-        setForm({
+        updateActiveLog({
             projectId: draft.projectId || '',
             taskId: draft.taskId || '',
-            date: draft.startTime ? draft.startTime.slice(0, 10) : getLocalDateString(),
             startHour,
             endHour,
+            workedHours: duration,
             notes: draft.notes && draft.notes !== 'Sugerido desde el planificador'
                 ? draft.notes
                 : (draft.taskTitle || ''),
             overtime: draft.overtime || false,
         });
-        setWorkedHours(duration);
         setSelectedDraftId(draft.id);
     };
 
     // Filter tasks by selected project and user assignment
     const filteredTasks = useMemo(() => {
         if (!tasks) return [];
+        const activeProjId = activeLog ? activeLog.projectId : '';
         return tasks.filter(t => {
             if (t.status === 'completed' || t.status === 'cancelled') return false;
             
-            // If a project is selected, show tasks belonging to that project
-            if (form.projectId) {
-                return t.projectId === form.projectId;
+            if (activeProjId) {
+                return t.projectId === activeProjId;
             }
             
-            // If no project is selected, show all tasks assigned to the user
             return t.assignedTo === selectedUserId;
         });
-    }, [tasks, form.projectId, selectedUserId]);
+    }, [tasks, activeLog, selectedUserId]);
 
     // Apply text search on top of filtered tasks
     const searchedTasks = useMemo(() => {
@@ -227,92 +257,83 @@ export default function ManualTimeEntry({
     if (!isOpen) return null;
 
     const handleSave = async () => {
-        if (!form.date || !form.startHour || !form.endHour) return;
+        if (!selectedDate || pendingLogs.length === 0) return;
         setIsSaving(true);
         setError('');
         try {
-            // Parse the date and time explicitly to avoid browser quirks with ISO strings
-            const [y, m, d] = form.date.split('-').map(Number);
-            const [sh, sm] = form.startHour.split(':').map(Number);
-            const [eh, em] = form.endHour.split(':').map(Number);
+            const [y, m, d] = selectedDate.split('-').map(Number);
             
-            const startDate = new Date(y, m - 1, d, sh, sm, 0);
-            const endDate = new Date(y, m - 1, d, eh, em, 0);
+            for (const log of pendingLogs) {
+                const [sh, sm] = log.startHour.split(':').map(Number);
+                const [eh, em] = log.endHour.split(':').map(Number);
+                
+                const startDate = new Date(y, m - 1, d, sh, sm, 0);
+                const endDate = new Date(y, m - 1, d, eh, em, 0);
 
-            // Output as fully-qualified UTC ISO strings
-            const startTime = startDate.toISOString();
-            const endTime = endDate.toISOString();
+                const startTime = startDate.toISOString();
+                const endTime = endDate.toISOString();
 
-            console.log("DEBUG TZ -> Local Start:", startDate.toString());
-            console.log("DEBUG TZ -> ISO Start:", startTime);
+                let associatedPlanItemId = null;
+                if (selectedDraftId) {
+                    const selDraftObj = currentDrafts.find(d => d.id === selectedDraftId);
+                    associatedPlanItemId = selDraftObj?.planItemId || null;
+                }
 
-            // Obtener el planItemId para asociar el nuevo log manual al bloque del planificador
-            let associatedPlanItemId = null;
-            if (selectedDraftId) {
-                const selDraftObj = currentDrafts.find(d => d.id === selectedDraftId);
-                associatedPlanItemId = selDraftObj?.planItemId || null;
-            }
+                const startNew = new Date(startTime);
+                const endNew = new Date(endTime);
 
-            const startNew = new Date(startTime);
-            const endNew = new Date(endTime);
-
-            // Filtrar borradores locales que se solapan en tiempo
-            const overlappingDrafts = currentDrafts.filter(draft => {
-                if (draft.id === selectedDraftId) return true;
-                const draftStart = new Date(draft.startTime);
-                const draftEnd = new Date(draft.endTime);
-                return draftStart < endNew && draftEnd > startNew;
-            });
-
-            if (!associatedPlanItemId && overlappingDrafts.length > 0) {
-                associatedPlanItemId = overlappingDrafts[0]?.planItemId || null;
-            }
-
-            if (isEditMode) {
-                await updateTimeLog(editLog.id, {
-                    taskId: form.taskId || null,
-                    projectId: form.projectId || null,
-                    startTime,
-                    endTime,
-                    notes: form.notes,
-                    overtime: form.overtime,
+                const overlappingDrafts = currentDrafts.filter(draft => {
+                    if (draft.id === selectedDraftId) return true;
+                    const draftStart = new Date(draft.startTime);
+                    const draftEnd = new Date(draft.endTime);
+                    return draftStart < endNew && draftEnd > startNew;
                 });
-            } else {
-                await createManualTimeLog({
-                    taskId: form.taskId || null,
-                    projectId: form.projectId || null,
-                    userId: selectedUserId || userId,
-                    startTime,
-                    endTime,
-                    notes: form.notes,
-                    overtime: form.overtime,
-                    planItemId: associatedPlanItemId,
-                });
-            }
 
-            // --- EVITAR DUPLICIDAD DE HORAS ---
-            // Sincronizar y eliminar borradores solapados/seleccionados
-            // Combinar los IDs de borradores solapados y el seleccionado
-            const draftsToDelete = [...new Set([
-                ...overlappingDrafts.map(d => d.id),
-                ...(selectedDraftId ? [selectedDraftId] : [])
-            ])];
+                if (!associatedPlanItemId && overlappingDrafts.length > 0) {
+                    associatedPlanItemId = overlappingDrafts[0]?.planItemId || null;
+                }
 
-            // Eliminar de la base de datos uno a uno
-            for (const draftId of draftsToDelete) {
-                try {
-                    const draftObj = currentDrafts.find(d => d.id === draftId);
-                    await deleteTimeLog(draftId, draftObj?.taskId, draftObj?.projectId);
-                    console.log(`[ManualTimeEntry] Deleted draft log to prevent duplication: ${draftId}`);
-                } catch (err) {
-                    console.error(`[ManualTimeEntry] Error deleting draft log ${draftId}:`, err);
+                if (isEditMode) {
+                    await updateTimeLog(log.id, {
+                        taskId: log.taskId || null,
+                        projectId: log.projectId || null,
+                        startTime,
+                        endTime,
+                        notes: log.notes,
+                        overtime: log.overtime,
+                    });
+                } else {
+                    await createManualTimeLog({
+                        taskId: log.taskId || null,
+                        projectId: log.projectId || null,
+                        userId: selectedUserId || userId,
+                        startTime,
+                        endTime,
+                        notes: log.notes,
+                        overtime: log.overtime,
+                        planItemId: associatedPlanItemId,
+                    });
+                }
+
+                const draftsToDelete = [...new Set([
+                    ...overlappingDrafts.map(dr => dr.id),
+                    ...(selectedDraftId ? [selectedDraftId] : [])
+                ])];
+
+                for (const draftId of draftsToDelete) {
+                    try {
+                        const draftObj = currentDrafts.find(dr => dr.id === draftId);
+                        await deleteTimeLog(draftId, draftObj?.taskId, draftObj?.projectId);
+                    } catch (err) {
+                        console.error(`[ManualTimeEntry] Error deleting draft log ${draftId}:`, err);
+                    }
                 }
             }
 
             onClose();
         } catch (err) {
-            console.error('Error saving time log:', err);
-            setError(err.message || 'Error guardando registro');
+            console.error('Error saving time logs:', err);
+            setError(err.message || 'Error guardando registros');
         }
         setIsSaving(false);
     };
@@ -366,80 +387,88 @@ export default function ManualTimeEntry({
 
     // --- INTERACTIVE TIMELINE DRAG & RESIZE HANDLERS FOR GHOST BLOCK ---
 
-    const handleGhostDragStart = (e) => {
+    const handleGhostDragStart = (e, targetLogId) => {
         e.preventDefault();
         e.stopPropagation();
 
         const initialY = e.clientY;
-        const initialStartMins = timeToMinutes(form.startHour);
-        const durationMins = Math.round(workedHours * 60);
+        const targetLog = pendingLogs.find(log => log.id === targetLogId);
+        if (!targetLog) return;
+
+        const initialStartMins = timeToMinutes(targetLog.startHour);
+        const durationMins = Math.round(targetLog.workedHours * 60);
 
         const handleMouseMove = (mv) => {
             const deltaY = mv.clientY - initialY;
             const deltaMins = (deltaY / ROW_HEIGHT) * 60;
-            
-            // Snap a múltiplos de 15 minutos (0.25h)
             const snappedDeltaMins = Math.round(deltaMins / 15) * 15;
             let newStartMins = initialStartMins + snappedDeltaMins;
 
-            // Limitar al rango laboral del timeline (START_HOUR a END_HOUR)
             const minAllowedMins = START_HOUR * 60;
             const maxAllowedMins = END_HOUR * 60 - durationMins;
             newStartMins = Math.max(minAllowedMins, Math.min(maxAllowedMins, newStartMins));
 
             const newStartStr = minutesToTime(newStartMins);
             const newEndMins = (newStartMins + durationMins) % 1440;
+            const newEndStr = minutesToTime(newEndMins);
 
-            setForm(f => ({
-                ...f,
-                startHour: newStartStr,
-                endHour: minutesToTime(newEndMins)
+            setPendingLogs(prev => prev.map(log => {
+                if (log.id !== targetLogId) return log;
+                return {
+                    ...log,
+                    startHour: newStartStr,
+                    endHour: newEndStr
+                };
             }));
         };
 
         const handleMouseUp = () => {
             document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
+            document.removeEventListener('mouseup',   handleMouseUp);
         };
 
         document.addEventListener('mousemove', handleMouseMove);
         document.addEventListener('mouseup',   handleMouseUp);
     };
 
-    const handleGhostResizeStart = (e) => {
+    const handleGhostResizeStart = (e, targetLogId) => {
         e.preventDefault();
         e.stopPropagation();
 
         const initialY = e.clientY;
-        const initialDurationMins = Math.round(workedHours * 60);
-        const startMins = timeToMinutes(form.startHour);
+        const targetLog = pendingLogs.find(log => log.id === targetLogId);
+        if (!targetLog) return;
+
+        const startMins = timeToMinutes(targetLog.startHour);
+        const initialDurationMins = Math.round(targetLog.workedHours * 60);
 
         const handleMouseMove = (mv) => {
             const deltaY = mv.clientY - initialY;
             const deltaMins = (deltaY / ROW_HEIGHT) * 60;
-
-            // Snap a múltiplos de 15 minutos (0.25h)
             const snappedDeltaMins = Math.round(deltaMins / 15) * 15;
             let newDurationMins = initialDurationMins + snappedDeltaMins;
 
-            // Mínimo 15 minutos y máximo hasta el fin del timeline
             const minDurationMins = 15;
             const maxDurationMins = (END_HOUR * 60) - startMins;
             newDurationMins = Math.max(minDurationMins, Math.min(maxDurationMins, newDurationMins));
 
             const newDurationHours = newDurationMins / 60;
             const newEndMins = (startMins + newDurationMins) % 1440;
+            const newEndStr = minutesToTime(newEndMins);
 
-            setWorkedHours(newDurationHours);
-            setForm(f => ({
-                ...f,
-                endHour: minutesToTime(newEndMins)
+            setPendingLogs(prev => prev.map(log => {
+                if (log.id !== targetLogId) return log;
+                return {
+                    ...log,
+                    workedHours: newDurationHours,
+                    endHour: newEndStr
+                };
             }));
         };
 
         const handleMouseUp = () => {
             document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
+            document.removeEventListener('mouseup',   handleMouseUp);
         };
 
         document.addEventListener('mousemove', handleMouseMove);
@@ -717,8 +746,8 @@ export default function ManualTimeEntry({
                                             <FolderGit2 className="w-3.5 h-3.5 inline mr-1 text-indigo-400" />Proyecto
                                         </span>
                                         <select
-                                            value={form.projectId}
-                                            onChange={e => setForm({ ...form, projectId: e.target.value, taskId: '' })}
+                                            value={activeLog ? activeLog.projectId : ''}
+                                            onChange={e => updateActiveLog({ projectId: e.target.value, taskId: '' })}
                                             className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 transition-all premium-select"
                                         >
                                             <option value="">Sin proyecto</option>
@@ -734,14 +763,14 @@ export default function ManualTimeEntry({
                                             <ListTodo className="w-3.5 h-3.5 inline mr-1 text-indigo-400" />Tarea
                                         </span>
                                         <select
-                                            value={form.taskId}
+                                            value={activeLog ? activeLog.taskId : ''}
                                             onChange={e => {
                                                 const newTaskId = e.target.value;
-                                                setForm(f => ({ ...f, taskId: newTaskId }));
                                                 const t = tasks.find(t => t.id === newTaskId);
-                                                if (t?.projectId && !form.projectId) {
-                                                    setForm(f => ({ ...f, projectId: t.projectId }));
-                                                }
+                                                updateActiveLog({
+                                                    taskId: newTaskId,
+                                                    projectId: t?.projectId || (activeLog ? activeLog.projectId : '')
+                                                });
                                             }}
                                             className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 transition-all premium-select"
                                         >
@@ -757,8 +786,8 @@ export default function ManualTimeEntry({
                                         <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Fecha</span>
                                         <input
                                             type="date"
-                                            value={form.date}
-                                            onChange={e => setForm({ ...form, date: e.target.value })}
+                                            value={selectedDate}
+                                            onChange={e => setSelectedDate(e.target.value)}
                                             className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 transition-all"
                                         />
                                     </div>
@@ -796,7 +825,7 @@ export default function ManualTimeEntry({
                                                 </div>
                                             ) : (
                                                 searchedTasks.map(t => {
-                                                    const isSelected = form.taskId === t.id;
+                                                    const isSelected = activeLog?.taskId === t.id;
                                                     const projectObj = projects.find(p => p.id === t.projectId);
                                                     const priorityColors = {
                                                         critical: 'bg-red-500/10 border-red-500/20 text-red-650 dark:text-red-400',
@@ -814,7 +843,7 @@ export default function ManualTimeEntry({
                                                                 e.dataTransfer.effectAllowed = 'copy';
                                                             }}
                                                             onClick={() => {
-                                                                setForm(f => ({ ...f, taskId: t.id, projectId: t.projectId || '' }));
+                                                                updateActiveLog({ taskId: t.id, projectId: t.projectId || '' });
                                                             }}
                                                             className={`p-2 rounded-lg border transition-all duration-150 cursor-grab active:cursor-grabbing flex items-center justify-between gap-2 text-left select-none ${
                                                                 isSelected
@@ -851,7 +880,7 @@ export default function ManualTimeEntry({
                                             </span>
                                             <input
                                                 type="time"
-                                                value={form.startHour}
+                                                value={activeLog?.startHour || '09:00'}
                                                 onChange={e => handleStartHourChange(e.target.value)}
                                                 className="px-2 py-0.5 border border-slate-200 dark:border-slate-800 rounded-lg text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 font-bold transition-all"
                                             />
@@ -862,16 +891,17 @@ export default function ManualTimeEntry({
                                                 min="0"
                                                 max="95"
                                                 step="1"
-                                                value={Math.floor(timeToMinutes(form.startHour) / 15)}
+                                                value={Math.floor(timeToMinutes(activeLog?.startHour || '09:00') / 15)}
                                                 onChange={e => {
                                                     const mins = Number(e.target.value) * 15;
                                                     handleStartHourChange(minutesToTime(mins));
                                                 }}
                                                 className="premium-slider"
                                             />
-                                            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 min-w-[70px] text-right font-mono">
+                                            <span className="text-xs font-bold text-slate-500 dark:text-slate-455 min-w-[70px] text-right font-mono">
                                                 {(() => {
-                                                    const [h, m] = form.startHour.split(':').map(Number);
+                                                    const startHour = activeLog?.startHour || '09:00';
+                                                    const [h, m] = startHour.split(':').map(Number);
                                                     const ampm = h >= 12 ? 'PM' : 'AM';
                                                     const dispH = h % 12 === 0 ? 12 : h % 12;
                                                     return `${dispH}:${String(m).padStart(2, '0')} ${ampm}`;
@@ -892,7 +922,7 @@ export default function ManualTimeEntry({
                                                     min="0.25"
                                                     max="24"
                                                     step="0.25"
-                                                    value={workedHours}
+                                                    value={activeLog?.workedHours || 1.0}
                                                     onChange={e => handleWorkedHoursChange(Number(e.target.value))}
                                                     className="w-14 px-1 py-0.5 border border-slate-200 dark:border-slate-800 rounded-lg text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-center font-bold text-indigo-500 dark:text-indigo-400 transition-all"
                                                 />
@@ -905,12 +935,12 @@ export default function ManualTimeEntry({
                                                 min="0.25"
                                                 max="24"
                                                 step="0.25"
-                                                value={workedHours}
+                                                value={activeLog?.workedHours || 1.0}
                                                 onChange={e => handleWorkedHoursChange(Number(e.target.value))}
                                                 className="premium-slider"
                                             />
-                                            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 min-w-[70px] text-right font-mono">
-                                                {workedHours.toFixed(2)}h
+                                            <span className="text-xs font-bold text-slate-500 dark:text-slate-455 min-w-[70px] text-right font-mono">
+                                                {(activeLog?.workedHours || 1.0).toFixed(2)}h
                                             </span>
                                         </div>
                                     </div>
@@ -922,8 +952,8 @@ export default function ManualTimeEntry({
                                                 Hora de Fin
                                             </span>
                                             {(() => {
-                                                const startMins = timeToMinutes(form.startHour);
-                                                const endMins = timeToMinutes(form.endHour);
+                                                const startMins = timeToMinutes(activeLog?.startHour || '09:00');
+                                                const endMins = timeToMinutes(activeLog?.endHour || '10:00');
                                                 if (endMins < startMins) {
                                                     return <span className="text-[9px] text-amber-500 font-bold ml-1 mt-0.5">⚠️ Siguiente día</span>;
                                                 }
@@ -933,7 +963,8 @@ export default function ManualTimeEntry({
                                         <div className="flex items-center gap-3">
                                             <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 dark:bg-emerald-500/10 px-2 py-0.5 rounded-md">
                                                 {(() => {
-                                                    const [h, m] = form.endHour.split(':').map(Number);
+                                                    const endHour = activeLog?.endHour || '10:00';
+                                                    const [h, m] = endHour.split(':').map(Number);
                                                     const ampm = h >= 12 ? 'PM' : 'AM';
                                                     const dispH = h % 12 === 0 ? 12 : h % 12;
                                                     return `${dispH}:${String(m).padStart(2, '0')} ${ampm}`;
@@ -941,7 +972,7 @@ export default function ManualTimeEntry({
                                             </span>
                                             <input
                                                 type="time"
-                                                value={form.endHour}
+                                                value={activeLog?.endHour || '10:00'}
                                                 onChange={e => handleEndHourChange(e.target.value)}
                                                 className="px-2 py-0.5 border border-slate-200 dark:border-slate-800 rounded-lg text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 font-bold transition-all"
                                             />
@@ -956,8 +987,8 @@ export default function ManualTimeEntry({
                                     <FileText className="w-3.5 h-3.5 inline mr-1 text-indigo-400" />Notas
                                 </span>
                                 <textarea
-                                    value={form.notes}
-                                    onChange={e => setForm({ ...form, notes: e.target.value })}
+                                    value={activeLog?.notes || ''}
+                                    onChange={e => updateActiveLog({ notes: e.target.value })}
                                     placeholder="¿Qué lograste avanzar hoy?"
                                     rows="3"
                                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 resize-none transition-all"
@@ -967,7 +998,7 @@ export default function ManualTimeEntry({
                             {/* Horas Totales e Interruptor de Horas Extra (Alineados en tarjeta premium) */}
                             <div className="flex items-center justify-between p-4 bg-slate-50/30 dark:bg-slate-950/30 border border-slate-200/50 dark:border-slate-850 rounded-xl mt-2">
                                 <div className="text-left">
-                                    <span className="text-3xl font-black text-indigo-650 dark:text-indigo-400 tracking-tight tabular-nums">{workedHours.toFixed(2)}h</span>
+                                    <span className="text-3xl font-black text-indigo-650 dark:text-indigo-400 tracking-tight tabular-nums">{(activeLog?.workedHours || 1.0).toFixed(2)}h</span>
                                     <p className="text-[9px] text-slate-450 uppercase tracking-wider font-black mt-0.5">Total de Horas</p>
                                 </div>
 
@@ -979,14 +1010,14 @@ export default function ManualTimeEntry({
                                     </div>
                                     <button
                                         type="button"
-                                        onClick={() => setForm(f => ({ ...f, overtime: !f.overtime }))}
+                                        onClick={() => updateActiveLog({ overtime: !activeLog?.overtime })}
                                         className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                            form.overtime ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-800'
+                                            activeLog?.overtime ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-800'
                                         }`}
                                     >
                                         <span
                                             className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                                form.overtime ? 'translate-x-4' : 'translate-x-0'
+                                                activeLog?.overtime ? 'translate-x-4' : 'translate-x-0'
                                             }`}
                                         />
                                     </button>
@@ -1035,12 +1066,47 @@ export default function ManualTimeEntry({
                                         </div>
                                     </div>
                                 </div>
-
-                                {/* Grid del Timeline */}
+                                        {/* Grid del Timeline */}
                                 <div className="flex-1 flex flex-col min-h-0 bg-slate-50 dark:bg-slate-950/20 rounded-2xl border border-slate-200 dark:border-slate-850 p-3 overflow-hidden shadow-inner">
-                                    <div className="text-[9px] font-black text-slate-500 dark:text-slate-450 uppercase tracking-wider px-2 mb-2 flex items-center justify-between">
+                                    <div className="text-[9px] font-black text-slate-500 dark:text-slate-455 uppercase tracking-wider px-2 mb-2 flex items-center justify-between">
                                         <span>Línea de Tiempo</span>
-                                        <span className="text-slate-400 dark:text-slate-500 text-[8px] normal-case font-bold">Haz clic en ⏱️ para aplicar</span>
+                                        <div className="flex items-center gap-2">
+                                            {!isEditMode && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        let lastEndMins = 540; // 09:00
+                                                        if (pendingLogs.length > 0) {
+                                                            const maxEndMins = Math.max(...pendingLogs.map(l => timeToMinutes(l.endHour)));
+                                                            if (maxEndMins < END_HOUR * 60) {
+                                                                lastEndMins = maxEndMins;
+                                                            }
+                                                        }
+                                                        const startStr = minutesToTime(lastEndMins);
+                                                        const endMins = (lastEndMins + 60) % 1440;
+                                                        const endStr = minutesToTime(endMins);
+
+                                                        const newLog = {
+                                                            id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                                                            taskId: '',
+                                                            projectId: '',
+                                                            startHour: startStr,
+                                                            endHour: endStr,
+                                                            workedHours: 1.0,
+                                                            notes: '',
+                                                            overtime: false
+                                                        };
+
+                                                        setPendingLogs(prev => [...prev, newLog]);
+                                                        setActivePendingId(newLog.id);
+                                                    }}
+                                                    className="px-2 py-0.5 bg-indigo-650 hover:bg-indigo-550 text-white text-[8px] font-bold rounded transition-all active:scale-95 flex items-center gap-0.5"
+                                                >
+                                                    ＋ Agregar Bloque
+                                                </button>
+                                            )}
+                                            <span className="text-slate-450 dark:text-slate-500 text-[8.5px] normal-case font-bold">Arrastra o haz clic</span>
+                                        </div>
                                     </div>
                                     
                                     <div 
@@ -1087,16 +1153,29 @@ export default function ManualTimeEntry({
                                                     
                                                     const selectedTaskObj = tasks.find(t => t.id === droppedTaskId);
                                                     
-                                                    setForm(f => {
-                                                        const newStart = startStr;
-                                                        const endMins = (timeToMinutes(newStart) + Math.round(workedHours * 60)) % 1440;
-                                                        return {
-                                                            ...f,
-                                                            taskId: droppedTaskId,
-                                                            projectId: selectedTaskObj?.projectId || '',
-                                                            startHour: newStart,
-                                                            endHour: minutesToTime(endMins)
-                                                        };
+                                                    const startMins = timeToMinutes(startStr);
+                                                    const duration = 1.0;
+                                                    const endMins = (startMins + 60) % 1440;
+                                                    const endStr = minutesToTime(endMins);
+
+                                                    const newLog = {
+                                                        id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                                                        taskId: droppedTaskId,
+                                                        projectId: selectedTaskObj?.projectId || '',
+                                                        startHour: startStr,
+                                                        endHour: endStr,
+                                                        workedHours: duration,
+                                                        notes: selectedTaskObj?.title || '',
+                                                        overtime: false
+                                                    };
+
+                                                    setPendingLogs(prev => {
+                                                        if (prev.length === 1 && !prev[0].taskId && !prev[0].projectId && prev[0].notes === '') {
+                                                            setActivePendingId(newLog.id);
+                                                            return [newLog];
+                                                        }
+                                                        setActivePendingId(newLog.id);
+                                                        return [...prev, newLog];
                                                     });
                                                 }}
                                             >
@@ -1201,111 +1280,75 @@ export default function ManualTimeEntry({
                                                     );
                                                 })}
 
-                                                {/* Bloques sugeridos en borrador */}
-                                                {currentDrafts.map(draft => {
-                                                    const isTemp = tempBlockPos && tempBlockPos.id === draft.id;
-                                                    const startVal = isTemp ? tempBlockPos.startHour : draft.startTime;
-                                                    const endVal = isTemp ? tempBlockPos.endHour : draft.endTime;
-                                                    const style = getBlockStyle(startVal, endVal);
-                                                    const startDisp = isTemp ? tempBlockPos.startHour : isoToLocalTimeStr(draft.startTime);
-                                                    const endDisp = isTemp ? tempBlockPos.endHour : isoToLocalTimeStr(draft.endTime);
-                                                    const isSelected = selectedDraftId === draft.id;
-
-                                                    // Calculate display hours
-                                                    let displayHrs = draft.totalHours || 0;
-                                                    if (isTemp) {
-                                                        displayHrs = calculateDuration(tempBlockPos.startHour, tempBlockPos.endHour);
-                                                    }
-
+                                                {/* Bloques en memoria pendientes de confirmación/lote */}
+                                                {pendingLogs.map(log => {
+                                                    const style = getBlockStyle(log.startHour, log.endHour);
+                                                    const isSelected = activePendingId === log.id;
+                                                    const taskObj = tasks.find(t => t.id === log.taskId);
+                                                    const projectObj = projects.find(p => p.id === log.projectId);
+                                                    
                                                     return (
                                                         <div
-                                                            key={draft.id}
-                                                            onMouseDown={(e) => handleExistingBlockDragStart(e, draft)}
-                                                            className={`absolute left-0.5 right-0.5 rounded-xl border-l-4 border-dashed border-amber-500 bg-slate-100/90 dark:bg-slate-900/95 border border-y-slate-200/80 dark:border-y-slate-800 border-r-slate-200/80 dark:border-r-slate-800 text-slate-800 dark:text-slate-200 text-[9px] px-2.5 py-1.5 overflow-hidden transition-all duration-205 z-[15] cursor-grab active:cursor-grabbing group/draft shadow-sm ${
-                                                                isSelected
-                                                                    ? 'ring-2 ring-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.25)]'
-                                                                    : 'hover:bg-slate-200/70 dark:hover:bg-slate-850'
-                                                            }`}
+                                                            key={log.id}
+                                                            onMouseDown={(e) => handleGhostDragStart(e, log.id)}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setActivePendingId(log.id);
+                                                            }}
+                                                            className={`absolute left-0.5 right-0.5 rounded-xl border-l-4 ${
+                                                                isSelected 
+                                                                    ? 'border-indigo-500 bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-800 dark:text-indigo-250 ring-2 ring-indigo-500 shadow-xl' 
+                                                                    : 'border-emerald-500 bg-emerald-550/10 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-250 ring-1 ring-emerald-500/30 shadow-md hover:bg-emerald-500/20'
+                                                            } text-[9px] px-2.5 py-1.5 overflow-hidden select-none z-[16] cursor-grab active:cursor-grabbing group/ghost`}
                                                             style={style}
-                                                            title={`Sugerencia: ${draft.taskTitle || 'Planificación libre'} (${displayHrs.toFixed(2)}h)`}
                                                         >
-                                                            <div 
-                                                                onClick={(e) => {
-                                                                    if (!tempBlockPos) {
-                                                                        applyDraftSuggestion(draft);
-                                                                    }
-                                                                }}
-                                                                className="h-full w-full pointer-events-auto flex flex-col justify-between"
-                                                            >
-                                                                <div>
-                                                                    <div className="font-black truncate flex items-center gap-1 pointer-events-none text-slate-700 dark:text-slate-350">
-                                                                        <span className="text-amber-500 font-bold">⏱️</span>
-                                                                        <span className="truncate">{draft.taskTitle || 'Planificación libre'}</span>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="flex justify-between items-center mt-1 pointer-events-none">
-                                                                    <span className="text-[8px] text-slate-500 dark:text-slate-400 font-mono font-semibold">
-                                                                        {startDisp} - {endDisp}
+                                                            <div className="flex justify-between items-start pointer-events-none">
+                                                                <div className={`font-black truncate flex items-center gap-1.5 ${isSelected ? 'text-indigo-700 dark:text-indigo-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                                                                    <span className="relative flex h-1.5 w-1.5 shrink-0">
+                                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-75" />
+                                                                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-current" />
                                                                     </span>
-                                                                    <span className="text-[8px] font-black text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1 py-0.2 rounded">
-                                                                        {displayHrs.toFixed(1)}h
+                                                                    <span className="truncate">
+                                                                        {taskObj ? taskObj.title : (projectObj ? projectObj.name : 'Nuevo Registro')}
                                                                     </span>
                                                                 </div>
+                                                                <span className="text-[8px] font-black bg-white/20 px-1 py-0.2 rounded shrink-0">
+                                                                    {log.workedHours.toFixed(2)}h
+                                                                </span>
                                                             </div>
+                                                            <div className="text-[8px] opacity-80 font-mono font-bold mt-1 pointer-events-none">
+                                                                {log.startHour} - {log.endHour}
+                                                            </div>
+
+                                                            {/* Botón de descarte rápido ✕ en la esquina derecha del bloque */}
+                                                            {!isEditMode && pendingLogs.length > 1 && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        removePendingLog(log.id);
+                                                                    }}
+                                                                    className="absolute top-1 right-1 p-0.5 rounded-full bg-slate-900/50 hover:bg-red-500 text-white hover:text-white pointer-events-auto transition-colors z-20"
+                                                                    title="Descartar tarea"
+                                                                >
+                                                                    <X className="w-2.5 h-2.5" />
+                                                                </button>
+                                                            )}
 
                                                             {/* Manilla para estirar (borde inferior) */}
                                                             <div 
-                                                                onMouseDown={(e) => handleExistingBlockResizeStart(e, draft)}
-                                                                className="absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize flex items-center justify-center bg-amber-500/10 border-t border-amber-500/20 opacity-0 group-hover/draft:opacity-100 transition-opacity"
+                                                                onMouseDown={(e) => handleGhostResizeStart(e, log.id)}
+                                                                className="absolute bottom-0 left-0 right-0 h-4 cursor-ns-resize flex items-center justify-center bg-current/10 border-t border-current/20 opacity-60 group-hover/ghost:opacity-100 transition-all duration-150 pointer-events-auto z-10"
                                                                 title="Arrastra para cambiar duración"
                                                             >
-                                                                <div className="w-6 h-0.5 rounded-full bg-amber-400/80" />
+                                                                <div className="flex gap-1 items-center justify-center pointer-events-none">
+                                                                    <span className="w-1 h-1 rounded-full bg-current" />
+                                                                    <span className="w-4 h-0.5 rounded-full bg-current" />
+                                                                    <span className="w-1 h-1 rounded-full bg-current" />
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     );
                                                 })}
-
-                                                {/* Previsualización actual interactiva */}
-                                                {(() => {
-                                                    if (isEditMode) return null;
-                                                    const style = getBlockStyle(form.startHour, form.endHour);
-                                                    return (
-                                                        <div
-                                                            className="absolute left-0.5 right-0.5 rounded-xl border-l-4 border-emerald-500 bg-emerald-550/10 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-250 text-[9px] px-2.5 py-1.5 overflow-hidden select-none z-[16] shadow-xl shadow-emerald-950/20 ring-1 ring-emerald-500/30 cursor-grab active:cursor-grabbing group/ghost"
-                                                            style={style}
-                                                            onMouseDown={handleGhostDragStart}
-                                                        >
-                                                            <div className="flex justify-between items-start pointer-events-none">
-                                                                <div className="font-black truncate flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
-                                                                    <span className="relative flex h-1.5 w-1.5 shrink-0">
-                                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                                                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
-                                                                    </span>
-                                                                    <span className="truncate">{tasks.find(t => t.id === form.taskId)?.title || 'Nuevo Registro'}</span>
-                                                                </div>
-                                                                <span className="text-[8px] font-black bg-emerald-500/20 px-1 py-0.2 rounded shrink-0 text-emerald-700 dark:text-emerald-300">
-                                                                    {workedHours.toFixed(2)}h
-                                                                </span>
-                                                            </div>
-                                                            <div className="text-[8px] text-emerald-650/90 dark:text-emerald-400/80 font-mono font-bold mt-1 pointer-events-none">
-                                                                {form.startHour} - {form.endHour}
-                                                            </div>
-
-                                                            {/* Manilla para estirar (borde inferior) */}
-                                                             <div 
-                                                                 onMouseDown={handleGhostResizeStart}
-                                                                 className="absolute bottom-0 left-0 right-0 h-4 cursor-ns-resize flex items-center justify-center bg-emerald-500/20 border-t border-emerald-500/30 opacity-60 group-hover/ghost:opacity-100 transition-all duration-150"
-                                                                 title="Arrastra para cambiar duración"
-                                                             >
-                                                                 <div className="flex gap-1 items-center justify-center pointer-events-none">
-                                                                     <span className="w-1 h-1 rounded-full bg-emerald-400" />
-                                                                     <span className="w-4 h-0.5 rounded-full bg-emerald-400" />
-                                                                     <span className="w-1 h-1 rounded-full bg-emerald-400" />
-                                                                 </div>
-                                                             </div>
-                                                        </div>
-                                                    );
-                                                })()}
                                             </div>
                                         </div>
                                     </div>
@@ -1319,13 +1362,13 @@ export default function ManualTimeEntry({
                 <div className="p-6 border-t border-slate-200 dark:border-slate-800 flex gap-3">
                     <button
                         onClick={onClose}
-                        className="flex-1 px-4 py-3 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl font-bold text-slate-500 dark:text-slate-400 transition-colors"
+                        className="flex-1 px-4 py-3 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl font-bold text-slate-500 dark:text-slate-455 transition-colors"
                     >
                         Cancelar
                     </button>
                     <button
                         onClick={handleSave}
-                        disabled={isSaving || workedHours <= 0}
+                        disabled={isSaving || pendingLogs.length === 0 || totalPendingHours <= 0}
                         className={`flex-1 px-4 py-3 ${
                             isEditMode 
                                 ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 hover:shadow-[0_0_15px_rgba(16,185,129,0.3)]' 
@@ -1333,7 +1376,13 @@ export default function ManualTimeEntry({
                         } text-white rounded-xl font-bold active:scale-95 transition-all duration-200 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-600 disabled:shadow-none flex items-center justify-center gap-2`}
                     >
                         <Save className="w-4 h-4" />
-                        {isSaving ? 'Guardando...' : isEditMode ? 'Actualizar' : 'Registrar'}
+                        {isSaving 
+                            ? 'Guardando...' 
+                            : isEditMode 
+                                ? 'Actualizar' 
+                                : pendingLogs.length > 1 
+                                    ? `Registrar ${pendingLogs.length} tareas (${totalPendingHours.toFixed(1)}h)` 
+                                    : 'Registrar tarea'}
                     </button>
                 </div>
             </div>
