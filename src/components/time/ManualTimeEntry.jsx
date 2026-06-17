@@ -710,296 +710,216 @@ export default function ManualTimeEntry({
 
                     {/* TWO-COLUMN INTEGRATED LAYOUT: Form (7 cols) + Mini Daily Board (5 cols) */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                        
-                        {/* LEFT COLUMN: Form Fields (7 columns) */}
+                                    {/* LEFT COLUMN: Form Fields (7 columns) */}
                         <div className="lg:col-span-7 space-y-4">
                             
+                            {/* Fila 1: Colaborador (si aplica) y Fecha */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* Sub-columna 1: Campos Generales */}
-                                <div className="space-y-4">
-                                    {/* Colaborador / Técnico selector */}
-                                    {teamMembers.length > 0 && (
-                                        <div>
-                                            <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider ml-1 mb-1.5 block">
-                                                Colaborador / Técnico
-                                            </span>
-                                            <select
-                                                value={selectedUserId}
-                                                onChange={e => setSelectedUserId(e.target.value)}
-                                                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 font-bold transition-all premium-select"
-                                            >
-                                                {teamMembers.filter(u => {
-                                                    const uid = u.uid || u.id;
-                                                    return uid && !uid.startsWith('ext_');
-                                                }).map(u => (
-                                                    <option key={u.uid || u.id} value={u.uid || u.id}>
-                                                        {u.displayName || u.email || 'Usuario'}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    )}
-
-                                    {/* Project selector */}
+                                {teamMembers.length > 0 && (
                                     <div>
                                         <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider ml-1 mb-1.5 block">
-                                            <FolderGit2 className="w-3.5 h-3.5 inline mr-1 text-indigo-400" />Proyecto
+                                            Colaborador / Técnico
                                         </span>
                                         <select
-                                            value={activeLog ? activeLog.projectId : ''}
-                                            onChange={e => updateActiveLog({ projectId: e.target.value, taskId: '' })}
-                                            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 transition-all premium-select"
+                                            value={selectedUserId}
+                                            onChange={e => setSelectedUserId(e.target.value)}
+                                            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 font-bold transition-all premium-select"
                                         >
-                                            <option value="">Sin proyecto</option>
-                                            {projects.map(p => (
-                                                <option key={p.id} value={p.id}>{p.name}</option>
+                                            {teamMembers.filter(u => {
+                                                const uid = u.uid || u.id;
+                                                return uid && !uid.startsWith('ext_');
+                                            }).map(u => (
+                                                <option key={u.uid || u.id} value={u.uid || u.id}>
+                                                    {u.displayName || u.email || 'Usuario'}
+                                                </option>
                                             ))}
                                         </select>
                                     </div>
+                                )}
 
-                                    {/* Task selector (filtered by project) */}
-                                    <div>
-                                        <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider ml-1 mb-1.5 block">
-                                            <ListTodo className="w-3.5 h-3.5 inline mr-1 text-indigo-400" />Tarea
+                                <div>
+                                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider ml-1 mb-1.5 block">Fecha</span>
+                                    <input
+                                        type="date"
+                                        value={selectedDate}
+                                        onChange={e => setSelectedDate(e.target.value)}
+                                        className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 transition-all font-bold"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Fila 2: Proyecto y Tarea lado a lado */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider ml-1 mb-1.5 block">
+                                        <FolderGit2 className="w-3.5 h-3.5 inline mr-1 text-indigo-400" />Proyecto
+                                    </span>
+                                    <select
+                                        value={activeLog ? activeLog.projectId : ''}
+                                        onChange={e => updateActiveLog({ projectId: e.target.value, taskId: '' })}
+                                        className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 transition-all premium-select"
+                                    >
+                                        <option value="">Sin proyecto</option>
+                                        {projects.map(p => (
+                                            <option key={p.id} value={p.id}>{p.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider ml-1 mb-1.5 block">
+                                        <ListTodo className="w-3.5 h-3.5 inline mr-1 text-indigo-400" />Tarea
+                                    </span>
+                                    <select
+                                        value={activeLog ? activeLog.taskId : ''}
+                                        onChange={e => {
+                                            const newTaskId = e.target.value;
+                                            const t = tasks.find(t => t.id === newTaskId);
+                                            updateActiveLog({
+                                                taskId: newTaskId,
+                                                projectId: t?.projectId || (activeLog ? activeLog.projectId : '')
+                                            });
+                                        }}
+                                        className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 transition-all premium-select"
+                                    >
+                                        <option value="">Sin tarea</option>
+                                        {filteredTasks.map(t => (
+                                            <option key={t.id} value={t.id}>{t.title}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Fila 3: Sliders de Hora de Inicio y Horas Trabajadas */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-950/20 p-4 rounded-xl border border-slate-250/10 dark:border-slate-850">
+                                {/* Slider Hora de Inicio */}
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
+                                            Hora de Inicio
                                         </span>
-                                        <select
-                                            value={activeLog ? activeLog.taskId : ''}
-                                            onChange={e => {
-                                                const newTaskId = e.target.value;
-                                                const t = tasks.find(t => t.id === newTaskId);
-                                                updateActiveLog({
-                                                    taskId: newTaskId,
-                                                    projectId: t?.projectId || (activeLog ? activeLog.projectId : '')
-                                                });
-                                            }}
-                                            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 transition-all premium-select"
-                                        >
-                                            <option value="">Sin tarea</option>
-                                            {filteredTasks.map(t => (
-                                                <option key={t.id} value={t.id}>{t.title}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    {/* Date */}
-                                    <div>
-                                        <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Fecha</span>
                                         <input
-                                            type="date"
-                                            value={selectedDate}
-                                            onChange={e => setSelectedDate(e.target.value)}
-                                            className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 transition-all"
+                                            type="time"
+                                            value={activeLog?.startHour || '09:00'}
+                                            onChange={e => handleStartHourChange(e.target.value)}
+                                            className="px-2 py-0.5 border border-slate-200 dark:border-slate-800 rounded-lg text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 font-bold transition-all"
                                         />
                                     </div>
-
-                                    {/* Lista de Tareas Disponibles (Arrastrables / Clickeables) */}
-                                    <div className="space-y-1.5 pt-1">
-                                        <div className="text-[10px] font-black text-slate-450 dark:text-slate-500 uppercase tracking-wider ml-1 mb-1.5 flex items-center justify-between">
-                                            <span>Tareas Disponibles ({searchedTasks.length})</span>
-                                            <span className="text-[8px] text-indigo-500 dark:text-indigo-400 normal-case font-bold animate-pulse">Arrastra al Timeline ➔</span>
-                                        </div>
-                                        
-                                        {/* Input de Búsqueda de Tareas */}
-                                        <div className="relative mb-2">
-                                            <input
-                                                type="text"
-                                                placeholder="Buscar tarea..."
-                                                value={taskQuery}
-                                                onChange={e => setTaskQuery(e.target.value)}
-                                                className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-xl text-[11px] outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 placeholder-slate-450 dark:placeholder-slate-600 transition-all font-medium"
-                                            />
-                                            {taskQuery && (
-                                                <button
-                                                    onClick={() => setTaskQuery('')}
-                                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-250 text-xs font-bold"
-                                                >
-                                                    ✕
-                                                </button>
-                                            )}
-                                        </div>
-
-                                        <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 scrollbar-track-transparent">
-                                            {searchedTasks.length === 0 ? (
-                                                <div className="text-[10px] text-slate-500 dark:text-slate-600 py-4 text-center font-bold bg-slate-50/30 dark:bg-slate-950/25 border border-dashed border-slate-200 dark:border-slate-850 rounded-xl">
-                                                    No hay tareas activas
-                                                </div>
-                                            ) : (
-                                                searchedTasks.map(t => {
-                                                    const isSelected = activeLog?.taskId === t.id;
-                                                    const projectObj = projects.find(p => p.id === t.projectId);
-                                                    const priorityColors = {
-                                                        critical: 'bg-red-500/10 border-red-500/20 text-red-650 dark:text-red-400',
-                                                        high: 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400',
-                                                        medium: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-600 dark:text-indigo-400',
-                                                        low: 'bg-slate-500/10 border-slate-500/20 text-slate-600 dark:text-slate-400',
-                                                    };
-                                                    const pColor = priorityColors[t.priority] || priorityColors.medium;
-                                                    return (
-                                                        <div
-                                                            key={t.id}
-                                                            draggable
-                                                            onDragStart={(e) => {
-                                                                e.dataTransfer.setData('text/plain', `task:${t.id}`);
-                                                                e.dataTransfer.effectAllowed = 'copy';
-                                                            }}
-                                                            onClick={() => {
-                                                                updateActiveLog({ taskId: t.id, projectId: t.projectId || '' });
-                                                            }}
-                                                            className={`p-2 rounded-lg border transition-all duration-150 cursor-grab active:cursor-grabbing flex items-center justify-between gap-2 text-left select-none ${
-                                                                isSelected
-                                                                    ? 'bg-indigo-500/10 border-indigo-500 text-indigo-900 dark:text-white shadow-sm shadow-indigo-550/10'
-                                                                    : 'bg-slate-50/30 dark:bg-slate-900/40 border-slate-200/60 dark:border-slate-850/60 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
-                                                            }`}
-                                                        >
-                                                            <div className="flex-1 min-w-0 pr-1">
-                                                                <div className="text-xs font-bold truncate">{t.title}</div>
-                                                                {projectObj && (
-                                                                    <div className="text-[9px] text-purple-600 dark:text-purple-400 font-bold truncate mt-0.5">
-                                                                        📁 {projectObj.name}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0 ${pColor}`}>
-                                                                {t.priority}
-                                                            </span>
-                                                        </div>
-                                                    );
-                                                })
-                                            )}
-                                        </div>
+                                    <div className="flex items-center gap-3">
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max="95"
+                                            step="1"
+                                            value={Math.floor(timeToMinutes(activeLog?.startHour || '09:00') / 15)}
+                                            onChange={e => {
+                                                const mins = Number(e.target.value) * 15;
+                                                handleStartHourChange(minutesToTime(mins));
+                                            }}
+                                            className="premium-slider"
+                                        />
+                                        <span className="text-xs font-bold text-slate-500 dark:text-slate-455 min-w-[70px] text-right font-mono">
+                                            {(() => {
+                                                const startHour = activeLog?.startHour || '09:00';
+                                                const [h, m] = startHour.split(':').map(Number);
+                                                const ampm = h >= 12 ? 'PM' : 'AM';
+                                                const dispH = h % 12 === 0 ? 12 : h % 12;
+                                                return `${dispH}:${String(m).padStart(2, '0')} ${ampm}`;
+                                            })()}
+                                        </span>
                                     </div>
                                 </div>
 
-                                {/* Sub-columna 2: Sliders & Tiempos */}
-                                <div className="space-y-4">
-                                    {/* Slider Hora de Inicio */}
-                                    <div className="space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider ml-1 block">
-                                                Hora de Inicio
-                                            </span>
+                                {/* Slider Horas Trabajadas */}
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
+                                            Horas Trabajadas
+                                        </span>
+                                        <div className="flex items-center gap-1">
                                             <input
-                                                type="time"
-                                                value={activeLog?.startHour || '09:00'}
-                                                onChange={e => handleStartHourChange(e.target.value)}
-                                                className="px-2 py-0.5 border border-slate-200 dark:border-slate-800 rounded-lg text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 font-bold transition-all"
-                                            />
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <input
-                                                type="range"
-                                                min="0"
-                                                max="95"
-                                                step="1"
-                                                value={Math.floor(timeToMinutes(activeLog?.startHour || '09:00') / 15)}
-                                                onChange={e => {
-                                                    const mins = Number(e.target.value) * 15;
-                                                    handleStartHourChange(minutesToTime(mins));
-                                                }}
-                                                className="premium-slider"
-                                            />
-                                            <span className="text-xs font-bold text-slate-500 dark:text-slate-455 min-w-[70px] text-right font-mono">
-                                                {(() => {
-                                                    const startHour = activeLog?.startHour || '09:00';
-                                                    const [h, m] = startHour.split(':').map(Number);
-                                                    const ampm = h >= 12 ? 'PM' : 'AM';
-                                                    const dispH = h % 12 === 0 ? 12 : h % 12;
-                                                    return `${dispH}:${String(m).padStart(2, '0')} ${ampm}`;
-                                                })()}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Slider Horas Trabajadas */}
-                                    <div className="space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider ml-1 block">
-                                                Horas Trabajadas
-                                            </span>
-                                            <div className="flex items-center gap-1">
-                                                <input
-                                                    type="number"
-                                                    min="0.25"
-                                                    max="24"
-                                                    step="0.25"
-                                                    value={activeLog?.workedHours || 1.0}
-                                                    onChange={e => handleWorkedHoursChange(Number(e.target.value))}
-                                                    className="w-14 px-1 py-0.5 border border-slate-200 dark:border-slate-800 rounded-lg text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-center font-bold text-indigo-500 dark:text-indigo-400 transition-all"
-                                                />
-                                                <span className="text-xs text-slate-500 font-bold">h</span>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <input
-                                                type="range"
+                                                type="number"
                                                 min="0.25"
                                                 max="24"
                                                 step="0.25"
                                                 value={activeLog?.workedHours || 1.0}
                                                 onChange={e => handleWorkedHoursChange(Number(e.target.value))}
-                                                className="premium-slider"
+                                                className="w-14 px-1 py-0.5 border border-slate-200 dark:border-slate-800 rounded-lg text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-center font-bold text-indigo-500 dark:text-indigo-400 transition-all"
                                             />
-                                            <span className="text-xs font-bold text-slate-500 dark:text-slate-455 min-w-[70px] text-right font-mono">
-                                                {(activeLog?.workedHours || 1.0).toFixed(2)}h
-                                            </span>
+                                            <span className="text-xs text-slate-500 font-bold">h</span>
                                         </div>
                                     </div>
-
-                                    {/* Hora de Fin (calculada / ajustable) */}
-                                    <div className="flex items-center justify-between bg-slate-50/30 dark:bg-slate-950/30 p-3 rounded-xl border border-slate-200/50 dark:border-slate-850">
-                                        <div className="flex flex-col">
-                                            <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider ml-1">
-                                                Hora de Fin
-                                            </span>
-                                            {(() => {
-                                                const startMins = timeToMinutes(activeLog?.startHour || '09:00');
-                                                const endMins = timeToMinutes(activeLog?.endHour || '10:00');
-                                                if (endMins < startMins) {
-                                                    return <span className="text-[9px] text-amber-500 font-bold ml-1 mt-0.5">⚠️ Siguiente día</span>;
-                                                }
-                                                return null;
-                                            })()}
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 dark:bg-emerald-500/10 px-2 py-0.5 rounded-md">
-                                                {(() => {
-                                                    const endHour = activeLog?.endHour || '10:00';
-                                                    const [h, m] = endHour.split(':').map(Number);
-                                                    const ampm = h >= 12 ? 'PM' : 'AM';
-                                                    const dispH = h % 12 === 0 ? 12 : h % 12;
-                                                    return `${dispH}:${String(m).padStart(2, '0')} ${ampm}`;
-                                                })()}
-                                            </span>
-                                            <input
-                                                type="time"
-                                                value={activeLog?.endHour || '10:00'}
-                                                onChange={e => handleEndHourChange(e.target.value)}
-                                                className="px-2 py-0.5 border border-slate-200 dark:border-slate-800 rounded-lg text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 font-bold transition-all"
-                                            />
-                                        </div>
+                                    <div className="flex items-center gap-3">
+                                        <input
+                                            type="range"
+                                            min="0.25"
+                                            max="24"
+                                            step="0.25"
+                                            value={activeLog?.workedHours || 1.0}
+                                            onChange={e => handleWorkedHoursChange(Number(e.target.value))}
+                                            className="premium-slider"
+                                        />
+                                        <span className="text-xs font-bold text-slate-500 dark:text-slate-455 min-w-[70px] text-right font-mono">
+                                            {(activeLog?.workedHours || 1.0).toFixed(2)}h
+                                        </span>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Notes */}
-                            <div>
-                                <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider ml-1 mb-1.5 block">
-                                    <FileText className="w-3.5 h-3.5 inline mr-1 text-indigo-400" />Notas
-                                </span>
-                                <textarea
-                                    value={activeLog?.notes || ''}
-                                    onChange={e => updateActiveLog({ notes: e.target.value })}
-                                    placeholder="¿Qué lograste avanzar hoy?"
-                                    rows="3"
-                                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 resize-none transition-all"
-                                />
+                            {/* Fila 4: Hora de Fin y Notas (apilado / compacto) */}
+                            <div className="grid grid-cols-1 gap-4">
+                                <div className="flex items-center justify-between bg-slate-50/30 dark:bg-slate-950/30 p-3 rounded-xl border border-slate-200/50 dark:border-slate-850">
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider ml-1">
+                                            Hora de Fin
+                                        </span>
+                                        {(() => {
+                                            const startMins = timeToMinutes(activeLog?.startHour || '09:00');
+                                            const endMins = timeToMinutes(activeLog?.endHour || '10:00');
+                                            if (endMins < startMins) {
+                                                return <span className="text-[9px] text-amber-500 font-bold ml-1 mt-0.5">⚠️ Siguiente día</span>;
+                                            }
+                                            return null;
+                                        })()}
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 dark:bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                                            {(() => {
+                                                const endHour = activeLog?.endHour || '10:00';
+                                                const [h, m] = endHour.split(':').map(Number);
+                                                const ampm = h >= 12 ? 'PM' : 'AM';
+                                                const dispH = h % 12 === 0 ? 12 : h % 12;
+                                                return `${dispH}:${String(m).padStart(2, '0')} ${ampm}`;
+                                            })()}
+                                        </span>
+                                        <input
+                                            type="time"
+                                            value={activeLog?.endHour || '10:00'}
+                                            onChange={e => handleEndHourChange(e.target.value)}
+                                            className="px-2 py-0.5 border border-slate-200 dark:border-slate-800 rounded-lg text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 font-bold transition-all"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider ml-1 mb-1.5 block">
+                                        <FileText className="w-3.5 h-3.5 inline mr-1 text-indigo-400" />Notas
+                                    </span>
+                                    <textarea
+                                        value={activeLog?.notes || ''}
+                                        onChange={e => updateActiveLog({ notes: e.target.value })}
+                                        placeholder="¿Qué lograste avanzar hoy?"
+                                        rows="2"
+                                        className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 resize-none transition-all"
+                                    />
+                                </div>
                             </div>
 
-                            {/* Horas Totales e Interruptor de Horas Extra (Alineados en tarjeta premium) */}
-                            <div className="flex items-center justify-between p-4 bg-slate-50/30 dark:bg-slate-950/30 border border-slate-200/50 dark:border-slate-850 rounded-xl mt-2">
+                            {/* Horas Totales e Interruptor de Horas Extra */}
+                            <div className="flex items-center justify-between p-4 bg-slate-50/30 dark:bg-slate-950/30 border border-slate-200/50 dark:border-slate-850 rounded-xl">
                                 <div className="text-left">
                                     <span className="text-3xl font-black text-indigo-650 dark:text-indigo-400 tracking-tight tabular-nums">{(activeLog?.workedHours || 1.0).toFixed(2)}h</span>
-                                    <p className="text-[9px] text-slate-450 uppercase tracking-wider font-black mt-0.5">Total de Horas</p>
+                                    <p className="text-[9px] text-slate-450 uppercase tracking-wider font-black mt-0.5">Total de Horas del Bloque</p>
                                 </div>
 
                                 {/* Premium iOS-like Switch for Overtime */}
@@ -1066,6 +986,88 @@ export default function ManualTimeEntry({
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Banda de Tareas Disponibles (Carrusel Horizontal) */}
+                                <div className="bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-850/80 rounded-xl p-3.5 my-3 space-y-2.5">
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-[10px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                                                Tareas Disponibles ({searchedTasks.length})
+                                            </span>
+                                            <span className="text-[8px] text-indigo-500 dark:text-indigo-400 bg-indigo-500/5 px-1 py-0.2 rounded font-bold animate-pulse">
+                                                Arrastra abajo ⬇
+                                            </span>
+                                        </div>
+
+                                        {/* Input de Búsqueda Compacto */}
+                                        <div className="relative w-40">
+                                            <input
+                                                type="text"
+                                                placeholder="Buscar tarea..."
+                                                value={taskQuery}
+                                                onChange={e => setTaskQuery(e.target.value)}
+                                                className="w-full pl-2 pr-6 py-0.5 border border-slate-200 dark:border-slate-800 rounded-lg text-[10px] outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 placeholder-slate-450 dark:placeholder-slate-600 transition-all font-medium"
+                                            />
+                                            {taskQuery && (
+                                                <button
+                                                    onClick={() => setTaskQuery('')}
+                                                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-250 text-[9px] font-bold"
+                                                >
+                                                    ✕
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Banda Horizontal de Tarjetas */}
+                                    <div className="flex overflow-x-auto gap-2.5 pb-1 pr-1 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 scrollbar-track-transparent select-none min-h-[58px]">
+                                        {searchedTasks.length === 0 ? (
+                                            <div className="text-[9px] text-slate-500 dark:text-slate-600 py-3 w-full text-center font-bold bg-slate-50/30 dark:bg-slate-950/25 border border-dashed border-slate-200 dark:border-slate-850 rounded-lg">
+                                                No hay tareas activas
+                                            </div>
+                                        ) : (
+                                            searchedTasks.map(t => {
+                                                const isSelected = activeLog?.taskId === t.id;
+                                                const projectObj = projects.find(p => p.id === t.projectId);
+                                                const priorityColors = {
+                                                    critical: 'bg-red-500/10 border-red-500/20 text-red-650 dark:text-red-450 border-l-red-500',
+                                                    high: 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-450 border-l-amber-550',
+                                                    medium: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-600 dark:text-indigo-400 border-l-indigo-500',
+                                                    low: 'bg-slate-500/10 border-slate-500/20 text-slate-600 dark:text-slate-400 border-l-slate-450',
+                                                };
+                                                const pColor = priorityColors[t.priority] || priorityColors.medium;
+                                                return (
+                                                    <div
+                                                        key={t.id}
+                                                        draggable
+                                                        onDragStart={(e) => {
+                                                            e.dataTransfer.setData('text/plain', `task:${t.id}`);
+                                                            e.dataTransfer.effectAllowed = 'copy';
+                                                        }}
+                                                        onClick={() => {
+                                                            updateActiveLog({ taskId: t.id, projectId: t.projectId || '' });
+                                                        }}
+                                                        className={`p-2 rounded-lg border border-l-4 shrink-0 w-[170px] text-left transition-all duration-150 cursor-grab active:cursor-grabbing flex flex-col justify-between select-none ${pColor} ${
+                                                            isSelected
+                                                                ? 'ring-2 ring-indigo-500 shadow-sm'
+                                                                : 'bg-slate-50/30 dark:bg-slate-900/40 border-slate-200/60 dark:border-slate-850/60 hover:border-slate-300 dark:hover:border-slate-700'
+                                                        }`}
+                                                    >
+                                                        <div className="text-[10px] font-black truncate text-slate-800 dark:text-slate-200" title={t.title}>
+                                                            {t.title}
+                                                        </div>
+                                                        {projectObj && (
+                                                            <div className="text-[8px] text-slate-455 dark:text-slate-500 truncate font-semibold mt-1">
+                                                                📁 {projectObj.name}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                </div>
+
                                         {/* Grid del Timeline */}
                                 <div className="flex-1 flex flex-col min-h-0 bg-slate-50 dark:bg-slate-950/20 rounded-2xl border border-slate-200 dark:border-slate-850 p-3 overflow-hidden shadow-inner">
                                     <div className="text-[9px] font-black text-slate-500 dark:text-slate-455 uppercase tracking-wider px-2 mb-2 flex items-center justify-between">
