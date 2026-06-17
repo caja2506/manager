@@ -63,6 +63,7 @@ export default function ManualTimeEntry({
     const [error, setError] = useState('');
     const [taskQuery, setTaskQuery] = useState('');
     const [tempBlockPos, setTempBlockPos] = useState(null); // { id, startHour, endHour }
+    const [zPriority, setZPriority] = useState('start');
 
     const activeLog = useMemo(() => {
         return pendingLogs.find(log => log.id === activePendingId) || null;
@@ -107,11 +108,6 @@ export default function ManualTimeEntry({
     // Sincronizadores bidireccionales
     const handleStartHourChange = (newStart) => {
         updateActiveLog({ startHour: newStart });
-    };
-
-    const handleWorkedHoursChange = (newHours) => {
-        const hours = Math.max(0.25, Math.min(24, Number(newHours)));
-        updateActiveLog({ workedHours: hours });
     };
 
     const handleEndHourChange = (newEnd) => {
@@ -210,25 +206,6 @@ export default function ManualTimeEntry({
         setIsConfirmingDrafts(false);
     };
 
-    const applyDraftSuggestion = (draft) => {
-        const startHour = isoToLocalTimeStr(draft.startTime);
-        const endHour = isoToLocalTimeStr(draft.endTime);
-        const duration = calculateDuration(startHour, endHour);
-        
-        updateActiveLog({
-            projectId: draft.projectId || '',
-            taskId: draft.taskId || '',
-            startHour,
-            endHour,
-            workedHours: duration,
-            notes: draft.notes && draft.notes !== 'Sugerido desde el planificador'
-                ? draft.notes
-                : (draft.taskTitle || ''),
-            overtime: draft.overtime || false,
-        });
-        setSelectedDraftId(draft.id);
-    };
-
     // Filter tasks by selected project and user assignment
     const filteredTasks = useMemo(() => {
         if (!tasks) return [];
@@ -254,7 +231,7 @@ export default function ManualTimeEntry({
         );
     }, [filteredTasks, taskQuery]);
 
-    if (!isOpen) return null;
+
 
     const handleSave = async () => {
         if (!selectedDate || pendingLogs.length === 0) return;
@@ -632,6 +609,62 @@ export default function ManualTimeEntry({
         timelineHours.push(h);
     }
 
+
+    if (!isOpen) return null;
+
+    // Dynamic calculations for the single bar range slider
+    const sliderMinHour = Math.min(8, activeLog ? Math.floor(timeToMinutes(activeLog.startHour) / 60) : 8);
+    const sliderMaxHour = Math.max(17, activeLog ? Math.ceil(timeToMinutes(activeLog.endHour) / 60) : 17);
+    const sliderMinMins = sliderMinHour * 60;
+    const sliderMaxMins = sliderMaxHour * 60;
+    const rangeDiff = sliderMaxMins - sliderMinMins;
+    const maxSteps = Math.round(rangeDiff / 15);
+
+    const startMins = activeLog ? timeToMinutes(activeLog.startHour) : 540;
+    const endMins = activeLog ? timeToMinutes(activeLog.endHour) : 600;
+
+    const startVal = Math.round((startMins - sliderMinMins) / 15);
+    const endVal = Math.round((endMins - sliderMinMins) / 15);
+
+    const leftPercent = Math.max(0, Math.min(100, ((startMins - sliderMinMins) / rangeDiff) * 100));
+    const rightPercent = Math.max(0, Math.min(100, ((endMins - sliderMinMins) / rangeDiff) * 100));
+
+    const handleSliderStartChange = (val) => {
+        const newStartMins = sliderMinMins + val * 15;
+        const allowedStartMins = Math.min(timeToMinutes(activeLog?.endHour || '10:00') - 15, newStartMins);
+        const newStartStr = minutesToTime(allowedStartMins);
+        const duration = calculateDuration(newStartStr, activeLog?.endHour || '10:00');
+        updateActiveLog({ startHour: newStartStr, workedHours: duration });
+    };
+
+    const handleSliderEndChange = (val) => {
+        const newEndMins = sliderMinMins + val * 15;
+        const allowedEndMins = Math.max(timeToMinutes(activeLog?.startHour || '09:00') + 15, newEndMins);
+        const newEndStr = minutesToTime(allowedEndMins);
+        updateActiveLog({ endHour: newEndStr });
+    };
+
+    const handleMouseMoveTrack = (e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const percent = clickX / rect.width;
+        const clickedMins = sliderMinMins + percent * rangeDiff;
+        
+        const distToStart = Math.abs(clickedMins - startMins);
+        const distToEnd = Math.abs(clickedMins - endMins);
+        
+        if (distToStart < distToEnd) {
+            setZPriority('start');
+        } else {
+            setZPriority('end');
+        }
+    };
+
+    const ticks = [];
+    for (let h = sliderMinHour; h <= sliderMaxHour; h++) {
+        ticks.push(h);
+    }
+
     return (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[300] flex items-center justify-center p-4">
             {/* Custom Range Sliders Premium Styling */}
@@ -685,7 +718,7 @@ export default function ManualTimeEntry({
                 }
             `}</style>
 
-            <div className="bg-slate-900 rounded-2xl shadow-2xl border border-slate-800 w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-slate-900 rounded-2xl shadow-2xl border border-slate-800 w-full max-w-[1200px] max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-slate-800">
                     <div className="flex items-center gap-3">
@@ -708,10 +741,10 @@ export default function ManualTimeEntry({
                         </div>
                     )}
 
-                    {/* TWO-COLUMN INTEGRATED LAYOUT: Form (7 cols) + Mini Daily Board (5 cols) */}
+                    {/* THREE-COLUMN INTEGRATED LAYOUT: Form (5 cols) + Timeline (4 cols) + Available Tasks (3 cols) */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                                    {/* LEFT COLUMN: Form Fields (7 columns) */}
-                        <div className="lg:col-span-7 space-y-4">
+                        {/* LEFT COLUMN: Form Fields (5 columns) */}
+                        <div className="lg:col-span-5 space-y-4">
                             
                             {/* Fila 1: Colaborador (si aplica) y Fecha */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -789,130 +822,115 @@ export default function ManualTimeEntry({
                                     </select>
                                 </div>
                             </div>
+                                                  {/* Rango de Horas Integrado (Sola Barra) */}
+                            <div className="bg-slate-950/20 p-4 rounded-xl border border-slate-250/10 dark:border-slate-850 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
+                                        Rango de Horas
+                                    </span>
+                                    <div className="flex items-center gap-1.5 bg-slate-500/5 dark:bg-slate-950/40 border border-slate-200/60 dark:border-slate-850 px-2 py-0.5 rounded-lg text-xs font-mono font-black text-indigo-550 dark:text-indigo-400">
+                                        {(activeLog?.workedHours || 1.0).toFixed(2)}h
+                                    </div>
+                                </div>
 
-                            {/* Fila 3: Sliders de Hora de Inicio y Horas Trabajadas */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-950/20 p-4 rounded-xl border border-slate-250/10 dark:border-slate-850">
-                                {/* Slider Hora de Inicio */}
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
-                                            Hora de Inicio
-                                        </span>
+                                <div className="flex items-center justify-between gap-4">
+                                    {/* Start Time Input */}
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[9px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-wider">Inicio</span>
                                         <input
                                             type="time"
                                             value={activeLog?.startHour || '09:00'}
                                             onChange={e => handleStartHourChange(e.target.value)}
-                                            className="px-2 py-0.5 border border-slate-200 dark:border-slate-800 rounded-lg text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 font-bold transition-all"
+                                            className="px-2 py-1 border border-slate-200 dark:border-slate-800 rounded-lg text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 font-bold transition-all"
                                         />
                                     </div>
-                                    <div className="flex items-center gap-3">
-                                        <input
-                                            type="range"
-                                            min="0"
-                                            max="95"
-                                            step="1"
-                                            value={Math.floor(timeToMinutes(activeLog?.startHour || '09:00') / 15)}
-                                            onChange={e => {
-                                                const mins = Number(e.target.value) * 15;
-                                                handleStartHourChange(minutesToTime(mins));
-                                            }}
-                                            className="premium-slider"
-                                        />
-                                        <span className="text-xs font-bold text-slate-500 dark:text-slate-455 min-w-[70px] text-right font-mono">
-                                            {(() => {
-                                                const startHour = activeLog?.startHour || '09:00';
-                                                const [h, m] = startHour.split(':').map(Number);
-                                                const ampm = h >= 12 ? 'PM' : 'AM';
-                                                const dispH = h % 12 === 0 ? 12 : h % 12;
-                                                return `${dispH}:${String(m).padStart(2, '0')} ${ampm}`;
-                                            })()}
-                                        </span>
-                                    </div>
-                                </div>
 
-                                {/* Slider Horas Trabajadas */}
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
-                                            Horas Trabajadas
-                                        </span>
-                                        <div className="flex items-center gap-1">
-                                            <input
-                                                type="number"
-                                                min="0.25"
-                                                max="24"
-                                                step="0.25"
-                                                value={activeLog?.workedHours || 1.0}
-                                                onChange={e => handleWorkedHoursChange(Number(e.target.value))}
-                                                className="w-14 px-1 py-0.5 border border-slate-200 dark:border-slate-800 rounded-lg text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-center font-bold text-indigo-500 dark:text-indigo-400 transition-all"
-                                            />
-                                            <span className="text-xs text-slate-500 font-bold">h</span>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <input
-                                            type="range"
-                                            min="0.25"
-                                            max="24"
-                                            step="0.25"
-                                            value={activeLog?.workedHours || 1.0}
-                                            onChange={e => handleWorkedHoursChange(Number(e.target.value))}
-                                            className="premium-slider"
-                                        />
-                                        <span className="text-xs font-bold text-slate-500 dark:text-slate-455 min-w-[70px] text-right font-mono">
-                                            {(activeLog?.workedHours || 1.0).toFixed(2)}h
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
+                                    {/* Connection icon */}
+                                    <span className="text-slate-400 dark:text-slate-650 font-bold text-xs select-none">➔</span>
 
-                            {/* Fila 4: Hora de Fin y Notas (apilado / compacto) */}
-                            <div className="grid grid-cols-1 gap-4">
-                                <div className="flex items-center justify-between bg-slate-50/30 dark:bg-slate-950/30 p-3 rounded-xl border border-slate-200/50 dark:border-slate-850">
-                                    <div className="flex flex-col">
-                                        <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider ml-1">
-                                            Hora de Fin
-                                        </span>
-                                        {(() => {
-                                            const startMins = timeToMinutes(activeLog?.startHour || '09:00');
-                                            const endMins = timeToMinutes(activeLog?.endHour || '10:00');
-                                            if (endMins < startMins) {
-                                                return <span className="text-[9px] text-amber-500 font-bold ml-1 mt-0.5">⚠️ Siguiente día</span>;
-                                            }
-                                            return null;
-                                        })()}
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 dark:bg-emerald-500/10 px-2 py-0.5 rounded-md">
-                                            {(() => {
-                                                const endHour = activeLog?.endHour || '10:00';
-                                                const [h, m] = endHour.split(':').map(Number);
-                                                const ampm = h >= 12 ? 'PM' : 'AM';
-                                                const dispH = h % 12 === 0 ? 12 : h % 12;
-                                                return `${dispH}:${String(m).padStart(2, '0')} ${ampm}`;
-                                            })()}
-                                        </span>
+                                    {/* End Time Input */}
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[9px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-wider">Fin</span>
                                         <input
                                             type="time"
                                             value={activeLog?.endHour || '10:00'}
                                             onChange={e => handleEndHourChange(e.target.value)}
-                                            className="px-2 py-0.5 border border-slate-200 dark:border-slate-800 rounded-lg text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 font-bold transition-all"
+                                            className="px-2 py-1 border border-slate-200 dark:border-slate-800 rounded-lg text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 font-bold transition-all"
                                         />
                                     </div>
                                 </div>
 
-                                <div>
-                                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider ml-1 mb-1.5 block">
-                                        <FileText className="w-3.5 h-3.5 inline mr-1 text-indigo-400" />Notas
-                                    </span>
-                                    <textarea
-                                        value={activeLog?.notes || ''}
-                                        onChange={e => updateActiveLog({ notes: e.target.value })}
-                                        placeholder="¿Qué lograste avanzar hoy?"
-                                        rows="2"
-                                        className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 resize-none transition-all"
-                                    />
+                                {/* Custom Dual-Range Slider (Single Bar) */}
+                                <div className="pt-2 pb-4">
+                                    <div 
+                                        className="relative w-full h-5 flex items-center group cursor-pointer"
+                                        onMouseMove={handleMouseMoveTrack}
+                                    >
+                                        {/* Base Track */}
+                                        <div className="absolute left-0 right-0 h-2 bg-slate-100 dark:bg-slate-900 rounded-lg border border-slate-200/40 dark:border-slate-800/40" />
+                                        
+                                        {/* Colored Range Highlight */}
+                                        <div 
+                                            className="absolute h-2 bg-gradient-to-r from-indigo-500 to-violet-500 rounded-lg shadow-[0_0_10px_rgba(99,102,241,0.25)]"
+                                            style={{
+                                                left: `${leftPercent}%`,
+                                                right: `${100 - rightPercent}%`
+                                            }}
+                                        />
+                                        
+                                        {/* Start Slider Input */}
+                                        <input
+                                            type="range"
+                                            min={0}
+                                            max={maxSteps}
+                                            value={startVal}
+                                            onChange={(e) => handleSliderStartChange(Number(e.target.value))}
+                                            className={`absolute w-full h-2 appearance-none bg-transparent pointer-events-none focus:outline-none ${
+                                                zPriority === 'start' ? 'z-30' : 'z-20'
+                                            } [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4.5 [&::-webkit-slider-thumb]:h-4.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-indigo-500 [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-4.5 [&::-moz-range-thumb]:h-4.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-indigo-500 [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:transition-transform [&::-moz-range-thumb]:hover:scale-110`}
+                                        />
+
+                                        {/* End Slider Input */}
+                                        <input
+                                            type="range"
+                                            min={0}
+                                            max={maxSteps}
+                                            value={endVal}
+                                            onChange={(e) => handleSliderEndChange(Number(e.target.value))}
+                                            className={`absolute w-full h-2 appearance-none bg-transparent pointer-events-none focus:outline-none ${
+                                                zPriority === 'end' ? 'z-30' : 'z-20'
+                                            } [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4.5 [&::-webkit-slider-thumb]:h-4.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-violet-550 [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-4.5 [&::-moz-range-thumb]:h-4.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-violet-550 [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:transition-transform [&::-moz-range-thumb]:hover:scale-110`}
+                                        />
+                                    </div>
+                                    
+                                    {/* Ticks underneath the slider */}
+                                    <div className="flex justify-between px-1 text-[8px] font-black text-slate-400 dark:text-slate-500 mt-1 select-none">
+                                        {ticks.map((h) => {
+                                            const ampm = h >= 12 ? 'PM' : 'AM';
+                                            const dispH = h % 12 === 0 ? 12 : h % 12;
+                                            return (
+                                                <div key={h} className="flex flex-col items-center">
+                                                    <span className="h-1 w-0.5 bg-slate-350 dark:bg-slate-800 mb-0.5" />
+                                                    <span>{dispH} {ampm}</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
+                            </div>
+
+                            {/* Campo de Notas */}
+                            <div className="space-y-1.5">
+                                <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider ml-1 mb-1 block flex items-center gap-1">
+                                    <FileText className="w-3.5 h-3.5 text-indigo-400" />Notas
+                                </span>
+                                <textarea
+                                    value={activeLog?.notes || ''}
+                                    onChange={e => updateActiveLog({ notes: e.target.value })}
+                                    placeholder="¿Qué lograste avanzar hoy?"
+                                    rows="2"
+                                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 resize-none transition-all font-medium"
+                                />
                             </div>
 
                             {/* Horas Totales e Interruptor de Horas Extra */}
@@ -944,9 +962,8 @@ export default function ManualTimeEntry({
                                 </div>
                             </div>
                         </div>
-
-                        {/* RIGHT COLUMN: Mini Daily Board (5 columns) */}
-                        <div className="lg:col-span-5 border-t lg:border-t-0 lg:border-l border-slate-200 dark:border-slate-800 pt-6 lg:pt-0 lg:pl-6 flex flex-col h-full min-h-[460px]">
+                                   {/* CENTER COLUMN: Timeline (4 columns) */}
+                        <div className="lg:col-span-4 border-t lg:border-t-0 lg:border-l border-slate-200 dark:border-slate-800 pt-6 lg:pt-0 lg:pl-6 flex flex-col h-full min-h-[460px]">
                             {/* Panel Integrado del Daily Board */}
                             <div className="bg-slate-50/20 dark:bg-slate-950/20 border border-slate-200 dark:border-slate-850/80 rounded-2xl p-4 flex-1 flex flex-col min-h-[400px]">
                                 
@@ -984,87 +1001,6 @@ export default function ManualTimeEntry({
                                             <div className="text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total</div>
                                             <div className="text-xs font-mono font-black text-indigo-600 dark:text-indigo-400 mt-0.5">{totalHoursToday.toFixed(1)}h</div>
                                         </div>
-                                    </div>
-                                </div>
-
-                                {/* Banda de Tareas Disponibles (Carrusel Horizontal) */}
-                                <div className="bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-850/80 rounded-xl p-3.5 my-3 space-y-2.5">
-                                    <div className="flex items-center justify-between gap-4">
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="text-[10px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                                                Tareas Disponibles ({searchedTasks.length})
-                                            </span>
-                                            <span className="text-[8px] text-indigo-500 dark:text-indigo-400 bg-indigo-500/5 px-1 py-0.2 rounded font-bold animate-pulse">
-                                                Arrastra abajo ⬇
-                                            </span>
-                                        </div>
-
-                                        {/* Input de Búsqueda Compacto */}
-                                        <div className="relative w-40">
-                                            <input
-                                                type="text"
-                                                placeholder="Buscar tarea..."
-                                                value={taskQuery}
-                                                onChange={e => setTaskQuery(e.target.value)}
-                                                className="w-full pl-2 pr-6 py-0.5 border border-slate-200 dark:border-slate-800 rounded-lg text-[10px] outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 placeholder-slate-450 dark:placeholder-slate-600 transition-all font-medium"
-                                            />
-                                            {taskQuery && (
-                                                <button
-                                                    onClick={() => setTaskQuery('')}
-                                                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-250 text-[9px] font-bold"
-                                                >
-                                                    ✕
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Banda Horizontal de Tarjetas */}
-                                    <div className="flex overflow-x-auto gap-2.5 pb-1 pr-1 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 scrollbar-track-transparent select-none min-h-[58px]">
-                                        {searchedTasks.length === 0 ? (
-                                            <div className="text-[9px] text-slate-500 dark:text-slate-600 py-3 w-full text-center font-bold bg-slate-50/30 dark:bg-slate-950/25 border border-dashed border-slate-200 dark:border-slate-850 rounded-lg">
-                                                No hay tareas activas
-                                            </div>
-                                        ) : (
-                                            searchedTasks.map(t => {
-                                                const isSelected = activeLog?.taskId === t.id;
-                                                const projectObj = projects.find(p => p.id === t.projectId);
-                                                const priorityColors = {
-                                                    critical: 'bg-red-500/10 border-red-500/20 text-red-650 dark:text-red-450 border-l-red-500',
-                                                    high: 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-450 border-l-amber-550',
-                                                    medium: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-600 dark:text-indigo-400 border-l-indigo-500',
-                                                    low: 'bg-slate-500/10 border-slate-500/20 text-slate-600 dark:text-slate-400 border-l-slate-450',
-                                                };
-                                                const pColor = priorityColors[t.priority] || priorityColors.medium;
-                                                return (
-                                                    <div
-                                                        key={t.id}
-                                                        draggable
-                                                        onDragStart={(e) => {
-                                                            e.dataTransfer.setData('text/plain', `task:${t.id}`);
-                                                            e.dataTransfer.effectAllowed = 'copy';
-                                                        }}
-                                                        onClick={() => {
-                                                            updateActiveLog({ taskId: t.id, projectId: t.projectId || '' });
-                                                        }}
-                                                        className={`p-2 rounded-lg border border-l-4 shrink-0 w-[170px] text-left transition-all duration-150 cursor-grab active:cursor-grabbing flex flex-col justify-between select-none ${pColor} ${
-                                                            isSelected
-                                                                ? 'ring-2 ring-indigo-500 shadow-sm'
-                                                                : 'bg-slate-50/30 dark:bg-slate-900/40 border-slate-200/60 dark:border-slate-850/60 hover:border-slate-300 dark:hover:border-slate-700'
-                                                        }`}
-                                                    >
-                                                        <div className="text-[10px] font-black truncate text-slate-800 dark:text-slate-200" title={t.title}>
-                                                            {t.title}
-                                                        </div>
-                                                        {projectObj && (
-                                                            <div className="text-[8px] text-slate-455 dark:text-slate-500 truncate font-semibold mt-1">
-                                                                📁 {projectObj.name}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })
-                                        )}
                                     </div>
                                 </div>
 
@@ -1354,6 +1290,95 @@ export default function ManualTimeEntry({
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* COLUMN 3: Available Tasks (3 columns) */}
+                        <div className="lg:col-span-3 border-t lg:border-t-0 lg:border-l border-slate-200 dark:border-slate-800 pt-6 lg:pt-0 lg:pl-6 flex flex-col h-full">
+                            <div className="bg-slate-50/20 dark:bg-slate-950/20 border border-slate-200 dark:border-slate-850/80 rounded-2xl p-4 flex-1 flex flex-col min-h-[400px]">
+                                
+                                {/* Cabecera de la columna */}
+                                <div className="space-y-3 mb-4">
+                                    <div className="flex items-center justify-between gap-1.5">
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
+                                            <span className="text-[10px] font-black text-slate-700 dark:text-slate-300 tracking-wider uppercase">
+                                                Tareas Disponibles ({searchedTasks.length})
+                                            </span>
+                                        </div>
+                                        <span className="text-[8px] text-indigo-500 dark:text-indigo-400 bg-indigo-500/5 px-1.5 py-0.5 rounded font-bold animate-pulse whitespace-nowrap">
+                                            ⬅ Arrastra
+                                        </span>
+                                    </div>
+
+                                    {/* Buscador Compacto */}
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            placeholder="Buscar tarea..."
+                                            value={taskQuery}
+                                            onChange={e => setTaskQuery(e.target.value)}
+                                            className="w-full pl-3 pr-8 py-1.5 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 placeholder-slate-450 dark:placeholder-slate-600 transition-all font-medium"
+                                        />
+                                        {taskQuery && (
+                                            <button
+                                                onClick={() => setTaskQuery('')}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-250 text-xs font-bold"
+                                            >
+                                                ✕
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Lista Vertical Scrollable */}
+                                <div className="flex-1 overflow-y-auto pr-1 space-y-2 max-h-[360px] scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 scrollbar-track-transparent">
+                                    {searchedTasks.length === 0 ? (
+                                        <div className="text-[10px] text-slate-500 dark:text-slate-600 py-6 text-center font-bold bg-slate-50/30 dark:bg-slate-950/25 border border-dashed border-slate-200 dark:border-slate-850 rounded-xl">
+                                            No hay tareas activas
+                                        </div>
+                                    ) : (
+                                        searchedTasks.map(t => {
+                                            const isSelected = activeLog?.taskId === t.id;
+                                            const projectObj = projects.find(p => p.id === t.projectId);
+                                            const priorityColors = {
+                                                critical: 'bg-red-500/10 border-red-500/20 text-red-650 dark:text-red-455 border-l-red-500',
+                                                high: 'bg-amber-500/10 border-amber-500/20 text-amber-655 dark:text-amber-455 border-l-amber-500',
+                                                medium: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-650 dark:text-indigo-400 border-l-indigo-550',
+                                                low: 'bg-slate-500/10 border-slate-500/20 text-slate-650 dark:text-slate-450 border-l-slate-450',
+                                            };
+                                            const pColor = priorityColors[t.priority] || priorityColors.medium;
+                                            return (
+                                                <div
+                                                    key={t.id}
+                                                    draggable
+                                                    onDragStart={(e) => {
+                                                        e.dataTransfer.setData('text/plain', `task:${t.id}`);
+                                                        e.dataTransfer.effectAllowed = 'copy';
+                                                    }}
+                                                    onClick={() => {
+                                                        updateActiveLog({ taskId: t.id, projectId: t.projectId || '' });
+                                                    }}
+                                                    className={`p-2.5 rounded-xl border border-l-4 text-left transition-all duration-150 cursor-grab active:cursor-grabbing flex flex-col justify-between select-none ${pColor} ${
+                                                        isSelected
+                                                            ? 'ring-2 ring-indigo-500 shadow-sm'
+                                                            : 'bg-slate-50/30 dark:bg-slate-900/40 border-slate-200/60 dark:border-slate-850/60 hover:border-slate-300 dark:hover:border-slate-700'
+                                                    }`}
+                                                >
+                                                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate-2-lines" title={t.title}>
+                                                        {t.title}
+                                                    </div>
+                                                    {projectObj && (
+                                                        <div className="text-[9px] text-slate-500 dark:text-slate-450 truncate font-semibold mt-1.5 flex items-center gap-1">
+                                                            <span className="shrink-0">📁</span>
+                                                            <span className="truncate">{projectObj.name}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })
+                                    )}
                                 </div>
                             </div>
                         </div>
