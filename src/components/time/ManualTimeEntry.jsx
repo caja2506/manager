@@ -331,6 +331,39 @@ export default function ManualTimeEntry({
     const END_HOUR = 17;
     const ROW_HEIGHT = 44;
 
+    const TIME_BANDS = [
+        {
+            id:     'desayuno',
+            label:  '🍳 Desayuno',
+            start:  8,
+            end:    8.5,
+            bg:     'rgba(245, 158, 11, 0.08)',
+            border: 'rgba(245, 158, 11, 0.25)',
+            text:   '#d97706',
+            textDark:'#fbbf24',
+        },
+        {
+            id:     'almuerzo',
+            label:  '🍽 Almuerzo',
+            start:  12,
+            end:    13,
+            bg:     'rgba(16, 185, 129, 0.08)',
+            border: 'rgba(16, 185, 129, 0.25)',
+            text:   '#059669',
+            textDark:'#34d399',
+        },
+        {
+            id:     'cafe',
+            label:  '☕ Café',
+            start:  15.5,
+            end:    16,
+            bg:     'rgba(249, 115, 22, 0.08)',
+            border: 'rgba(234, 88, 12, 0.25)',
+            text:   '#ea580c',
+            textDark:'#fb923c',
+        },
+    ];
+
     // --- INTERACTIVE TIMELINE DRAG & RESIZE HANDLERS FOR GHOST BLOCK ---
 
     const handleGhostDragStart = (e) => {
@@ -587,8 +620,8 @@ export default function ManualTimeEntry({
                 .premium-slider::-webkit-slider-thumb {
                     -webkit-appearance: none;
                     appearance: none;
-                    width: 16px;
-                    height: 16px;
+                    width: 18px;
+                    height: 18px;
                     border-radius: 50%;
                     background: #6366f1; /* indigo-500 */
                     cursor: pointer;
@@ -600,8 +633,8 @@ export default function ManualTimeEntry({
                     background: #4f46e5; /* indigo-600 */
                 }
                 .premium-slider::-moz-range-thumb {
-                    width: 16px;
-                    height: 16px;
+                    width: 18px;
+                    height: 18px;
                     border-radius: 50%;
                     background: #6366f1;
                     cursor: pointer;
@@ -612,6 +645,14 @@ export default function ManualTimeEntry({
                 .premium-slider::-moz-range-thumb:hover {
                     transform: scale(1.2);
                     background: #4f46e5;
+                }
+                .premium-select {
+                    appearance: none;
+                    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgb(100, 116, 139)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+                    background-repeat: no-repeat;
+                    background-position: right 10px center;
+                    background-size: 14px;
+                    padding-right: 32px !important;
                 }
             `}</style>
 
@@ -656,7 +697,7 @@ export default function ManualTimeEntry({
                                             <select
                                                 value={selectedUserId}
                                                 onChange={e => setSelectedUserId(e.target.value)}
-                                                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 font-bold transition-all"
+                                                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 font-bold transition-all premium-select"
                                             >
                                                 {teamMembers.filter(u => {
                                                     const uid = u.uid || u.id;
@@ -678,7 +719,7 @@ export default function ManualTimeEntry({
                                         <select
                                             value={form.projectId}
                                             onChange={e => setForm({ ...form, projectId: e.target.value, taskId: '' })}
-                                            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 transition-all"
+                                            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 transition-all premium-select"
                                         >
                                             <option value="">Sin proyecto</option>
                                             {projects.map(p => (
@@ -702,7 +743,7 @@ export default function ManualTimeEntry({
                                                     setForm(f => ({ ...f, projectId: t.projectId }));
                                                 }
                                             }}
-                                            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 transition-all"
+                                            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 transition-all premium-select"
                                         >
                                             <option value="">Sin tarea</option>
                                             {filteredTasks.map(t => (
@@ -996,7 +1037,7 @@ export default function ManualTimeEntry({
                                 </div>
 
                                 {/* Grid del Timeline */}
-                                <div className="flex-1 flex flex-col min-h-0 bg-slate-50/30 dark:bg-slate-950/10 rounded-xl border border-slate-200/50 dark:border-slate-850/40 p-2 overflow-hidden">
+                                <div className="flex-1 flex flex-col min-h-0 bg-slate-50 dark:bg-slate-950/20 rounded-2xl border border-slate-200 dark:border-slate-850 p-3 overflow-hidden shadow-inner">
                                     <div className="text-[9px] font-black text-slate-500 dark:text-slate-450 uppercase tracking-wider px-2 mb-2 flex items-center justify-between">
                                         <span>Línea de Tiempo</span>
                                         <span className="text-slate-400 dark:text-slate-500 text-[8px] normal-case font-bold">Haz clic en ⏱️ para aplicar</span>
@@ -1059,14 +1100,47 @@ export default function ManualTimeEntry({
                                                     });
                                                 }}
                                             >
-                                                {/* Líneas horizontales de fondo */}
+                                                {/* Líneas horizontales de fondo (Estilo Daily Board) */}
                                                 {timelineHours.map(h => (
-                                                    <div 
-                                                        key={h} 
-                                                        className="absolute left-0 right-0 border-t border-slate-200/60 dark:border-slate-850/30" 
-                                                        style={{ top: `${(h - START_HOUR) * ROW_HEIGHT}px` }}
-                                                    />
+                                                    <React.Fragment key={h}>
+                                                        <div 
+                                                            className="absolute left-0 right-0 border-t border-slate-200/90 dark:border-slate-800/80" 
+                                                            style={{ top: `${(h - START_HOUR) * ROW_HEIGHT}px` }}
+                                                        />
+                                                        {h < END_HOUR && (
+                                                            <div 
+                                                                className="absolute left-0 right-0 border-t border-dashed border-slate-200/40 dark:border-slate-800/30" 
+                                                                style={{ top: `${(h - START_HOUR) * ROW_HEIGHT + ROW_HEIGHT / 2}px` }}
+                                                            />
+                                                        )}
+                                                    </React.Fragment>
                                                 ))}
+
+                                                {/* Bandas de descanso / rutina (Estilo Daily Board) */}
+                                                {TIME_BANDS.map(band => {
+                                                    const top = Math.max(0, (band.start - START_HOUR) * ROW_HEIGHT);
+                                                    const height = Math.max(10, (band.end - band.start) * ROW_HEIGHT);
+                                                    return (
+                                                        <div
+                                                            key={band.id}
+                                                            className="absolute left-0 right-0 pointer-events-none flex items-center justify-center overflow-hidden z-0 select-none"
+                                                            style={{
+                                                                top: `${top}px`,
+                                                                height: `${height}px`,
+                                                                background: band.bg,
+                                                                borderTop: `1.5px dashed ${band.border}`,
+                                                                borderBottom: `1.5px dashed ${band.border}`,
+                                                            }}
+                                                        >
+                                                            <span
+                                                                className="text-[9px] font-black uppercase tracking-[0.18em] select-none whitespace-nowrap"
+                                                            >
+                                                                <span className="dark:hidden font-black" style={{ color: band.text }}>{band.label}</span>
+                                                                <span className="hidden dark:inline font-black" style={{ color: band.textDark }}>{band.label}</span>
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })}
 
                                                 {/* Bloques confirmados reales */}
                                                 {currentConfirmed.map(log => {
@@ -1083,29 +1157,45 @@ export default function ManualTimeEntry({
                                                         displayHrs = calculateDuration(tempBlockPos.startHour, tempBlockPos.endHour);
                                                     }
 
+                                                    // Get task priority styles matching Daily Board
+                                                    const taskObj = tasks.find(t => t.id === log.taskId);
+                                                    const priority = taskObj?.priority || 'medium';
+                                                    
+                                                    const priorityStyles = {
+                                                        critical: 'bg-red-500 border-red-700 text-white',
+                                                        high:     'bg-amber-500 border-amber-700 text-white',
+                                                        medium:   'bg-indigo-505 border-indigo-700 text-white',
+                                                        low:      'bg-slate-500 border-slate-700 text-white',
+                                                    };
+                                                    const styleClass = priorityStyles[priority] || priorityStyles.medium;
+
                                                     return (
                                                         <div
                                                             key={log.id}
                                                             onMouseDown={(e) => handleExistingBlockDragStart(e, log)}
-                                                            className="absolute left-0.5 right-0.5 rounded-lg bg-indigo-500/10 border-l-4 border-indigo-500 text-indigo-800 dark:text-indigo-200 text-[9px] px-2 py-1 overflow-hidden select-none z-[15] shadow-sm shadow-indigo-950/10 cursor-grab active:cursor-grabbing group/confirmed"
+                                                            className={`absolute left-0.5 right-0.5 rounded-xl border-l-4 border-emerald-500 ${styleClass} text-[9px] px-2.5 py-1.5 overflow-hidden select-none z-[15] shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:shadow-xl transition-shadow cursor-grab active:cursor-grabbing group/confirmed`}
                                                             style={style}
                                                             title={`${log.taskTitle || 'Sin título'} (${displayHrs.toFixed(2)}h)`}
                                                         >
-                                                            <div className="font-bold truncate flex items-center gap-1 pointer-events-none">
-                                                                <span className="text-emerald-500 font-bold">✓</span>
-                                                                <span className="truncate">{log.taskTitle || 'Registro Manual'}</span>
+                                                            <div className="flex justify-between items-start pointer-events-none">
+                                                                <div className="font-black truncate pr-1">
+                                                                    {log.taskTitle || 'Registro Manual'}
+                                                                </div>
+                                                                <span className="text-[8px] font-black bg-white/25 px-1 py-0.2 rounded shrink-0">
+                                                                    {displayHrs.toFixed(1)}h
+                                                                </span>
                                                             </div>
-                                                            <div className="text-[8px] text-indigo-650/80 dark:text-indigo-400/80 font-mono font-medium truncate mt-0.5 pointer-events-none">
-                                                                {startDisp} - {endDisp} ({displayHrs.toFixed(2)}h)
+                                                            <div className="text-[8px] opacity-80 font-mono font-bold mt-1 pointer-events-none">
+                                                                {startDisp} - {endDisp}
                                                             </div>
 
                                                             {/* Manilla para estirar (borde inferior) */}
                                                             <div 
                                                                 onMouseDown={(e) => handleExistingBlockResizeStart(e, log)}
-                                                                className="absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize flex items-center justify-center bg-indigo-500/20 border-t border-indigo-500/30 opacity-0 group-hover/confirmed:opacity-100 transition-opacity"
+                                                                className="absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize flex items-center justify-center bg-white/10 border-t border-white/20 opacity-0 group-hover/confirmed:opacity-100 transition-opacity"
                                                                 title="Arrastra para cambiar duración"
                                                             >
-                                                                <div className="w-6 h-0.5 rounded-full bg-indigo-400" />
+                                                                <div className="w-6 h-0.5 rounded-full bg-white/80" />
                                                             </div>
                                                         </div>
                                                     );
@@ -1131,10 +1221,10 @@ export default function ManualTimeEntry({
                                                         <div
                                                             key={draft.id}
                                                             onMouseDown={(e) => handleExistingBlockDragStart(e, draft)}
-                                                            className={`absolute left-0.5 right-0.5 rounded-lg text-left text-[9px] px-2 py-1 overflow-hidden transition-all duration-200 z-[15] border cursor-grab active:cursor-grabbing group/draft ${
+                                                            className={`absolute left-0.5 right-0.5 rounded-xl border-l-4 border-dashed border-amber-500 bg-slate-100/90 dark:bg-slate-900/95 border border-y-slate-200/80 dark:border-y-slate-800 border-r-slate-200/80 dark:border-r-slate-800 text-slate-800 dark:text-slate-200 text-[9px] px-2.5 py-1.5 overflow-hidden transition-all duration-205 z-[15] cursor-grab active:cursor-grabbing group/draft shadow-sm ${
                                                                 isSelected
-                                                                    ? 'bg-indigo-600/10 border-2 border-indigo-500 text-slate-800 dark:text-white shadow-[0_0_10px_rgba(99,102,241,0.2)]'
-                                                                    : 'bg-amber-500/5 border-l-4 border-dashed border-amber-500/60 hover:bg-amber-500/10 text-amber-800 dark:text-amber-250 border-y-slate-200 dark:border-y-slate-850/40 border-r-slate-200 dark:border-r-slate-850/40'
+                                                                    ? 'ring-2 ring-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.25)]'
+                                                                    : 'hover:bg-slate-200/70 dark:hover:bg-slate-850'
                                                             }`}
                                                             style={style}
                                                             title={`Sugerencia: ${draft.taskTitle || 'Planificación libre'} (${displayHrs.toFixed(2)}h)`}
@@ -1145,24 +1235,31 @@ export default function ManualTimeEntry({
                                                                         applyDraftSuggestion(draft);
                                                                     }
                                                                 }}
-                                                                className="h-full w-full pointer-events-auto"
+                                                                className="h-full w-full pointer-events-auto flex flex-col justify-between"
                                                             >
-                                                                <div className="font-bold truncate flex items-center gap-1 pointer-events-none">
-                                                                    <span className="text-amber-600 dark:text-amber-500">⏱️</span>
-                                                                    <span className="truncate text-amber-700 dark:text-amber-300">{draft.taskTitle || 'Planificación libre'}</span>
+                                                                <div>
+                                                                    <div className="font-black truncate flex items-center gap-1 pointer-events-none text-slate-700 dark:text-slate-350">
+                                                                        <span className="text-amber-500 font-bold">⏱️</span>
+                                                                        <span className="truncate">{draft.taskTitle || 'Planificación libre'}</span>
+                                                                    </div>
                                                                 </div>
-                                                                <div className="text-[8px] text-amber-750/80 dark:text-amber-400/70 font-mono font-medium truncate mt-0.5 pointer-events-none">
-                                                                    {startDisp} - {endDisp} ({displayHrs.toFixed(2)}h)
+                                                                <div className="flex justify-between items-center mt-1 pointer-events-none">
+                                                                    <span className="text-[8px] text-slate-500 dark:text-slate-400 font-mono font-semibold">
+                                                                        {startDisp} - {endDisp}
+                                                                    </span>
+                                                                    <span className="text-[8px] font-black text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1 py-0.2 rounded">
+                                                                        {displayHrs.toFixed(1)}h
+                                                                    </span>
                                                                 </div>
                                                             </div>
 
                                                             {/* Manilla para estirar (borde inferior) */}
                                                             <div 
                                                                 onMouseDown={(e) => handleExistingBlockResizeStart(e, draft)}
-                                                                className="absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize flex items-center justify-center bg-amber-500/20 border-t border-amber-500/30 opacity-0 group-hover/draft:opacity-100 transition-opacity"
+                                                                className="absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize flex items-center justify-center bg-amber-500/10 border-t border-amber-500/20 opacity-0 group-hover/draft:opacity-100 transition-opacity"
                                                                 title="Arrastra para cambiar duración"
                                                             >
-                                                                <div className="w-6 h-0.5 rounded-full bg-amber-400" />
+                                                                <div className="w-6 h-0.5 rounded-full bg-amber-400/80" />
                                                             </div>
                                                         </div>
                                                     );
@@ -1174,25 +1271,30 @@ export default function ManualTimeEntry({
                                                     const style = getBlockStyle(form.startHour, form.endHour);
                                                     return (
                                                         <div
-                                                            className="absolute left-0.5 right-0.5 rounded-lg bg-emerald-500/15 border-2 border-emerald-500 text-emerald-800 dark:text-emerald-100 text-[9px] px-2 py-1 overflow-hidden select-none z-[16] shadow-lg shadow-emerald-950/20 ring-2 ring-emerald-500/5 dark:ring-2 dark:ring-emerald-500/10 cursor-grab active:cursor-grabbing group/ghost"
+                                                            className="absolute left-0.5 right-0.5 rounded-xl border-l-4 border-emerald-500 bg-emerald-550/10 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-250 text-[9px] px-2.5 py-1.5 overflow-hidden select-none z-[16] shadow-xl shadow-emerald-950/20 ring-1 ring-emerald-500/30 cursor-grab active:cursor-grabbing group/ghost"
                                                             style={style}
                                                             onMouseDown={handleGhostDragStart}
                                                         >
-                                                            <div className="font-black truncate flex items-center gap-1 pointer-events-none">
-                                                                <span className="relative flex h-1.5 w-1.5 shrink-0">
-                                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                                                            <div className="flex justify-between items-start pointer-events-none">
+                                                                <div className="font-black truncate flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
+                                                                    <span className="relative flex h-1.5 w-1.5 shrink-0">
+                                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                                                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                                                                    </span>
+                                                                    <span className="truncate">{tasks.find(t => t.id === form.taskId)?.title || 'Nuevo Registro'}</span>
+                                                                </div>
+                                                                <span className="text-[8px] font-black bg-emerald-500/20 px-1 py-0.2 rounded shrink-0 text-emerald-700 dark:text-emerald-300">
+                                                                    {workedHours.toFixed(2)}h
                                                                 </span>
-                                                                <span className="truncate text-emerald-700 dark:text-emerald-350 font-bold">{tasks.find(t => t.id === form.taskId)?.title || 'Nuevo Registro'}</span>
                                                             </div>
-                                                            <div className="text-[8px] text-emerald-650/80 dark:text-emerald-400/80 font-mono font-medium truncate mt-0.5 pointer-events-none">
-                                                                {form.startHour} - {form.endHour} ({workedHours.toFixed(2)}h)
+                                                            <div className="text-[8px] text-emerald-650/90 dark:text-emerald-400/80 font-mono font-bold mt-1 pointer-events-none">
+                                                                {form.startHour} - {form.endHour}
                                                             </div>
 
                                                             {/* Manilla para estirar (borde inferior) */}
                                                              <div 
                                                                  onMouseDown={handleGhostResizeStart}
-                                                                 className="absolute bottom-0 left-0 right-0 h-4 cursor-ns-resize flex items-center justify-center bg-emerald-500/20 border-t border-emerald-500/30 opacity-40 group-hover/ghost:opacity-100 transition-all duration-150"
+                                                                 className="absolute bottom-0 left-0 right-0 h-4 cursor-ns-resize flex items-center justify-center bg-emerald-500/20 border-t border-emerald-500/30 opacity-60 group-hover/ghost:opacity-100 transition-all duration-150"
                                                                  title="Arrastra para cambiar duración"
                                                              >
                                                                  <div className="flex gap-1 items-center justify-center pointer-events-none">
