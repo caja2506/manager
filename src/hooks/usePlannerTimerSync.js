@@ -21,8 +21,17 @@ export function usePlannerTimerStatus({ timeLogs = [], planItems = [] }) {
         if (!timeLogs.length || !planItems.length) return statusMap;
 
         for (const block of planItems) {
+            // Find any logs associated with this plan_item_id
+            const associatedLogs = timeLogs.filter(l => l.planItemId === block.id);
+            const hasDraft = associatedLogs.some(l => l.status === 'draft');
+            const hasConfirmed = associatedLogs.some(l => l.status === 'confirmed');
+
             if (!block.taskId || !block.assignedTo) {
-                statusMap.set(block.id, { status: 'idle' });
+                statusMap.set(block.id, { 
+                    status: 'idle',
+                    isDraft: hasDraft,
+                    isConfirmed: hasConfirmed,
+                });
                 continue;
             }
 
@@ -45,9 +54,15 @@ export function usePlannerTimerStatus({ timeLogs = [], planItems = [] }) {
                     timerId: timer.id,
                     elapsedMin,
                     source: timer.source || 'legacy',
+                    isDraft: hasDraft,
+                    isConfirmed: hasConfirmed,
                 });
             } else {
-                statusMap.set(block.id, { status: 'idle' });
+                statusMap.set(block.id, { 
+                    status: 'idle',
+                    isDraft: hasDraft,
+                    isConfirmed: hasConfirmed,
+                });
             }
         }
 

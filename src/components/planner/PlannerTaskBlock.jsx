@@ -48,11 +48,25 @@ export default function PlannerTaskBlock({
     const displayAssignee = item.assigneeDisplayName || item.assignedToName || '';
     const isOrphan        = item._taskNotFound;
 
-    const styleClass = isConflict
+    const isDraft = timerStatus?.isDraft;
+    const isConfirmed = timerStatus?.isConfirmed;
+
+    const baseStyleClass = isConflict
         ? 'bg-rose-500 border-rose-700 text-white ring-2 ring-rose-300'
         : isOrphan
             ? 'bg-slate-600 border-slate-700 text-white ring-1 ring-amber-500/50'
             : (PRIORITY_STYLES[item.priority] || PRIORITY_STYLES.medium);
+
+    let borderClass = 'border-l-4';
+    let opacityStyle = '';
+    let styleClass = baseStyleClass;
+
+    if (isDraft) {
+        borderClass = 'border-l-4 border-dashed border-amber-500/80';
+        opacityStyle = 'opacity-[0.80] border-dashed border-slate-700 bg-slate-900/60';
+    } else if (isConfirmed) {
+        borderClass = 'border-l-4 border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.25)]';
+    }
 
     // Timer indicator styles
     const tsStatus = timerStatus?.status || 'idle';
@@ -143,7 +157,7 @@ export default function PlannerTaskBlock({
             ref={blockRef}
             draggable
             onDragStart={handleDragStart}
-            className={`absolute rounded-xl border-l-4 ${styleClass} ${timerRingClass} shadow-md cursor-grab active:cursor-grabbing overflow-hidden z-20 group hover:shadow-xl hover:z-30 transition-shadow`}
+            className={`absolute rounded-xl ${borderClass} ${styleClass} ${timerRingClass} shadow-md cursor-grab active:cursor-grabbing overflow-hidden z-20 group hover:shadow-xl hover:z-30 transition-shadow ${opacityStyle}`}
             style={wrapperStyle}
             onClick={e => { if (!resizingRef.current) { e.stopPropagation(); onClick && onClick(); } }}
         >
@@ -205,6 +219,8 @@ export default function PlannerTaskBlock({
                                 wordBreak:       'break-word',
                             }}
                         >
+                            {isConfirmed && '✓ '}
+                            {isDraft && '⏱️ '}
                             {displayTitle}
                         </span>
                     </div>
@@ -250,6 +266,8 @@ export default function PlannerTaskBlock({
                     <div className="flex items-start justify-between gap-0.5">
                         <p className="text-[10px] font-black leading-tight line-clamp-2 flex-1 break-words">
                             {isOrphan && <AlertTriangle className="w-2.5 h-2.5 text-amber-400 inline mr-0.5" />}
+                            {isConfirmed && <span className="text-emerald-450 font-black mr-1" title="Confirmado">✓</span>}
+                            {isDraft && <span className="text-amber-500 font-bold mr-1" title="Borrador">⏱️</span>}
                             {displayTitle}
                         </p>
                         <button
@@ -282,6 +300,8 @@ export default function PlannerTaskBlock({
                     <div className="flex items-start justify-between gap-1">
                         <p className="text-[11px] font-black leading-tight line-clamp-2 flex-1">
                             {isOrphan && <AlertTriangle className="w-3 h-3 text-amber-400 inline mr-0.5" />}
+                            {isConfirmed && <span className="text-emerald-450 font-black mr-1" title="Confirmado">✓</span>}
+                            {isDraft && <span className="text-amber-500 font-bold mr-1" title="Borrador">⏱️</span>}
                             {displayTitle}
                         </p>
                         <button

@@ -15,6 +15,7 @@ export {
   closeDay,
   openDay,
   recalculateTaskHours,
+  confirmDraftLogs,
   createManualTimeLog,
   addSimpleManualTimeLog,
   updateTimeLog,

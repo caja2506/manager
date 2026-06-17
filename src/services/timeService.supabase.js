@@ -401,7 +401,7 @@ export async function recalculateTaskHours(taskId) {
 // ============================================================
 
 export async function createManualTimeLog({
-    taskId, projectId, userId, startTime, endTime, notes, overtime,
+    taskId, projectId, userId, startTime, endTime, notes, overtime, planItemId,
 }) {
     const start = new Date(startTime);
     const end = new Date(endTime);
@@ -429,6 +429,7 @@ export async function createManualTimeLog({
             overtime: !!overtime,
             overtime_hours: overtimeHours,
             notes,
+            plan_item_id: planItemId || null,
         })
         .select('id')
         .single();
@@ -552,6 +553,7 @@ function mapTimeLogRow(row) {
         autoStopped: row.auto_stopped,
         createdAt: row.created_at,
         status: row.status,
+        planItemId: row.plan_item_id,
     };
 }
 

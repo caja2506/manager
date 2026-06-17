@@ -370,6 +370,65 @@ export default function DailyTeamBoard() {
         return list;
     }, [dayPlanItems]);
 
+    // --- ESTADÍSTICAS HORARIAS Y CONFIRMACIÓN ---
+    const activeMemberUid = filterMember === 'all' ? user?.uid : filterMember;
+    const activeMemberName = useMemo(() => {
+        if (filterMember === 'all') return 'Mis Horas';
+        const member = teamMembers?.find(m => m.uid === filterMember);
+        if (member?.displayName) {
+            return member.displayName.split(' ')[0];
+        }
+        return member?.email?.split('@')[0] || 'Miembro';
+    }, [filterMember, teamMembers]);
+
+    const [confirmingToday, setConfirmingToday] = useState(false);
+
+    const memberTodayLogs = useMemo(() => {
+        if (!timeLogs || !activeMemberUid || !selectedDateStr) return [];
+        return timeLogs.filter(log => 
+            log.userId === activeMemberUid &&
+            log.startTime?.startsWith(selectedDateStr)
+        );
+    }, [timeLogs, activeMemberUid, selectedDateStr]);
+
+    const memberTodayStats = useMemo(() => {
+        let confirmed = 0;
+        let drafts = 0;
+        const draftsList = [];
+
+        memberTodayLogs.forEach(log => {
+            const hrs = log.totalHours || 0;
+            if (log.status === 'draft') {
+                drafts += hrs;
+                draftsList.push(log);
+            } else {
+                confirmed += hrs;
+            }
+        });
+
+        return {
+            confirmedHours: confirmed,
+            draftHours: drafts,
+            draftsList,
+            totalHours: confirmed + drafts
+        };
+    }, [memberTodayLogs]);
+
+    const handleConfirmTodayDrafts = async () => {
+        const drafts = memberTodayStats.draftsList;
+        if (!drafts.length) return;
+        setConfirmingToday(true);
+        try {
+            const { confirmDraftLogs } = await import('../services/timeService.supabase');
+            const result = await confirmDraftLogs(drafts);
+            alert(`Se confirmaron ${result.count} bloques planificados para hoy.`);
+        } catch (err) {
+            console.error('Error al confirmar borradores:', err);
+            alert('No se pudieron confirmar las sugerencias: ' + err.message);
+        }
+        setConfirmingToday(false);
+    };
+
     const isTodaySelected = isToday(selectedDate);
 
     return (
@@ -459,6 +518,8 @@ export default function DailyTeamBoard() {
                     </button>
                 )}
             </TaskModuleBanner>
+
+
 
             {/* Main workspace */}
             <div className="flex flex-1 min-h-0 relative">
