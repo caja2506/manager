@@ -11,7 +11,7 @@ import {
     RefreshCw, GanttChartSquare, Calendar, BarChart2,
     AlertCircle, Loader2, Plus, CalendarPlus, ListPlus,
     ChevronDown, ChevronUp, Clock, User, FolderGit2,
-    Workflow, History,
+    Workflow, History, Settings,
 } from 'lucide-react';
 import GanttGrid from '../components/gantt/GanttGrid';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
@@ -127,6 +127,18 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
     const [visualizeLateness, setVisualizeLateness] = useState(false);
     const [hasActiveBackup, setHasActiveBackup] = useState(false);
     const [isRollingBack, setIsRollingBack] = useState(false);
+    const [showImportSettings, setShowImportSettings] = useState(false);
+    const importSettingsRef = useRef(null);
+
+    useEffect(() => {
+        function handleClickOutside(event) {
+            if (importSettingsRef.current && !importSettingsRef.current.contains(event.target)) {
+                setShowImportSettings(false);
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const activePid = forceProjectId || filterProject;
 
@@ -805,19 +817,34 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                                     Importar Planner
                                 </button>
                                 {hasActiveBackup && (
-                                    <button
-                                        onClick={handleRollback}
-                                        disabled={isRollingBack}
-                                        className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[10px] font-bold border border-amber-500/40 bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition-all cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                        title="Deshacer última importación de Planner (Rollback)"
-                                    >
-                                        {isRollingBack ? (
-                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                        ) : (
-                                            <History className="w-3.5 h-3.5" />
+                                    <div className="relative" ref={importSettingsRef}>
+                                        <button
+                                            onClick={() => setShowImportSettings(prev => !prev)}
+                                            className={`flex items-center justify-center w-8 h-8 rounded-lg border transition-all cursor-pointer shadow-sm ${showImportSettings ? 'border-amber-500 bg-amber-500/20 text-amber-400' : 'border-slate-700 bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'}`}
+                                            title="Opciones de Importación"
+                                        >
+                                            <Settings className="w-3.5 h-3.5" />
+                                        </button>
+                                        {showImportSettings && (
+                                            <div className="absolute right-0 mt-1 z-[100] w-48 bg-slate-900 border border-slate-700 rounded-lg shadow-xl p-1.5">
+                                                <button
+                                                    onClick={() => {
+                                                        setShowImportSettings(false);
+                                                        handleRollback();
+                                                    }}
+                                                    disabled={isRollingBack}
+                                                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-[10px] font-bold text-amber-400 hover:bg-amber-500/10 hover:text-amber-300 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-left"
+                                                >
+                                                    {isRollingBack ? (
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                    ) : (
+                                                        <History className="w-3.5 h-3.5" />
+                                                    )}
+                                                    Deshacer Importación
+                                                </button>
+                                            </div>
                                         )}
-                                        Deshacer Importación
-                                    </button>
+                                    </div>
                                 )}
                             </div>
                         )}
@@ -944,19 +971,34 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                                     Importar Planner
                                 </button>
                                 {hasActiveBackup && (
-                                    <button
-                                        onClick={handleRollback}
-                                        disabled={isRollingBack}
-                                        className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[10px] font-bold border border-amber-500/40 bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition-all cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                        title="Deshacer última importación de Planner (Rollback)"
-                                    >
-                                        {isRollingBack ? (
-                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                        ) : (
-                                            <History className="w-3.5 h-3.5" />
+                                    <div className="relative" ref={importSettingsRef}>
+                                        <button
+                                            onClick={() => setShowImportSettings(prev => !prev)}
+                                            className={`flex items-center justify-center w-8 h-8 rounded-lg border transition-all cursor-pointer shadow-sm ${showImportSettings ? 'border-amber-500 bg-amber-500/20 text-amber-400' : 'border-slate-700 bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'}`}
+                                            title="Opciones de Importación"
+                                        >
+                                            <Settings className="w-3.5 h-3.5" />
+                                        </button>
+                                        {showImportSettings && (
+                                            <div className="absolute right-0 mt-1 z-[100] w-48 bg-slate-900 border border-slate-700 rounded-lg shadow-xl p-1.5">
+                                                <button
+                                                    onClick={() => {
+                                                        setShowImportSettings(false);
+                                                        handleRollback();
+                                                    }}
+                                                    disabled={isRollingBack}
+                                                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-[10px] font-bold text-amber-400 hover:bg-amber-500/10 hover:text-amber-300 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-left"
+                                                >
+                                                    {isRollingBack ? (
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                    ) : (
+                                                        <History className="w-3.5 h-3.5" />
+                                                    )}
+                                                    Deshacer Importación
+                                                </button>
+                                            </div>
                                         )}
-                                        Deshacer Importación
-                                    </button>
+                                    </div>
                                 )}
                             </div>
                         )}
