@@ -207,13 +207,12 @@ export async function rollbackProjectFromBackup(projectId) {
 }
 
 /**
- * Comprueba si existe un backup activo y reciente para el proyecto seleccionado.
+ * Comprueba si existe un backup activo para el proyecto seleccionado (sin límite de tiempo).
  *
  * @param {string} projectId - ID del proyecto.
- * @param {number} maxAgeMinutes - Edad máxima del backup en minutos (por defecto 60).
  * @returns {boolean} Retorna true si hay un backup listo para ser revertido.
  */
-export function hasActiveProjectBackup(projectId, maxAgeMinutes = 60) {
+export function hasActiveProjectBackup(projectId) {
     if (!projectId) return false;
     const key = `planner_import_backup_${projectId}`;
     const backupRaw = localStorage.getItem(key);
@@ -221,11 +220,7 @@ export function hasActiveProjectBackup(projectId, maxAgeMinutes = 60) {
     
     try {
         const backup = JSON.parse(backupRaw);
-        if (!backup.timestamp || backup.projectId !== projectId) return false;
-        
-        const ageMs = Date.now() - backup.timestamp;
-        const maxAgeMs = maxAgeMinutes * 60 * 1000;
-        return ageMs <= maxAgeMs;
+        return backup.projectId === projectId;
     } catch {
         return false;
     }
