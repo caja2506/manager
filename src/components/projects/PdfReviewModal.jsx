@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { X, Check, Sparkles, AlertTriangle, PackagePlus, Loader2, Hash } from 'lucide-react';
+import { X, Check, Sparkles, AlertTriangle, PackagePlus, Loader2, Hash, CheckCircle2, Link2 } from 'lucide-react';
+import { supabase } from '../../supabase';
 
 // ========================================================
 // COMPONENTE: MODAL DE REVISIÓN PRE-IMPORTACIÓN DE PDF
@@ -16,6 +17,11 @@ const PdfReviewModal = ({ isOpen, onClose, onConfirm, extractedData, supplierAna
     const [selectedSimilarId, setSelectedSimilarId] = useState(null);
 
     const [isConfirming, setIsConfirming] = useState(false);
+
+    // Órdenes de compra y coincidencia automática
+    const [pos, setPOs] = useState([]);
+    const [selectedPoId, setSelectedPoId] = useState(null);
+    const [matchingPOs, setMatchingPOs] = useState([]);
 
     // Sincronizar estado cuando se abren nuevos datos
     useEffect(() => {
@@ -43,6 +49,98 @@ const PdfReviewModal = ({ isOpen, onClose, onConfirm, extractedData, supplierAna
             }
         }
     }, [isOpen, supplierAnalysis]);
+
+    // Obtener POs del proyecto de ingeniería asociado al abrir el modal
+    useEffect(() => {
+        if (isOpen && window.__activeProject__) {
+            const activeProjectId = window.__activeProject__.id;
+            supabase
+                .from('projects')
+                .select('id')
+                .eq('bom_project_id', activeProjectId)
+                .maybeSingle()
+                .then(({ data: proj, error: projError }) => {
+                    if (projError) {
+                        console.error("[PdfReviewModal] Error al obtener el proyecto de ingeniería:", projError);
+                        return;
+                    }
+                    if (proj && proj.id) {
+                        supabase
+                            .from('project_pos')
+                            .select('*')
+                            .eq('project_id', proj.id)
+                            .then(({ data: posData, error: posError }) => {
+                                if (posError) {
+                                    console.error("[PdfReviewModal] Error al obtener las POs:", posError);
+                                    return;
+                                }
+                                setPOs(posData || []);
+                            });
+                    }
+                });
+        } else {
+            setPOs([]);
+            setMatchingPOs([]);
+            setSelectedPoId(null);
+        }
+    }, [isOpen]);
+
+    // Calcular costo total cotizado de los ítems seleccionados
+    const totalCotizado = useMemo(() => {
+        return items.filter(i => i.isSelected).reduce((sum, i) => sum + (i.quantity || 0) * (i.unitPrice || 0), 0);
+    }, [items]);
+
+    // Lógica reactiva para calcular POs coincidentes por proveedor y monto (+/- $5)
+    useEffect(() => {
+        if (pos.length === 0 || totalCotizado === 0) {
+            setMatchingPOs([]);
+            setSelectedPoId(null);
+            return;
+        }
+
+        // Obtener el nombre del proveedor seleccionado
+        let providerName = '';
+        if (supplierAction === 'use_existing' && selectedSimilarId) {
+            if (supplierAnalysis?.exactMatch?.id === selectedSimilarId) {
+                providerName = supplierAnalysis.exactMatch.name;
+            } else {
+                const matchedSimilar = supplierAnalysis?.similarMatches?.find(s => s.id === selectedSimilarId);
+                providerName = matchedSimilar ? matchedSimilar.name : '';
+            }
+        } else {
+            providerName = extractedData?.supplier || '';
+        }
+
+        if (!providerName) {
+            setMatchingPOs([]);
+            setSelectedPoId(null);
+            return;
+        }
+
+        const matches = pos.filter(po => {
+            const poSupplier = String(po.supplier || '').toLowerCase().trim();
+            const pdfSupplier = String(providerName).toLowerCase().trim();
+
+            // Comparación de proveedor (uno contiene al otro)
+            const supplierMatch = poSupplier.includes(pdfSupplier) || pdfSupplier.includes(poSupplier);
+            // Diferencia máxima de $5 dólares
+            const priceDiff = Math.abs(Number(po.amount || 0) - totalCotizado);
+            const priceMatch = priceDiff <= 5;
+
+            return supplierMatch && priceMatch;
+        });
+
+        setMatchingPOs(matches);
+
+        // Si hay una única coincidencia clara, auto-seleccionarla y rellenar PRCR
+        if (matches.length === 1) {
+            setSelectedPoId(matches[0].id);
+            setPrcr(matches[0].prcr || '');
+        } else {
+            // Si hay múltiples o ninguna, limpiar selección automática
+            setSelectedPoId(null);
+        }
+    }, [pos, totalCotizado, supplierAction, selectedSimilarId, supplierAnalysis, extractedData]);
 
     // Contadores
     const stats = useMemo(() => {
@@ -73,7 +171,8 @@ const PdfReviewModal = ({ isOpen, onClose, onConfirm, extractedData, supplierAna
                     action: supplierAction,
                     selectedProviderId: supplierAction === 'use_existing' ? selectedSimilarId : null,
                     name: extractedData?.supplier || '',
-                }
+                },
+                poId: selectedPoId
             });
         } catch (err) {
             console.error('Error confirming import:', err);
@@ -174,6 +273,53 @@ const PdfReviewModal = ({ isOpen, onClose, onConfirm, extractedData, supplierAna
                                 className="w-full p-3.5 border border-amber-200 rounded-xl bg-slate-900 font-bold font-mono uppercase outline-none focus:ring-2 focus:ring-amber-400 text-lg"
                             />
                             <p className="text-xs text-amber-400 mt-2">Se aplicará a todos los ítems importados</p>
+
+                            {/* Bloque de Coincidencias de PO por precio */}
+                            {matchingPOs.length > 0 && (
+                                <div className="mt-4 pt-3 border-t border-amber-200/50 space-y-2">
+                                    {matchingPOs.length === 1 ? (
+                                        <div className="flex items-center gap-2.5 text-green-400 bg-green-950/20 p-3 rounded-xl border border-green-500/20 text-xs">
+                                            <CheckCircle2 className="w-4 h-4 shrink-0 text-green-400" />
+                                            <div>
+                                                <span className="font-black">Coincidencia de PO detectada por monto:</span>
+                                                <div className="mt-0.5 text-[11px] text-slate-300">
+                                                    PO #{matchingPOs[0].po_number || 'S/N'} ({matchingPOs[0].supplier}) de ${Number(matchingPOs[0].amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} con PRCR <strong className="text-amber-500 font-mono">{matchingPOs[0].prcr || '—'}</strong>. Se asociará automáticamente.
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <span className="text-[10px] font-black uppercase text-amber-400 flex items-center gap-1">
+                                                <Link2 className="w-3.5 h-3.5" />
+                                                Vincular con PO Coincidente ({matchingPOs.length})
+                                            </span>
+                                            <div className="flex flex-col gap-1.5 max-h-[120px] overflow-y-auto pr-1">
+                                                {matchingPOs.map(po => {
+                                                    const isSelected = selectedPoId === po.id;
+                                                    return (
+                                                        <button
+                                                            key={po.id}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setSelectedPoId(po.id);
+                                                                setPrcr(po.prcr || '');
+                                                            }}
+                                                            className={`flex items-center justify-between w-full p-2 rounded-lg text-left text-[11px] font-bold border transition-all ${
+                                                                isSelected 
+                                                                    ? 'bg-indigo-600 border-indigo-500 text-white' 
+                                                                    : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
+                                                            }`}
+                                                        >
+                                                            <span>PO #{po.po_number || 'S/N'} (${Number(po.amount).toLocaleString('en-US')})</span>
+                                                            <span className="font-mono text-[10px] text-amber-500">{po.prcr || '—'}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <div className="rounded-2xl border border-slate-700 bg-slate-800 p-5 flex items-center justify-around">

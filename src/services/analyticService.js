@@ -187,7 +187,7 @@ export async function handlePdfUpload(file, activeProject, providers, callbacks)
  * @returns {Promise<void>}
  */
 export async function executePdfImport(reviewedData, activeProject) {
-    const { items, prcr, supplierDecision } = reviewedData;
+    const { items, prcr, supplierDecision, poId } = reviewedData;
     if (items.length === 0) return;
 
     if (USE_SUPABASE) {
@@ -221,6 +221,7 @@ export async function executePdfImport(reviewedData, activeProject) {
                 total_price: item.quantity * item.unitPrice,
                 lead_time_weeks: item.leadTimeWeeks, proveedor_id: supplierId,
                 prcr: prcr || '', status: 'En Cotización', added_at: new Date().toISOString(),
+                po_id: poId || null
             });
         }
         return;
@@ -264,7 +265,8 @@ export async function executePdfImport(reviewedData, activeProject) {
             quantity: item.quantity, unitPrice: item.unitPrice, totalPrice: item.quantity * item.unitPrice,
             leadTimeWeeks: item.leadTimeWeeks,
             proveedor: supplierId ? doc(db, 'proveedores', supplierId) : null,
-            prcr: prcr || '', status: 'En Cotización', addedAt: new Date().toISOString()
+            prcr: prcr || '', status: 'En Cotización', addedAt: new Date().toISOString(),
+            poId: poId || null
         });
     }
 
