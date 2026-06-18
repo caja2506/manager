@@ -257,6 +257,7 @@ function mapProject(r) {
         client: r.client, priority: r.priority, status: r.status,
         ownerId: r.owner_id, teamMemberIds: r.team_member_ids,
         startDate: r.start_date, dueDate: r.due_date,
+        targetStartDate: r.start_date, targetEndDate: r.due_date,
         completedDate: r.completed_date, progress: r.progress,
         bomProjectId: r.bom_project_id, tags: r.tags,
         riskScore: r.risk_score, riskLevel: r.risk_level,

@@ -27,6 +27,32 @@ export async function syncPlannerExcelToSupabase(projectId, parsedData, userId) 
     const taskNumberToUuidMap = new Map(); // Mapeo plano de número de Excel a UUID de Supabase
 
     // ============================================================
+    // 0. ACTUALIZAR FECHAS DEL PROYECTO
+    // ============================================================
+    if (parsedData.projectStartDate || parsedData.projectFinishDate) {
+        const projectUpdates = {
+            updated_at: new Date().toISOString()
+        };
+        if (parsedData.projectStartDate) {
+            projectUpdates.start_date = parsedData.projectStartDate;
+        }
+        if (parsedData.projectFinishDate) {
+            projectUpdates.due_date = parsedData.projectFinishDate;
+        }
+        
+        const { error: projUpdErr } = await supabase
+            .from('projects')
+            .update(projectUpdates)
+            .eq('id', projectId);
+
+        if (projUpdErr) {
+            console.warn('[PlannerSync] Error al actualizar fechas del proyecto:', projUpdErr.message);
+        } else {
+            console.log(`[PlannerSync] Fechas del proyecto actualizadas: Start=${parsedData.projectStartDate}, End=${parsedData.projectFinishDate}`);
+        }
+    }
+
+    // ============================================================
     // 1. PROCESAR MILESTONES (NIVEL 1)
     // ============================================================
 

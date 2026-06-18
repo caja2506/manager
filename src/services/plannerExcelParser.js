@@ -226,6 +226,20 @@ export function parsePlannerExcel(arrayBuffer, existingTasks, teamMembers, exist
     const projectHeader = jsonData[0];
     const projectName = projectHeader && projectHeader[0]?.toLowerCase().includes('project') ? projectHeader[1] : 'Proyecto importado';
     
+    let projectStartDate = null;
+    let projectFinishDate = null;
+
+    for (let r = 0; r < 8; r++) {
+        const row = jsonData[r];
+        if (!row || row.length < 2) continue;
+        const col0 = String(row[0] || '').toLowerCase();
+        if (col0.includes('start date')) {
+            projectStartDate = excelDateToISO(row[1]);
+        } else if (col0.includes('finish date')) {
+            projectFinishDate = excelDateToISO(row[1]);
+        }
+    }
+    
     const headers = jsonData[8]?.map(h => String(h || '').trim());
     if (!headers || !headers.includes('Task number') || !headers.includes('Name')) {
         throw new Error('No se encontró la fila de cabeceras en la fila 9 o faltan columnas esenciales.');
@@ -353,6 +367,8 @@ export function parsePlannerExcel(arrayBuffer, existingTasks, teamMembers, exist
     
     return {
         projectName,
+        projectStartDate,
+        projectFinishDate,
         stats: {
             totalExcel: rawMilestones.length + rawTasks.length + rawSubtasks.length,
             totalMilestones: rawMilestones.length,

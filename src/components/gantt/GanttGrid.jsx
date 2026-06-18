@@ -501,6 +501,18 @@ export default function GanttGrid({
     const todayOffset = daysBetween(viewStart, new Date()) * dayWidth;
     const showToday = todayOffset >= 0 && todayOffset <= totalTimelineWidth;
 
+    // Project Deadline
+    const activeProjectId = tasks[0]?.projectId;
+    const activeProject = activeProjectId ? projectMap.get(activeProjectId) : null;
+    const deadlineDate = activeProject?.dueDate || activeProject?.targetEndDate;
+    let deadlineOffset = -1;
+    let showDeadline = false;
+    if (deadlineDate) {
+        const deadline = toMidnight(new Date(deadlineDate));
+        deadlineOffset = daysBetween(viewStart, deadline) * dayWidth;
+        showDeadline = deadlineOffset >= 0 && deadlineOffset <= totalTimelineWidth;
+    }
+
     // Auto-scroll to today
     useEffect(() => {
         if (timelineRef.current && showToday) {
@@ -922,6 +934,15 @@ export default function GanttGrid({
                         {showToday && (
                             <div className="absolute top-0 bottom-0 w-px bg-red-500/80 z-20 pointer-events-none" style={{ left: todayOffset }}>
                                 <div className="absolute top-0 -left-1 w-2.5 h-2.5 rounded-full bg-red-500" />
+                            </div>
+                        )}
+
+                        {/* Project Deadline line */}
+                        {showDeadline && (
+                            <div className="absolute top-0 bottom-0 w-px bg-amber-500/85 z-20 pointer-events-none border-l border-dashed border-amber-500" style={{ left: deadlineOffset }}>
+                                <div className="absolute top-1 -left-12 px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-amber-500 text-slate-950 shadow-md">
+                                    Límite Proyecto
+                                </div>
                             </div>
                         )}
 

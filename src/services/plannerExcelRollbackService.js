@@ -37,9 +37,20 @@ export async function createProjectBackup(projectId) {
             
         if (dError) throw new Error(`Error al respaldar dependencias: ${dError.message}`);
         
+        // 4. Fetch de Proyecto para respaldar fechas
+        const { data: projectData, error: pError } = await supabase
+            .from('projects')
+            .select('start_date, due_date')
+            .eq('id', projectId)
+            .single();
+
+        if (pError) throw new Error(`Error al respaldar fechas del proyecto: ${pError.message}`);
+        
         const backup = {
             projectId,
             timestamp: Date.now(),
+            projectStartDate: projectData?.start_date || null,
+            projectDueDate: projectData?.due_date || null,
             milestones: milestones || [],
             tasks: tasks || [],
             dependencies: dependencies || []
@@ -71,6 +82,22 @@ export async function rollbackProjectFromBackup(projectId) {
     
     const backup = JSON.parse(backupRaw);
     console.log(`[RollbackService] Iniciando reversión para el proyecto ${projectId}.`);
+    
+    // 0. Restaurar fechas originales del proyecto
+    if ('projectStartDate' in backup || 'projectDueDate' in backup) {
+        const { error: resProjErr } = await supabase
+            .from('projects')
+            .update({
+                start_date: backup.projectStartDate,
+                due_date: backup.projectDueDate,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', projectId);
+
+        if (resProjErr) {
+            console.warn('[RollbackService] Error al restaurar fechas del proyecto:', resProjErr.message);
+        }
+    }
     
     // 1. Eliminar dependencias actuales de Supabase
     const { error: delDepsErr } = await supabase
