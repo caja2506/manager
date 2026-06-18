@@ -5,6 +5,7 @@
  * Includes: project filter, assignee filter, status filter, view toggle, navigation.
  */
 
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     CalendarRange, ChevronLeft, ChevronRight,
     RefreshCw, GanttChartSquare, Calendar, BarChart2,
@@ -31,7 +32,6 @@ import {
     deleteDependency,
 } from '../services/ganttService';
 import { syncGanttToPlanner } from '../services/ganttPlannerSync';
-import { useRef } from 'react';
 import { parsePlannerExcel } from '../services/plannerExcelParser';
 import { syncPlannerExcelToSupabase } from '../services/plannerExcelSyncService';
 import PlannerImportModal from '../components/gantt/PlannerImportModal';
