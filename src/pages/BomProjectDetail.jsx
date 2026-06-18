@@ -458,7 +458,10 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
             if (activeBomTab === 'electric_pneumatic' && isMechanical) return false;
 
             const s = bomFilters.search.toLowerCase();
-            const matchesSearch = !s || String(details.name || '').toLowerCase().includes(s) || String(details.partNumber || '').toLowerCase().includes(s);
+            const matchesSearch = !s || 
+                String(details.name || '').toLowerCase().includes(s) || 
+                String(details.partNumber || '').toLowerCase().includes(s) ||
+                String(item.prcr || '').toLowerCase().includes(s);
             const matchesBrand = bomFilters.brand.length === 0 || bomFilters.brand.includes(details.brandId);
             const matchesCategory = bomFilters.category.length === 0 || bomFilters.category.includes(details.categoryId);
             const matchesProvider = bomFilters.provider.length === 0 || bomFilters.provider.includes(details.providerId);
