@@ -13,7 +13,7 @@ import {
     Search, Trash2, ArrowLeft, PackagePlus, X,
     Loader2, Sparkles, SlidersHorizontal, Check,
     Tag, Camera, Download, Edit3, Layers, AlertTriangle,
-    GitMerge, ShoppingCart
+    GitMerge, ShoppingCart, ChevronDown, ChevronUp, CornerDownRight
 } from 'lucide-react';
 
 // ============================================================
@@ -130,6 +130,7 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
     const [groupBy, setGroupBy] = useState('none'); // 'none' | 'brand' | 'category'
     const [collapsedGroups, setCollapsedGroups] = useState({});
     const [isMerging, setIsMerging] = useState(false);
+    const [expandedParts, setExpandedParts] = useState({});
 
     const duplicatesGroup = useMemo(() => {
         const counts = {};
@@ -188,6 +189,213 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
         } finally {
             setIsMerging(false);
         }
+    };
+
+    // ── Helper rendering functions for BOM table cells ──
+    const renderVisualCell = (item) => {
+        const masterPart = item.masterPartRef ? catalogo.find(p => p.id === item.masterPartRef.id) : null;
+        const imgUrl = masterPart?.imageUrl || item.imageUrl;
+        const openImagePicker = () => {
+            if (masterPart) {
+                setImagePickerItem({ id: masterPart.id, name: masterPart.name, partNumber: masterPart.partNumber });
+            } else {
+                setImagePickerItem({ id: item.id, name: item.name, partNumber: item.partNumber, _isBomItem: true });
+            }
+        };
+        return (
+            <div className="w-[80px] h-[80px] mx-auto relative" onDoubleClick={openImagePicker} title="Doble clic para cambiar">
+                {imgUrl ? (
+                    <>
+                        <img
+                            src={imgUrl}
+                            alt=""
+                            referrerPolicy="no-referrer"
+                            onClick={() => setZoomedImageUrl(imgUrl)}
+                            className="w-full h-full object-contain rounded-xl border border-slate-700 bg-white transition-all duration-300 cursor-zoom-in hover:border-indigo-400 hover:shadow-lg p-1"
+                            onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                        />
+                        <div style={{ display: 'none' }} className="absolute inset-0 items-center justify-center bg-slate-800 border border-dashed border-slate-700 rounded-xl"><Camera className="w-5 h-5 text-slate-500" /></div>
+                    </>
+                ) : (
+                    <button
+                        onClick={openImagePicker}
+                        className="w-full h-full rounded-xl border-2 border-dashed border-slate-800 hover:border-indigo-500/50 bg-slate-900 transition-all flex items-center justify-center text-slate-600 hover:text-indigo-400"
+                        title="Agregar imagen"
+                    >
+                        <Camera className="w-5 h-5" />
+                    </button>
+                )}
+            </div>
+        );
+    };
+
+    const renderQtyCell = (item) => {
+        return canEdit ? (
+            <InlineEditCell
+                value={item.quantity}
+                onSave={v => handleUpdateBomItem(item.id, { quantity: v, unitPrice: item.unitPrice, prcr: item.prcr, leadTimeWeeks: item.leadTimeWeeks, stationId: item.stationId, isCustomMechanical: item.isCustomMechanical })}
+                placeholder="0"
+                className="font-black text-lg"
+                inputClassName="w-20 font-black text-lg"
+            />
+        ) : item.quantity;
+    };
+
+    const renderDescriptionCell = (item, details, providerName) => {
+        return (
+            <div>
+                <div className="font-bold leading-tight" style={{ color: 'var(--text-heading)' }}>{details.name || 'Sin nombre'}</div>
+                <div className="text-[10px] font-mono mt-1" style={{ color: 'var(--text-muted)' }}>{details.partNumber || 'S/N'}</div>
+                <div className="flex items-center flex-wrap gap-2 mt-2">
+                    {details.brandName && <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-slate-400 bg-slate-800 border-slate-700"><Tag className="w-3 h-3 mr-1.5 flex-shrink-0" />{details.brandName}</div>}
+                    {details.categoryName && <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-purple-400 bg-purple-950/20 border-purple-800/30"><Tag className="w-3 h-3 mr-1.5 flex-shrink-0" />{details.categoryName}</div>}
+                    {providerName && <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-indigo-400 bg-indigo-950/20 border-indigo-900/30">Prov: {providerName}</div>}
+                    {canEdit && isBomEditMode ? (
+                        <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-black uppercase text-amber-400 bg-amber-950/20 hover:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-500/20 select-none">
+                            <input 
+                                type="checkbox" 
+                                checked={!!item.isCustomMechanical} 
+                                onChange={e => handleUpdateBomItem(item.id, { 
+                                    quantity: item.quantity, 
+                                    unitPrice: item.unitPrice, 
+                                    prcr: item.prcr, 
+                                    leadTimeWeeks: item.leadTimeWeeks, 
+                                    stationId: item.stationId,
+                                    isCustomMechanical: e.target.checked 
+                                })}
+                                className="w-3 h-3 rounded bg-slate-800 border-slate-700 text-amber-500 focus:ring-amber-500" 
+                            />
+                            A la Medida
+                        </label>
+                    ) : item.isCustomMechanical ? (
+                        <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-amber-400 bg-amber-950/40 border-amber-500/30">
+                            🛠️ Pieza Custom
+                        </div>
+                    ) : null}
+                </div>
+            </div>
+        );
+    };
+
+    const renderPrcrCell = (item) => {
+        return (
+            <div className="flex flex-col gap-1.5">
+                {canEdit ? (
+                    <InlineEditCell
+                        value={item.prcr || ''}
+                        type="text"
+                        onSave={v => handleUpdateBomItem(item.id, { quantity: item.quantity, unitPrice: item.unitPrice, prcr: v, leadTimeWeeks: item.leadTimeWeeks, stationId: item.stationId, isCustomMechanical: item.isCustomMechanical })}
+                        placeholder="—"
+                        className="text-xs font-bold font-mono text-amber-500"
+                        inputClassName="w-full text-xs font-mono uppercase"
+                    />
+                ) : (
+                    item.prcr ? <span className="px-2 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-lg text-xs font-bold font-mono w-max">{item.prcr}</span> : <span className="text-slate-500 text-xs">—</span>
+                )}
+
+                {(() => {
+                    const matchedPO = pos.find(po => 
+                        (item.poId && po.id === item.poId) ||
+                        (!item.poId && item.prcr && String(po.prcr || '') === String(item.prcr))
+                    );
+                    if (!matchedPO) return null;
+                    const isManualMatch = item.poId && matchedPO.id === item.poId;
+                    return (
+                        <span 
+                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider w-max ${
+                                isManualMatch 
+                                    ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30' 
+                                    : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                            }`}
+                            title={isManualMatch ? "Asociación manual de PO" : "Emparejado por PRCR automático"}
+                        >
+                            <ShoppingCart className="w-2.5 h-2.5" />
+                            PO: {matchedPO.po_number || 'S/N'}
+                        </span>
+                    );
+                })()}
+            </div>
+        );
+    };
+
+    const renderStationCell = (item) => {
+        return isBomEditMode && canEdit ? (
+            <select
+                value={item.stationId || ''}
+                onChange={e => handleUpdateBomItem(item.id, { 
+                    quantity: item.quantity, 
+                    unitPrice: item.unitPrice, 
+                    prcr: item.prcr, 
+                    leadTimeWeeks: item.leadTimeWeeks, 
+                    isCustomMechanical: item.isCustomMechanical,
+                    stationId: e.target.value || null 
+                })}
+                className="w-full text-xs bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+                <option value="">— Sin Estación —</option>
+                {stations.map(st => (
+                    <option key={st.id} value={st.id}>
+                        STN{String(st.stn || '').padStart(2, '0')} - {st.abbreviation || st.description}
+                    </option>
+                ))}
+            </select>
+        ) : (() => {
+            const st = stations.find(s => s.id === item.stationId);
+            return st ? (
+                <span className="inline-flex items-center px-2 py-1 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-bold font-mono">
+                    STN{String(st.stn || '').padStart(2, '0')} - {st.abbreviation}
+                </span>
+            ) : (
+                <span className="text-slate-500 text-xs">—</span>
+            );
+        })();
+    };
+
+    const renderLeadCell = (item) => {
+        const masterPart = item.masterPartRef ? catalogo.find(p => p.id === item.masterPartRef.id) : null;
+        const catalogLT = masterPart?.leadTimeWeeks;
+        const bomLT = item.leadTimeWeeks;
+        const changed = bomLT != null && catalogLT != null && bomLT !== catalogLT;
+        if (bomLT != null) return <span className="text-sm font-bold text-teal-400">{bomLT} sem {changed && <span title={`Catálogo: ${catalogLT} sem`} className="text-amber-500 cursor-help">⚡</span>}</span>;
+        if (catalogLT != null) return <span className="text-sm text-slate-500">{catalogLT} sem</span>;
+        return <span className="text-slate-600 text-xs">—</span>;
+    };
+
+    const renderCostCell = (item) => {
+        return (
+            <div className="text-right">
+                <div className="font-black text-lg" style={{ color: 'var(--text-primary)' }}>${(item.totalPrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                {canEdit ? (
+                    <InlineEditCell
+                        value={item.unitPrice}
+                        onSave={v => handleUpdateBomItem(item.id, { quantity: item.quantity, unitPrice: v, prcr: item.prcr, leadTimeWeeks: item.leadTimeWeeks, stationId: item.stationId, isCustomMechanical: item.isCustomMechanical })}
+                        prefix="$"
+                        suffix="/u"
+                        placeholder="$0"
+                        className="text-[10px] text-slate-500"
+                        inputClassName="w-20 text-[11px]"
+                    />
+                ) : (
+                    <div className="text-[10px] text-slate-500">${item.unitPrice}/u</div>
+                )}
+            </div>
+        );
+    };
+
+    const renderActionsCell = (item, details) => {
+        return (
+            <div className='flex justify-center items-center gap-2'>
+                {canEdit && item.masterPartRef && (() => {
+                    const masterPart = catalogo.find(p => p.id === item.masterPartRef.id);
+                    return masterPart ? (
+                        <button onClick={() => handleEditClick(masterPart)} className="p-2 text-amber-500 bg-amber-500/10 rounded-lg hover:bg-amber-500/20 transition-all active:scale-90" title="Editar pieza en catálogo">
+                            <Edit3 className="w-4 h-4" />
+                        </button>
+                    ) : null;
+                })()}
+                {canDelete && <button onClick={() => setConfirmDelete({ isOpen: true, title: 'Quitar ítem', message: `¿Quitar "${details.name}" de la lista?`, onConfirm: () => handleDeleteBomItem(item.id) })} className="p-2 text-red-500 bg-red-500/10 rounded-lg hover:bg-red-500/20 transition-all active:scale-90"><Trash2 className="w-4 h-4" /></button>}
+            </div>
+        );
     };
 
     // Reset on project change
@@ -471,27 +679,7 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
                         </div>
                     )}
 
-                    {hasDuplicates && (
-                        <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl flex flex-col sm:flex-row gap-3 items-center justify-between shadow-lg animate-in fade-in duration-300">
-                            <div className="flex items-center gap-3 mr-auto">
-                                <div className="p-2.5 bg-red-500/20 text-red-400 rounded-xl">
-                                    <AlertTriangle className="w-5 h-5 animate-pulse" />
-                                </div>
-                                <div>
-                                    <h4 className="text-sm font-black uppercase tracking-wider text-red-400">Elementos Duplicados Detectados</h4>
-                                    <p className="text-xs text-slate-400 mt-0.5">Se han encontrado componentes duplicados en este proyecto BOM (mismo número de parte).</p>
-                                </div>
-                            </div>
-                            <button
-                                onClick={handleMergeAll}
-                                disabled={isMerging}
-                                className="w-full sm:w-auto px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs transition-all active:scale-95 shadow-md shadow-red-950 flex items-center justify-center gap-1.5 shrink-0"
-                            >
-                                {isMerging ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <GitMerge className="w-3.5 h-3.5" />}
-                                Unificar Todos los Duplicados
-                            </button>
-                        </div>
-                    )}
+                    {/* Visual grouping is active by default. No separate merge banner needed. */}
 
                     {/* BOM Table */}
                     <div className="bg-slate-900/70 rounded-2xl border border-slate-800 shadow-lg overflow-auto flex-1">
@@ -580,238 +768,278 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
                                                     </tr>
                                                 )}
                                                 {/* Group Items */}
-                                                {!isCollapsed && group.items.map(item => {
-                                                    const resolved = resolveDetails(item);
-                                                    if (!resolved) return <tr key={item.id}><td colSpan={colCount} className="p-4 text-center text-slate-400">Ítem obsoleto o borrado del catálogo.</td></tr>;
-                                                    const { details, providerName } = resolved;
-                                                    const isSelected = selectedBomItems.includes(item.id);
-                                                    const isDup = isItemDuplicate(item);
-                                                    return (
-                                                        <tr
-                                                            key={item.id}
-                                                            className={`group transition-colors border-l-4 ${
-                                                                isDup
-                                                                    ? 'bg-red-500/10 hover:bg-red-500/20 border-l-red-500 text-red-100/90'
-                                                                    : isSelected
-                                                                        ? 'bg-indigo-500/10 hover:bg-indigo-500/15 border-l-indigo-500'
-                                                                        : 'border-l-transparent hover:bg-slate-800/30'
-                                                            }`}
-                                                        >
-                                                            {isBomEditMode && <td className="p-5 text-center"><input type="checkbox" className="w-4 h-4" checked={isSelected} onChange={() => handleToggleSelectBomItem(item.id)} /></td>}
-                                                            <td className="p-3 text-center">
-                                                                {(() => {
-                                                                    const masterPart = item.masterPartRef ? catalogo.find(p => p.id === item.masterPartRef.id) : null;
-                                                                    const imgUrl = masterPart?.imageUrl || item.imageUrl;
-                                                                    
-                                                                    const openImagePicker = () => {
-                                                                        if (masterPart) {
-                                                                            // Linked to catalog — save to catalog
-                                                                            setImagePickerItem({ id: masterPart.id, name: masterPart.name, partNumber: masterPart.partNumber });
-                                                                        } else {
-                                                                            // Standalone BOM item — save to BOM item directly
-                                                                            setImagePickerItem({ id: item.id, name: item.name, partNumber: item.partNumber, _isBomItem: true });
-                                                                        }
-                                                                    };
-                                                                    
-                                                                    return (
-                                                                        <div className="w-[120px] h-[120px] mx-auto relative" onDoubleClick={openImagePicker} title="Doble clic para cambiar">
-                                                                            {imgUrl ? (
-                                                                                <>
-                                                                                    <img
-                                                                                        src={imgUrl}
-                                                                                        alt=""
-                                                                                        referrerPolicy="no-referrer"
-                                                                                        onClick={() => setZoomedImageUrl(imgUrl)}
-                                                                                        className="w-full h-full object-contain rounded-xl border-2 border-slate-200 bg-white transition-all duration-300 cursor-zoom-in hover:border-indigo-400 hover:shadow-lg p-1"
-                                                                                        onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
-                                                                                    />
-                                                                                    <div style={{ display: 'none' }} className="absolute inset-0 items-center justify-center bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl"><Camera className="w-6 h-6 text-slate-300" /></div>
-                                                                                </>
-                                                                            ) : (
-                                                                                <button
-                                                                                    onClick={openImagePicker}
-                                                                                    className="w-full h-full rounded-xl border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50 transition-all flex items-center justify-center text-slate-300 hover:text-indigo-500"
-                                                                                    title="Agregar imagen"
-                                                                                >
-                                                                                    <Camera className="w-6 h-6" />
-                                                                                </button>
-                                                                            )}
-                                                                        </div>
-                                                                    );
-                                                                })()}
-                                                            </td>
-                                                            <td className="p-5 font-black text-lg" style={{ color: 'var(--text-primary)' }}>
-                                                                {canEdit ? (
-                                                                    <InlineEditCell
-                                                                        value={item.quantity}
-                                                                        onSave={v => handleUpdateBomItem(item.id, { quantity: v, unitPrice: item.unitPrice, prcr: item.prcr, leadTimeWeeks: item.leadTimeWeeks })}
-                                                                        placeholder="0"
-                                                                        className="font-black text-lg"
-                                                                        inputClassName="w-24 font-black text-lg"
-                                                                    />
-                                                                ) : item.quantity}
-                                                            </td>
-                                                            <td className="p-5">
-                                                                <div className="font-bold leading-tight" style={{ color: 'var(--text-heading)' }}>{details.name || 'Sin nombre'}</div>
-                                                                <div className="text-[10px] font-mono mt-1" style={{ color: 'var(--text-muted)' }}>{details.partNumber || 'S/N'}</div>
-                                                                <div className="flex items-center flex-wrap gap-2 mt-2">
-                                                                    {details.brandName && <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-gray-600 bg-gray-100 border-gray-200"><Tag className="w-3 h-3 mr-1.5 flex-shrink-0" />{details.brandName}</div>}
-                                                                    {details.categoryName && <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-purple-600 bg-purple-50 border-purple-100"><Tag className="w-3 h-3 mr-1.5 flex-shrink-0" />{details.categoryName}</div>}
-                                                                    {providerName && <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-indigo-500 bg-indigo-50 border-indigo-100">Prov: {providerName}</div>}
-                                                                    {canEdit && isBomEditMode ? (
-                                                                        <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-black uppercase text-amber-400 bg-amber-950/20 hover:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-500/20 select-none">
-                                                                            <input 
-                                                                                type="checkbox" 
-                                                                                checked={!!item.isCustomMechanical} 
-                                                                                onChange={e => handleUpdateBomItem(item.id, { 
-                                                                                    quantity: item.quantity, 
-                                                                                    unitPrice: item.unitPrice, 
-                                                                                    prcr: item.prcr, 
-                                                                                    leadTimeWeeks: item.leadTimeWeeks, 
-                                                                                    isCustomMechanical: e.target.checked 
-                                                                                })}
-                                                                                className="w-3 h-3 rounded bg-slate-800 border-slate-700 text-amber-500 focus:ring-amber-500" 
-                                                                            />
-                                                                            A la Medida
-                                                                        </label>
-                                                                    ) : item.isCustomMechanical ? (
-                                                                        <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-amber-400 bg-amber-950/40 border-amber-500/30">
-                                                                            🛠️ Pieza Custom
-                                                                        </div>
-                                                                    ) : null}
-                                                                    {isDup && (
-                                                                        <div className="flex items-center gap-1.5">
-                                                                            <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-red-400 bg-red-950/40 border-red-500/30 animate-pulse">
-                                                                                ⚠️ Duplicado
-                                                                            </div>
-                                                                            {canEdit && (
-                                                                                <button
-                                                                                    onClick={() => handleMergeSingle(details.partNumber)}
-                                                                                    disabled={isMerging}
-                                                                                    className="flex items-center justify-center h-6 px-2.5 rounded-full border text-[9px] font-black uppercase tracking-tighter text-white bg-red-600 hover:bg-red-700 border-red-500 transition-all active:scale-90"
-                                                                                    title="Combinar este componente con sus duplicados"
-                                                                                >
-                                                                                    <GitMerge className="w-2.5 h-2.5 mr-1" /> Unificar
-                                                                                </button>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </td>
-                                                            <td className="p-5">
-                                                                <div className="flex flex-col gap-1.5">
-                                                                    {canEdit ? (
-                                                                        <InlineEditCell
-                                                                            value={item.prcr || ''}
-                                                                            type="text"
-                                                                            onSave={v => handleUpdateBomItem(item.id, { quantity: item.quantity, unitPrice: item.unitPrice, prcr: v, leadTimeWeeks: item.leadTimeWeeks })}
-                                                                            placeholder="—"
-                                                                            className="text-xs font-bold font-mono text-amber-500"
-                                                                            inputClassName="w-full text-xs font-mono uppercase"
-                                                                        />
-                                                                    ) : (
-                                                                        item.prcr ? <span className="px-2 py-1 bg-amber-100/10 border border-amber-500/20 text-amber-500 rounded-lg text-xs font-bold font-mono w-max">{item.prcr}</span> : <span className="text-slate-500 text-xs">—</span>
-                                                                    )}
+                                                {!isCollapsed && (() => {
+                                                    // Helper to group by Part Number
+                                                    const getPartNumberGroupedRows = (itemsList) => {
+                                                        const norm = (pn) => String(pn || '').trim().replace(/\s+/g, '').toUpperCase();
+                                                        const grouped = {};
+                                                        const standalones = [];
+                                                        itemsList.forEach(item => {
+                                                            let pn = '';
+                                                            if (item.masterPartRef) {
+                                                                const mp = catalogo.find(p => p.id === item.masterPartRef.id);
+                                                                if (mp) pn = mp.partNumber;
+                                                            } else {
+                                                                pn = item.partNumber;
+                                                            }
+                                                            const key = norm(pn);
+                                                            if (!key || key === 'S/N' || key === '') {
+                                                                standalones.push(item);
+                                                            } else {
+                                                                if (!grouped[key]) grouped[key] = [];
+                                                                grouped[key].push(item);
+                                                            }
+                                                        });
 
-                                                                    {(() => {
-                                                                        const matchedPO = pos.find(po => 
-                                                                            (item.poId && po.id === item.poId) ||
-                                                                            (!item.poId && item.prcr && String(po.prcr || '') === String(item.prcr))
-                                                                        );
-                                                                        if (!matchedPO) return null;
-                                                                        const isManualMatch = item.poId && matchedPO.id === item.poId;
-                                                                        return (
-                                                                            <span 
-                                                                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider w-max ${
-                                                                                    isManualMatch 
-                                                                                        ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' 
-                                                                                        : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                                                                }`}
-                                                                                title={isManualMatch ? "Asociación manual de PO" : "Emparejado por PRCR automático"}
-                                                                            >
-                                                                                <ShoppingCart className="w-2.5 h-2.5" />
-                                                                                PO: {matchedPO.po_number || 'S/N'}
-                                                                            </span>
-                                                                        );
-                                                                    })()}
-                                                                </div>
-                                                            </td>
-                                                            <td className="p-5">
-                                                                {isBomEditMode && canEdit ? (
-                                                                    <select
-                                                                        value={item.stationId || ''}
-                                                                        onChange={e => handleUpdateBomItem(item.id, { 
-                                                                            quantity: item.quantity, 
-                                                                            unitPrice: item.unitPrice, 
-                                                                            prcr: item.prcr, 
-                                                                            leadTimeWeeks: item.leadTimeWeeks, 
-                                                                            stationId: e.target.value || null 
-                                                                        })}
-                                                                        className="w-full text-xs bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500"
-                                                                    >
-                                                                        <option value="">— Sin Estación —</option>
-                                                                        {stations.map(st => (
-                                                                            <option key={st.id} value={st.id}>
-                                                                                STN{String(st.stn || '').padStart(2, '0')} - {st.abbreviation || st.description}
-                                                                            </option>
-                                                                        ))}
-                                                                    </select>
-                                                                ) : (() => {
-                                                                    const st = stations.find(s => s.id === item.stationId);
-                                                                    return st ? (
-                                                                        <span className="inline-flex items-center px-2 py-1 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-bold font-mono">
-                                                                            STN{String(st.stn || '').padStart(2, '0')} - {st.abbreviation}
-                                                                        </span>
-                                                                    ) : (
-                                                                        <span className="text-slate-500 text-xs">—</span>
-                                                                    );
-                                                                })()}
-                                                            </td>
-                                                            <td className="p-5 text-center">
-                                                                {(() => {
-                                                                    const masterPart = item.masterPartRef ? catalogo.find(p => p.id === item.masterPartRef.id) : null;
-                                                                    const catalogLT = masterPart?.leadTimeWeeks;
-                                                                    const bomLT = item.leadTimeWeeks;
-                                                                    const changed = bomLT != null && catalogLT != null && bomLT !== catalogLT;
-                                                                    if (bomLT != null) return <span className="text-sm font-bold text-teal-700">{bomLT} sem {changed && <span title={`Catálogo: ${catalogLT} sem`} className="text-amber-500 cursor-help">⚡</span>}</span>;
-                                                                    if (catalogLT != null) return <span className="text-sm text-slate-400">{catalogLT} sem</span>;
-                                                                    return <span className="text-slate-300 text-xs">—</span>;
-                                                                })()}
-                                                            </td>
-                                                            <td className="p-5 text-right">
-                                                                <div className="font-black text-lg" style={{ color: 'var(--text-primary)' }}>${(item.totalPrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
-                                                                {canEdit ? (
-                                                                    <InlineEditCell
-                                                                        value={item.unitPrice}
-                                                                        onSave={v => handleUpdateBomItem(item.id, { quantity: item.quantity, unitPrice: v, prcr: item.prcr, leadTimeWeeks: item.leadTimeWeeks })}
-                                                                        prefix="$"
-                                                                        suffix="/u"
-                                                                        placeholder="$0"
-                                                                        className="text-[10px] text-slate-400"
-                                                                        inputClassName="w-20 text-[11px]"
-                                                                    />
-                                                                ) : (
-                                                                    <div className="text-[10px] text-slate-400">${item.unitPrice}/u</div>
-                                                                )}
-                                                            </td>
-                                                            {isBomEditMode && (
-                                                                <td className="p-5 text-center">
-                                                                    <div className='flex justify-center items-center gap-2'>
-                                                                        {canEdit && item.masterPartRef && (() => {
-                                                                            const masterPart = catalogo.find(p => p.id === item.masterPartRef.id);
-                                                                            return masterPart ? (
-                                                                                <button onClick={() => handleEditClick(masterPart)} className="p-2 text-amber-500 bg-amber-50 rounded-lg hover:bg-amber-100 transition-all active:scale-90" title="Editar pieza en catálogo">
-                                                                                    <Edit3 className="w-4 h-4" />
+                                                        const rows = [];
+                                                        Object.keys(grouped).forEach(key => {
+                                                            const items = grouped[key];
+                                                            if (items.length > 1) {
+                                                                rows.push({
+                                                                    isParent: true,
+                                                                    partNumberKey: key,
+                                                                    items: items,
+                                                                    representativeItem: items[0]
+                                                                });
+                                                            } else {
+                                                                rows.push({
+                                                                    isParent: false,
+                                                                    item: items[0]
+                                                                });
+                                                            }
+                                                        });
+                                                        standalones.forEach(item => {
+                                                            rows.push({
+                                                                isParent: false,
+                                                                item: item
+                                                            });
+                                                        });
+                                                        return rows;
+                                                    };
+
+                                                    const groupedRows = getPartNumberGroupedRows(group.items);
+
+                                                    return groupedRows.map((row) => {
+                                                        if (row.isParent) {
+                                                            const resolved = resolveDetails(row.representativeItem);
+                                                            if (!resolved) return null;
+                                                            const { details, providerName } = resolved;
+                                                            const isExpanded = !!expandedParts[row.partNumberKey];
+                                                            const toggleExpand = () => setExpandedParts(prev => ({ ...prev, [row.partNumberKey]: !isExpanded }));
+
+                                                            const totalQty = row.items.reduce((s, i) => s + (i.quantity || 0), 0);
+                                                            const totalCost = row.items.reduce((s, i) => s + (i.totalPrice || 0), 0);
+                                                            const areAllPrcrSame = row.items.every(i => (i.prcr || '') === (row.items[0].prcr || ''));
+                                                            const areAllStationsSame = row.items.every(i => i.stationId === row.items[0].stationId);
+                                                            const arePricesSame = row.items.every(i => i.unitPrice === row.items[0].unitPrice);
+                                                            const priceSummary = arePricesSame 
+                                                                ? `$${(row.items[0].unitPrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}/u` 
+                                                                : 'Precios varían';
+
+                                                            const allIds = row.items.map(i => i.id);
+                                                            const isAllSelected = allIds.every(id => selectedBomItems.includes(id));
+                                                            const handleToggleSelectParent = () => {
+                                                                if (isAllSelected) {
+                                                                    setSelectedBomItems(prev => prev.filter(id => !allIds.includes(id)));
+                                                                } else {
+                                                                    setSelectedBomItems(prev => [...new Set([...prev, ...allIds])]);
+                                                                }
+                                                            };
+
+                                                            return (
+                                                                <React.Fragment key={row.partNumberKey}>
+                                                                    <tr className="group border-l-4 border-l-indigo-500/60 bg-indigo-500/5 hover:bg-indigo-500/10 transition-colors">
+                                                                        {isBomEditMode && (
+                                                                            <td className="p-5 text-center">
+                                                                                <input 
+                                                                                    type="checkbox" 
+                                                                                    className="w-4 h-4" 
+                                                                                    checked={isAllSelected} 
+                                                                                    onChange={handleToggleSelectParent} 
+                                                                                />
+                                                                            </td>
+                                                                        )}
+                                                                        <td className="p-3 text-center">
+                                                                            {renderVisualCell(row.representativeItem)}
+                                                                        </td>
+                                                                        <td className="p-5 font-black text-lg text-slate-300">
+                                                                            <div className="flex flex-col">
+                                                                                <span>{totalQty}</span>
+                                                                                <span className="text-[9px] text-slate-500 uppercase tracking-widest font-bold">Total</span>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="p-5">
+                                                                            <div className="font-bold leading-tight" style={{ color: 'var(--text-heading)' }}>{details.name || 'Sin nombre'}</div>
+                                                                            <div className="text-[10px] font-mono mt-1" style={{ color: 'var(--text-muted)' }}>{details.partNumber || 'S/N'}</div>
+                                                                            <div className="flex items-center flex-wrap gap-2 mt-2">
+                                                                                {details.brandName && <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-slate-400 bg-slate-800 border-slate-700"><Tag className="w-3 h-3 mr-1.5 flex-shrink-0" />{details.brandName}</div>}
+                                                                                {details.categoryName && <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-purple-400 bg-purple-950/20 border-purple-800/30"><Tag className="w-3 h-3 mr-1.5 flex-shrink-0" />{details.categoryName}</div>}
+                                                                                {providerName && <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-indigo-400 bg-indigo-950/20 border-indigo-900/30">Prov: {providerName}</div>}
+                                                                                <button
+                                                                                    onClick={toggleExpand}
+                                                                                    className="flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider text-indigo-400 bg-indigo-950/30 border-indigo-500/30 hover:bg-indigo-500/20 transition-all select-none"
+                                                                                >
+                                                                                    {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                                                                    {isExpanded ? 'Ocultar compras' : `Ver compras (${row.items.length})`}
                                                                                 </button>
-                                                                            ) : null;
-                                                                        })()}
-                                                                        {canDelete && <button onClick={() => setConfirmDelete({ isOpen: true, title: 'Quitar ítem', message: `¿Quitar "${details.name}" de la lista?`, onConfirm: () => handleDeleteBomItem(item.id) })} className="p-2 text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition-all active:scale-90"><Trash2 className="w-4 h-4" /></button>}
-                                                                    </div>
-                                                                </td>
-                                                            )}
-                                                        </tr>
-                                                    );
-                                                })}
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="p-5">
+                                                                            <div className="flex flex-col gap-1">
+                                                                                {areAllPrcrSame && row.items[0].prcr ? (
+                                                                                    <span className="px-2 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-lg text-xs font-bold font-mono w-max">{row.items[0].prcr}</span>
+                                                                                ) : (
+                                                                                    <span className="text-slate-400 text-xs font-bold font-mono">
+                                                                                        {row.items.map(i => i.prcr).filter(Boolean).length > 0 
+                                                                                            ? `Múltiples (${[...new Set(row.items.map(i => i.prcr).filter(Boolean))].length})`
+                                                                                            : '—'
+                                                                                        }
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="p-5">
+                                                                            {areAllStationsSame ? (
+                                                                                renderStationCell(row.representativeItem)
+                                                                            ) : (
+                                                                                <span className="inline-flex items-center px-2 py-1 rounded bg-slate-800 border border-slate-700 text-slate-400 text-xs font-bold">
+                                                                                    Varios
+                                                                                </span>
+                                                                            )}
+                                                                        </td>
+                                                                        <td className="p-5 text-center">
+                                                                            {renderLeadCell(row.representativeItem)}
+                                                                        </td>
+                                                                        <td className="p-5 text-right">
+                                                                            <div className="font-black text-lg" style={{ color: 'var(--text-primary)' }}>
+                                                                                ${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                                                            </div>
+                                                                            <div className="text-[10px] text-slate-500">
+                                                                                {priceSummary}
+                                                                            </div>
+                                                                        </td>
+                                                                        {isBomEditMode && (
+                                                                            <td className="p-5 text-center">
+                                                                                {renderActionsCell(row.representativeItem, details)}
+                                                                            </td>
+                                                                        )}
+                                                                    </tr>
+
+                                                                    {isExpanded && row.items.map(childItem => {
+                                                                        const isChildSelected = selectedBomItems.includes(childItem.id);
+                                                                        const childResolved = resolveDetails(childItem);
+                                                                        const childDetails = childResolved?.details || details;
+                                                                        return (
+                                                                            <tr 
+                                                                                key={childItem.id} 
+                                                                                className="group border-l-4 border-l-slate-700 bg-slate-950/40 hover:bg-slate-900/30 transition-colors border-b border-b-slate-900/20"
+                                                                            >
+                                                                                {isBomEditMode && (
+                                                                                    <td className="p-5 text-center">
+                                                                                        <input 
+                                                                                            type="checkbox" 
+                                                                                            className="w-4 h-4" 
+                                                                                            checked={isChildSelected} 
+                                                                                            onChange={() => handleToggleSelectBomItem(childItem.id)} 
+                                                                                        />
+                                                                                    </td>
+                                                                                )}
+                                                                                <td className="p-3 text-center text-slate-600">
+                                                                                    <CornerDownRight className="w-4 h-4 mx-auto" />
+                                                                                </td>
+                                                                                <td className="p-5 font-black text-lg" style={{ color: 'var(--text-primary)' }}>
+                                                                                    {renderQtyCell(childItem)}
+                                                                                </td>
+                                                                                <td className="p-5">
+                                                                                    <div className="text-xs font-bold text-slate-400">
+                                                                                        Requisición / Línea de Compra
+                                                                                    </div>
+                                                                                    {childItem.isCustomMechanical ? (
+                                                                                        <div className="mt-1 text-[9px] font-black uppercase text-amber-400 bg-amber-950/40 border border-amber-500/30 w-max px-2 py-0.5 rounded-full">
+                                                                                            🛠️ Pieza Custom
+                                                                                        </div>
+                                                                                    ) : null}
+                                                                                </td>
+                                                                                <td className="p-5">
+                                                                                    {renderPrcrCell(childItem)}
+                                                                                </td>
+                                                                                <td className="p-5">
+                                                                                    {renderStationCell(childItem)}
+                                                                                </td>
+                                                                                <td className="p-5 text-center">
+                                                                                    {renderLeadCell(childItem)}
+                                                                                </td>
+                                                                                <td className="p-5 text-right">
+                                                                                    {renderCostCell(childItem)}
+                                                                                </td>
+                                                                                {isBomEditMode && (
+                                                                                    <td className="p-5 text-center">
+                                                                                        <button 
+                                                                                            onClick={() => setConfirmDelete({ 
+                                                                                                isOpen: true, 
+                                                                                                title: 'Quitar ítem', 
+                                                                                                message: `¿Quitar esta compra con PRCR "${childItem.prcr || '—'}" de la lista?`, 
+                                                                                                onConfirm: () => handleDeleteBomItem(childItem.id) 
+                                                                                            })} 
+                                                                                            className="p-2 text-red-500 bg-red-500/10 rounded-lg hover:bg-red-500/20 transition-all active:scale-90"
+                                                                                        >
+                                                                                            <Trash2 className="w-4 h-4" />
+                                                                                        </button>
+                                                                                    </td>
+                                                                                )}
+                                                                            </tr>
+                                                                        );
+                                                                    })}
+                                                                </React.Fragment>
+                                                            );
+                                                        } else {
+                                                            // Standalone item
+                                                            const item = row.item;
+                                                            const resolved = resolveDetails(item);
+                                                            if (!resolved) return <tr key={item.id}><td colSpan={colCount} className="p-4 text-center text-slate-400">Ítem obsoleto o borrado del catálogo.</td></tr>;
+                                                            const { details, providerName } = resolved;
+                                                            const isSelected = selectedBomItems.includes(item.id);
+                                                            return (
+                                                                <tr
+                                                                    key={item.id}
+                                                                    className={`group transition-colors border-l-4 ${
+                                                                        isSelected
+                                                                            ? 'bg-indigo-500/10 hover:bg-indigo-500/15 border-l-indigo-500'
+                                                                            : 'border-l-transparent hover:bg-slate-800/30'
+                                                                    }`}
+                                                                >
+                                                                    {isBomEditMode && <td className="p-5 text-center"><input type="checkbox" className="w-4 h-4" checked={isSelected} onChange={() => handleToggleSelectBomItem(item.id)} /></td>}
+                                                                    <td className="p-3 text-center">
+                                                                        {renderVisualCell(item)}
+                                                                    </td>
+                                                                    <td className="p-5 font-black text-lg" style={{ color: 'var(--text-primary)' }}>
+                                                                        {renderQtyCell(item)}
+                                                                    </td>
+                                                                    <td className="p-5">
+                                                                        {renderDescriptionCell(item, details, providerName)}
+                                                                    </td>
+                                                                    <td className="p-5">
+                                                                        {renderPrcrCell(item)}
+                                                                    </td>
+                                                                    <td className="p-5">
+                                                                        {renderStationCell(item)}
+                                                                    </td>
+                                                                    <td className="p-5 text-center">
+                                                                        {renderLeadCell(item)}
+                                                                    </td>
+                                                                    <td className="p-5 text-right">
+                                                                        {renderCostCell(item)}
+                                                                    </td>
+                                                                    {isBomEditMode && (
+                                                                        <td className="p-5 text-center">
+                                                                            {renderActionsCell(item, details)}
+                                                                        </td>
+                                                                    )}
+                                                                </tr>
+                                                            );
+                                                        }
+                                                    });
+                                                })()}
                                             </React.Fragment>
                                         );
                                     });
