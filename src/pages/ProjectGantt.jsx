@@ -124,6 +124,7 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
     const [plannerParsedData, setPlannerParsedData] = useState(null);
     const [plannerProjectName, setPlannerProjectName] = useState('');
     const [isSyncingPlanner, setIsSyncingPlanner] = useState(false);
+    const [visualizeLateness, setVisualizeLateness] = useState(false);
 
     const handlePlannerExcelUpload = async (e) => {
         const file = e.target.files[0];
@@ -757,6 +758,16 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                             </button>
                         )}
 
+                        {/* Visualizar Atrasos */}
+                        <button
+                            onClick={() => setVisualizeLateness(prev => !prev)}
+                            className={`flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${visualizeLateness ? 'bg-rose-500/20 text-rose-400 border-rose-500/40 shadow-sm' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700'}`}
+                            title="Visualizar tramos de atraso en tareas vencidas"
+                        >
+                            <Clock className="w-3.5 h-3.5" />
+                            Visualizar Atrasos
+                        </button>
+
                         {/* Ruta Crítica */}
                         <button
                             onClick={() => setShowCriticalPath(prev => !prev)}
@@ -869,6 +880,15 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                             </button>
                         )}
 
+                        {/* Visualizar Atrasos Embebido */}
+                        <button
+                            onClick={() => setVisualizeLateness(prev => !prev)}
+                            className={`flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${visualizeLateness ? 'bg-rose-500/20 text-rose-400 border-rose-500/40 shadow-sm' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700'}`}
+                            title="Visualizar tramos de atraso en tareas vencidas"
+                        >
+                            <Clock className="w-3.5 h-3.5" /> Visualizar Atrasos
+                        </button>
+
                         {/* Ruta Crítica Embebida */}
                         <button
                             onClick={() => setShowCriticalPath(prev => !prev)}
@@ -976,6 +996,7 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                         showCriticalPath={showCriticalPath}
                         projects={projects}
                         onRemoveFromGantt={handleRemoveFromGantt}
+                        visualizeLateness={visualizeLateness}
                     />
                 )}
             </div>

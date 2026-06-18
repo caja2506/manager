@@ -104,6 +104,7 @@ export default function GanttBar({
     task, left, width, color = 'indigo', rowHeight = 42, dayWidth = 96,
     viewStart, onClick, onDragEnd, onLinkStart, onLinkComplete, isLinking, isLinkSource,
     isCritical = false, dimmed = false,
+    visualizeLateness = false,
 }) {
     const [hovered, setHovered] = useState(false);
     const [dragState, setDragState] = useState(null); // { mode: 'move'|'left'|'right', startX, origLeft, origWidth }
@@ -220,31 +221,16 @@ export default function GanttBar({
     const startStr = task.plannedStartDate ? getLocalDateStr(task.plannedStartDate) : null;
     const plannedEndStr = task.plannedEndDate ? getLocalDateStr(task.plannedEndDate) : startStr;
     
-    let totalDays = 1;
-    let plannedDays = 1;
-    let hasDelay = false;
+    let nominalWidth = displayWidth;
+    let delayWidth = 0;
     
-    if (startStr && plannedEndStr) {
+    if (visualizeLateness && startStr && plannedEndStr && task.status !== 'completed' && task.status !== 'cancelled') {
         const todayStr = new Date().toLocaleDateString('en-CA');
-        let effectiveEndStr = plannedEndStr;
-        
-        if (task.status === 'completed') {
-            if (task.completedDate) {
-                const completedStr = getLocalDateStr(task.completedDate);
-                if (completedStr && completedStr > effectiveEndStr) {
-                    effectiveEndStr = completedStr;
-                    hasDelay = true;
-                }
-            }
-        } else if (task.status !== 'cancelled') {
-            if (todayStr > effectiveEndStr) {
-                effectiveEndStr = todayStr;
-                hasDelay = true;
-            }
+        if (todayStr > plannedEndStr) {
+            const plannedDays = Math.max(daysBetweenStr(startStr, plannedEndStr) + 1, 1);
+            nominalWidth = plannedDays * dayWidth;
+            delayWidth = Math.max(displayWidth - nominalWidth, 0);
         }
-        
-        totalDays = Math.max(daysBetweenStr(startStr, effectiveEndStr) + 1, 1);
-        plannedDays = Math.max(daysBetweenStr(startStr, plannedEndStr) + 1, 1);
     }
 
     // --- Milestone ---
@@ -275,7 +261,7 @@ export default function GanttBar({
 
     const barStyle = {
         left: displayLeft,
-        width: Math.max(displayWidth, 8),
+        width: displayWidth,
         height: barH,
         top: barTop,
         zIndex: isDragging ? 30 : isLinkSource ? 20 : 5,
@@ -283,13 +269,10 @@ export default function GanttBar({
         userSelect: 'none',
     };
 
-    // Red lateness gradient styling removed as requested.
-
-
     return (
         <div
             ref={barRef}
-            className={`absolute rounded-md overflow-visible ${barClasses} shadow-lg transition-shadow ${isDragging ? 'shadow-xl opacity-90 z-30' : 'hover:shadow-md'} ${isLinkSource ? 'ring-2 ring-indigo-400 ring-offset-1 ring-offset-slate-900 animate-pulse z-20' : ''} ${isLinking && !isLinkSource ? 'cursor-crosshair hover:ring-2 hover:ring-emerald-400' : ''} ${dimClass} ${criticalClass}`}
+            className={`absolute rounded-md overflow-visible shadow-lg transition-shadow ${isDragging ? 'shadow-xl opacity-90 z-30' : 'hover:shadow-md'} ${isLinkSource ? 'ring-2 ring-indigo-400 ring-offset-1 ring-offset-slate-900 animate-pulse z-20' : ''} ${isLinking && !isLinkSource ? 'cursor-crosshair hover:ring-2 hover:ring-emerald-400' : ''} ${dimClass} ${criticalClass}`}
             style={barStyle}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
@@ -327,16 +310,36 @@ export default function GanttBar({
             }}
             title={isLinking && !isLinkSource ? `Click para enlazar con "${task.title}"` : `${task.title} (${pct}%) — Click para enlazar, doble click para editar`}
         >
-            {/* Progress fill */}
-            {pct > 0 && task.status !== 'completed' && (
-                <div className={`absolute inset-y-0 left-0 ${progressClasses} opacity-60`} style={{ width: `${pct}%` }} />
-            )}
+            {/* Tramo Planificado */}
+            <div
+                className={`absolute inset-y-0 left-0 rounded-md ${barClasses} flex items-center overflow-hidden`}
+                style={{ width: nominalWidth }}
+            >
+                {/* Progress fill */}
+                {pct > 0 && task.status !== 'completed' && (
+                    <div className={`absolute inset-y-0 left-0 ${progressClasses} opacity-60`} style={{ width: `${pct}%` }} />
+                )}
 
-            {/* Label */}
-            {displayWidth > 60 && (
-                <span className="absolute inset-0 flex items-center px-2 text-[10px] font-bold text-white truncate drop-shadow pointer-events-none">
-                    {task.title}
-                </span>
+                {/* Label */}
+                {nominalWidth > 60 && (
+                    <span className="absolute inset-0 flex items-center px-2 text-[10px] font-bold text-white truncate drop-shadow pointer-events-none">
+                        {task.title}
+                    </span>
+                )}
+            </div>
+
+            {/* Tramo de Atraso (extensión rayada y borde punteado) */}
+            {delayWidth > 0 && (
+                <div
+                    className="absolute inset-y-0 rounded-r-md border border-red-500 border-dashed"
+                    style={{
+                        left: nominalWidth,
+                        width: delayWidth,
+                        borderLeft: 'none',
+                        background: 'repeating-linear-gradient(45deg, rgba(239,68,68,0.12) 0px, rgba(239,68,68,0.12) 6px, rgba(239,68,68,0.28) 6px, rgba(239,68,68,0.28) 12px)'
+                    }}
+                    title={`Atraso acumulado: ${Math.round(delayWidth / dayWidth)} días transcurridos tras la fecha límite planificada`}
+                />
             )}
 
             {/* Left resize handle */}
@@ -344,25 +347,26 @@ export default function GanttBar({
                 <div
                     data-handle="left"
                     className={`absolute left-0 top-0 bottom-0 cursor-col-resize transition-opacity ${hovered || isDragging ? 'opacity-100' : 'opacity-0'}`}
-                    style={{ width: HANDLE_W, background: 'rgba(255,255,255,0.3)', borderRadius: '4px 0 0 4px' }}
+                    style={{ width: HANDLE_W, background: 'rgba(255,255,255,0.3)', borderRadius: '4px 0 0 4px', zIndex: 10 }}
                     onMouseDown={(e) => startDrag(e, 'left')}
                 />
             )}
 
-            {/* Right resize handle */}
+            {/* Right resize handle (pegado al fin del tramo planificado) */}
             {!isLinking && (
                 <div
                     data-handle="right"
-                    className={`absolute right-0 top-0 bottom-0 cursor-col-resize transition-opacity ${hovered || isDragging ? 'opacity-100' : 'opacity-0'}`}
-                    style={{ width: HANDLE_W, background: 'rgba(255,255,255,0.3)', borderRadius: '0 4px 4px 0' }}
+                    className={`absolute top-0 bottom-0 cursor-col-resize transition-opacity ${hovered || isDragging ? 'opacity-100' : 'opacity-0'}`}
+                    style={{ left: nominalWidth - HANDLE_W, width: HANDLE_W, background: 'rgba(255,255,255,0.3)', borderRadius: '0 4px 4px 0', zIndex: 10 }}
                     onMouseDown={(e) => startDrag(e, 'right')}
                 />
             )}
 
-            {/* Link source indicator — only after click */}
+            {/* Link source indicator (pegado al extremo planificado) */}
             {isLinkSource && (
                 <div
-                    className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-indigo-500 border-2 border-white shadow-lg z-30 flex items-center justify-center"
+                    className="absolute top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-indigo-500 border-2 border-white shadow-lg z-30 flex items-center justify-center animate-bounce"
+                    style={{ left: nominalWidth - 12 }}
                     title="Click en otra tarea para enlazar"
                 >
                     <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>

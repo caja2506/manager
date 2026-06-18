@@ -80,6 +80,7 @@ export default function GanttGrid({
     onTaskClick, onBarDragEnd, onLinkCreated, onDeleteDependency,
     zoomLevel = 1, showCriticalPath, projects = [],
     onRemoveFromGantt,
+    visualizeLateness = false,
 }) {
     const timelineRef = useRef(null);
     const leftPanelRef = useRef(null);
@@ -432,7 +433,7 @@ export default function GanttGrid({
                     endStr = completedStr;
                 }
             }
-        } else if (task.status !== 'cancelled') {
+        } else if (task.status !== 'cancelled' && visualizeLateness) {
             if (todayStr > endStr) {
                 endStr = todayStr;
             }
@@ -1016,6 +1017,7 @@ export default function GanttGrid({
                                                     isLinkSource={linkSource === task.id}
                                                     isCritical={criticalTaskIds.has(task.id)}
                                                     dimmed={showCriticalPath && !criticalTaskIds.has(task.id)}
+                                                    visualizeLateness={visualizeLateness}
                                                 />
                                             </div>
                                         )}
