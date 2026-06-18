@@ -5,13 +5,12 @@
  * Includes: project filter, assignee filter, status filter, view toggle, navigation.
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     CalendarRange, ChevronLeft, ChevronRight,
     RefreshCw, GanttChartSquare, Calendar, BarChart2,
     AlertCircle, Loader2, Plus, CalendarPlus, ListPlus,
     ChevronDown, ChevronUp, Clock, User, FolderGit2,
-    Workflow,
+    Workflow, History,
 } from 'lucide-react';
 import GanttGrid from '../components/gantt/GanttGrid';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
@@ -36,6 +35,7 @@ import { useRef } from 'react';
 import { parsePlannerExcel } from '../services/plannerExcelParser';
 import { syncPlannerExcelToSupabase } from '../services/plannerExcelSyncService';
 import PlannerImportModal from '../components/gantt/PlannerImportModal';
+import { createProjectBackup, rollbackProjectFromBackup, hasActiveProjectBackup } from '../services/plannerExcelRollbackService';
 
 // ---- Date helpers ----
 function getMondayOfWeek(date = new Date()) {
@@ -125,6 +125,18 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
     const [plannerProjectName, setPlannerProjectName] = useState('');
     const [isSyncingPlanner, setIsSyncingPlanner] = useState(false);
     const [visualizeLateness, setVisualizeLateness] = useState(false);
+    const [hasActiveBackup, setHasActiveBackup] = useState(false);
+    const [isRollingBack, setIsRollingBack] = useState(false);
+
+    const activePid = forceProjectId || filterProject;
+
+    useEffect(() => {
+        if (activePid) {
+            setHasActiveBackup(hasActiveProjectBackup(activePid));
+        } else {
+            setHasActiveBackup(false);
+        }
+    }, [activePid, tasks]);
 
     const handlePlannerExcelUpload = async (e) => {
         const file = e.target.files[0];
@@ -158,16 +170,51 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
 
         setIsSyncingPlanner(true);
         try {
+            // Guardar copia de seguridad en localStorage antes de sincronizar
+            await createProjectBackup(activePid);
+            
             await syncPlannerExcelToSupabase(activePid, plannerParsedData, user?.uid);
             setIsPlannerModalOpen(false);
             setPlannerParsedData(null);
             alert('¡Sincronización de Planner completada con éxito!');
             await loadData();
+            setHasActiveBackup(true);
         } catch (err) {
             console.error('Error al sincronizar Planner:', err);
             alert('Error al sincronizar: ' + err.message);
         } finally {
             setIsSyncingPlanner(false);
+        }
+    };
+
+    const handleRollback = async () => {
+        const activePid = forceProjectId || filterProject;
+        if (!activePid) return;
+
+        const confirmRestore = window.confirm(
+            '¿Estás seguro de que deseas deshacer la última importación de Planner?\n\n' +
+            'Esta acción eliminará las tareas nuevas creadas y restaurará todas las fechas, dependencias e hitos a su estado exacto previo a la importación.'
+        );
+
+        if (!confirmRestore) return;
+
+        setIsRollingBack(true);
+        try {
+            const res = await rollbackProjectFromBackup(activePid);
+            alert(
+                `¡Importación revertida con éxito!\n\n` +
+                `Se restauraron:\n` +
+                `- ${res.milestonesRestored} Hitos\n` +
+                `- ${res.tasksRestored} Tareas\n` +
+                `- ${res.dependenciesRestored} Dependencias`
+            );
+            setHasActiveBackup(false);
+            await loadData();
+        } catch (err) {
+            console.error('Error al deshacer importación:', err);
+            alert('Error al revertir la importación: ' + err.message);
+        } finally {
+            setIsRollingBack(false);
         }
     };
 
@@ -748,14 +795,31 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                         </div>
                         {/* Importar Planner */}
                         {canEdit && (forceProjectId || filterProject) && (
-                            <button
-                                onClick={() => plannerFileInputRef.current.click()}
-                                className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[10px] font-bold border border-green-500/40 bg-green-500/15 text-green-400 hover:bg-green-500/25 transition-all cursor-pointer shadow-sm"
-                                title="Importar Cronograma desde Excel (Planner)"
-                            >
-                                <CalendarPlus className="w-3.5 h-3.5" />
-                                Importar Planner
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => plannerFileInputRef.current.click()}
+                                    className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[10px] font-bold border border-green-500/40 bg-green-500/15 text-green-400 hover:bg-green-500/25 transition-all cursor-pointer shadow-sm"
+                                    title="Importar Cronograma desde Excel (Planner)"
+                                >
+                                    <CalendarPlus className="w-3.5 h-3.5" />
+                                    Importar Planner
+                                </button>
+                                {hasActiveBackup && (
+                                    <button
+                                        onClick={handleRollback}
+                                        disabled={isRollingBack}
+                                        className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[10px] font-bold border border-amber-500/40 bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition-all cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                        title="Deshacer última importación de Planner (Rollback)"
+                                    >
+                                        {isRollingBack ? (
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        ) : (
+                                            <History className="w-3.5 h-3.5" />
+                                        )}
+                                        Deshacer Importación
+                                    </button>
+                                )}
+                            </div>
                         )}
 
                         {/* Visualizar Atrasos */}
@@ -870,14 +934,31 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                         </div>
                         {/* Importar Planner Embebido */}
                         {canEdit && (forceProjectId || filterProject) && (
-                            <button
-                                onClick={() => plannerFileInputRef.current.click()}
-                                className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[10px] font-bold border border-green-500/40 bg-green-500/15 text-green-400 hover:bg-green-500/25 transition-all cursor-pointer shadow-sm"
-                                title="Importar Cronograma desde Excel (Planner)"
-                            >
-                                <CalendarPlus className="w-3.5 h-3.5" />
-                                Importar Planner
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => plannerFileInputRef.current.click()}
+                                    className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[10px] font-bold border border-green-500/40 bg-green-500/15 text-green-400 hover:bg-green-500/25 transition-all cursor-pointer shadow-sm"
+                                    title="Importar Cronograma desde Excel (Planner)"
+                                >
+                                    <CalendarPlus className="w-3.5 h-3.5" />
+                                    Importar Planner
+                                </button>
+                                {hasActiveBackup && (
+                                    <button
+                                        onClick={handleRollback}
+                                        disabled={isRollingBack}
+                                        className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[10px] font-bold border border-amber-500/40 bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition-all cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                        title="Deshacer última importación de Planner (Rollback)"
+                                    >
+                                        {isRollingBack ? (
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        ) : (
+                                            <History className="w-3.5 h-3.5" />
+                                        )}
+                                        Deshacer Importación
+                                    </button>
+                                )}
+                            </div>
                         )}
 
                         {/* Visualizar Atrasos Embebido */}
