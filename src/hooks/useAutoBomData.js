@@ -13,6 +13,49 @@ import { supabase } from '../supabase';
 const safeLocaleCompare = (a, b, field) =>
     String(a[field] || '').localeCompare(String(b[field] || ''));
 
+const fetchAllItemsBom = async () => {
+    let allItems = [];
+    let start = 0;
+    const pageSize = 1000;
+    while (true) {
+        const { data, error } = await supabase
+            .from('items_bom')
+            .select('*')
+            .range(start, start + pageSize - 1);
+        if (error) {
+            console.error("Error al paginar items_bom:", error);
+            break;
+        }
+        if (!data || data.length === 0) break;
+        allItems = allItems.concat(data);
+        if (data.length < pageSize) break;
+        start += pageSize;
+    }
+    return allItems;
+};
+
+const fetchAllCatalogoMaestro = async () => {
+    let allItems = [];
+    let start = 0;
+    const pageSize = 1000;
+    while (true) {
+        const { data, error } = await supabase
+            .from('catalogo_maestro')
+            .select('*')
+            .order('name')
+            .range(start, start + pageSize - 1);
+        if (error) {
+            console.error("Error al paginar catalogo_maestro:", error);
+            break;
+        }
+        if (!data || data.length === 0) break;
+        allItems = allItems.concat(data);
+        if (data.length < pageSize) break;
+        start += pageSize;
+    }
+    return allItems;
+};
+
 // ============================================================
 // Hook
 // ============================================================
@@ -88,15 +131,15 @@ export function useAutoBomData() {
             const fetchAll = async () => {
                 const [p, c, b, cat, prov, br] = await Promise.all([
                     supabase.from('proyectos_bom').select('*').order('created_at', { ascending: false }),
-                    supabase.from('catalogo_maestro').select('*').order('name'),
-                    supabase.from('items_bom').select('*'),
+                    fetchAllCatalogoMaestro(),
+                    fetchAllItemsBom(),
                     supabase.from('categorias').select('*').order('name'),
                     supabase.from('proveedores').select('*').order('name'),
                     supabase.from('marcas').select('*').order('name'),
                 ]);
                 if (p.data) setProyectos(p.data.map(mapProject));
-                if (c.data) setCatalogo(c.data.map(mapCatalogItem));
-                if (b.data) setBomItems(b.data.map(mapBomItem));
+                if (c) setCatalogo(c.map(mapCatalogItem));
+                if (b) setBomItems(b.map(mapBomItem));
                 setManagedLists({
                     categories: (cat.data || []).filter(d => d.name),
                     providers: (prov.data || []).filter(d => d.name),
@@ -124,10 +167,10 @@ export function useAutoBomData() {
                     supabase.from('proyectos_bom').select('*').order('created_at', { ascending: false }).then(({ data }) => data && setProyectos(data.map(mapProject)));
                 })
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'catalogo_maestro' }, () => {
-                    supabase.from('catalogo_maestro').select('*').order('name').then(({ data }) => data && setCatalogo(data.map(mapCatalogItem)));
+                    fetchAllCatalogoMaestro().then(data => data && setCatalogo(data.map(mapCatalogItem)));
                 })
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'items_bom' }, () => {
-                    supabase.from('items_bom').select('*').then(({ data }) => data && setBomItems(data.map(mapBomItem)));
+                    fetchAllItemsBom().then(data => data && setBomItems(data.map(mapBomItem)));
                 })
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'categorias' }, refreshLists)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'proveedores' }, refreshLists)
@@ -276,7 +319,7 @@ export function useAutoBomData() {
                     if (error) throw error;
                 }
                 // Refresh local state immediately
-                const { data: updatedCatalog } = await supabase.from('catalogo_maestro').select('*').order('name');
+                const updatedCatalog = await fetchAllCatalogoMaestro();
                 if (updatedCatalog) setCatalogo(updatedCatalog.map(mapCatalogItem));
             } else {
                 const { doc, setDoc, updateDoc, collection } = await import('firebase/firestore');
@@ -345,7 +388,7 @@ export function useAutoBomData() {
                     const idsToDelete = group.slice(1).map(item => item.id);
                     await supabase.from('items_bom').delete().in('id', idsToDelete);
                 }
-                const { data } = await supabase.from('items_bom').select('*');
+                const data = await fetchAllItemsBom();
                 if (data) setBomItems(data.map(mapBomItem));
             } else {
                 const { doc, writeBatch } = await import('firebase/firestore');
@@ -406,7 +449,7 @@ export function useAutoBomData() {
                 const idsToDelete = group.slice(1).map(item => item.id);
                 await supabase.from('items_bom').delete().in('id', idsToDelete);
                 
-                const { data } = await supabase.from('items_bom').select('*');
+                const data = await fetchAllItemsBom();
                 if (data) setBomItems(data.map(mapBomItem));
             } else {
                 const { doc, writeBatch } = await import('firebase/firestore');
@@ -822,7 +865,7 @@ export function useAutoBomData() {
             alert(msg);
 
             // Refresh catalog
-            const { data } = await supabase.from('catalogo_maestro').select('*').order('name');
+            const data = await fetchAllCatalogoMaestro();
             if (data) setCatalogo(data.map(mapCatalogItem));
         } catch (err) {
             console.error('[syncImages] Error:', err);
