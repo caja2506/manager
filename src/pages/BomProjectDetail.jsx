@@ -686,7 +686,7 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
                                 value={bomFilters.search}
                                 onChange={e => setBomFilters({ ...bomFilters, search: e.target.value })}
                                 placeholder="Buscar en BOM..."
-                                className="pl-12 pr-4 py-2 w-full border border-slate-700 rounded-xl text-sm shadow-inner outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800 text-white"
+                                className="pl-12 pr-4 h-11 w-full border border-slate-700 rounded-xl text-sm shadow-inner outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-800 text-white"
                             />
                         </div>
                         <FilterPopover
@@ -698,7 +698,14 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
                             const pcrValues = [...new Set(activeBomItems.map(i => i.prcr).filter(Boolean))];
                             if (pcrValues.length > 0) return (
                                 <div className="w-full sm:w-auto sm:min-w-[140px]">
-                                    <SearchableDropdown compact options={[{ value: '', label: 'Todos los PRCR' }, ...pcrValues.map(p => ({ value: p, label: p }))]} value={bomFilters.prcr} onChange={val => setBomFilters({ ...bomFilters, prcr: val })} placeholder="#PRCR" />
+                                    <SearchableDropdown 
+                                        compact 
+                                        options={[{ value: '', label: 'Todos los PRCR' }, ...pcrValues.map(p => ({ value: p, label: p }))]} 
+                                        value={bomFilters.prcr} 
+                                        onChange={val => setBomFilters({ ...bomFilters, prcr: val })} 
+                                        placeholder="#PRCR"
+                                        className="w-full h-11 px-3 text-left flex items-center justify-between border border-slate-700 rounded-xl bg-slate-800 text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-bold"
+                                    />
                                 </div>
                             );
                             return null;
@@ -708,7 +715,7 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
                                 <select
                                     value={bomFilters.station || ''}
                                     onChange={e => setBomFilters({ ...bomFilters, station: e.target.value })}
-                                    className="px-3 py-2 w-full border border-slate-700 rounded-xl text-sm bg-slate-800 text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500"
+                                    className="px-3 h-11 w-full border border-slate-700 rounded-xl text-sm bg-slate-800 text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500"
                                 >
                                     <option value="">Todas las Estaciones</option>
                                     {stations.map(st => (
@@ -721,7 +728,7 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
                         <div className="relative">
                             <button
                                 onClick={() => setGroupBy(g => g === 'none' ? 'brand' : g === 'brand' ? 'category' : 'none')}
-                                className={`px-3 py-2 rounded-xl border flex items-center gap-1.5 transition-all text-xs font-bold ${groupBy !== 'none' ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}
+                                className={`h-11 px-3 rounded-xl border flex items-center gap-1.5 transition-all text-sm font-bold ${groupBy !== 'none' ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}
                                 title="Agrupar por..."
                             >
                                 <Layers className="w-3.5 h-3.5" />
@@ -731,7 +738,7 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
                         {canEdit && (
                             <button
                                 onClick={() => { setIsBomEditMode(!isBomEditMode); setSelectedBomItems([]); }}
-                                className={`px-4 py-3 rounded-xl border flex items-center gap-2 transition-all ${isBomEditMode ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}
+                                className={`h-11 px-4 rounded-xl border flex items-center gap-2 transition-all ${isBomEditMode ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}
                             >
                                 <SlidersHorizontal className="w-4 h-4" />
                                 <span className="font-bold text-sm hidden sm:inline">Gestionar</span>

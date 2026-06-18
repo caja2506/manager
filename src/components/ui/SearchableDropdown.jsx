@@ -4,7 +4,7 @@ import { Search, Check, ChevronDown } from 'lucide-react';
 // ========================================================
 // COMPONENTE: DROPDOWN DE BÚSQUEDA (SOPORTA MULTI-SELECCIÓN)
 // ========================================================
-const SearchableDropdown = ({ options, value, onChange, placeholder, dark = false, compact = false, multiple = false }) => {
+const SearchableDropdown = ({ options, value, onChange, placeholder, dark = false, compact = false, multiple = false, className = "" }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState('');
     const dropdownRef = useRef(null);
@@ -65,7 +65,7 @@ const SearchableDropdown = ({ options, value, onChange, placeholder, dark = fals
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className={`w-full text-left flex items-center justify-between transition-all ${compact
+                className={className || `w-full text-left flex items-center justify-between transition-all ${compact
                     ? 'px-3 py-2 text-xs border border-slate-700 rounded-lg bg-slate-800'
                     : `p-4 border rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 ${dark ? 'bg-slate-800 text-white border-slate-700' : 'bg-slate-800 border-slate-700'}`
                     }`}
