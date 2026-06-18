@@ -747,23 +747,14 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                         </div>
                         {/* Importar Planner */}
                         {canEdit && (forceProjectId || filterProject) && (
-                            <>
-                                <button
-                                    onClick={() => plannerFileInputRef.current.click()}
-                                    className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[10px] font-bold border border-green-500/40 bg-green-500/15 text-green-400 hover:bg-green-500/25 transition-all cursor-pointer shadow-sm"
-                                    title="Importar Cronograma desde Excel (Planner)"
-                                >
-                                    <CalendarPlus className="w-3.5 h-3.5" />
-                                    Importar Planner
-                                </button>
-                                <input
-                                    type="file"
-                                    ref={plannerFileInputRef}
-                                    onChange={handlePlannerExcelUpload}
-                                    accept=".xlsx, .xls"
-                                    className="hidden"
-                                />
-                            </>
+                            <button
+                                onClick={() => plannerFileInputRef.current.click()}
+                                className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[10px] font-bold border border-green-500/40 bg-green-500/15 text-green-400 hover:bg-green-500/25 transition-all cursor-pointer shadow-sm"
+                                title="Importar Cronograma desde Excel (Planner)"
+                            >
+                                <CalendarPlus className="w-3.5 h-3.5" />
+                                Importar Planner
+                            </button>
                         )}
 
                         {/* Ruta Crítica */}
@@ -1014,6 +1005,13 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
             />
 
             {/* ======== PLANNER IMPORT MODAL ======== */}
+            <input
+                type="file"
+                ref={plannerFileInputRef}
+                onChange={handlePlannerExcelUpload}
+                accept=".xlsx, .xls"
+                className="hidden"
+            />
             <PlannerImportModal
                 isOpen={isPlannerModalOpen}
                 onClose={() => { setIsPlannerModalOpen(false); setPlannerParsedData(null); }}
