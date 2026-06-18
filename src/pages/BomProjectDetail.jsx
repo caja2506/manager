@@ -6,11 +6,14 @@ import SearchableDropdown from '../components/ui/SearchableDropdown';
 import FilterPopover from '../components/ui/FilterPopover';
 import CatalogPickerModal from '../components/catalog/CatalogPickerModal';
 import * as XLSX from 'xlsx';
+import { getPOsByProject } from '../services/poService';
+import { getProjectStations } from '../services/stationService';
+import { supabase } from '../supabase';
 import {
     Search, Trash2, ArrowLeft, PackagePlus, X,
     Loader2, Sparkles, SlidersHorizontal, Check,
     Tag, Camera, Download, Edit3, Layers, AlertTriangle,
-    GitMerge
+    GitMerge, ShoppingCart
 } from 'lucide-react';
 
 // ============================================================
@@ -62,8 +65,9 @@ function InlineEditCell({ value, onSave, type = 'number', placeholder = '—', p
     );
 }
 
-export default function BomProjectDetail() {
+export default function BomProjectDetail({ forceProjectId = null, isEmbedded = false }) {
     const { projectId } = useParams();
+    const resolvedProjectId = forceProjectId || projectId;
     const navigate = useNavigate();
     const { canEdit, canDelete } = useRole();
     const {
@@ -78,7 +82,7 @@ export default function BomProjectDetail() {
         handleMergeAllDuplicates, handleMergeSingleDuplicate,
     } = useAppData();
 
-    const activeProject = proyectos.find(p => p.id === projectId);
+    const activeProject = proyectos.find(p => p.id === resolvedProjectId);
     const activeBomItems = activeProject
         ? bomItems.filter(i => i.projectId === activeProject.id).sort((a, b) => new Date(a.addedAt) - new Date(b.addedAt))
         : [];
@@ -89,10 +93,40 @@ export default function BomProjectDetail() {
         return () => { window.__activeProject__ = null; };
     }, [activeProject]);
 
+    const [pos, setPOs] = useState([]);
+    const [stations, setStations] = useState([]);
+
+    useEffect(() => {
+        if (resolvedProjectId) {
+            getPOsByProject(resolvedProjectId)
+                .then(setPOs)
+                .catch(err => console.error("Error fetching POs in BOM:", err));
+
+            // Fetch stations of the linked engineering project
+            supabase
+                .from('projects')
+                .select('id')
+                .eq('bom_project_id', resolvedProjectId)
+                .maybeSingle()
+                .then(({ data }) => {
+                    if (data && data.id) {
+                        getProjectStations(data.id)
+                            .then(setStations)
+                            .catch(err => console.error("Error fetching project stations:", err));
+                    } else {
+                        setStations([]);
+                    }
+                });
+        } else {
+            setPOs([]);
+            setStations([]);
+        }
+    }, [resolvedProjectId]);
+
     const [catalogPickerOpen, setCatalogPickerOpen] = useState(false);
     const [isBomEditMode, setIsBomEditMode] = useState(false);
     const [selectedBomItems, setSelectedBomItems] = useState([]);
-    const [bomFilters, setBomFilters] = useState({ search: '', brand: [], category: [], provider: [], prcr: '' });
+    const [bomFilters, setBomFilters] = useState({ search: '', brand: [], category: [], provider: [], prcr: '', station: '' });
     const [groupBy, setGroupBy] = useState('none'); // 'none' | 'brand' | 'category'
     const [collapsedGroups, setCollapsedGroups] = useState({});
     const [isMerging, setIsMerging] = useState(false);
@@ -140,7 +174,7 @@ export default function BomProjectDetail() {
         if (!window.confirm('¿Estás seguro de que deseas unificar todos los elementos repetidos? Se sumarán las cantidades y se mantendrá un solo registro por componente.')) return;
         setIsMerging(true);
         try {
-            await handleMergeAllDuplicates(projectId);
+            await handleMergeAllDuplicates(resolvedProjectId);
         } finally {
             setIsMerging(false);
         }
@@ -150,7 +184,7 @@ export default function BomProjectDetail() {
         if (!window.confirm(`¿Deseas unificar los elementos con el número de parte "${partNumber}"?`)) return;
         setIsMerging(true);
         try {
-            await handleMergeSingleDuplicate(projectId, partNumber);
+            await handleMergeSingleDuplicate(resolvedProjectId, partNumber);
         } finally {
             setIsMerging(false);
         }
@@ -159,9 +193,9 @@ export default function BomProjectDetail() {
     // Reset on project change
     useEffect(() => {
         setSelectedBomItems([]);
-        setBomFilters({ search: '', brand: [], category: [], provider: [], prcr: '' });
+        setBomFilters({ search: '', brand: [], category: [], provider: [], prcr: '', station: '' });
         setIsBomEditMode(false);
-    }, [projectId]);
+    }, [resolvedProjectId]);
 
     const filteredActiveBomItems = useMemo(() => {
         return activeBomItems.filter(item => {
@@ -192,8 +226,9 @@ export default function BomProjectDetail() {
             const matchesCategory = bomFilters.category.length === 0 || bomFilters.category.includes(details.categoryId);
             const matchesProvider = bomFilters.provider.length === 0 || bomFilters.provider.includes(details.providerId);
             const matchesPrcr = !bomFilters.prcr || (item.prcr || '') === bomFilters.prcr;
+            const matchesStation = !bomFilters.station || item.stationId === bomFilters.station;
 
-            return matchesSearch && matchesBrand && matchesCategory && matchesProvider && matchesPrcr;
+            return matchesSearch && matchesBrand && matchesCategory && matchesProvider && matchesPrcr && matchesStation;
         });
     }, [activeBomItems, catalogo, bomFilters]);
 
@@ -317,7 +352,10 @@ export default function BomProjectDetail() {
     }
 
     return (
-        <div className="flex flex-col animate-in slide-in-from-right duration-300 overflow-hidden -mt-4 md:-mt-8" style={{ height: 'calc(100vh - 80px)' }}>
+        <div 
+            className={isEmbedded ? "flex flex-col flex-1 min-h-0 overflow-hidden p-3 md:p-6" : "flex flex-col animate-in slide-in-from-right duration-300 overflow-hidden -mt-4 md:-mt-8"} 
+            style={{ height: isEmbedded ? '100%' : 'calc(100vh - 80px)' }}
+        >
             {catalogPickerOpen && (
                 <CatalogPickerModal
                     catalogo={catalogo}
@@ -388,6 +426,20 @@ export default function BomProjectDetail() {
                             );
                             return null;
                         })()}
+                        {stations.length > 0 && (
+                            <div className="w-full sm:w-auto sm:min-w-[160px]">
+                                <select
+                                    value={bomFilters.station || ''}
+                                    onChange={e => setBomFilters({ ...bomFilters, station: e.target.value })}
+                                    className="px-3 py-2 w-full border border-slate-700 rounded-xl text-sm bg-slate-800 text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500"
+                                >
+                                    <option value="">Todas las Estaciones</option>
+                                    {stations.map(st => (
+                                        <option key={st.id} value={st.id}>STN{String(st.stn || '').padStart(2, '0')} - {st.abbreviation || st.description}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
                         {/* Group By toggle */}
                         <div className="relative">
                             <button
@@ -402,7 +454,7 @@ export default function BomProjectDetail() {
                         {canEdit && (
                             <button
                                 onClick={() => { setIsBomEditMode(!isBomEditMode); setSelectedBomItems([]); }}
-                                className={`px-4 py-3 rounded-xl border flex items-center gap-2 transition-all ${isBomEditMode ? 'bg-amber-100 border-amber-300 text-amber-700' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                                className={`px-4 py-3 rounded-xl border flex items-center gap-2 transition-all ${isBomEditMode ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}
                             >
                                 <SlidersHorizontal className="w-4 h-4" />
                                 <span className="font-bold text-sm hidden sm:inline">Gestionar</span>
@@ -451,6 +503,7 @@ export default function BomProjectDetail() {
                                     <th className="p-5 w-16">Cant</th>
                                     <th className="p-5">Descripción del Ítem</th>
                                     <th className="p-5 w-28">#PRCR</th>
+                                    <th className="p-5 w-44">Estación</th>
                                     <th className="p-5 w-24 text-center">⏱️ Lead</th>
                                     <th className="p-5 text-right">Costo</th>
                                     {isBomEditMode && <th className="p-5 text-center w-28">Acciones</th>}
@@ -500,7 +553,7 @@ export default function BomProjectDetail() {
                                         });
                                     }
 
-                                    const colCount = 7 + (isBomEditMode ? 2 : 0);
+                                    const colCount = 8 + (isBomEditMode ? 2 : 0);
                                     const toggleGroup = (key) => setCollapsedGroups(prev => ({ ...prev, [key]: !prev[key] }));
 
                                     return groups.map(group => {
@@ -605,6 +658,27 @@ export default function BomProjectDetail() {
                                                                     {details.brandName && <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-gray-600 bg-gray-100 border-gray-200"><Tag className="w-3 h-3 mr-1.5 flex-shrink-0" />{details.brandName}</div>}
                                                                     {details.categoryName && <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-purple-600 bg-purple-50 border-purple-100"><Tag className="w-3 h-3 mr-1.5 flex-shrink-0" />{details.categoryName}</div>}
                                                                     {providerName && <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-indigo-500 bg-indigo-50 border-indigo-100">Prov: {providerName}</div>}
+                                                                    {canEdit && isBomEditMode ? (
+                                                                        <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-black uppercase text-amber-400 bg-amber-950/20 hover:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-500/20 select-none">
+                                                                            <input 
+                                                                                type="checkbox" 
+                                                                                checked={!!item.isCustomMechanical} 
+                                                                                onChange={e => handleUpdateBomItem(item.id, { 
+                                                                                    quantity: item.quantity, 
+                                                                                    unitPrice: item.unitPrice, 
+                                                                                    prcr: item.prcr, 
+                                                                                    leadTimeWeeks: item.leadTimeWeeks, 
+                                                                                    isCustomMechanical: e.target.checked 
+                                                                                })}
+                                                                                className="w-3 h-3 rounded bg-slate-800 border-slate-700 text-amber-500 focus:ring-amber-500" 
+                                                                            />
+                                                                            A la Medida
+                                                                        </label>
+                                                                    ) : item.isCustomMechanical ? (
+                                                                        <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-amber-400 bg-amber-950/40 border-amber-500/30">
+                                                                            🛠️ Pieza Custom
+                                                                        </div>
+                                                                    ) : null}
                                                                     {isDup && (
                                                                         <div className="flex items-center gap-1.5">
                                                                             <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-red-400 bg-red-950/40 border-red-500/30 animate-pulse">
@@ -625,18 +699,73 @@ export default function BomProjectDetail() {
                                                                 </div>
                                                             </td>
                                                             <td className="p-5">
-                                                                {canEdit ? (
-                                                                    <InlineEditCell
-                                                                        value={item.prcr || ''}
-                                                                        type="text"
-                                                                        onSave={v => handleUpdateBomItem(item.id, { quantity: item.quantity, unitPrice: item.unitPrice, prcr: v, leadTimeWeeks: item.leadTimeWeeks })}
-                                                                        placeholder="—"
-                                                                        className="text-xs font-bold font-mono text-amber-500"
-                                                                        inputClassName="w-full text-xs font-mono uppercase"
-                                                                    />
-                                                                ) : (
-                                                                    item.prcr ? <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-lg text-xs font-bold font-mono">{item.prcr}</span> : <span className="text-slate-300 text-xs">—</span>
-                                                                )}
+                                                                <div className="flex flex-col gap-1.5">
+                                                                    {canEdit ? (
+                                                                        <InlineEditCell
+                                                                            value={item.prcr || ''}
+                                                                            type="text"
+                                                                            onSave={v => handleUpdateBomItem(item.id, { quantity: item.quantity, unitPrice: item.unitPrice, prcr: v, leadTimeWeeks: item.leadTimeWeeks })}
+                                                                            placeholder="—"
+                                                                            className="text-xs font-bold font-mono text-amber-500"
+                                                                            inputClassName="w-full text-xs font-mono uppercase"
+                                                                        />
+                                                                    ) : (
+                                                                        item.prcr ? <span className="px-2 py-1 bg-amber-100/10 border border-amber-500/20 text-amber-500 rounded-lg text-xs font-bold font-mono w-max">{item.prcr}</span> : <span className="text-slate-500 text-xs">—</span>
+                                                                    )}
+
+                                                                    {(() => {
+                                                                        const matchedPO = pos.find(po => 
+                                                                            (item.poId && po.id === item.poId) ||
+                                                                            (!item.poId && item.prcr && String(po.prcr || '') === String(item.prcr))
+                                                                        );
+                                                                        if (!matchedPO) return null;
+                                                                        const isManualMatch = item.poId && matchedPO.id === item.poId;
+                                                                        return (
+                                                                            <span 
+                                                                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider w-max ${
+                                                                                    isManualMatch 
+                                                                                        ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' 
+                                                                                        : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                                                }`}
+                                                                                title={isManualMatch ? "Asociación manual de PO" : "Emparejado por PRCR automático"}
+                                                                            >
+                                                                                <ShoppingCart className="w-2.5 h-2.5" />
+                                                                                PO: {matchedPO.po_number || 'S/N'}
+                                                                            </span>
+                                                                        );
+                                                                    })()}
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-5">
+                                                                {isBomEditMode && canEdit ? (
+                                                                    <select
+                                                                        value={item.stationId || ''}
+                                                                        onChange={e => handleUpdateBomItem(item.id, { 
+                                                                            quantity: item.quantity, 
+                                                                            unitPrice: item.unitPrice, 
+                                                                            prcr: item.prcr, 
+                                                                            leadTimeWeeks: item.leadTimeWeeks, 
+                                                                            stationId: e.target.value || null 
+                                                                        })}
+                                                                        className="w-full text-xs bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500"
+                                                                    >
+                                                                        <option value="">— Sin Estación —</option>
+                                                                        {stations.map(st => (
+                                                                            <option key={st.id} value={st.id}>
+                                                                                STN{String(st.stn || '').padStart(2, '0')} - {st.abbreviation || st.description}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                ) : (() => {
+                                                                    const st = stations.find(s => s.id === item.stationId);
+                                                                    return st ? (
+                                                                        <span className="inline-flex items-center px-2 py-1 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-bold font-mono">
+                                                                            STN{String(st.stn || '').padStart(2, '0')} - {st.abbreviation}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-slate-500 text-xs">—</span>
+                                                                    );
+                                                                })()}
                                                             </td>
                                                             <td className="p-5 text-center">
                                                                 {(() => {

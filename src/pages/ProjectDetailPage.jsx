@@ -12,11 +12,16 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
 import { useEngineeringData } from '../hooks/useEngineeringData';
+import { useAppData } from '../contexts/AppDataContext';
+import { updateProject } from '../services/taskService';
+import { supabase } from '../supabase';
+import BomProjectDetail from './BomProjectDetail';
+import POControlPanel from '../components/projects/POControlPanel';
 import {
     ArrowLeft, Target, ListTodo, Clock, Calendar, AlertTriangle,
     ChevronRight, Plus, BarChart3, Settings, FolderGit2,
     CheckCircle2, Activity, Edit3, Trash2, AlertCircle, Loader2, Table2, GanttChartSquare, Grid3X3,
-    Timer
+    Timer, ShoppingCart, Boxes
 } from 'lucide-react';
 import { PROJECT_STATUS_CONFIG, TASK_PRIORITY_CONFIG, MILESTONE_TYPE } from '../models/schemas';
 import ProjectModal from '../components/tasks/ProjectModal';
@@ -76,6 +81,18 @@ export default function ProjectDetailPage() {
     }, [projectId]);
 
     useEffect(() => { loadMilestones(); }, [loadMilestones]);
+
+    // ── BOM Association Handler ──
+    const handleAssociateBOM = async (bomId) => {
+        if (!bomId) return;
+        try {
+            await updateProject(projectId, { bomProjectId: bomId });
+            alert("Listado de BOM asociado correctamente al proyecto.");
+        } catch (e) {
+            console.error("Error associating BOM project:", e);
+            alert("Error al asociar el BOM: " + e.message);
+        }
+    };
 
     // ── Create milestone handler ──
     const handleCreateMilestone = async (data) => {
@@ -297,6 +314,32 @@ export default function ProjectDetailPage() {
                 >
                     <Timer className="w-3.5 h-3.5" /> Estudio de Tiempos
                     {activeTab === 'timingStudy' && (
+                        <span className="absolute bottom-0 left-1 right-1 h-0.5 bg-indigo-500 rounded-t-full" />
+                    )}
+                </button>
+                <button
+                    onClick={() => setActiveTab('bom')}
+                    className={`relative flex items-center gap-1.5 px-2.5 md:px-4 py-2.5 md:py-3 text-[11px] md:text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                        activeTab === 'bom'
+                            ? 'text-slate-900 dark:text-white'
+                            : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                    }`}
+                >
+                    <Boxes className="w-3.5 h-3.5" /> BOM
+                    {activeTab === 'bom' && (
+                        <span className="absolute bottom-0 left-1 right-1 h-0.5 bg-indigo-500 rounded-t-full" />
+                    )}
+                </button>
+                <button
+                    onClick={() => setActiveTab('poControl')}
+                    className={`relative flex items-center gap-1.5 px-2.5 md:px-4 py-2.5 md:py-3 text-[11px] md:text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                        activeTab === 'poControl'
+                            ? 'text-slate-900 dark:text-white'
+                            : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                    }`}
+                >
+                    <ShoppingCart className="w-3.5 h-3.5" /> Control de POs
+                    {activeTab === 'poControl' && (
                         <span className="absolute bottom-0 left-1 right-1 h-0.5 bg-indigo-500 rounded-t-full" />
                     )}
                 </button>
@@ -535,6 +578,22 @@ export default function ProjectDetailPage() {
                     />
                 </div>
             )}
+
+            {activeTab === 'bom' && (
+                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                    {project.bomProjectId ? (
+                        <BomProjectDetail forceProjectId={project.bomProjectId} isEmbedded={true} />
+                    ) : (
+                        <BOMAssociationSetup project={project} onAssociate={handleAssociateBOM} />
+                    )}
+                </div>
+            )}
+
+            {activeTab === 'poControl' && (
+                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                    <POControlPanel projectId={projectId} bomProjectId={project.bomProjectId} />
+                </div>
+            )}
         </div>
     );
 }
@@ -580,5 +639,96 @@ function QuickNavCard({ icon, label, desc, onClick }) {
                 </div>
             </div>
         </button>
+    );
+}
+
+function BOMAssociationSetup({ project, onAssociate }) {
+    const { proyectos } = useAppData();
+    const [selectedBomId, setSelectedBomId] = useState('');
+    const [isCreating, setIsCreating] = useState(false);
+
+    const handleCreateNew = async () => {
+        setIsCreating(true);
+        try {
+            // Create a new proyecto_bom in Supabase
+            const { data, error } = await supabase
+                .from('proyectos_bom')
+                .insert({
+                    name: project.name,
+                    description: `BOM creado automáticamente para el proyecto ${project.name}`,
+                    created_at: new Date().toISOString()
+                })
+                .select('id')
+                .single();
+
+            if (error) throw error;
+            if (data && data.id) {
+                await onAssociate(data.id);
+            }
+        } catch (e) {
+            console.error("Error creating BOM project:", e);
+            alert("Error al crear el proyecto de BOM: " + e.message);
+        } finally {
+            setIsCreating(false);
+        }
+    };
+
+    return (
+        <div className="flex-1 flex items-center justify-center p-8 bg-slate-950/20">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl p-8 max-w-md w-full text-center space-y-6 animate-in zoom-in-95 duration-200">
+                <div className="w-16 h-16 bg-indigo-500/15 text-indigo-400 rounded-2xl flex items-center justify-center mx-auto">
+                    <Boxes className="w-8 h-8" />
+                </div>
+                <div>
+                    <h3 className="text-lg font-black text-white tracking-tight">Asociar Listado de Materiales (BOM)</h3>
+                    <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                        Este proyecto de ingeniería actualmente no tiene un listado de materiales (BOM) vinculado. 
+                        Asocia un catálogo existente o crea uno nuevo para empezar.
+                    </p>
+                </div>
+
+                <div className="space-y-3 pt-2">
+                    {/* Option 1: Associate existing */}
+                    <div className="space-y-1.5 text-left">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1 mb-1">Vincular con un BOM existente</span>
+                        <div className="flex gap-2">
+                            <select
+                                value={selectedBomId}
+                                onChange={e => setSelectedBomId(e.target.value)}
+                                className="flex-1 px-3 py-2 border border-slate-700 rounded-xl text-xs bg-slate-800 text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500"
+                            >
+                                <option value="">Selecciona un proyecto BOM...</option>
+                                {proyectos.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                            </select>
+                            <button
+                                onClick={() => onAssociate(selectedBomId)}
+                                disabled={!selectedBomId}
+                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition disabled:opacity-40 shrink-0 cursor-pointer"
+                            >
+                                Vincular
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="relative flex py-2 items-center">
+                        <div className="flex-grow border-t border-slate-800/80"></div>
+                        <span className="flex-shrink mx-4 text-slate-600 text-[10px] font-black uppercase tracking-wider">O</span>
+                        <div className="flex-grow border-t border-slate-800/80"></div>
+                    </div>
+
+                    {/* Option 2: Create new */}
+                    <button
+                        onClick={handleCreateNew}
+                        disabled={isCreating}
+                        className="w-full py-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl font-bold text-xs text-white transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                        {isCreating ? <Loader2 className="w-4 h-4 animate-spin text-slate-400" /> : <Plus className="w-4 h-4 text-indigo-400" />}
+                        {isCreating ? "Creando..." : "Crear y Asociar Nuevo BOM"}
+                    </button>
+                </div>
+            </div>
+        </div>
     );
 }

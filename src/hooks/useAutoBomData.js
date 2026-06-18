@@ -65,6 +65,9 @@ export function useAutoBomData() {
     const mapBomItem = (r) => ({
         ...r,
         projectId: r.project_id || r.projectId,
+        poId: r.po_id || r.poId || null,
+        isCustomMechanical: r.is_custom_mechanical || r.isCustomMechanical || false,
+        stationId: r.station_id || r.stationId || null,
         masterPartRef: r.master_part_ref_id ? { id: r.master_part_ref_id } : r.masterPartRef || null,
         quantity: Number(r.quantity || 0),
         unitPrice: Number(r.unit_price ?? r.unitPrice ?? 0),
@@ -435,6 +438,9 @@ export function useAutoBomData() {
     const handleUpdateBomItem = async (itemId, updatedData, catalogLeadTimeUpdate) => {
         const newData = { ...updatedData, totalPrice: (updatedData.quantity || 0) * (updatedData.unitPrice || 0) };
 
+        // Find old item for status transition check
+        const oldItem = bomItems.find(i => i.id === itemId);
+
         // Optimistic UI Update for items_bom
         setBomItems(prev => prev.map(item => {
             if (item.id === itemId) {
@@ -472,7 +478,80 @@ export function useAutoBomData() {
                     prcr: newData.prcr,
                     lead_time_weeks: newData.leadTimeWeeks,
                 };
+                if (newData.status !== undefined) sbData.status = newData.status;
+                if (newData.isCustomMechanical !== undefined) sbData.is_custom_mechanical = newData.isCustomMechanical;
+                if (newData.stationId !== undefined) sbData.station_id = newData.stationId;
+
                 await supabase.from('items_bom').update(sbData).eq('id', itemId);
+
+                // Check for "Comprado" status transition to create receipt task in Gantt
+                const statusWasChanged = newData.status !== undefined && oldItem && String(oldItem.status).toLowerCase() !== 'comprado';
+                const isComprado = newData.status !== undefined && String(newData.status).toLowerCase() === 'comprado';
+
+                if (statusWasChanged && isComprado) {
+                    const targetStationId = newData.stationId !== undefined ? newData.stationId : (oldItem?.stationId || null);
+                    
+                    // 1. Fetch engineering project linked to this BOM project
+                    const { data: engProj } = await supabase
+                        .from('projects')
+                        .select('id')
+                        .eq('bom_project_id', oldItem.projectId)
+                        .maybeSingle();
+
+                    if (engProj && engProj.id) {
+                        const leadWeeks = Number(newData.leadTimeWeeks ?? oldItem.leadTimeWeeks ?? 1) || 1;
+                        const startDate = new Date();
+                        const dueDate = new Date(startDate.getTime() + leadWeeks * 7 * 24 * 60 * 60 * 1000);
+                        
+                        const formattedStart = startDate.toISOString().split('T')[0];
+                        const formattedDue = dueDate.toISOString().split('T')[0];
+
+                        // Find details
+                        let partNumber = oldItem.partNumber || '';
+                        let partName = oldItem.name || 'Componente';
+                        if (oldItem.masterPartRef) {
+                            const mp = catalogo.find(p => p.id === oldItem.masterPartRef.id);
+                            if (mp) {
+                                partNumber = mp.partNumber || '';
+                                partName = mp.name || 'Componente';
+                            }
+                        }
+
+                        const taskTitle = `Recibo: ${partNumber || 'S/N'} - ${partName}`;
+
+                        // Check if a task with this title already exists in the project
+                        const { data: existingTask } = await supabase
+                            .from('tasks')
+                            .select('id')
+                            .eq('project_id', engProj.id)
+                            .eq('title', taskTitle)
+                            .maybeSingle();
+
+                        if (!existingTask) {
+                            const taskRow = {
+                                id: crypto.randomUUID(),
+                                project_id: engProj.id,
+                                station_id: targetStationId,
+                                title: taskTitle,
+                                status: 'pending',
+                                planned_start_date: formattedStart,
+                                planned_end_date: formattedDue,
+                                due_date: formattedDue,
+                                show_in_gantt: true,
+                                milestone: false,
+                                summary_task: false,
+                                percent_complete: 0,
+                                estimated_hours: 0,
+                                actual_hours: 0,
+                                created_at: new Date().toISOString()
+                            };
+
+                            await supabase.from('tasks').insert(taskRow);
+                            console.log(`[useAutoBomData] Auto-created receipt task for BOM item ${itemId}:`, taskTitle);
+                        }
+                    }
+                }
+
                 if (catalogLeadTimeUpdate !== undefined) {
                     const bomItem = bomItems.find(i => i.id === itemId);
                     const refId = bomItem?.masterPartRef?.id || bomItem?.master_part_ref_id;
