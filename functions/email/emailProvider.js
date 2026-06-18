@@ -26,7 +26,7 @@ async function sendEmail(apiKey, options) {
         to,
         subject,
         html,
-        from = "AnalyzeOps <reportes@analyzeops.com>",
+        from = "Passdown AME CR <reportes@analyzeops.com>",
         replyTo,
     } = options;
 

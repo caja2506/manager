@@ -2,7 +2,7 @@ import React, { useCallback, useRef, useEffect, useState, useMemo } from 'react'
 import { parseISO } from 'date-fns';
 import { MousePointerClick } from 'lucide-react';
 import PlannerTaskBlock from './PlannerTaskBlock';
-import { PLANNER_START_HOUR, PLANNER_END_HOUR, SLOT_HEIGHT_PX } from './PlannerGrid';
+import { PLANNER_START_HOUR, PLANNER_END_HOUR, SLOT_HEIGHT_PX } from './plannerConstants';
 
 // ── Break time bands (same as PlannerGrid) ──
 const TIME_BANDS = [

@@ -4,10 +4,8 @@ import { es } from 'date-fns/locale';
 import { MousePointerClick } from 'lucide-react';
 import PlannerTaskBlock from './PlannerTaskBlock';
 
-// ── Exported constants ─────────────────────────────────────────
-export const PLANNER_START_HOUR = 7;
-export const PLANNER_END_HOUR   = 19;
-export const SLOT_HEIGHT_PX     = 64;  // pixels per 1-hour row
+import { PLANNER_START_HOUR, PLANNER_END_HOUR, SLOT_HEIGHT_PX } from './plannerConstants';
+export { PLANNER_START_HOUR, PLANNER_END_HOUR, SLOT_HEIGHT_PX };
 
 // ── Break time bands ───────────────────────────────────────────
 const TIME_BANDS = [

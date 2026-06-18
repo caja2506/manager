@@ -1,5 +1,5 @@
 import React from 'react';
-import { PLANNER_START_HOUR, PLANNER_END_HOUR, SLOT_HEIGHT_PX } from './PlannerGrid';
+import { PLANNER_START_HOUR, PLANNER_END_HOUR, SLOT_HEIGHT_PX } from './plannerConstants';
 
 export default function PlannerSkeleton({ weekDays }) {
     const hours = Array.from({ length: PLANNER_END_HOUR - PLANNER_START_HOUR }, (_, i) => PLANNER_START_HOUR + i);

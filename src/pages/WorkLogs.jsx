@@ -282,31 +282,6 @@ export default function WorkLogs() {
                         </div>
                     ) : (
                         <div className="space-y-2">
-                            {/* Weekly suggested drafts banner */}
-                            {myWeekLogs.some(log => log.isDraft) && (
-                                <div className="bg-amber-600/10 border border-amber-500/20 rounded-xl p-3 flex items-center justify-between gap-3 text-xs animate-in fade-in">
-                                    <span className="font-bold text-slate-200">
-                                        Tienes bloques planificados sugeridos como borradores esta semana.
-                                    </span>
-                                    <button
-                                        onClick={async () => {
-                                            const drafts = myWeekLogs.filter(log => log.isDraft);
-                                            try {
-                                                const { confirmDraftLogs } = await import('../services/timeService.supabase');
-                                                const result = await confirmDraftLogs(drafts);
-                                                alert(`Se confirmaron ${result.count} bloques planificados.`);
-                                            } catch (err) {
-                                                console.error(err);
-                                                alert("Error al confirmar: " + err.message);
-                                            }
-                                        }}
-                                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-black transition-all"
-                                    >
-                                        ✓ Confirmar Todos
-                                    </button>
-                                </div>
-                            )}
-
                             {myWeekLogs.map(log => {
                                 const isRunning = !log.endTime;
                                 const isDraft = log.isDraft;
@@ -415,26 +390,6 @@ export default function WorkLogs() {
                                                 }`}>
                                                     {isRunning ? '⏱' : formatDurationSec(log.totalHours)}
                                                 </span>
-
-                                                {/* Confirm button for suggested logs */}
-                                                {isDraft && (
-                                                    <button
-                                                        onClick={async (e) => {
-                                                            e.stopPropagation();
-                                                            try {
-                                                                const { confirmDraftLogs } = await import('../services/timeService.supabase');
-                                                                await confirmDraftLogs([log]);
-                                                            } catch (err) {
-                                                                console.error("Confirm Draft Error:", err);
-                                                                alert("No se pudo confirmar la sugerencia: " + err.message);
-                                                            }
-                                                        }}
-                                                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg transition-all"
-                                                        title="Confirmar sugerencia"
-                                                    >
-                                                        ✓ Confirmar
-                                                    </button>
-                                                )}
 
                                                 {/* Stop button for running logs */}
                                                 {isRunning && (canEdit || log.userId === user?.uid || isSupervisorOf(user?.uid, log.userId, teamMembers, resourceAssignments)) && (

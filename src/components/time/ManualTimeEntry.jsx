@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Save, Clock, Zap, ListTodo, FolderGit2, FileText } from 'lucide-react';
 import { createManualTimeLog, updateTimeLog, deleteTimeLog, confirmDraftLogs } from '../../services/timeService';
+import { createTask } from '../../services/taskService';
 import { useEngineeringData } from '../../hooks/useEngineeringData';
 
 
@@ -11,7 +12,7 @@ import { useEngineeringData } from '../../hooks/useEngineeringData';
 export default function ManualTimeEntry({
     isOpen, onClose, tasks, projects, userId, teamMembers = [], editLog = null
 }) {
-    const { timeLogs } = useEngineeringData();
+    const { timeLogs, refetchTable } = useEngineeringData();
     const isEditMode = !!editLog;
     const [selectedDraftId, setSelectedDraftId] = useState(null);
 
@@ -64,9 +65,18 @@ export default function ManualTimeEntry({
     const [taskQuery, setTaskQuery] = useState('');
     const [tempBlockPos, setTempBlockPos] = useState(null); // { id, startHour, endHour }
     const [zPriority, setZPriority] = useState('start');
+    const [newQuickTaskTitle, setNewQuickTaskTitle] = useState('');
+    const [isCreatingTask, setIsCreatingTask] = useState(false);
 
     const activeLog = useMemo(() => {
-        return pendingLogs.find(log => log.id === activePendingId) || null;
+        let found = pendingLogs.find(log => log.id === activePendingId) || null;
+        if (!found && pendingLogs.length > 0) {
+            found = pendingLogs[0];
+            console.log('[ManualTimeEntry] activePendingId not found. Defaulting activeLog to first pendingLog:', found);
+        } else {
+            console.log('[ManualTimeEntry] activePendingId:', activePendingId, 'found activeLog:', found);
+        }
+        return found;
     }, [pendingLogs, activePendingId]);
 
     const totalPendingHours = useMemo(() => {
@@ -74,24 +84,40 @@ export default function ManualTimeEntry({
     }, [pendingLogs]);
 
     const updateActiveLog = (updates) => {
-        if (!activePendingId) return;
-        setPendingLogs(prev => prev.map(log => {
-            if (log.id !== activePendingId) return log;
-            const updated = { ...log, ...updates };
-            
-            if (updates.startHour !== undefined || updates.workedHours !== undefined) {
-                const start = updates.startHour !== undefined ? updates.startHour : log.startHour;
-                const hours = updates.workedHours !== undefined ? updates.workedHours : log.workedHours;
-                const startMins = timeToMinutes(start);
-                const endMins = (startMins + Math.round(hours * 60)) % 1440;
-                updated.endHour = minutesToTime(endMins);
-            } else if (updates.endHour !== undefined) {
-                const duration = calculateDuration(log.startHour, updates.endHour);
-                updated.workedHours = duration;
-            }
-            
-            return updated;
-        }));
+        console.log('[ManualTimeEntry] updateActiveLog called with updates:', updates, 'current activePendingId:', activePendingId);
+        let targetId = activePendingId;
+        if (!targetId && pendingLogs.length > 0) {
+            targetId = pendingLogs[0].id;
+            setActivePendingId(targetId);
+            console.log('[ManualTimeEntry] No activePendingId set inside updateActiveLog. Defaulted to first log ID:', targetId);
+        }
+        
+        if (!targetId) {
+            console.warn('[ManualTimeEntry] No target ID found for updates inside updateActiveLog!');
+            return;
+        }
+
+        setPendingLogs(prev => {
+            const next = prev.map(log => {
+                if (log.id !== targetId) return log;
+                const updated = { ...log, ...updates };
+                
+                if (updates.startHour !== undefined || updates.workedHours !== undefined) {
+                    const start = updates.startHour !== undefined ? updates.startHour : log.startHour;
+                    const hours = updates.workedHours !== undefined ? updates.workedHours : log.workedHours;
+                    const startMins = timeToMinutes(start);
+                    const endMins = (startMins + Math.round(hours * 60)) % 1440;
+                    updated.endHour = minutesToTime(endMins);
+                } else if (updates.endHour !== undefined) {
+                    const duration = calculateDuration(log.startHour, updates.endHour);
+                    updated.workedHours = duration;
+                }
+                
+                return updated;
+            });
+            console.log('[ManualTimeEntry] pendingLogs updated to:', next);
+            return next;
+        });
     };
 
     const removePendingLog = (idToRemove) => {
@@ -114,54 +140,41 @@ export default function ManualTimeEntry({
         updateActiveLog({ endHour: newEnd });
     };
 
-    // Populate pending logs when modal opens
-    useEffect(() => {
-        if (isOpen) {
-            setTaskQuery('');
-            setTempBlockPos(null);
+    const handleCreateQuickTask = async (e) => {
+        e.preventDefault();
+        const title = newQuickTaskTitle.trim();
+        const activeProjId = activeLog ? activeLog.projectId : '';
+        if (!title || !activeProjId) return;
+
+        setIsCreatingTask(true);
+        setError('');
+        try {
+            const taskData = {
+                projectId: activeProjId,
+                title,
+                description: 'Creada rápidamente desde el registro manual de horas',
+                status: 'in_progress',
+                priority: 'medium',
+                assignedTo: selectedUserId || userId,
+            };
+            const newTaskId = await createTask(taskData, userId);
             
-            if (editLog) {
-                const start = editLog.startTime ? new Date(editLog.startTime) : null;
-                const end = editLog.endTime ? new Date(editLog.endTime) : null;
-                const startStr = start ? start.toTimeString().slice(0, 5) : '09:00';
-                const endStr = end ? end.toTimeString().slice(0, 5) : '10:00';
-                const duration = calculateDuration(startStr, endStr);
-                
-                const logToEdit = {
-                    id: editLog.id,
-                    taskId: editLog.taskId || '',
-                    projectId: editLog.projectId || '',
-                    startHour: startStr,
-                    endHour: endStr,
-                    workedHours: duration,
-                    notes: editLog.notes || '',
-                    overtime: editLog.overtime || false,
-                };
-                
-                setPendingLogs([logToEdit]);
-                setActivePendingId(editLog.id);
-                setSelectedDate(start ? getLocalDateString(start) : getLocalDateString());
-                setSelectedUserId(editLog.userId || userId || '');
-                setSelectedDraftId(null);
-            } else {
-                const defaultLog = {
-                    id: `temp_${Date.now()}`,
-                    taskId: '',
-                    projectId: '',
-                    startHour: '09:00',
-                    endHour: '10:00',
-                    workedHours: 1,
-                    notes: '',
-                    overtime: false,
-                };
-                setPendingLogs([defaultLog]);
-                setActivePendingId(defaultLog.id);
-                setSelectedDate(getLocalDateString());
-                setSelectedUserId(userId || '');
-                setSelectedDraftId(null);
+            // Refrescar lista de tareas
+            if (refetchTable) {
+                await refetchTable('tasks');
             }
+            
+            // Auto-seleccionar la tarea recién creada en el log activo
+            updateActiveLog({ taskId: newTaskId, projectId: activeProjId });
+            setNewQuickTaskTitle('');
+        } catch (err) {
+            console.error('Error al crear tarea rápida:', err);
+            setError(err.message || 'Error al crear la tarea rápida');
         }
-    }, [editLog, isOpen, userId]);
+        setIsCreatingTask(false);
+    };
+
+    const [isConfirmingDrafts, setIsConfirmingDrafts] = useState(false);
 
     const getLocalDateOnly = (isoStr) => {
         if (!isoStr) return '';
@@ -192,8 +205,6 @@ export default function ManualTimeEntry({
         );
     }, [timeLogs, selectedUserId, selectedDate]);
 
-    const [isConfirmingDrafts, setIsConfirmingDrafts] = useState(false);
-
     const handleConfirmLocalDrafts = async () => {
         if (!currentDrafts.length) return;
         setIsConfirmingDrafts(true);
@@ -205,6 +216,65 @@ export default function ManualTimeEntry({
         }
         setIsConfirmingDrafts(false);
     };
+
+    // Populate pending logs when modal opens
+    useEffect(() => {
+        console.log('[ManualTimeEntry] useEffect mount/update. isOpen:', isOpen, 'editLog:', editLog, 'userId:', userId);
+        if (isOpen) {
+            setTaskQuery('');
+            setTempBlockPos(null);
+            
+            if (editLog) {
+                const start = editLog.startTime ? new Date(editLog.startTime) : null;
+                const end = editLog.endTime ? new Date(editLog.endTime) : null;
+                const startStr = start ? start.toTimeString().slice(0, 5) : '09:00';
+                const endStr = end ? end.toTimeString().slice(0, 5) : '10:00';
+                const duration = calculateDuration(startStr, endStr);
+                
+                const logToEdit = {
+                    id: editLog.id,
+                    taskId: editLog.taskId || '',
+                    projectId: editLog.projectId || '',
+                    startHour: startStr,
+                    endHour: endStr,
+                    workedHours: duration,
+                    notes: editLog.notes || '',
+                    overtime: editLog.overtime || false,
+                };
+                
+                console.log('[ManualTimeEntry] Initializing in EDIT mode with log:', logToEdit);
+                setPendingLogs([logToEdit]);
+                setActivePendingId(editLog.id);
+                setSelectedDate(start ? getLocalDateString(start) : getLocalDateString());
+                setSelectedUserId(editLog.userId || userId || '');
+                setSelectedDraftId(null);
+            } else {
+                const defaultLog = {
+                    id: `temp_${Date.now()}`,
+                    taskId: '',
+                    projectId: '',
+                    startHour: '09:00',
+                    endHour: '10:00',
+                    workedHours: 1,
+                    notes: '',
+                    overtime: false,
+                };
+                console.log('[ManualTimeEntry] Initializing in CREATE mode with default log:', defaultLog);
+                setPendingLogs([defaultLog]);
+                setActivePendingId(defaultLog.id);
+                setSelectedDate(getLocalDateString());
+                setSelectedUserId(userId || '');
+                setSelectedDraftId(null);
+            }
+        }
+    }, [editLog, isOpen, userId]);
+
+    // Auto-confirmar borradores en segundo plano al abrir o cambiar de filtros
+    useEffect(() => {
+        if (isOpen && currentDrafts.length > 0 && !isConfirmingDrafts) {
+            handleConfirmLocalDrafts();
+        }
+    }, [isOpen, currentDrafts.length, selectedUserId, selectedDate, isConfirmingDrafts]);
 
     // Filter tasks by selected project and user assignment
     const filteredTasks = useMemo(() => {
@@ -316,14 +386,13 @@ export default function ManualTimeEntry({
     };
 
     const confirmedHoursToday = useMemo(() => {
-        return currentConfirmed.reduce((sum, log) => sum + (log.totalHours || 0), 0);
-    }, [currentConfirmed]);
+        return currentConfirmed.reduce((sum, log) => sum + (log.totalHours || 0), 0) +
+               currentDrafts.reduce((sum, log) => sum + (log.totalHours || 0), 0);
+    }, [currentConfirmed, currentDrafts]);
 
-    const suggestedHoursToday = useMemo(() => {
-        return currentDrafts.reduce((sum, log) => sum + (log.totalHours || 0), 0);
-    }, [currentDrafts]);
-
-    const totalHoursToday = confirmedHoursToday + suggestedHoursToday;
+    const savedLogs = useMemo(() => {
+        return [...currentConfirmed, ...currentDrafts];
+    }, [currentConfirmed, currentDrafts]);
 
     const START_HOUR = 8;
     const END_HOUR = 17;
@@ -365,18 +434,28 @@ export default function ManualTimeEntry({
     // --- INTERACTIVE TIMELINE DRAG & RESIZE HANDLERS FOR GHOST BLOCK ---
 
     const handleGhostDragStart = (e, targetLogId) => {
-        e.preventDefault();
+        if (e.cancelable) e.preventDefault();
         e.stopPropagation();
 
-        const initialY = e.clientY;
+        const isTouch = e.type === 'touchstart';
+        const clientY = isTouch ? e.touches[0].clientY : e.clientY;
         const targetLog = pendingLogs.find(log => log.id === targetLogId);
         if (!targetLog) return;
 
         const initialStartMins = timeToMinutes(targetLog.startHour);
         const durationMins = Math.round(targetLog.workedHours * 60);
 
+        let hasMoved = false;
+
         const handleMouseMove = (mv) => {
-            const deltaY = mv.clientY - initialY;
+            if (mv.cancelable) mv.preventDefault();
+            const currentY = mv.type === 'touchmove' ? mv.touches[0].clientY : mv.clientY;
+            const deltaY = currentY - clientY;
+
+            if (Math.abs(deltaY) > 4) {
+                hasMoved = true;
+            }
+
             const deltaMins = (deltaY / ROW_HEIGHT) * 60;
             const snappedDeltaMins = Math.round(deltaMins / 15) * 15;
             let newStartMins = initialStartMins + snappedDeltaMins;
@@ -400,19 +479,35 @@ export default function ManualTimeEntry({
         };
 
         const handleMouseUp = () => {
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup',   handleMouseUp);
+            if (isTouch) {
+                document.removeEventListener('touchmove', handleMouseMove);
+                document.removeEventListener('touchend',   handleMouseUp);
+            } else {
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup',   handleMouseUp);
+            }
+
+            if (!hasMoved) {
+                console.log('[ManualTimeEntry] Simple click detected on ghost block. Setting activePendingId:', targetLogId);
+                setActivePendingId(targetLogId);
+            }
         };
 
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup',   handleMouseUp);
+        if (isTouch) {
+            document.addEventListener('touchmove', handleMouseMove, { passive: false });
+            document.addEventListener('touchend',   handleMouseUp);
+        } else {
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup',   handleMouseUp);
+        }
     };
 
     const handleGhostResizeStart = (e, targetLogId) => {
-        e.preventDefault();
+        if (e.cancelable) e.preventDefault();
         e.stopPropagation();
 
-        const initialY = e.clientY;
+        const isTouch = e.type === 'touchstart';
+        const clientY = isTouch ? e.touches[0].clientY : e.clientY;
         const targetLog = pendingLogs.find(log => log.id === targetLogId);
         if (!targetLog) return;
 
@@ -420,7 +515,9 @@ export default function ManualTimeEntry({
         const initialDurationMins = Math.round(targetLog.workedHours * 60);
 
         const handleMouseMove = (mv) => {
-            const deltaY = mv.clientY - initialY;
+            if (mv.cancelable) mv.preventDefault();
+            const currentY = mv.type === 'touchmove' ? mv.touches[0].clientY : mv.clientY;
+            const deltaY = currentY - clientY;
             const deltaMins = (deltaY / ROW_HEIGHT) * 60;
             const snappedDeltaMins = Math.round(deltaMins / 15) * 15;
             let newDurationMins = initialDurationMins + snappedDeltaMins;
@@ -444,26 +541,41 @@ export default function ManualTimeEntry({
         };
 
         const handleMouseUp = () => {
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup',   handleMouseUp);
+            if (isTouch) {
+                document.removeEventListener('touchmove', handleMouseMove);
+                document.removeEventListener('touchend',   handleMouseUp);
+            } else {
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup',   handleMouseUp);
+            }
         };
 
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup',   handleMouseUp);
+        if (isTouch) {
+            document.addEventListener('touchmove', handleMouseMove, { passive: false });
+            document.addEventListener('touchend',   handleMouseUp);
+        } else {
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup',   handleMouseUp);
+        }
     };
 
     const handleExistingBlockDragStart = (e, log) => {
-        e.preventDefault();
+        if (e.cancelable) e.preventDefault();
         e.stopPropagation();
 
-        const initialY = e.clientY;
+        const isTouch = e.type === 'touchstart';
+        const clientY = isTouch ? e.touches[0].clientY : e.clientY;
         const startDt = new Date(log.startTime);
         const endDt = new Date(log.endTime);
         const durationMins = Math.round((endDt - startDt) / 60000);
         const initialStartMins = startDt.getHours() * 60 + startDt.getMinutes();
 
+        let currentPos = null;
+
         const handleMouseMove = (mv) => {
-            const deltaY = mv.clientY - initialY;
+            if (mv.cancelable) mv.preventDefault();
+            const currentY = mv.type === 'touchmove' ? mv.touches[0].clientY : mv.clientY;
+            const deltaY = currentY - clientY;
             const deltaMins = (deltaY / ROW_HEIGHT) * 60;
             const snappedDeltaMins = Math.round(deltaMins / 15) * 15;
             let newStartMins = initialStartMins + snappedDeltaMins;
@@ -477,20 +589,26 @@ export default function ManualTimeEntry({
             const newEndMins = (newStartMins + durationMins) % 1440;
             const newEndStr = minutesToTime(newEndMins);
 
-            setTempBlockPos({
+            currentPos = {
                 id: log.id,
                 startHour: newStartStr,
                 endHour: newEndStr
-            });
+            };
+            setTempBlockPos(currentPos);
         };
 
         const handleMouseUp = async () => {
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup',   handleMouseUp);
+            if (isTouch) {
+                document.removeEventListener('touchmove', handleMouseMove);
+                document.removeEventListener('touchend',   handleMouseUp);
+            } else {
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup',   handleMouseUp);
+            }
 
-            if (tempBlockPos && tempBlockPos.id === log.id) {
-                const [sh, sm] = tempBlockPos.startHour.split(':').map(Number);
-                const [eh, em] = tempBlockPos.endHour.split(':').map(Number);
+            if (currentPos && currentPos.id === log.id) {
+                const [sh, sm] = currentPos.startHour.split(':').map(Number);
+                const [eh, em] = currentPos.endHour.split(':').map(Number);
                 
                 const baseStart = new Date(log.startTime);
                 const newStartDt = new Date(baseStart.getFullYear(), baseStart.getMonth(), baseStart.getDate(), sh, sm, 0);
@@ -510,22 +628,32 @@ export default function ManualTimeEntry({
             setTempBlockPos(null);
         };
 
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup',   handleMouseUp);
+        if (isTouch) {
+            document.addEventListener('touchmove', handleMouseMove, { passive: false });
+            document.addEventListener('touchend',   handleMouseUp);
+        } else {
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup',   handleMouseUp);
+        }
     };
 
     const handleExistingBlockResizeStart = (e, log) => {
-        e.preventDefault();
+        if (e.cancelable) e.preventDefault();
         e.stopPropagation();
 
-        const initialY = e.clientY;
+        const isTouch = e.type === 'touchstart';
+        const clientY = isTouch ? e.touches[0].clientY : e.clientY;
         const startDt = new Date(log.startTime);
         const endDt = new Date(log.endTime);
         const initialDurationMins = Math.round((endDt - startDt) / 60000);
         const startMins = startDt.getHours() * 60 + startDt.getMinutes();
 
+        let currentPos = null;
+
         const handleMouseMove = (mv) => {
-            const deltaY = mv.clientY - initialY;
+            if (mv.cancelable) mv.preventDefault();
+            const currentY = mv.type === 'touchmove' ? mv.touches[0].clientY : mv.clientY;
+            const deltaY = currentY - clientY;
             const deltaMins = (deltaY / ROW_HEIGHT) * 60;
             const snappedDeltaMins = Math.round(deltaMins / 15) * 15;
             let newDurationMins = initialDurationMins + snappedDeltaMins;
@@ -538,19 +666,25 @@ export default function ManualTimeEntry({
             const newEndMins = (startMins + newDurationMins) % 1440;
             const newEndStr = minutesToTime(newEndMins);
 
-            setTempBlockPos({
+            currentPos = {
                 id: log.id,
                 startHour: minutesToTime(startMins),
                 endHour: newEndStr
-            });
+            };
+            setTempBlockPos(currentPos);
         };
 
         const handleMouseUp = async () => {
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup',   handleMouseUp);
+            if (isTouch) {
+                document.removeEventListener('touchmove', handleMouseMove);
+                document.removeEventListener('touchend',   handleMouseUp);
+            } else {
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup',   handleMouseUp);
+            }
 
-            if (tempBlockPos && tempBlockPos.id === log.id) {
-                const [eh, em] = tempBlockPos.endHour.split(':').map(Number);
+            if (currentPos && currentPos.id === log.id) {
+                const [eh, em] = currentPos.endHour.split(':').map(Number);
                 const baseStart = new Date(log.startTime);
                 const newEndDt = new Date(baseStart.getFullYear(), baseStart.getMonth(), baseStart.getDate(), eh, em, 0);
 
@@ -568,8 +702,13 @@ export default function ManualTimeEntry({
             setTempBlockPos(null);
         };
 
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup',   handleMouseUp);
+        if (isTouch) {
+            document.addEventListener('touchmove', handleMouseMove, { passive: false });
+            document.addEventListener('touchend',   handleMouseUp);
+        } else {
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup',   handleMouseUp);
+        }
     };
 
     const timelineScrollRef = useRef(null);
@@ -789,7 +928,10 @@ export default function ManualTimeEntry({
                                     </span>
                                     <select
                                         value={activeLog ? activeLog.projectId : ''}
-                                        onChange={e => updateActiveLog({ projectId: e.target.value, taskId: '' })}
+                                        onChange={e => {
+                                            console.log('[ManualTimeEntry] select projects onChange. Selected value:', e.target.value);
+                                            updateActiveLog({ projectId: e.target.value, taskId: '' });
+                                        }}
                                         className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 transition-all premium-select"
                                     >
                                         <option value="">Sin proyecto</option>
@@ -976,30 +1118,20 @@ export default function ManualTimeEntry({
                                                 Resumen de hoy
                                             </span>
                                         </div>
-                                        {currentDrafts.length > 0 && (
-                                            <button
-                                                type="button"
-                                                onClick={handleConfirmLocalDrafts}
-                                                disabled={isConfirmingDrafts}
-                                                className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:bg-amber-700/50 text-white font-bold text-[9px] rounded-lg transition-all active:scale-95 flex items-center justify-center gap-1 shadow-md shadow-amber-900/10"
-                                            >
-                                                {isConfirmingDrafts ? 'Confirmando...' : '✓ Confirmar sugerencias'}
-                                            </button>
-                                        )}
                                     </div>
 
                                     <div className="grid grid-cols-3 gap-2 text-center">
                                         <div className="bg-slate-50/50 dark:bg-slate-950/40 p-2 rounded-xl border border-slate-200/60 dark:border-slate-850/60">
-                                            <div className="text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Confirmadas</div>
+                                            <div className="text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Registradas</div>
                                             <div className="text-xs font-mono font-black text-emerald-600 dark:text-emerald-400 mt-0.5">{confirmedHoursToday.toFixed(1)}h</div>
                                         </div>
                                         <div className="bg-slate-50/50 dark:bg-slate-950/40 p-2 rounded-xl border border-slate-200/60 dark:border-slate-850/60">
-                                            <div className="text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Sugeridas</div>
-                                            <div className="text-xs font-mono font-black text-amber-600 dark:text-amber-400 mt-0.5">{suggestedHoursToday.toFixed(1)}h</div>
+                                            <div className="text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Por Registrar</div>
+                                            <div className="text-xs font-mono font-black text-indigo-600 dark:text-indigo-400 mt-0.5">{totalPendingHours.toFixed(1)}h</div>
                                         </div>
                                         <div className="bg-slate-50/50 dark:bg-slate-950/40 p-2 rounded-xl border border-slate-200/60 dark:border-slate-850/60">
-                                            <div className="text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total</div>
-                                            <div className="text-xs font-mono font-black text-indigo-600 dark:text-indigo-400 mt-0.5">{totalHoursToday.toFixed(1)}h</div>
+                                            <div className="text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total del Día</div>
+                                            <div className="text-xs font-mono font-black text-violet-600 dark:text-violet-400 mt-0.5">{(confirmedHoursToday + totalPendingHours).toFixed(1)}h</div>
                                         </div>
                                     </div>
                                 </div>
@@ -1159,8 +1291,8 @@ export default function ManualTimeEntry({
                                                     );
                                                 })}
 
-                                                {/* Bloques confirmados reales */}
-                                                {currentConfirmed.map(log => {
+                                                {/* Bloques de horas guardadas (confirmadas y sugeridas consolidadas) */}
+                                                {savedLogs.map(log => {
                                                     const isTemp = tempBlockPos && tempBlockPos.id === log.id;
                                                     const startVal = isTemp ? tempBlockPos.startHour : log.startTime;
                                                     const endVal = isTemp ? tempBlockPos.endHour : log.endTime;
@@ -1181,7 +1313,7 @@ export default function ManualTimeEntry({
                                                     const priorityStyles = {
                                                         critical: 'bg-red-500 border-red-700 text-white',
                                                         high:     'bg-amber-500 border-amber-700 text-white',
-                                                        medium:   'bg-indigo-505 border-indigo-700 text-white',
+                                                        medium:   'bg-indigo-500 border-indigo-700 text-white',
                                                         low:      'bg-slate-500 border-slate-700 text-white',
                                                     };
                                                     const styleClass = priorityStyles[priority] || priorityStyles.medium;
@@ -1190,6 +1322,7 @@ export default function ManualTimeEntry({
                                                         <div
                                                             key={log.id}
                                                             onMouseDown={(e) => handleExistingBlockDragStart(e, log)}
+                                                            onTouchStart={(e) => handleExistingBlockDragStart(e, log)}
                                                             className={`absolute left-0.5 right-0.5 rounded-xl border-l-4 border-emerald-500 ${styleClass} text-[9px] px-2.5 py-1.5 overflow-hidden select-none z-[15] shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:shadow-xl transition-shadow cursor-grab active:cursor-grabbing group/confirmed`}
                                                             style={style}
                                                             title={`${log.taskTitle || 'Sin título'} (${displayHrs.toFixed(2)}h)`}
@@ -1209,6 +1342,7 @@ export default function ManualTimeEntry({
                                                             {/* Manilla para estirar (borde inferior) */}
                                                             <div 
                                                                 onMouseDown={(e) => handleExistingBlockResizeStart(e, log)}
+                                                                onTouchStart={(e) => handleExistingBlockResizeStart(e, log)}
                                                                 className="absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize flex items-center justify-center bg-white/10 border-t border-white/20 opacity-0 group-hover/confirmed:opacity-100 transition-opacity"
                                                                 title="Arrastra para cambiar duración"
                                                             >
@@ -1229,6 +1363,7 @@ export default function ManualTimeEntry({
                                                         <div
                                                             key={log.id}
                                                             onMouseDown={(e) => handleGhostDragStart(e, log.id)}
+                                                            onTouchStart={(e) => handleGhostDragStart(e, log.id)}
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 setActivePendingId(log.id);
@@ -1275,6 +1410,7 @@ export default function ManualTimeEntry({
                                                             {/* Manilla para estirar (borde inferior) */}
                                                             <div 
                                                                 onMouseDown={(e) => handleGhostResizeStart(e, log.id)}
+                                                                onTouchStart={(e) => handleGhostResizeStart(e, log.id)}
                                                                 className="absolute bottom-0 left-0 right-0 h-4 cursor-ns-resize flex items-center justify-center bg-current/10 border-t border-current/20 opacity-60 group-hover/ghost:opacity-100 transition-all duration-150 pointer-events-auto z-10"
                                                                 title="Arrastra para cambiar duración"
                                                             >
@@ -1330,6 +1466,28 @@ export default function ManualTimeEntry({
                                             </button>
                                         )}
                                     </div>
+
+                                    {/* Crear Tarea Rápida */}
+                                    <form onSubmit={handleCreateQuickTask} className="relative flex gap-1.5">
+                                        <input
+                                            type="text"
+                                            placeholder={activeLog?.projectId 
+                                                ? "＋ Crear nueva tarea..." 
+                                                : "Selecciona proyecto a la izq..."}
+                                            value={newQuickTaskTitle}
+                                            onChange={e => setNewQuickTaskTitle(e.target.value)}
+                                            disabled={!activeLog?.projectId || isCreatingTask}
+                                            className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none focus:border-indigo-500 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 transition-all font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                                        />
+                                        <button
+                                            type="submit"
+                                            disabled={!activeLog?.projectId || isCreatingTask || !newQuickTaskTitle.trim()}
+                                            className="px-2.5 py-1.5 bg-indigo-650 hover:bg-indigo-550 disabled:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shrink-0 select-none flex items-center justify-center"
+                                            title="Crear nueva tarea en este proyecto"
+                                        >
+                                            {isCreatingTask ? '...' : '＋'}
+                                        </button>
+                                    </form>
                                 </div>
 
                                 {/* Lista Vertical Scrollable */}

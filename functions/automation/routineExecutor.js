@@ -139,6 +139,7 @@ async function executeRoutine(adminDb, token, routineKey, triggerType, options =
             dryRun: effectiveDryRun,
             debug: effectiveDebug,
             options,
+            triggerType,
         };
 
         result = await handler.execute(adminDb, token, targets, context);

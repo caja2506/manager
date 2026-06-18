@@ -8,6 +8,7 @@ import { updateTask } from '../services/taskService';
 import { enrichPlanItemsWithTasks } from '../utils/plannerUtils';
 import { getEffectiveHours } from '../utils/breakTimeUtils';
 import { usePlannerTimerStatus } from '../hooks/usePlannerTimerSync';
+import { confirmDraftLogs } from '../services/timeService';
 import PlannerSidebar from '../components/planner/PlannerSidebar';
 import DailyTeamGrid from '../components/planner/DailyTeamGrid';
 import PlannerTaskModal from '../components/planner/PlannerTaskModal';
@@ -414,20 +415,24 @@ export default function DailyTeamBoard() {
         };
     }, [memberTodayLogs]);
 
-    const handleConfirmTodayDrafts = async () => {
+    // Auto-confirmación silenciosa de borradores en segundo plano al cargar el Daily Board o cambiar filtros
+    useEffect(() => {
         const drafts = memberTodayStats.draftsList;
-        if (!drafts.length) return;
-        setConfirmingToday(true);
-        try {
-            const { confirmDraftLogs } = await import('../services/timeService.supabase');
-            const result = await confirmDraftLogs(drafts);
-            alert(`Se confirmaron ${result.count} bloques planificados para hoy.`);
-        } catch (err) {
-            console.error('Error al confirmar borradores:', err);
-            alert('No se pudieron confirmar las sugerencias: ' + err.message);
+        if (drafts.length > 0 && !confirmingToday) {
+            const autoConfirm = async () => {
+                setConfirmingToday(true);
+                try {
+                    const result = await confirmDraftLogs(drafts);
+                    console.log(`[DailyTeamBoard] Auto-confirmed ${result.count} drafts automatically.`);
+                } catch (err) {
+                    console.error('[DailyTeamBoard] Error auto-confirming drafts:', err);
+                } finally {
+                    setConfirmingToday(false);
+                }
+            };
+            autoConfirm();
         }
-        setConfirmingToday(false);
-    };
+    }, [memberTodayStats.draftsList.length, confirmingToday]);
 
     const isTodaySelected = isToday(selectedDate);
 

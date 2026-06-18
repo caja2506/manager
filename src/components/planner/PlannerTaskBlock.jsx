@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { format, parseISO } from 'date-fns';
 import { X, User, Clock, AlertTriangle } from 'lucide-react';
-import { PLANNER_START_HOUR, SLOT_HEIGHT_PX } from './PlannerGrid';
+import { PLANNER_START_HOUR, SLOT_HEIGHT_PX } from './plannerConstants';
 
 const PRIORITY_STYLES = {
     critical: 'bg-red-500    border-red-700    text-white',
@@ -50,6 +50,7 @@ export default function PlannerTaskBlock({
 
     const isDraft = timerStatus?.isDraft;
     const isConfirmed = timerStatus?.isConfirmed;
+    const hasTimeLog = isConfirmed || isDraft;
 
     const baseStyleClass = isConflict
         ? 'bg-rose-500 border-rose-700 text-white ring-2 ring-rose-300'
@@ -61,11 +62,7 @@ export default function PlannerTaskBlock({
     let opacityStyle = '';
     let styleClass = baseStyleClass;
 
-    if (isDraft) {
-        borderClass = 'border-l-4 border-dashed border-amber-500';
-        styleClass = 'bg-slate-50/90 dark:bg-slate-900/50 border-slate-250 dark:border-slate-800/80 text-slate-800 dark:text-slate-200 ring-1 ring-amber-500/10';
-        opacityStyle = 'border-dashed';
-    } else if (isConfirmed) {
+    if (hasTimeLog) {
         borderClass = 'border-l-4 border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.25)]';
     }
 
@@ -211,7 +208,7 @@ export default function PlannerTaskBlock({
                         }}
                     >
                         <span
-                            className={`font-black text-[11px] leading-tight ${isDraft ? 'text-slate-800 dark:text-slate-200' : 'text-white'}`}
+                            className="font-black text-[11px] leading-tight text-white"
                             style={{
                                 overflow:        'hidden',
                                 display:         '-webkit-box',
@@ -220,8 +217,7 @@ export default function PlannerTaskBlock({
                                 wordBreak:       'break-word',
                             }}
                         >
-                            {isConfirmed && '✓ '}
-                            {isDraft && '⏱️ '}
+                            {hasTimeLog && '✓ '}
                             {displayTitle}
                         </span>
                     </div>
@@ -267,8 +263,7 @@ export default function PlannerTaskBlock({
                     <div className="flex items-start justify-between gap-0.5">
                         <p className="text-[10px] font-black leading-tight line-clamp-2 flex-1 break-words">
                             {isOrphan && <AlertTriangle className="w-2.5 h-2.5 text-amber-400 inline mr-0.5" />}
-                            {isConfirmed && <span className="text-emerald-450 font-black mr-1" title="Confirmado">✓</span>}
-                            {isDraft && <span className="text-amber-500 font-bold mr-1" title="Borrador">⏱️</span>}
+                            {hasTimeLog && <span className="text-emerald-450 font-black mr-1" title="Registrado">✓</span>}
                             {displayTitle}
                         </p>
                         <button
@@ -301,8 +296,7 @@ export default function PlannerTaskBlock({
                     <div className="flex items-start justify-between gap-1">
                         <p className="text-[11px] font-black leading-tight line-clamp-2 flex-1">
                             {isOrphan && <AlertTriangle className="w-3 h-3 text-amber-400 inline mr-0.5" />}
-                            {isConfirmed && <span className="text-emerald-450 font-black mr-1" title="Confirmado">✓</span>}
-                            {isDraft && <span className="text-amber-500 font-bold mr-1" title="Borrador">⏱️</span>}
+                            {hasTimeLog && <span className="text-emerald-450 font-black mr-1" title="Registrado">✓</span>}
                             {displayTitle}
                         </p>
                         <button

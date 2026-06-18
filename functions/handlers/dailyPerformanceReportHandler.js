@@ -114,15 +114,50 @@ async function execute(adminDb, token, targets, context) {
     // 3. LOAD REPORT CONFIG
     // ══════════════════════════════════════════
     let config = {
+        enabled: true,
         channels: { email: true, telegramPdf: true },
         recipients: [],
     };
 
     try {
-        const configSnap = await adminDb.collection(paths.SETTINGS).doc("emailReportConfig").get();
-        if (configSnap.exists) config = { ...config, ...configSnap.data() };
+        const { loadSetting } = require("../db/coreDataReader");
+        const supabaseConfig = await loadSetting("emailReportConfig");
+        if (supabaseConfig) {
+            config = { ...config, ...supabaseConfig };
+            console.log(`[perfReport] Loaded config from Supabase: enabled=${config.enabled}, recipients=${config.recipients?.join(", ")}`);
+        } else {
+            // Fallback to Firestore
+            const configSnap = await adminDb.collection(paths.SETTINGS).doc("emailReportConfig").get();
+            if (configSnap.exists) {
+                config = { ...config, ...configSnap.data() };
+                console.log(`[perfReport] Loaded config from Firestore (fallback): enabled=${config.enabled}, recipients=${config.recipients?.join(", ")}`);
+            }
+        }
     } catch (err) {
-        console.warn("[perfReport] No config found:", err.message);
+        console.warn("[perfReport] Failed to load config from Supabase, trying Firestore fallback:", err.message);
+        try {
+            const configSnap = await adminDb.collection(paths.SETTINGS).doc("emailReportConfig").get();
+            if (configSnap.exists) {
+                config = { ...config, ...configSnap.data() };
+            }
+        } catch (fbErr) {
+            console.warn("[perfReport] Firestore fallback failed:", fbErr.message);
+        }
+    }
+
+    // 3.5 Check if enabled (skip scheduled runs if deactivated)
+    const isManual = context?.triggerType === "manual";
+    if (config.enabled === false && !isManual) {
+        console.log(`[perfReport] Routine is disabled in settings/emailReportConfig and trigger is not manual (triggerType: ${context?.triggerType}). Skipping delivery.`);
+        return {
+            sentCount: 0,
+            failedCount: 0,
+            errors: [],
+            emailSent: false,
+            telegramSent: 0,
+            skipped: true,
+            reason: "Routine is disabled in settings",
+        };
     }
 
     // ══════════════════════════════════════════
@@ -292,11 +327,24 @@ async function execute(adminDb, token, targets, context) {
     // ══════════════════════════════════════════
     if (!dryRun) {
         try {
+            const lastSentAt = now.toISOString();
+
+            // Update Supabase
+            try {
+                const { saveSetting } = require("../db/coreDataReader");
+                const updatedValue = { ...config, lastSentAt };
+                await saveSetting("emailReportConfig", updatedValue, "email");
+                console.log("[perfReport] Updated lastSentAt in Supabase");
+            } catch (sbErr) {
+                console.warn("[perfReport] Failed to update lastSentAt in Supabase:", sbErr.message);
+            }
+
+            // Update Firestore
             await adminDb.collection(paths.SETTINGS).doc("emailReportConfig").set({
-                lastSentAt: now.toISOString(),
+                lastSentAt,
             }, { merge: true });
         } catch (err) {
-            console.warn("[perfReport] Failed to update lastSentAt:", err.message);
+            console.warn("[perfReport] Failed to update lastSentAt in Firestore:", err.message);
         }
     }
 
@@ -1029,8 +1077,8 @@ function buildTelegramSummary(data) {
         msg += `🆕 ${tomorrowView.unassignedTasks} tareas sin asignar\n`;
     }
 
-    msg += `\n🔗 <a href="https://analyzeops.com">Ver Dashboard</a>`;
-    msg += `\n<i>— AnalyzeOps</i>`;
+    msg += `\n🔗 <a href="https://bom-ame-cr.web.app">Ver Dashboard</a>`;
+    msg += `\n<i>— AutoBOM Pro</i>`;
 
     return msg;
 }

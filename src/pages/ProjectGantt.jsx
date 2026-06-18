@@ -32,6 +32,10 @@ import {
     deleteDependency,
 } from '../services/ganttService';
 import { syncGanttToPlanner } from '../services/ganttPlannerSync';
+import { useRef } from 'react';
+import { parsePlannerExcel } from '../services/plannerExcelParser';
+import { syncPlannerExcelToSupabase } from '../services/plannerExcelSyncService';
+import PlannerImportModal from '../components/gantt/PlannerImportModal';
 
 // ---- Date helpers ----
 function getMondayOfWeek(date = new Date()) {
@@ -113,6 +117,58 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
 
     const openNew = () => { setSelectedTask(null); setTaskModalInitialData({}); setIsModalOpen(true); };
     const openTask = (task) => { setSelectedTask(task); setTaskModalInitialData({}); setIsModalOpen(true); };
+
+    // Planner Excel Import States
+    const plannerFileInputRef = useRef(null);
+    const [isPlannerModalOpen, setIsPlannerModalOpen] = useState(false);
+    const [plannerParsedData, setPlannerParsedData] = useState(null);
+    const [plannerProjectName, setPlannerProjectName] = useState('');
+    const [isSyncingPlanner, setIsSyncingPlanner] = useState(false);
+
+    const handlePlannerExcelUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const activePid = forceProjectId || filterProject;
+        if (!activePid) {
+            alert('Por favor selecciona un proyecto antes de importar el Planner.');
+            e.target.value = null;
+            return;
+        }
+
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const parsed = parsePlannerExcel(arrayBuffer, tasks, teamMembers, milestones);
+            
+            setPlannerProjectName(parsed.projectName);
+            setPlannerParsedData(parsed);
+            setIsPlannerModalOpen(true);
+        } catch (err) {
+            console.error('Error al analizar el Excel de Planner:', err);
+            alert('Error al analizar el Excel: ' + err.message);
+        } finally {
+            e.target.value = null;
+        }
+    };
+
+    const handleConfirmPlannerSync = async () => {
+        const activePid = forceProjectId || filterProject;
+        if (!activePid || !plannerParsedData) return;
+
+        setIsSyncingPlanner(true);
+        try {
+            await syncPlannerExcelToSupabase(activePid, plannerParsedData, user?.uid);
+            setIsPlannerModalOpen(false);
+            setPlannerParsedData(null);
+            alert('¡Sincronización de Planner completada con éxito!');
+            await loadData();
+        } catch (err) {
+            console.error('Error al sincronizar Planner:', err);
+            alert('Error al sincronizar: ' + err.message);
+        } finally {
+            setIsSyncingPlanner(false);
+        }
+    };
 
     // ---- Load data ----
     const loadData = useCallback(async () => {
@@ -689,6 +745,26 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                                 Year by weeks
                             </button>
                         </div>
+                        {/* Importar Planner */}
+                        {canEdit && (forceProjectId || filterProject) && (
+                            <>
+                                <button
+                                    onClick={() => plannerFileInputRef.current.click()}
+                                    className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[10px] font-bold border border-green-500/40 bg-green-500/15 text-green-400 hover:bg-green-500/25 transition-all cursor-pointer shadow-sm"
+                                    title="Importar Cronograma desde Excel (Planner)"
+                                >
+                                    <CalendarPlus className="w-3.5 h-3.5" />
+                                    Importar Planner
+                                </button>
+                                <input
+                                    type="file"
+                                    ref={plannerFileInputRef}
+                                    onChange={handlePlannerExcelUpload}
+                                    accept=".xlsx, .xls"
+                                    className="hidden"
+                                />
+                            </>
+                        )}
 
                         {/* Ruta Crítica */}
                         <button
@@ -790,6 +866,17 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                                 <CalendarRange className="w-3 h-3" /> Year by weeks
                             </button>
                         </div>
+                        {/* Importar Planner Embebido */}
+                        {canEdit && (forceProjectId || filterProject) && (
+                            <button
+                                onClick={() => plannerFileInputRef.current.click()}
+                                className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[10px] font-bold border border-green-500/40 bg-green-500/15 text-green-400 hover:bg-green-500/25 transition-all cursor-pointer shadow-sm"
+                                title="Importar Cronograma desde Excel (Planner)"
+                            >
+                                <CalendarPlus className="w-3.5 h-3.5" />
+                                Importar Planner
+                            </button>
+                        )}
 
                         {/* Ruta Crítica Embebida */}
                         <button
@@ -924,6 +1011,16 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                 onSave={handleSaveMilestone}
                 parentMilestoneId={milestoneParentId}
                 parentMilestoneName={milestoneParentName}
+            />
+
+            {/* ======== PLANNER IMPORT MODAL ======== */}
+            <PlannerImportModal
+                isOpen={isPlannerModalOpen}
+                onClose={() => { setIsPlannerModalOpen(false); setPlannerParsedData(null); }}
+                projectName={plannerProjectName}
+                parsedData={plannerParsedData}
+                onConfirm={handleConfirmPlannerSync}
+                isSyncing={isSyncingPlanner}
             />
         </div>
     );

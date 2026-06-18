@@ -130,6 +130,11 @@ export default function App() {
   const user = realUser || (import.meta.env.DEV ? { uid: 'dev-auditor', email: 'caja2506@gmail.com', displayName: 'QA Auditor' } : null);
   const { roleLoading } = useRole();
 
+  // Cache busting log
+  React.useEffect(() => {
+    console.log('[AnalyzeOps] App loaded. Build timestamp: 2026-06-17T15:35:00-06:00');
+  }, []);
+
   // --- Splash Screen DISABLED — go straight to app ---
   const splashDone = true;
 

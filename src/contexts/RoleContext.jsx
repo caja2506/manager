@@ -200,7 +200,7 @@ export function RoleProvider({ children }) {
     const isEditor = role === 'editor';
     const isViewer = role === 'viewer';
     const canEdit = role === 'admin' || role === 'editor';
-    const canDelete = role === 'admin';
+    const canDelete = role === 'admin' || role === 'editor';
     const canEditDates = canEdit && (userProfile?.teamRole !== 'technician');
 
     const value = {

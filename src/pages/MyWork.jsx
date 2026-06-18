@@ -290,25 +290,6 @@ export default function MyWork() {
         ? (engTasks.find(t => t.id === activeTimer.taskId) || focusTask)
         : focusTask;
 
-    const draftLogs = myTodayLogs.filter(log => log.isDraft);
-    const hasDrafts = draftLogs.length > 0;
-    const [confirmingDrafts, setConfirmingDrafts] = useState(false);
-
-    const handleConfirmAllDrafts = useCallback(async () => {
-        if (!draftLogs.length) return;
-        setConfirmingDrafts(true);
-        try {
-            const { confirmDraftLogs } = await import('../services/timeService.supabase');
-            const result = await confirmDraftLogs(draftLogs);
-            alert(`Se confirmaron ${result.count} bloques planificados como registros de tiempo reales.`);
-            handleTimerStop();
-        } catch (err) {
-            console.error('Error al confirmar borradores:', err);
-            alert('No se pudieron confirmar las sugerencias: ' + err.message);
-        }
-        setConfirmingDrafts(false);
-    }, [draftLogs, handleTimerStop]);
-
     // ── Date/greeting header ──
     const todayLabel = format(new Date(), "EEEE, d 'de' MMMM", { locale: es });
     const userName = user?.displayName?.split(' ')[0] || user?.email?.split('@')[0] || 'ahí';
@@ -350,40 +331,6 @@ export default function MyWork() {
                     <ExternalLink className="w-3.5 h-3.5 opacity-60" />
                 </a>
             </div>
-
-            {/* ══════════════════════════════════════════
-                SUGGESTIONS CONFIRMATION BANNER
-            ══════════════════════════════════════════ */}
-            {hasDrafts && (
-                <div className="bg-amber-600/10 border border-amber-500/20 rounded-2xl p-4 md:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 animate-in slide-in-from-top duration-300">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center shrink-0">
-                            <span className="text-xl">⏱️</span>
-                        </div>
-                        <div>
-                            <h4 className="text-sm md:text-base font-black text-white">¿Tu día transcurrió según lo planeado?</h4>
-                            <p className="text-xs font-bold text-slate-400 mt-0.5">
-                                Tienes {draftLogs.length} {draftLogs.length === 1 ? 'sugerencia de bloque' : 'sugerencias de bloques'} de tu planificador para hoy.
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2.5 w-full sm:w-auto shrink-0">
-                        <button
-                            onClick={handleConfirmAllDrafts}
-                            disabled={confirmingDrafts}
-                            className="w-full sm:w-auto px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-amber-700/50 text-white font-black text-xs md:text-sm rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2"
-                        >
-                            {confirmingDrafts ? 'Confirmando...' : '✓ Confirmar Todo'}
-                        </button>
-                        <a
-                            href="/work-logs"
-                            className="w-full sm:w-auto px-4 py-2 bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-300 font-bold text-xs md:text-sm rounded-xl text-center transition-all"
-                        >
-                            ✏️ Ajustar Logs
-                        </a>
-                    </div>
-                </div>
-            )}
 
             {/* ══════════════════════════════════════════
                 STAT BAR — today summary

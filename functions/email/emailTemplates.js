@@ -29,13 +29,12 @@ function dailyPerformanceReport(data) {
 <body style="margin:0;padding:0;background-color:#f0f2f5;font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;" bgcolor="#f0f2f5">
 <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0f2f5;padding:20px 0;" bgcolor="#f0f2f5" role="presentation">
 <tr><td align="center">
-<table width="800" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);max-width:100%;" bgcolor="#ffffff">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);max-width:1200px;width:100%;" bgcolor="#ffffff">
 
 <!-- Header -->
 <tr><td style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:32px 40px;">
   <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:800;letter-spacing:-0.5px;">Passdown AME CR</h1>
   <p style="margin:8px 0 0;color:#ffffff;font-size:18px;font-weight:700;">${datePretty}</p>
-  <p style="margin:4px 0 0;color:#c7d2fe;font-size:12px;">AnalyzeOps</p>
 </td></tr>
 
 <!-- SECTION 1: ¿CÓMO NOS FUE AYER? -->
@@ -176,10 +175,10 @@ ${overdueTasks.length > 0 ? `
 <tr><td style="padding:24px 40px;background-color:#f8fafc;border-top:1px solid #e5e7eb;" bgcolor="#f8fafc">
   <table width="100%"><tr>
     <td style="color:#9ca3af;font-size:12px;">
-      Generado automáticamente por <strong style="color:#4f46e5;">AnalyzeOps</strong>
+      Generado automáticamente
     </td>
     <td align="right">
-      <a href="https://analyzeops.com" style="color:#4f46e5;font-size:12px;text-decoration:none;">Ver Dashboard</a>
+      <a href="https://bom-ame-cr.web.app" style="color:#4f46e5;font-size:12px;text-decoration:none;">Ver Dashboard</a>
     </td>
   </tr></table>
 </td></tr>

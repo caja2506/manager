@@ -231,6 +231,32 @@ async function loadSetting(key) {
 }
 
 /**
+ * Save or update a setting in the Supabase settings table.
+ * @param {string} key
+ * @param {any} value
+ * @param {string} [category]
+ * @returns {Promise<boolean>}
+ */
+async function saveSetting(key, value, category = null) {
+    const sb = getSupabase();
+    const payload = {
+        key,
+        value,
+        updated_at: new Date().toISOString(),
+    };
+    if (category) payload.category = category;
+
+    const { error } = await sb.from("settings")
+        .upsert(payload, { onConflict: "key" });
+
+    if (error) {
+        console.error(`[coreDataReader] saveSetting(${key}) failed:`, error.message);
+        return false;
+    }
+    return true;
+}
+
+/**
  * Load active (running) timer for a user — endTime IS NULL.
  * @param {string} userId
  * @returns {Promise<Object|null>}
@@ -751,5 +777,6 @@ module.exports = {
 
     // Settings
     loadSetting,
+    saveSetting,
 };
 
