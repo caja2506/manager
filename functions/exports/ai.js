@@ -9,7 +9,7 @@ const { requireAdmin } = require("../middleware/authGuard");
 const MODEL_NAME = "gemini-2.5-flash";
 
 function createAiExports(adminDb, secrets) {
-    const { geminiApiKey, googleCseKey, googleCx } = secrets;
+    const { geminiApiKey, googleCseKey, googleCx, deepseekApiKey } = secrets;
 
     const testGeminiConnection = onCall(
         { secrets: [geminiApiKey] },
@@ -183,15 +183,52 @@ ${text}`;
     );
 
     const generateInsights = onCall(
-        { secrets: [geminiApiKey], timeoutSeconds: 60 },
+        { secrets: [geminiApiKey, deepseekApiKey], timeoutSeconds: 60 },
         async (request) => {
             if (!request.auth) {
                 throw new HttpsError("unauthenticated", "User must be authenticated.");
             }
-            const { prompt, type } = request.data;
+            const { prompt, type, provider } = request.data;
             if (!prompt || typeof prompt !== "string") {
                 throw new HttpsError("invalid-argument", "A valid prompt string is required.");
             }
+
+            // ── Soporte para DeepSeek con Fallback ──
+            if (provider === 'deepseek') {
+                const { callWithFallback } = require("../ai/deepseekClient");
+                const dsKey = deepseekApiKey.value();
+                const geminiKey = geminiApiKey.value();
+
+                const messages = [
+                    { role: "user", content: prompt }
+                ];
+
+                try {
+                    const aiResult = await callWithFallback({ deepseekKey: dsKey, geminiKey: geminiKey }, messages, {
+                        temperature: 0.3,
+                        maxTokens: 4096
+                    });
+
+                    if (aiResult.ok) {
+                        console.log(`[generateInsights] Successfully generated insights of type: ${type} using DeepSeek/Gemini Fallback.`);
+                        return { 
+                            success: true, 
+                            response: aiResult.text, 
+                            type: type || "general", 
+                            model: aiResult.model, 
+                            provider: aiResult.provider,
+                            generatedAt: new Date().toISOString() 
+                        };
+                    } else {
+                        throw new HttpsError("internal", `DeepSeek/Gemini Fallback failed: ${aiResult.error}`);
+                    }
+                } catch (err) {
+                    console.error("DeepSeek call error:", err);
+                    throw new HttpsError("internal", `DeepSeek/Gemini Fallback failed: ${err.message}`);
+                }
+            }
+
+            // ── Comportamiento original: Gemini ──
             const apiKey = geminiApiKey.value();
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
             try {

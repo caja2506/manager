@@ -3,9 +3,10 @@ import { useRole } from '../contexts/RoleContext';
 import { useAppData } from '../contexts/AppDataContext';
 import { deleteCatalogRecord, deleteCatalogRecordsBatch } from '../services/bomCrudService';
 import FilterPopover from '../components/ui/FilterPopover';
+import CatalogEnrichmentModal from '../components/catalog/CatalogEnrichmentModal';
 import {
     Search, Plus, Trash2, Database,
-    SlidersHorizontal, Edit3, Tag, Camera, RefreshCw
+    SlidersHorizontal, Edit3, Tag, Camera, RefreshCw, Sparkles
 } from 'lucide-react';
 
 export default function Catalog() {
@@ -21,6 +22,7 @@ export default function Catalog() {
     } = useAppData();
 
     const [isCatalogEditMode, setIsCatalogEditMode] = useState(false);
+    const [isCatalogEnrichmentOpen, setIsCatalogEnrichmentOpen] = useState(false);
     const [selectedCatalogItems, setSelectedCatalogItems] = useState([]);
     const [catalogFilters, setCatalogFilters] = useState({ search: '', brand: [], category: [], provider: [] });
 
@@ -115,6 +117,14 @@ export default function Catalog() {
                             <RefreshCw className="w-4 h-4 mr-1.5" />Sync Imgs
                         </button>
                     )}
+                    {canEdit && (
+                        <button
+                            onClick={() => setIsCatalogEnrichmentOpen(true)}
+                            className="bg-purple-600 text-white px-4 py-3 rounded-2xl font-black flex items-center justify-center shadow-lg active:scale-95 transition-all text-sm"
+                        >
+                            <Sparkles className="w-4 h-4 mr-1.5" />Enriquecer Catálogo
+                        </button>
+                    )}
                 </div>
 
                 {selectedCatalogItems.length > 0 && isCatalogEditMode && canDelete && (
@@ -198,6 +208,7 @@ export default function Catalog() {
                     </table>
                 </div>
             </div>
+            <CatalogEnrichmentModal isOpen={isCatalogEnrichmentOpen} onClose={() => setIsCatalogEnrichmentOpen(false)} />
         </div>
     );
 }
