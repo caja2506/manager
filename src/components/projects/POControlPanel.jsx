@@ -289,7 +289,8 @@ export default function POControlPanel({ projectId, bomProjectId }) {
             const diffPct = po.amount > 0 ? Math.abs((Number(item.totalPrice) - Number(po.amount)) / Number(po.amount)) : 1;
             const matchesAmount = diffPct <= 0.1;
 
-            return matchesAmount || (matchesSupplier && matchesAmount);
+            // Sugerir solo si coincide la marca/proveedor y el monto está dentro del 10%
+            return matchesSupplier && matchesAmount;
         });
     };
 
