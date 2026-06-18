@@ -29,7 +29,7 @@ export default function BomListsPage() {
                     icon={Truck}
                     iconBg="bg-cyan-100 dark:bg-cyan-500/10"
                     iconColor="text-cyan-600 dark:text-cyan-400"
-                    items={(managedLists?.providers || []).map(p => p.name)}
+                    items={managedLists?.providers || []}
                     onSave={(data) => handleSaveManagedList({ type: 'provider', data })}
                 />
                 <ManagedListCard

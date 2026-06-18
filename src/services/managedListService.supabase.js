@@ -33,15 +33,24 @@ export async function saveManagedList({ type, data }) {
         const found = items.find(d => d.name === name);
         if (found) await supabase.from(table).delete().eq('id', found.id);
     }
-    // Renames
-    for (const { oldName, newName } of renames) {
+    // Renames / Updates
+    for (const item of renames) {
+        const { oldName, newName, is_workshop } = item;
         const found = items.find(d => d.name === oldName);
-        if (found) await supabase.from(table).update({ name: newName }).eq('id', found.id);
+        if (found) {
+            const upd = { name: newName };
+            if (is_workshop !== undefined) upd.is_workshop = is_workshop;
+            await supabase.from(table).update(upd).eq('id', found.id);
+        }
     }
     // Adds
-    for (const name of added) {
+    for (const item of added) {
+        const name = typeof item === 'string' ? item : item.name;
+        const is_workshop = typeof item === 'string' ? false : !!item.is_workshop;
         if (!items.some(d => d.name.toLowerCase() === name.toLowerCase())) {
-            await supabase.from(table).insert({ name });
+            const ins = { name };
+            if (type === 'provider') ins.is_workshop = is_workshop;
+            await supabase.from(table).insert(ins);
         }
     }
 }

@@ -10,13 +10,20 @@ export default function ManagedListCard({ title, subtitle, icon: Icon, iconBg, i
     const [search, setSearch] = useState('');
     const [isSaving, setIsSaving] = useState(false);
 
+    const getDisplayName = (item) => typeof item === 'string' ? item : item.name;
+    const getIsWorkshop = (item) => typeof item === 'string' ? false : !!item.is_workshop;
+
     const startEdit = () => {
-        setEditItems(items.map((name, i) => ({ id: `e-${i}`, name, original: name })));
+        setEditItems(items.map((item, i) => {
+            const name = getDisplayName(item);
+            const is_workshop = getIsWorkshop(item);
+            return { id: `e-${i}`, name, original: name, is_workshop };
+        }));
         setIsEditing(true);
     };
 
     const handleAdd = () => {
-        setEditItems(prev => [...prev, { id: `n-${Date.now()}`, name: '', original: null }]);
+        setEditItems(prev => [...prev, { id: `n-${Date.now()}`, name: '', original: null, is_workshop: false }]);
     };
 
     const handleRemove = (id) => {
@@ -27,14 +34,23 @@ export default function ManagedListCard({ title, subtitle, icon: Icon, iconBg, i
         setEditItems(prev => prev.map(i => i.id === id ? { ...i, name: value } : i));
     };
 
+    const handleToggleWorkshop = (id) => {
+        setEditItems(prev => prev.map(i => i.id === id ? { ...i, is_workshop: !i.is_workshop } : i));
+    };
+
     const handleSave = async () => {
         setIsSaving(true);
         const renames = editItems
-            .filter(i => i.original && i.name.trim() && i.original !== i.name.trim())
-            .map(i => ({ oldName: i.original, newName: i.name.trim() }));
-        const added = editItems.filter(i => !i.original && i.name.trim()).map(i => i.name.trim());
+            .filter(i => {
+                const origObj = items.find(orig => getDisplayName(orig) === i.original);
+                const origIsWorkshop = origObj ? getIsWorkshop(origObj) : false;
+                return i.original && i.name.trim() && (i.original !== i.name.trim() || i.is_workshop !== origIsWorkshop);
+            })
+            .map(i => ({ oldName: i.original, newName: i.name.trim(), is_workshop: i.is_workshop }));
+
+        const added = editItems.filter(i => !i.original && i.name.trim()).map(i => ({ name: i.name.trim(), is_workshop: i.is_workshop }));
         const remainingOriginals = editItems.map(i => i.original).filter(Boolean);
-        const deleted = items.filter(name => !remainingOriginals.includes(name));
+        const deleted = items.map(i => getDisplayName(i)).filter(name => !remainingOriginals.includes(name));
         try {
             await onSave({ renames, deleted, added });
             setIsEditing(false);
@@ -50,7 +66,7 @@ export default function ManagedListCard({ title, subtitle, icon: Icon, iconBg, i
         setEditItems([]);
     };
 
-    const filtered = items.filter(n => n.toLowerCase().includes(search.toLowerCase()));
+    const filtered = items.filter(n => getDisplayName(n).toLowerCase().includes(search.toLowerCase()));
 
     return (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-lg overflow-hidden">
@@ -91,6 +107,17 @@ export default function ManagedListCard({ title, subtitle, icon: Icon, iconBg, i
                                     placeholder="Nuevo valor..."
                                     className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                 />
+                                {title === "Proveedores" && (
+                                    <label className="flex items-center gap-1.5 cursor-pointer ml-1 select-none shrink-0">
+                                        <input
+                                            type="checkbox"
+                                            checked={item.is_workshop}
+                                            onChange={() => handleToggleWorkshop(item.id)}
+                                            className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800"
+                                        />
+                                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Taller</span>
+                                    </label>
+                                )}
                                 <button onClick={() => handleRemove(item.id)} className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/15 rounded-lg transition-colors">
                                     <Trash2 className="w-4 h-4" />
                                 </button>
@@ -117,12 +144,23 @@ export default function ManagedListCard({ title, subtitle, icon: Icon, iconBg, i
                             {filtered.length === 0 && (
                                 <p className="text-xs text-slate-500 text-center py-4">Sin resultados</p>
                             )}
-                            {filtered.map((name, idx) => (
-                                <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-transparent">
-                                    <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full flex-shrink-0" />
-                                    <span className="text-sm text-slate-700 dark:text-slate-200 font-medium">{name}</span>
-                                </div>
-                            ))}
+                            {filtered.map((item, idx) => {
+                                const name = getDisplayName(item);
+                                const is_workshop = getIsWorkshop(item);
+                                return (
+                                    <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-transparent">
+                                        <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full flex-shrink-0" />
+                                        <span className="text-sm text-slate-700 dark:text-slate-200 font-medium">{name}</span>
+                                        {title === "Proveedores" && (
+                                            <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ml-auto ${
+                                                is_workshop ? 'bg-cyan-500/10 text-cyan-500 dark:bg-cyan-500/20' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                                            }`}>
+                                                {is_workshop ? 'Taller' : 'Comercial / OTS'}
+                                            </span>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                     </>
                 )}

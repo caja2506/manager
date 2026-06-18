@@ -92,7 +92,9 @@ export default function AppLayout() {
                     items={
                         listManager.type === 'taskType'
                             ? (taskTypes || []).map(t => t.name)
-                            : managedLists[listManager.type === 'category' ? 'categories' : listManager.type + 's']?.map(i => i.name) || []
+                            : listManager.type === 'provider'
+                                ? (managedLists.providers || [])
+                                : managedLists[listManager.type === 'category' ? 'categories' : listManager.type + 's']?.map(i => i.name) || []
                     }
                     onClose={() => setListManager({ isOpen: false, type: null, title: '' })}
                     onSave={(data) => handleSaveManagedList({ type: listManager.type, data })}

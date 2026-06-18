@@ -131,6 +131,7 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
     const [collapsedGroups, setCollapsedGroups] = useState({});
     const [isMerging, setIsMerging] = useState(false);
     const [expandedParts, setExpandedParts] = useState({});
+    const [activeBomTab, setActiveBomTab] = useState('general'); // 'general' | 'electric_pneumatic' | 'mechanical'
 
     const duplicatesGroup = useMemo(() => {
         const counts = {};
@@ -403,7 +404,30 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
         setSelectedBomItems([]);
         setBomFilters({ search: '', brand: [], category: [], provider: [], prcr: '', station: '' });
         setIsBomEditMode(false);
+        setActiveBomTab('general');
     }, [resolvedProjectId]);
+
+    const resolveIsMechanical = useCallback((item) => {
+        if (item.isCustomMechanical) return true;
+        
+        // Robust retrieval of providerId
+        let providerId = item.proveedor?.id || item.proveedor_id || null;
+        
+        if (!providerId && item.masterPartRef) {
+            const masterPart = catalogo.find(p => p.id === item.masterPartRef.id);
+            if (masterPart) {
+                providerId = masterPart.defaultProvider?.id || masterPart.default_provider_id || null;
+            }
+        }
+        
+        if (providerId) {
+            const prov = managedLists.providers.find(p => p.id === providerId);
+            console.log(`[resolveIsMechanical] Item: ${item.partNumber || 'S/N'}, providerId: ${providerId}, Found Provider: ${prov ? prov.name : 'NO'}, is_workshop: ${prov ? prov.is_workshop : 'N/A'}`);
+            if (prov && prov.is_workshop) return true;
+        }
+        return false;
+    }, [catalogo, managedLists.providers]);
+
 
     const filteredActiveBomItems = useMemo(() => {
         return activeBomItems.filter(item => {
@@ -428,6 +452,11 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
                 };
             }
 
+            // Tab filtering (General, Eléctrico & Neumático, Mecánico)
+            const isMechanical = resolveIsMechanical(item);
+            if (activeBomTab === 'mechanical' && !isMechanical) return false;
+            if (activeBomTab === 'electric_pneumatic' && isMechanical) return false;
+
             const s = bomFilters.search.toLowerCase();
             const matchesSearch = !s || String(details.name || '').toLowerCase().includes(s) || String(details.partNumber || '').toLowerCase().includes(s);
             const matchesBrand = bomFilters.brand.length === 0 || bomFilters.brand.includes(details.brandId);
@@ -438,7 +467,7 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
 
             return matchesSearch && matchesBrand && matchesCategory && matchesProvider && matchesPrcr && matchesStation;
         });
-    }, [activeBomItems, catalogo, bomFilters]);
+    }, [activeBomItems, catalogo, bomFilters, activeBomTab, resolveIsMechanical]);
 
     const handleToggleSelectAllBomItems = (items) => {
         if (selectedBomItems.length === items.length) {
@@ -600,11 +629,48 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
                     <Download className="w-4 h-4 mr-1.5" /> Excel
                 </button>
                 <div className="bg-emerald-500/15 border border-emerald-500/30 px-3 py-1.5 rounded-xl text-right flex items-center gap-2">
-                    <span className="text-[9px] font-black text-green-600 uppercase tracking-widest">Inv.</span>
+                    <span className="text-[9px] font-black text-green-600 uppercase tracking-widest">
+                        {activeBomTab === 'general' ? 'Inv. Total' : activeBomTab === 'mechanical' ? 'Inv. Mecánico' : 'Inv. Eléc & Neum'}
+                    </span>
                     <span className="text-lg font-black text-green-500 tracking-tighter leading-none">
-                        ${(activeBomItems || []).reduce((s, i) => s + (i.totalPrice || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        ${(activeBomItems || [])
+                            .filter(i => activeBomTab === 'general' || (activeBomTab === 'mechanical' ? resolveIsMechanical(i) : !resolveIsMechanical(i)))
+                            .reduce((s, i) => s + (i.totalPrice || 0), 0)
+                            .toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </span>
                 </div>
+            </div>
+
+            {/* Pestañas de Disciplina / Vista (General, Eléctrico & Neumático, Mecánico) */}
+            <div className="flex bg-slate-950/40 p-1 rounded-xl border border-slate-800/80 gap-1.5 self-start mt-1.5 shrink-0">
+                {[
+                    { id: 'general', label: 'General', count: activeBomItems.length },
+                    { id: 'electric_pneumatic', label: 'Eléctrico & Neumático', count: activeBomItems.filter(i => !resolveIsMechanical(i)).length },
+                    { id: 'mechanical', label: 'Mecánico', count: activeBomItems.filter(i => resolveIsMechanical(i)).length }
+                ].map(tab => {
+                    const isActive = activeBomTab === tab.id;
+                    return (
+                        <button
+                            key={tab.id}
+                            onClick={() => {
+                                setActiveBomTab(tab.id);
+                                setSelectedBomItems([]);
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 active:scale-95 ${
+                                isActive
+                                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
+                                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                            }`}
+                        >
+                            {tab.label}
+                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${
+                                isActive ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-800 text-slate-500'
+                            }`}>
+                                {tab.count}
+                            </span>
+                        </button>
+                    );
+                })}
             </div>
 
             {/* Filters */}

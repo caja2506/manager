@@ -24,6 +24,7 @@ export default function POControlPanel({ projectId, bomProjectId }) {
     const [expandedPOId, setExpandedPOId] = useState(null);
     const [isImporting, setIsImporting] = useState(false);
     const [importError, setImportError] = useState(null);
+    const [showManualMatchPOIds, setShowManualMatchPOIds] = useState({});
     const fileInputRef = useRef(null);
 
     // Manual association states
@@ -505,212 +506,234 @@ export default function POControlPanel({ projectId, bomProjectId }) {
                                             <td className="p-4 text-center">
                                                 {isExpanded ? <ChevronUp className="w-4 h-4 text-indigo-400" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
                                             </td>
-                                            <td className="p-4 font-bold text-white">
+                                            <td className="p-4 font-bold text-slate-900 dark:text-white">
                                                 {po.supplier}
                                                 {po.comments && (
-                                                    <div className="text-[10px] text-slate-500 font-normal mt-0.5 truncate max-w-xs" title={po.comments}>
+                                                    <div className="text-[10px] text-slate-500 dark:text-slate-400 font-normal mt-0.5 truncate max-w-xs" title={po.comments}>
                                                         {po.comments}
                                                     </div>
                                                 )}
                                             </td>
-                                            <td className="p-4 font-mono text-xs text-amber-500 font-bold">{po.prcr || '—'}</td>
-                                            <td className="p-4 font-mono text-xs text-slate-300">{po.po_number || '—'}</td>
-                                            <td className="p-4 text-right font-black text-white">
+                                            <td className="p-4 font-mono text-xs text-amber-800 dark:text-amber-400 font-bold">{po.prcr || '—'}</td>
+                                            <td className="p-4 font-mono text-xs text-slate-700 dark:text-slate-300">{po.po_number || '—'}</td>
+                                            <td className="p-4 text-right font-black text-slate-900 dark:text-white">
                                                 ${Number(po.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                             </td>
-                                            <td className="p-4 text-center text-xs text-slate-400">
+                                            <td className="p-4 text-center text-xs text-slate-700 dark:text-slate-400">
                                                 {po.po_date || po.prcr_start_date || '—'}
                                             </td>
                                             <td className="p-4 text-center">
                                                 <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
                                                     String(po.status).toLowerCase().includes('approved') || String(po.status).toLowerCase().includes('aprobado')
-                                                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+                                                        ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20'
                                                         : String(po.status).toLowerCase().includes('cancel') || String(po.status).toLowerCase().includes('rechaz')
-                                                            ? 'bg-red-500/15 text-red-400 border border-red-500/20'
-                                                            : 'bg-slate-800 text-slate-400 border border-slate-700'
+                                                            ? 'bg-red-50 dark:bg-red-500/15 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-500/20'
+                                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
                                                 }`}>
                                                     {po.status || 'Pendiente'}
                                                 </span>
                                             </td>
-                                            <td className="p-4 text-xs text-slate-400 truncate max-w-[100px]" title={po.made_by}>
+                                            <td className="p-4 text-xs text-slate-700 dark:text-slate-400 truncate max-w-[100px]" title={po.made_by}>
                                                 {po.made_by || '—'}
                                             </td>
                                         </tr>
 
                                         {/* COLLAPSIBLE DETAILS FOR MATCHING */}
-                                        {isExpanded && (
-                                            <tr>
-                                                <td colSpan="8" className="p-6 bg-slate-950/40 border-t border-b border-indigo-500/20">
-                                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                                                        
-                                                        {/* LEFT COLUMN: Associated Items */}
-                                                        <div className="lg:col-span-8 space-y-4">
-                                                            <div className="flex items-center justify-between">
-                                                                <h4 className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                                                                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                                                                    Materiales BOM Conciliados ({associatedItems.length})
-                                                                </h4>
-                                                                {associatedItems.length > 0 && (
-                                                                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                                                                        costDiff > 0 ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'
-                                                                    }`}>
-                                                                        Diferencia: {costDiff > 0 ? '+' : ''}${costDiff.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                                                    </span>
-                                                                )}
-                                                            </div>
+                                        {isExpanded && (() => {
+                                            const isMatchingOk = associatedItems.length > 0 && Math.abs(costDiff) <= 5;
+                                            const forceRightPanel = !!showManualMatchPOIds[po.id];
+                                            const showRightPanel = !isMatchingOk || forceRightPanel;
 
-                                                            {associatedItems.length === 0 ? (
-                                                                <div className="border border-dashed border-slate-800 p-6 rounded-xl text-center text-slate-500 text-xs">
-                                                                    No hay materiales asociados a esta orden de compra. Usa las sugerencias o la asociación manual de la derecha para conectarlos.
-                                                                </div>
-                                                            ) : (
-                                                                <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-inner">
-                                                                    <table className="w-full text-left text-xs">
-                                                                        <thead className="bg-slate-800/50 border-b border-slate-700/50 text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                                                                            <tr>
-                                                                                <th className="p-3">Nº Parte / Componente</th>
-                                                                                <th className="p-3 w-16 text-center">Cant</th>
-                                                                                <th className="p-3 w-28 text-right">Unitario</th>
-                                                                                <th className="p-3 w-28 text-right">Cotizado Total</th>
-                                                                                <th className="p-3 w-24 text-center">Match</th>
-                                                                                {canEdit && <th className="p-3 w-16"></th>}
-                                                                            </tr>
-                                                                        </thead>
-                                                                        <tbody className="divide-y divide-slate-800">
-                                                                            {associatedItems.map(item => {
-                                                                                const part = getPartDetails(item);
-                                                                                const isManual = item.poId === po.id;
-                                                                                return (
-                                                                                    <tr key={item.id} className="hover:bg-slate-800/20 text-slate-300">
-                                                                                        <td className="p-3">
-                                                                                            <div className="font-bold text-slate-200">{part.name}</div>
-                                                                                            <div className="text-[10px] font-mono text-slate-500 mt-0.5">{part.partNumber}</div>
-                                                                                        </td>
-                                                                                        <td className="p-3 text-center font-bold">{item.quantity}</td>
-                                                                                        <td className="p-3 text-right">
-                                                                                            ${Number(item.unitPrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                                                                        </td>
-                                                                                        <td className="p-3 text-right font-black text-white">
-                                                                                            ${Number(item.totalPrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                                                                        </td>
-                                                                                        <td className="p-3 text-center">
-                                                                                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
-                                                                                                isManual 
-                                                                                                    ? 'bg-purple-500/10 text-purple-400' 
-                                                                                                    : 'bg-emerald-500/10 text-emerald-400'
-                                                                                            }`}>
-                                                                                                {isManual ? 'Manual' : 'Automático'}
-                                                                                            </span>
-                                                                                        </td>
-                                                                                        {canEdit && (
-                                                                                            <td className="p-3 text-center">
-                                                                                                {isManual ? (
-                                                                                                    <button
-                                                                                                        onClick={() => handleDisassociate(item.id)}
-                                                                                                        className="p-1 hover:bg-red-500/20 rounded text-red-400 transition"
-                                                                                                        title="Desvincular material de la PO"
-                                                                                                    >
-                                                                                                        <Unlink className="w-3.5 h-3.5" />
-                                                                                                    </button>
-                                                                                                ) : (
-                                                                                                    <span className="text-[9px] text-slate-600" title="Los matches automáticos se definen por número de PRCR. Edita el PRCR del ítem para removerlo.">🔒</span>
-                                                                                                )}
-                                                                                            </td>
-                                                                                        )}
-                                                                                    </tr>
-                                                                                );
-                                                                            })}
-                                                                        </tbody>
-                                                                    </table>
-                                                                </div>
-                                                            )}
-                                                        </div>
-
-                                                        {/* RIGHT COLUMN: Suggestions & Manual Match */}
-                                                        <div className="lg:col-span-4 space-y-4 border-l border-slate-800/80 pl-0 lg:pl-6">
+                                            return (
+                                                <tr>
+                                                    <td colSpan="8" className="p-6 bg-slate-50 dark:bg-slate-950/40 border-t border-b border-slate-200 dark:border-indigo-500/20">
+                                                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                                                             
-                                                            {/* Suggested Matches */}
-                                                            <div>
-                                                                <h5 className="text-[10px] font-black uppercase tracking-wider text-indigo-400 flex items-center gap-1.5 mb-2">
-                                                                    <HelpCircle className="w-3.5 h-3.5" />
-                                                                    Sugerencias de Matching ({suggestedItems.length})
-                                                                </h5>
-                                                                {suggestedItems.length === 0 ? (
-                                                                    <div className="text-[11px] text-slate-500 italic bg-slate-900/30 p-3 rounded-lg border border-slate-800/50">
-                                                                        No se encontraron ítems de BOM sugeridos para esta PO.
+                                                            {/* LEFT COLUMN: Associated Items */}
+                                                            <div className={`${showRightPanel ? 'lg:col-span-8' : 'lg:col-span-12'} space-y-4`}>
+                                                                <div className="flex items-center justify-between flex-wrap gap-2">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                                                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                                                            Materiales BOM Conciliados ({associatedItems.length})
+                                                                        </h4>
+                                                                        {isMatchingOk && (
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setShowManualMatchPOIds(prev => ({ ...prev, [po.id]: !prev[po.id] }));
+                                                                                }}
+                                                                                className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-900/30"
+                                                                            >
+                                                                                {forceRightPanel ? "Ocultar Herramientas" : "Editar / Agregar Componentes"}
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                    {associatedItems.length > 0 && (
+                                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded border ${
+                                                                            isMatchingOk
+                                                                                ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/40'
+                                                                                : 'bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-900/40'
+                                                                        }`}>
+                                                                            Diferencia: {costDiff > 0 ? '+' : ''}${costDiff.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+
+                                                                {associatedItems.length === 0 ? (
+                                                                    <div className="border border-dashed border-slate-300 dark:border-slate-800 p-6 rounded-xl text-center text-slate-500 text-xs bg-white dark:bg-slate-900">
+                                                                        No hay materiales asociados a esta orden de compra. Usa las sugerencias o la asociación manual de la derecha para conectarlos.
                                                                     </div>
                                                                 ) : (
-                                                                    <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
-                                                                        {suggestedItems.map(item => {
-                                                                            const part = getPartDetails(item);
-                                                                            return (
-                                                                                <div key={item.id} className="bg-slate-900 p-2.5 border border-slate-800 rounded-lg flex items-center justify-between gap-2 text-xs">
-                                                                                    <div className="min-w-0">
-                                                                                        <div className="font-bold text-slate-300 truncate">{part.name}</div>
-                                                                                        <div className="text-[9px] font-mono text-slate-500 mt-0.5">
-                                                                                            {part.partNumber} · ${Number(item.totalPrice || 0).toLocaleString('en-US')}
-                                                                                        </div>
-                                                                                    </div>
-                                                                                    {canEdit && (
-                                                                                        <button
-                                                                                            onClick={() => handleAssociate(po.id, item.id)}
-                                                                                            className="px-2 py-1 bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white rounded border border-indigo-500/20 text-[10px] font-bold transition shrink-0"
-                                                                                        >
-                                                                                            Vincular
-                                                                                        </button>
-                                                                                    )}
-                                                                                </div>
-                                                                            );
-                                                                        })}
+                                                                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
+                                                                        <table className="w-full text-left text-xs">
+                                                                            <thead className="bg-slate-100 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700/50 text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                                                                                <tr>
+                                                                                    <th className="p-3">Nº Parte / Componente</th>
+                                                                                    <th className="p-3 w-16 text-center">Cant</th>
+                                                                                    <th className="p-3 w-28 text-right">Unitario</th>
+                                                                                    <th className="p-3 w-28 text-right">Cotizado Total</th>
+                                                                                    <th className="p-3 w-24 text-center">Match</th>
+                                                                                    {canEdit && <th className="p-3 w-16"></th>}
+                                                                                </tr>
+                                                                            </thead>
+                                                                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                                                                {associatedItems.map(item => {
+                                                                                    const part = getPartDetails(item);
+                                                                                    const isManual = item.poId === po.id;
+                                                                                    return (
+                                                                                        <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/20 text-slate-700 dark:text-slate-300">
+                                                                                            <td className="p-3">
+                                                                                                <div className="font-bold text-slate-900 dark:text-slate-200">{part.name}</div>
+                                                                                                <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400 mt-0.5">{part.partNumber}</div>
+                                                                                            </td>
+                                                                                            <td className="p-3 text-center font-bold">{item.quantity}</td>
+                                                                                            <td className="p-3 text-right">
+                                                                                                ${Number(item.unitPrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                                                                            </td>
+                                                                                            <td className="p-3 text-right font-black text-slate-900 dark:text-white">
+                                                                                                ${Number(item.totalPrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                                                                            </td>
+                                                                                            <td className="p-3 text-center">
+                                                                                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
+                                                                                                    isManual 
+                                                                                                        ? 'bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-100 dark:border-purple-900/30' 
+                                                                                                        : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30'
+                                                                                                }`}>
+                                                                                                    {isManual ? 'Manual' : 'Automático'}
+                                                                                                </span>
+                                                                                            </td>
+                                                                                            {canEdit && (
+                                                                                                <td className="p-3 text-center">
+                                                                                                    {isManual ? (
+                                                                                                        <button
+                                                                                                            onClick={() => handleDisassociate(item.id)}
+                                                                                                            className="p-1 hover:bg-red-500/10 rounded text-red-500 transition"
+                                                                                                            title="Desvincular material de la PO"
+                                                                                                        >
+                                                                                                            <Unlink className="w-3.5 h-3.5" />
+                                                                                                        </button>
+                                                                                                    ) : (
+                                                                                                        <span className="text-[9px] text-slate-400 dark:text-slate-600" title="Los matches automáticos se definen por número de PRCR. Edita el PRCR del ítem para removerlo.">🔒</span>
+                                                                                                    )}
+                                                                                                </td>
+                                                                                            )}
+                                                                                        </tr>
+                                                                                    );
+                                                                                })}
+                                                                            </tbody>
+                                                                        </table>
                                                                     </div>
                                                                 )}
                                                             </div>
 
-                                                            {/* Manual Match form */}
-                                                            {canEdit && (
-                                                                <div className="pt-2 border-t border-slate-800/60">
-                                                                    <h5 className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2">
-                                                                        <Plus className="w-3.5 h-3.5" />
-                                                                        Asociar Manualmente
-                                                                    </h5>
-                                                                    {unmatchedItems.length === 0 ? (
-                                                                        <div className="text-[11px] text-slate-600 italic">
-                                                                            No hay ítems del BOM libres para asociar en este proyecto.
-                                                                        </div>
-                                                                    ) : (
-                                                                        <div className="flex gap-2">
-                                                                            <select
-                                                                                value={selectedBomItemId}
-                                                                                onChange={e => setSelectedBomItemId(e.target.value)}
-                                                                                className="flex-1 px-2.5 py-1.5 border border-slate-700 rounded-lg text-xs bg-slate-800 text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500"
-                                                                            >
-                                                                                <option value="">Selecciona componente...</option>
-                                                                                {unmatchedItems.map(item => {
+                                                            {/* RIGHT COLUMN: Suggestions & Manual Match */}
+                                                            {showRightPanel && (
+                                                                <div className="lg:col-span-4 space-y-4 border-l border-slate-200 dark:border-slate-800/80 pl-0 lg:pl-6">
+                                                                    
+                                                                    {/* Suggested Matches */}
+                                                                    <div>
+                                                                        <h5 className="text-[10px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5 mb-2">
+                                                                            <HelpCircle className="w-3.5 h-3.5" />
+                                                                            Sugerencias de Matching ({suggestedItems.length})
+                                                                        </h5>
+                                                                        {suggestedItems.length === 0 ? (
+                                                                            <div className="text-[11px] text-slate-500 italic bg-slate-100 dark:bg-slate-900/30 p-3 rounded-lg border border-slate-200 dark:border-slate-800/50">
+                                                                                No se encontraron ítems de BOM sugeridos para esta PO.
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
+                                                                                {suggestedItems.map(item => {
                                                                                     const part = getPartDetails(item);
                                                                                     return (
-                                                                                        <option key={item.id} value={item.id}>
-                                                                                            {part.partNumber} - {part.name.substring(0, 25)}... (${item.totalPrice})
-                                                                                        </option>
+                                                                                        <div key={item.id} className="bg-white dark:bg-slate-900 p-2.5 border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-between gap-2 text-xs shadow-sm">
+                                                                                            <div className="min-w-0">
+                                                                                                <div className="font-bold text-slate-800 dark:text-slate-200 truncate">{part.name}</div>
+                                                                                                <div className="text-[9px] font-mono text-slate-500 dark:text-slate-400 mt-0.5">
+                                                                                                    {part.partNumber} · ${Number(item.totalPrice || 0).toLocaleString('en-US')}
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            {canEdit && (
+                                                                                                <button
+                                                                                                    onClick={() => handleAssociate(po.id, item.id)}
+                                                                                                    className="px-2 py-1 bg-indigo-50 dark:bg-indigo-600/10 hover:bg-indigo-600 text-indigo-600 dark:text-indigo-400 hover:text-white rounded border border-indigo-200 dark:border-indigo-500/20 text-[10px] font-bold transition shrink-0"
+                                                                                                >
+                                                                                                    Vincular
+                                                                                                </button>
+                                                                                            )}
+                                                                                        </div>
                                                                                     );
                                                                                 })}
-                                                                            </select>
-                                                                            <button
-                                                                                onClick={() => handleAssociate(po.id, selectedBomItemId)}
-                                                                                disabled={!selectedBomItemId}
-                                                                                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition disabled:opacity-40"
-                                                                            >
-                                                                                Asociar
-                                                                            </button>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+
+                                                                    {/* Manual Match form */}
+                                                                    {canEdit && (
+                                                                        <div className="pt-2 border-t border-slate-200 dark:border-slate-800/60">
+                                                                            <h5 className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mb-2">
+                                                                                <Plus className="w-3.5 h-3.5" />
+                                                                                Asociar Manualmente
+                                                                            </h5>
+                                                                            {unmatchedItems.length === 0 ? (
+                                                                                <div className="text-[11px] text-slate-600 italic">
+                                                                                    No hay ítems del BOM libres para asociar en este proyecto.
+                                                                                </div>
+                                                                            ) : (
+                                                                                <div className="flex gap-2">
+                                                                                    <select
+                                                                                        value={selectedBomItemId}
+                                                                                        onChange={e => setSelectedBomItemId(e.target.value)}
+                                                                                        className="flex-1 px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 rounded-lg text-xs bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500"
+                                                                                    >
+                                                                                        <option value="">Selecciona componente...</option>
+                                                                                        {unmatchedItems.map(item => {
+                                                                                            const part = getPartDetails(item);
+                                                                                            return (
+                                                                                                <option key={item.id} value={item.id}>
+                                                                                                    {part.partNumber} - {part.name.substring(0, 25)}... (${item.totalPrice})
+                                                                                                </option>
+                                                                                            );
+                                                                                        })}
+                                                                                    </select>
+                                                                                    <button
+                                                                                        onClick={() => handleAssociate(po.id, selectedBomItemId)}
+                                                                                        disabled={!selectedBomItemId}
+                                                                                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition disabled:opacity-40"
+                                                                                    >
+                                                                                        Asociar
+                                                                                    </button>
+                                                                                </div>
+                                                                            )}
                                                                         </div>
                                                                     )}
                                                                 </div>
                                                             )}
                                                         </div>
-
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })()}
                                     </React.Fragment>
                                 );
                             })}

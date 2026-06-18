@@ -10,11 +10,16 @@ const ListManagerModal = ({ title, items: initialItems, onSave, onClose }) => {
 
     useEffect(() => {
         setManagedItems(
-            (initialItems || []).map((name, index) => ({
-                id: `existing-${index}`,
-                name: name,
-                originalName: name,
-            }))
+            (initialItems || []).map((item, index) => {
+                const name = typeof item === 'string' ? item : item.name;
+                const is_workshop = typeof item === 'string' ? false : !!item.is_workshop;
+                return {
+                    id: `existing-${index}`,
+                    name: name,
+                    originalName: name,
+                    is_workshop: is_workshop,
+                };
+            })
         );
     }, [initialItems]);
 
@@ -22,8 +27,12 @@ const ListManagerModal = ({ title, items: initialItems, onSave, onClose }) => {
         setManagedItems(managedItems.map(item => item.id === id ? { ...item, name: newName } : item));
     };
 
+    const handleToggleWorkshop = (id) => {
+        setManagedItems(managedItems.map(item => item.id === id ? { ...item, is_workshop: !item.is_workshop } : item));
+    };
+
     const handleAddItem = () => {
-        setManagedItems([...managedItems, { id: `new-${Date.now()}`, name: '', originalName: null }]);
+        setManagedItems([...managedItems, { id: `new-${Date.now()}`, name: '', originalName: null, is_workshop: false }]);
     };
 
     const handleRemoveItem = (id) => {
@@ -34,15 +43,19 @@ const ListManagerModal = ({ title, items: initialItems, onSave, onClose }) => {
         setIsSaving(true);
 
         const renames = managedItems
-            .filter(item => item.originalName && item.name.trim() && item.originalName !== item.name.trim())
-            .map(item => ({ oldName: item.originalName, newName: item.name.trim() }));
+            .filter(item => {
+                const origObj = initialItems.find(orig => (typeof orig === 'string' ? orig : orig.name) === item.originalName);
+                const origIsWorkshop = origObj ? (typeof origObj === 'string' ? false : !!origObj.is_workshop) : false;
+                return item.originalName && item.name.trim() && (item.originalName !== item.name.trim() || item.is_workshop !== origIsWorkshop);
+            })
+            .map(item => ({ oldName: item.originalName, newName: item.name.trim(), is_workshop: item.is_workshop }));
 
         const added = managedItems
             .filter(item => !item.originalName && item.name.trim())
-            .map(item => item.name.trim());
+            .map(item => ({ name: item.name.trim(), is_workshop: item.is_workshop }));
 
         const remainingOriginalNames = managedItems.map(i => i.originalName).filter(Boolean);
-        const deleted = initialItems.filter(originalName => !remainingOriginalNames.includes(originalName));
+        const deleted = initialItems.map(i => typeof i === 'string' ? i : i.name).filter(originalName => !remainingOriginalNames.includes(originalName));
 
         await onSave({ renames, deleted, added });
         setIsSaving(false);
@@ -60,8 +73,19 @@ const ListManagerModal = ({ title, items: initialItems, onSave, onClose }) => {
                                 value={item.name}
                                 onChange={e => handleItemChange(item.id, e.target.value)}
                                 placeholder="Nuevo valor..."
-                                className="w-full p-3 border rounded-xl bg-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 font-bold"
+                                className="w-full p-3 border rounded-xl bg-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-white"
                             />
+                            {title.includes("Proveedores") && (
+                                <label className="flex items-center gap-1.5 cursor-pointer ml-1 select-none shrink-0">
+                                    <input
+                                        type="checkbox"
+                                        checked={item.is_workshop}
+                                        onChange={() => handleToggleWorkshop(item.id)}
+                                        className="w-4 h-4 rounded border-slate-700 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-slate-900 bg-slate-800"
+                                    />
+                                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Taller</span>
+                                </label>
+                            )}
                             <button onClick={() => handleRemoveItem(item.id)} className="p-3 text-red-500 hover:bg-red-500/15 rounded-lg">
                                 <Trash2 className="w-5 h-5" />
                             </button>
