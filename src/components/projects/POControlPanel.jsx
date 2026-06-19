@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppData } from '../../contexts/AppDataContext';
 import { useRole } from '../../contexts/RoleContext';
-import { supabase } from '../../supabase';
 import {
-    getPOsByProject, syncProjectPOs, updatePO, deletePO,
+    getPOsByProject, syncProjectPOs,
     associateItemWithPO, disassociateItemFromPO
 } from '../../services/poService';
 import * as XLSX from 'xlsx';
@@ -232,21 +231,44 @@ export default function POControlPanel({ projectId, bomProjectId }) {
                     const prcr = getCellValue(4);
 
                     if (supplier || prcr) {
-                        hasContent = true;
-                        rowData.supplier = supplier ? String(supplier).trim() : null;
-                        rowData.project_code = getCellValue(2) ? String(getCellValue(2)).trim() : null;
-                        rowData.cap_id = getCellValue(3) ? String(getCellValue(3)).trim() : null;
-                        rowData.prcr = prcr ? String(prcr).trim() : null;
-                        rowData.type_code = getCellValue(5) ? String(getCellValue(5)).trim() : null;
-                        rowData.prcr_start_date = parseExcelDate(getCellValue(6));
-                        rowData.po_date = parseExcelDate(getCellValue(7));
-                        rowData.amount = parseFloat(getCellValue(8)) || 0;
-                        rowData.comments = getCellValue(9) ? String(getCellValue(9)).trim() : null;
-                        rowData.expected_date = parseExcelDate(getCellValue(10));
-                        rowData.received_date = parseExcelDate(getCellValue(11));
-                        rowData.po_number = getCellValue(12) ? String(getCellValue(12)).trim() : null;
-                        rowData.status = getCellValue(13) ? String(getCellValue(13)).trim() : null;
-                        rowData.made_by = getCellValue(14) ? String(getCellValue(14)).trim() : null;
+                        const supplierStr = supplier ? String(supplier).trim().toLowerCase() : '';
+                        const prcrStr = prcr ? String(prcr).trim().toLowerCase() : '';
+
+                        // Condición para detectar filas de resúmenes contables/metadatos y evitar importarlas
+                        const isAccountingSummary = 
+                            !supplier ||
+                            supplierStr.includes('control') || 
+                            supplierStr.includes('carry over') || 
+                            supplierStr.includes('cpa') || 
+                            supplierStr.includes('total') ||
+                            supplierStr === 'cuenta' ||
+                            supplierStr === '036-23' ||
+                            prcrStr.includes('amount') ||
+                            prcrStr.includes('capital') ||
+                            prcrStr.includes('expense') ||
+                            prcrStr.includes('cuenta') ||
+                            prcrStr.includes('negociar') ||
+                            prcrStr.includes('logistica') ||
+                            prcrStr.includes('tbd') ||
+                            prcrStr.includes('snap fit');
+
+                        if (!isAccountingSummary) {
+                            hasContent = true;
+                            rowData.supplier = supplier ? String(supplier).trim() : null;
+                            rowData.project_code = getCellValue(2) ? String(getCellValue(2)).trim() : null;
+                            rowData.cap_id = getCellValue(3) ? String(getCellValue(3)).trim() : null;
+                            rowData.prcr = prcr ? String(prcr).trim() : null;
+                            rowData.type_code = getCellValue(5) ? String(getCellValue(5)).trim() : null;
+                            rowData.prcr_start_date = parseExcelDate(getCellValue(6));
+                            rowData.po_date = parseExcelDate(getCellValue(7));
+                            rowData.amount = parseFloat(getCellValue(8)) || 0;
+                            rowData.comments = getCellValue(9) ? String(getCellValue(9)).trim() : null;
+                            rowData.expected_date = parseExcelDate(getCellValue(10));
+                            rowData.received_date = parseExcelDate(getCellValue(11));
+                            rowData.po_number = getCellValue(12) ? String(getCellValue(12)).trim() : null;
+                            rowData.status = getCellValue(13) ? String(getCellValue(13)).trim() : null;
+                            rowData.made_by = getCellValue(14) ? String(getCellValue(14)).trim() : null;
+                        }
                     }
 
                     if (hasContent) {
