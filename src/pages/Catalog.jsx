@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useRole } from '../contexts/RoleContext';
 import { useAppData } from '../contexts/AppDataContext';
 import { deleteCatalogRecord, deleteCatalogRecordsBatch } from '../services/bomCrudService';
@@ -25,6 +25,30 @@ export default function Catalog() {
     const [isCatalogEnrichmentOpen, setIsCatalogEnrichmentOpen] = useState(false);
     const [selectedCatalogItems, setSelectedCatalogItems] = useState([]);
     const [catalogFilters, setCatalogFilters] = useState({ search: '', brand: [], category: [], provider: [] });
+    const [activeTab, setActiveTab] = useState('cots'); // 'cots' | 'custom'
+
+    // Contadores de ítems COTS y Custom sobre la lista completa de catálogo
+    const cotsCount = useMemo(() => {
+        return catalogo.filter(item => {
+            const providerId = item.defaultProvider?.id || item.default_provider_id || null;
+            if (providerId) {
+                const prov = managedLists.providers.find(p => p.id === providerId);
+                return !(prov && prov.is_workshop);
+            }
+            return true;
+        }).length;
+    }, [catalogo, managedLists.providers]);
+
+    const customCount = useMemo(() => {
+        return catalogo.filter(item => {
+            const providerId = item.defaultProvider?.id || item.default_provider_id || null;
+            if (providerId) {
+                const prov = managedLists.providers.find(p => p.id === providerId);
+                return prov && prov.is_workshop;
+            }
+            return false;
+        }).length;
+    }, [catalogo, managedLists.providers]);
 
     const filteredCatalogo = useMemo(() => {
         return catalogo.filter(item => {
@@ -38,9 +62,19 @@ export default function Catalog() {
             const matchesCategory = catalogFilters.category.length === 0 || catalogFilters.category.includes(categoryId);
             const matchesProvider = catalogFilters.provider.length === 0 || catalogFilters.provider.includes(providerId);
 
-            return matchesSearch && matchesBrand && matchesCategory && matchesProvider;
+            // Filtrado dinámico por la pestaña seleccionada
+            let matchesTab = true;
+            if (providerId) {
+                const prov = managedLists.providers.find(p => p.id === providerId);
+                const isWorkshop = prov && prov.is_workshop;
+                matchesTab = activeTab === 'cots' ? !isWorkshop : isWorkshop;
+            } else {
+                matchesTab = activeTab === 'cots';
+            }
+
+            return matchesSearch && matchesBrand && matchesCategory && matchesProvider && matchesTab;
         });
-    }, [catalogo, catalogFilters]);
+    }, [catalogo, catalogFilters, activeTab, managedLists.providers]);
 
     const handleToggleSelectAllCatalog = (items) => {
         if (selectedCatalogItems.length === items.length) {
@@ -136,6 +170,38 @@ export default function Catalog() {
                     </div>
                 )}
 
+                {/* Selector de Pestañas COTS vs Custom */}
+                <div className="flex border-b border-slate-800 gap-6 px-1 mt-2 mb-4">
+                    <button
+                        onClick={() => { setActiveTab('cots'); setSelectedCatalogItems([]); }}
+                        className={`pb-4 text-sm font-black transition-all relative ${activeTab === 'cots' ? 'text-indigo-400' : 'text-slate-400 hover:text-slate-200'}`}
+                    >
+                        <div className="flex items-center gap-2">
+                            <span>Componentes COTS</span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeTab === 'cots' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-slate-800 text-slate-500'}`}>
+                                {cotsCount}
+                            </span>
+                        </div>
+                        {activeTab === 'cots' && (
+                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500 rounded-full animate-in fade-in slide-in-from-bottom-1 duration-200" />
+                        )}
+                    </button>
+                    <button
+                        onClick={() => { setActiveTab('custom'); setSelectedCatalogItems([]); }}
+                        className={`pb-4 text-sm font-black transition-all relative ${activeTab === 'custom' ? 'text-amber-400' : 'text-slate-400 hover:text-slate-200'}`}
+                    >
+                        <div className="flex items-center gap-2">
+                            <span>Componentes Custom / Diseñados</span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeTab === 'custom' ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-800 text-slate-500'}`}>
+                                {customCount}
+                            </span>
+                        </div>
+                        {activeTab === 'custom' && (
+                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500 rounded-full animate-in fade-in slide-in-from-bottom-1 duration-200" />
+                        )}
+                    </button>
+                </div>
+
                 <div className="bg-slate-900/70 rounded-2xl border border-slate-800 shadow-lg overflow-auto" style={{ maxHeight: 'calc(100vh - 220px)' }}>
                     <table className="w-full text-left text-sm">
                         <thead className="bg-slate-800/80 border-b border-slate-700 text-[10px] font-black text-slate-400 uppercase tracking-widest sticky top-0">
@@ -185,6 +251,20 @@ export default function Catalog() {
                                             <div className="font-bold text-white text-base leading-tight">{item.name || 'Sin nombre'}</div>
                                             <div className="text-[10px] font-mono text-slate-500 mt-1">{item.partNumber}</div>
                                             <div className="flex items-center flex-wrap gap-2 mt-2">
+                                                {/* Tag dinámico COTS/Custom */}
+                                                {(() => {
+                                                    const provId = item.defaultProvider?.id || item.default_provider_id || '';
+                                                    const isWorkshop = provId && managedLists.providers.find(p => p.id === provId)?.is_workshop;
+                                                    return isWorkshop ? (
+                                                        <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-amber-400 bg-amber-500/15 border-amber-500/30">
+                                                            <Sparkles className="w-3 h-3 mr-1.5 flex-shrink-0" />Custom
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-sky-400 bg-sky-500/15 border-sky-500/30">
+                                                            <Database className="w-3 h-3 mr-1.5 flex-shrink-0" />COTS
+                                                        </div>
+                                                    );
+                                                })()}
                                                 {brandName && <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-slate-300 bg-slate-800 border-slate-700"><Tag className="w-3 h-3 mr-1.5 flex-shrink-0" />{brandName}</div>}
                                                 {categoryName && <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-purple-400 bg-purple-500/15 border-purple-500/30"><Tag className="w-3 h-3 mr-1.5 flex-shrink-0" />{categoryName}</div>}
                                             </div>
