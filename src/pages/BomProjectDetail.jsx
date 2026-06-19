@@ -87,6 +87,19 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
         ? bomItems.filter(i => i.projectId === activeProject.id).sort((a, b) => new Date(a.addedAt) - new Date(b.addedAt))
         : [];
 
+    const prcrCounts = useMemo(() => {
+        const counts = {};
+        activeBomItems.forEach(item => {
+            if (item.prcr) {
+                const val = String(item.prcr).trim().toUpperCase();
+                if (val) {
+                    counts[val] = (counts[val] || 0) + 1;
+                }
+            }
+        });
+        return counts;
+    }, [activeBomItems]);
+
     // Store active project reference for PdfReviewModal callback
     useEffect(() => {
         window.__activeProject__ = activeProject;
@@ -279,20 +292,35 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
     };
 
     const renderPrcrCell = (item) => {
+        const prcrValue = item.prcr ? String(item.prcr).trim().toUpperCase() : '';
+        const count = prcrValue ? (prcrCounts[prcrValue] || 0) : 0;
+        const isDuplicated = count > 1;
+
         return (
             <div className="flex flex-col gap-1.5">
-                {canEdit ? (
-                    <InlineEditCell
-                        value={item.prcr || ''}
-                        type="text"
-                        onSave={v => handleUpdateBomItem(item.id, { quantity: item.quantity, unitPrice: item.unitPrice, prcr: v, leadTimeWeeks: item.leadTimeWeeks, stationId: item.stationId, isCustomMechanical: item.isCustomMechanical })}
-                        placeholder="—"
-                        className="text-xs font-bold font-mono text-amber-500"
-                        inputClassName="w-full text-xs font-mono uppercase"
-                    />
-                ) : (
-                    item.prcr ? <span className="px-2 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-lg text-xs font-bold font-mono w-max">{item.prcr}</span> : <span className="text-slate-500 text-xs">—</span>
-                )}
+                <div className="flex items-center gap-1.5">
+                    {canEdit ? (
+                        <InlineEditCell
+                            value={item.prcr || ''}
+                            type="text"
+                            onSave={v => handleUpdateBomItem(item.id, { quantity: item.quantity, unitPrice: item.unitPrice, prcr: v, leadTimeWeeks: item.leadTimeWeeks, stationId: item.stationId, isCustomMechanical: item.isCustomMechanical })}
+                            placeholder="—"
+                            className="text-xs font-bold font-mono text-amber-500"
+                            inputClassName="w-full text-xs font-mono uppercase"
+                        />
+                    ) : (
+                        item.prcr ? <span className="px-2 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-lg text-xs font-bold font-mono w-max">{item.prcr}</span> : <span className="text-slate-500 text-xs">—</span>
+                    )}
+
+                    {isDuplicated && (
+                        <span 
+                            title={`PRCR duplicado: este número de PRCR aparece en ${count} partidas del BOM.`}
+                            className="p-1 rounded-full bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 cursor-help transition-colors shrink-0"
+                        >
+                            <AlertTriangle className="w-3 h-3 animate-pulse" />
+                        </span>
+                    )}
+                </div>
 
                 {(() => {
                     const matchedPO = pos.find(po => 
@@ -457,11 +485,19 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
             if (activeBomTab === 'mechanical' && !isMechanical) return false;
             if (activeBomTab === 'electric_pneumatic' && isMechanical) return false;
 
-            const s = bomFilters.search.toLowerCase();
-            const matchesSearch = !s || 
-                String(details.name || '').toLowerCase().includes(s) || 
-                String(details.partNumber || '').toLowerCase().includes(s) ||
-                String(item.prcr || '').toLowerCase().includes(s);
+            const s = bomFilters.search.toLowerCase().trim();
+            const showOnlyDuplicates = s === 'duplicado' || s === 'duplicados' || s === 'prcr duplicado' || s === 'prcr duplicados' || s === 'repetido' || s === 'repetidos';
+            
+            let matchesSearch = true;
+            if (showOnlyDuplicates) {
+                const prcrValue = item.prcr ? String(item.prcr).trim().toUpperCase() : '';
+                matchesSearch = prcrValue ? (prcrCounts[prcrValue] || 0) > 1 : false;
+            } else if (s) {
+                matchesSearch = 
+                    String(details.name || '').toLowerCase().includes(s) || 
+                    String(details.partNumber || '').toLowerCase().includes(s) ||
+                    String(item.prcr || '').toLowerCase().includes(s);
+            }
             const matchesBrand = bomFilters.brand.length === 0 || bomFilters.brand.includes(details.brandId);
             const matchesCategory = bomFilters.category.length === 0 || bomFilters.category.includes(details.categoryId);
             const matchesProvider = bomFilters.provider.length === 0 || bomFilters.provider.includes(details.providerId);
@@ -470,7 +506,7 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
 
             return matchesSearch && matchesBrand && matchesCategory && matchesProvider && matchesPrcr && matchesStation;
         });
-    }, [activeBomItems, catalogo, bomFilters, activeBomTab, resolveIsMechanical]);
+    }, [activeBomItems, catalogo, bomFilters, activeBomTab, resolveIsMechanical, prcrCounts]);
 
     const handleToggleSelectAllBomItems = (items) => {
         if (selectedBomItems.length === items.length) {
@@ -975,9 +1011,24 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
                                                                         </td>
                                                                         <td className="p-5">
                                                                             <div className="flex flex-col gap-1">
-                                                                                {areAllPrcrSame && row.items[0].prcr ? (
-                                                                                    <span className="px-2 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-lg text-xs font-bold font-mono w-max">{row.items[0].prcr}</span>
-                                                                                ) : (
+                                                                                {areAllPrcrSame && row.items[0].prcr ? (() => {
+                                                                                    const prcrVal = String(row.items[0].prcr).trim().toUpperCase();
+                                                                                    const c = prcrCounts[prcrVal] || 0;
+                                                                                    const isDup = c > 1;
+                                                                                    return (
+                                                                                        <div className="flex items-center gap-1.5">
+                                                                                            <span className="px-2 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-lg text-xs font-bold font-mono w-max">{row.items[0].prcr}</span>
+                                                                                            {isDup && (
+                                                                                                <span 
+                                                                                                    title={`PRCR duplicado: este número de PRCR aparece en ${c} partidas del BOM.`}
+                                                                                                    className="p-1 rounded-full bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 cursor-help transition-colors shrink-0"
+                                                                                                >
+                                                                                                    <AlertTriangle className="w-3 h-3 animate-pulse" />
+                                                                                                </span>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    );
+                                                                                })() : (
                                                                                     <span className="text-slate-400 text-xs font-bold font-mono">
                                                                                         {row.items.map(i => i.prcr).filter(Boolean).length > 0 
                                                                                             ? `Múltiples (${[...new Set(row.items.map(i => i.prcr).filter(Boolean))].length})`
