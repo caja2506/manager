@@ -924,7 +924,20 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
 
                                                             return (
                                                                 <React.Fragment key={row.partNumberKey}>
-                                                                    <tr className="group border-l-4 border-l-indigo-500/60 bg-indigo-500/5 hover:bg-indigo-500/10 transition-colors">
+                                                                    <tr 
+                                                                        className="group border-l-4 border-l-indigo-500/60 bg-indigo-500/5 hover:bg-indigo-500/10 transition-colors cursor-pointer select-none"
+                                                                        onDoubleClick={(e) => {
+                                                                            if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
+                                                                                return;
+                                                                            }
+                                                                            if (canEdit && row.representativeItem.masterPartRef) {
+                                                                                const masterPart = catalogo.find(p => p.id === row.representativeItem.masterPartRef.id);
+                                                                                if (masterPart) {
+                                                                                    handleEditClick(masterPart);
+                                                                                }
+                                                                            }
+                                                                        }}
+                                                                    >
                                                                         {isBomEditMode && (
                                                                             <td className="p-5 text-center">
                                                                                 <input 
@@ -1008,7 +1021,18 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
                                                                         return (
                                                                             <tr 
                                                                                 key={childItem.id} 
-                                                                                className="group border-l-4 border-l-slate-700 bg-slate-950/40 hover:bg-slate-900/30 transition-colors border-b border-b-slate-900/20"
+                                                                                className="group border-l-4 border-l-slate-700 bg-slate-950/40 hover:bg-slate-900/30 transition-colors border-b border-b-slate-900/20 cursor-pointer select-none"
+                                                                                onDoubleClick={(e) => {
+                                                                                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
+                                                                                        return;
+                                                                                    }
+                                                                                    if (canEdit && childItem.masterPartRef) {
+                                                                                        const masterPart = catalogo.find(p => p.id === childItem.masterPartRef.id);
+                                                                                        if (masterPart) {
+                                                                                            handleEditClick(masterPart);
+                                                                                        }
+                                                                                    }
+                                                                                }}
                                                                             >
                                                                                 {isBomEditMode && (
                                                                                     <td className="p-5 text-center">
@@ -1078,11 +1102,22 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
                                                             return (
                                                                 <tr
                                                                     key={item.id}
-                                                                    className={`group transition-colors border-l-4 ${
+                                                                    className={`group transition-colors border-l-4 cursor-pointer select-none ${
                                                                         isSelected
                                                                             ? 'bg-indigo-500/10 hover:bg-indigo-500/15 border-l-indigo-500'
                                                                             : 'border-l-transparent hover:bg-slate-800/30'
                                                                     }`}
+                                                                    onDoubleClick={(e) => {
+                                                                        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
+                                                                            return;
+                                                                        }
+                                                                        if (canEdit && item.masterPartRef) {
+                                                                            const masterPart = catalogo.find(p => p.id === item.masterPartRef.id);
+                                                                            if (masterPart) {
+                                                                                handleEditClick(masterPart);
+                                                                            }
+                                                                        }
+                                                                    }}
                                                                 >
                                                                     {isBomEditMode && <td className="p-5 text-center"><input type="checkbox" className="w-4 h-4" checked={isSelected} onChange={() => handleToggleSelectBomItem(item.id)} /></td>}
                                                                     <td className="p-3 text-center">
