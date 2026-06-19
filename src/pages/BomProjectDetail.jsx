@@ -264,6 +264,7 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
                     {details.brandName && <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-slate-400 bg-slate-800 border-slate-700"><Tag className="w-3 h-3 mr-1.5 flex-shrink-0" />{details.brandName}</div>}
                     {details.categoryName && <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-purple-400 bg-purple-950/20 border-purple-800/30"><Tag className="w-3 h-3 mr-1.5 flex-shrink-0" />{details.categoryName}</div>}
                     {providerName && <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-indigo-400 bg-indigo-950/20 border-indigo-900/30">Prov: {providerName}</div>}
+                    {item.prcr && <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-amber-500 bg-amber-950/20 border-amber-800/30 font-mono">PRCR: {item.prcr}</div>}
                     {canEdit && isBomEditMode ? (
                         <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-black uppercase text-amber-400 bg-amber-950/20 hover:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-500/20 select-none">
                             <input 
@@ -1067,8 +1068,6 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
 
                                                                     {isExpanded && row.items.map(childItem => {
                                                                         const isChildSelected = selectedBomItems.includes(childItem.id);
-                                                                        const childResolved = resolveDetails(childItem);
-                                                                        const childDetails = childResolved?.details || details;
                                                                         return (
                                                                             <tr 
                                                                                 key={childItem.id} 
@@ -1102,15 +1101,22 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
                                                                                     {renderQtyCell(childItem)}
                                                                                 </td>
                                                                                 <td className="p-5">
-                                                                                    <div className="text-xs font-bold text-slate-400">
-                                                                                        Requisición / Línea de Compra
-                                                                                    </div>
-                                                                                    {childItem.isCustomMechanical ? (
-                                                                                        <div className="mt-1 text-[9px] font-black uppercase text-amber-400 bg-amber-950/40 border border-amber-500/30 w-max px-2 py-0.5 rounded-full">
-                                                                                            🛠️ Pieza Custom
-                                                                                        </div>
-                                                                                    ) : null}
-                                                                                </td>
+                                                                                     <div className="text-xs font-bold text-slate-400">
+                                                                                         Requisición / Línea de Compra
+                                                                                     </div>
+                                                                                     <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                                                                         {childItem.prcr && (
+                                                                                             <div className="flex items-center justify-center h-5 px-1.5 rounded-full border text-[9px] font-black uppercase tracking-tighter text-amber-500 bg-amber-950/20 border-amber-800/30 font-mono">
+                                                                                                 PRCR: {childItem.prcr}
+                                                                                             </div>
+                                                                                         )}
+                                                                                         {childItem.isCustomMechanical ? (
+                                                                                             <div className="text-[9px] font-black uppercase text-amber-400 bg-amber-950/40 border border-amber-500/30 w-max px-2 py-0.5 rounded-full">
+                                                                                                 🛠️ Pieza Custom
+                                                                                             </div>
+                                                                                         ) : null}
+                                                                                     </div>
+                                                                                 </td>
                                                                                 <td className="p-5">
                                                                                     {renderPrcrCell(childItem)}
                                                                                 </td>
