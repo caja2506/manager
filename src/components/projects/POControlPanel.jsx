@@ -144,22 +144,43 @@ export default function POControlPanel({ projectId, bomProjectId }) {
 
     // Excel Date Parser Helper
     const parseExcelDate = (val) => {
-        if (!val) return null;
-        if (val instanceof Date) {
-            return val.toISOString().split('T')[0];
-        }
-        const num = Number(val);
-        if (!isNaN(num) && num > 25569) {
-            const date = new Date((num - 25569) * 86400 * 1000);
-            const offset = date.getTimezoneOffset() * 60000;
-            const localDate = new Date(date.getTime() + offset);
-            return localDate.toISOString().split('T')[0];
-        }
-        if (typeof val === 'string') {
-            const cleaned = val.trim();
-            if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) return cleaned;
-            const parsed = Date.parse(cleaned);
-            if (!isNaN(parsed)) return new Date(parsed).toISOString().split('T')[0];
+        try {
+            if (!val) return null;
+            let dateStr = null;
+
+            if (val instanceof Date) {
+                dateStr = val.toISOString().split('T')[0];
+            } else {
+                const num = Number(val);
+                // 25569 es 1970-01-01. 100000 es aproximadamente el año 2173.
+                if (!isNaN(num) && num > 25569 && num < 100000) {
+                    const date = new Date((num - 25569) * 86400 * 1000);
+                    const offset = date.getTimezoneOffset() * 60000;
+                    const localDate = new Date(date.getTime() + offset);
+                    dateStr = localDate.toISOString().split('T')[0];
+                } else if (typeof val === 'string') {
+                    const cleaned = val.trim();
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) {
+                        dateStr = cleaned;
+                    } else {
+                        const parsed = Date.parse(cleaned);
+                        if (!isNaN(parsed)) {
+                            dateStr = new Date(parsed).toISOString().split('T')[0];
+                        }
+                    }
+                }
+            }
+
+            if (dateStr) {
+                // Validar que el año esté en un rango lógico (ej. 1970 a 2100)
+                const parts = dateStr.split('-');
+                const year = parseInt(parts[0], 10);
+                if (year >= 1970 && year <= 2100) {
+                    return dateStr;
+                }
+            }
+        } catch (e) {
+            console.error("Error parsing date:", val, e);
         }
         return null;
     };
