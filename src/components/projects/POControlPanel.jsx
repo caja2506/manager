@@ -74,21 +74,11 @@ export default function POControlPanel({ projectId, bomProjectId }) {
         };
     };
 
-    // Helper para extraer monto de control considerando que puede estar en 'comments' o en 'amount'
-    const getControlPoAmount = (po) => {
-        if (po.comments) {
-            const cleaned = po.comments.replace(/[^0-9.]/g, '');
-            const val = parseFloat(cleaned);
-            if (!isNaN(val) && val > 0) {
-                return val;
-            }
-        }
-        return Number(po.amount || 0);
-    };
+
 
     // Calculate Summary Stats
     const stats = useMemo(() => {
-        const totalRealCost = pos.reduce((sum, po) => sum + getControlPoAmount(po), 0);
+        const totalRealCost = pos.reduce((sum, po) => sum + Number(po.amount || 0), 0);
         
         // Items associated with any PO (either by po_id or by matching PRCR)
         const matchedBomItems = activeBomItems.filter(item => {
@@ -261,8 +251,20 @@ export default function POControlPanel({ projectId, bomProjectId }) {
                             rowData.type_code = getCellValue(5) ? String(getCellValue(5)).trim() : null;
                             rowData.prcr_start_date = parseExcelDate(getCellValue(6));
                             rowData.po_date = parseExcelDate(getCellValue(7));
-                            rowData.amount = parseFloat(getCellValue(8)) || 0;
-                            rowData.comments = getCellValue(9) ? String(getCellValue(9)).trim() : null;
+                            const rawAmount = parseFloat(getCellValue(8)) || 0;
+                            const rawComments = getCellValue(9) ? String(getCellValue(9)).trim() : null;
+                            let finalAmount = rawAmount;
+                            let finalComments = rawComments;
+
+                            if (rawComments && !isNaN(parseFloat(rawComments)) && isFinite(rawComments)) {
+                                if (rawAmount === 0 || (rawAmount > 40000 && rawAmount < 50000)) {
+                                    finalAmount = parseFloat(rawComments);
+                                    finalComments = null;
+                                }
+                            }
+
+                            rowData.amount = finalAmount;
+                            rowData.comments = finalComments;
                             rowData.expected_date = parseExcelDate(getCellValue(10));
                             rowData.received_date = parseExcelDate(getCellValue(11));
                             rowData.po_number = getCellValue(12) ? String(getCellValue(12)).trim() : null;
@@ -314,7 +316,7 @@ export default function POControlPanel({ projectId, bomProjectId }) {
             'Tipo': po.type_code || '',
             'Inicio PRCR': po.prcr_start_date || '',
             'Fecha PO': po.po_date || '',
-            'Monto Real': getControlPoAmount(po),
+            'Monto Real': Number(po.amount || 0),
             'Comentarios': po.comments || '',
             'Fecha Entrega': po.expected_date || '',
             'Recibido': po.received_date || '',
@@ -358,7 +360,7 @@ export default function POControlPanel({ projectId, bomProjectId }) {
             const itemDetails = getPartDetails(item);
             const matchesSupplier = po.supplier && itemDetails.brand && String(po.supplier).toLowerCase().includes(itemDetails.brand.toLowerCase());
             
-            const poAmount = getControlPoAmount(po);
+            const poAmount = Number(po.amount || 0);
             const diffPct = poAmount > 0 ? Math.abs((Number(item.totalPrice) - Number(poAmount)) / Number(poAmount)) : 1;
             const matchesAmount = diffPct <= 0.1;
 
@@ -578,7 +580,7 @@ export default function POControlPanel({ projectId, bomProjectId }) {
                                 });
 
                                 const associatedTotalCotizado = associatedItems.reduce((s, i) => s + Number(i.totalPrice || 0), 0);
-                                const costDiff = getControlPoAmount(po) - associatedTotalCotizado;
+                                const costDiff = Number(po.amount || 0) - associatedTotalCotizado;
 
                                 const hasNoItems = associatedItems.length === 0;
                                 const rowBgClass = isExpanded 
@@ -617,7 +619,7 @@ export default function POControlPanel({ projectId, bomProjectId }) {
                                             <td className="p-4 font-mono text-xs text-amber-800 dark:text-amber-400 font-bold">{po.prcr || '—'}</td>
                                             <td className="p-4 font-mono text-xs text-slate-700 dark:text-slate-300">{po.po_number || '—'}</td>
                                             <td className="p-4 text-right font-black text-slate-900 dark:text-white">
-                                                ${getControlPoAmount(po).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                                ${Number(po.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                             </td>
                                             <td className="p-4 text-center text-xs text-slate-700 dark:text-slate-400">
                                                 {po.po_date || po.prcr_start_date || '—'}
