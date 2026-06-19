@@ -21,6 +21,7 @@ export default function POControlPanel({ projectId, bomProjectId }) {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
+    const [associationFilter, setAssociationFilter] = useState('all');
     const [expandedPOId, setExpandedPOId] = useState(null);
     const [isImporting, setIsImporting] = useState(false);
     const [importError, setImportError] = useState(null);
@@ -115,9 +116,25 @@ export default function POControlPanel({ projectId, bomProjectId }) {
 
             const matchesStatus = !statusFilter || po.status === statusFilter;
 
-            return matchesSearch && matchesStatus;
+            // Association filter matching
+            let matchesAssociation = true;
+            if (associationFilter !== 'all') {
+                const associated = activeBomItems.filter(item => {
+                    if (item.poId === po.id) return true;
+                    if (!item.poId && item.prcr && String(item.prcr) === String(po.prcr)) return true;
+                    return false;
+                });
+                
+                if (associationFilter === 'no_items') {
+                    matchesAssociation = associated.length === 0;
+                } else if (associationFilter === 'with_items') {
+                    matchesAssociation = associated.length > 0;
+                }
+            }
+
+            return matchesSearch && matchesStatus && matchesAssociation;
         });
-    }, [pos, searchTerm, statusFilter]);
+    }, [pos, searchTerm, statusFilter, associationFilter, activeBomItems]);
 
     // Status options
     const statusOptions = useMemo(() => {
@@ -404,6 +421,17 @@ export default function POControlPanel({ projectId, bomProjectId }) {
                             <option key={st} value={st}>{st}</option>
                         ))}
                     </select>
+
+                    {/* Association filter dropdown */}
+                    <select
+                        value={associationFilter}
+                        onChange={e => setAssociationFilter(e.target.value)}
+                        className="px-3 py-2 border border-slate-700 rounded-xl text-xs bg-slate-800 text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                        <option value="all">Todas las POs</option>
+                        <option value="with_items">Con Items Conciliados</option>
+                        <option value="no_items">Sin Items Conciliados</option>
+                    </select>
                 </div>
 
                 <div className="flex items-center gap-2 w-full md:w-auto justify-end">
@@ -496,19 +524,34 @@ export default function POControlPanel({ projectId, bomProjectId }) {
                                 const associatedTotalCotizado = associatedItems.reduce((s, i) => s + Number(i.totalPrice || 0), 0);
                                 const costDiff = Number(po.amount || 0) - associatedTotalCotizado;
 
+                                const hasNoItems = associatedItems.length === 0;
+                                const rowBgClass = isExpanded 
+                                    ? 'bg-indigo-500/5 hover:bg-indigo-500/10 border-l-indigo-500/60' 
+                                    : hasNoItems 
+                                        ? 'bg-red-500/5 hover:bg-red-500/10 dark:bg-red-500/5 dark:hover:bg-red-500/10 border-l-red-500/40' 
+                                        : 'border-l-transparent';
+
                                 return (
                                     <React.Fragment key={po.id}>
                                         <tr
                                             onClick={() => setExpandedPOId(isExpanded ? null : po.id)}
-                                            className={`hover:bg-slate-800/40 cursor-pointer transition-colors ${
-                                                isExpanded ? 'bg-indigo-500/5 hover:bg-indigo-500/10' : ''
-                                            }`}
+                                            className={`hover:bg-slate-800/40 cursor-pointer transition-colors border-l-4 ${rowBgClass}`}
                                         >
                                             <td className="p-4 text-center">
                                                 {isExpanded ? <ChevronUp className="w-4 h-4 text-indigo-400" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
                                             </td>
                                             <td className="p-4 font-bold text-slate-900 dark:text-white">
-                                                {po.supplier}
+                                                <div className="flex items-center gap-2">
+                                                    <span>{po.supplier}</span>
+                                                    {hasNoItems && (
+                                                        <span 
+                                                            title="Sin materiales conciliados: esta orden de compra no tiene ninguna partida asociada en el BOM."
+                                                            className="p-1 rounded bg-red-500/10 text-red-500 hover:bg-red-500/20 cursor-help transition-colors shrink-0"
+                                                        >
+                                                            <AlertCircle className="w-3 h-3 animate-pulse" />
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 {po.comments && (
                                                     <div className="text-[10px] text-slate-500 dark:text-slate-400 font-normal mt-0.5 truncate max-w-xs" title={po.comments}>
                                                         {po.comments}
