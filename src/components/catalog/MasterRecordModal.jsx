@@ -69,31 +69,17 @@ const MasterRecordModal = ({ isOpen, onClose, onSave, initialData, managedLists,
                     <div className="p-5 space-y-4 pb-40">
 
                         {/* Row 1: Descripción — full width */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                            <div className="lg:col-span-2">
-                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center ml-0.5">
-                                    <FileText className="w-2.5 h-2.5 mr-1" /> Descripción
-                                </label>
-                                <input
-                                    value={formData.name}
-                                    onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                    placeholder="Nombre del repuesto..."
-                                    className="w-full px-3 py-2 border border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 transition-all bg-slate-800 text-white font-bold placeholder-slate-500 text-xs"
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center ml-0.5">
-                                    <Hash className="w-2.5 h-2.5 mr-1" /> Part Number
-                                </label>
-                                <input
-                                    value={formData.partNumber}
-                                    onChange={e => setFormData({ ...formData, partNumber: e.target.value })}
-                                    placeholder="Ej: 5069RTB64SCREW"
-                                    className="w-full px-3 py-2 border border-slate-700 rounded-lg font-mono uppercase focus:ring-2 focus:ring-indigo-500 outline-none transition-all bg-slate-800 text-white font-bold placeholder-slate-500 text-xs"
-                                    required
-                                />
-                            </div>
+                        <div>
+                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center ml-0.5">
+                                <FileText className="w-2.5 h-2.5 mr-1" /> Descripción
+                            </label>
+                            <input
+                                value={formData.name}
+                                onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                placeholder="Nombre del repuesto..."
+                                className="w-full px-3 py-2 border border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 transition-all bg-slate-800 text-white font-bold placeholder-slate-500 text-xs"
+                                required
+                            />
                         </div>
 
                         {/* Row 2: 3 columns — Marca, Categoría, Proveedor */}
@@ -127,7 +113,7 @@ const MasterRecordModal = ({ isOpen, onClose, onSave, initialData, managedLists,
                             </div>
                         </div>
 
-                        {/* Row 3: 3 columns — Precio, Lead Time, Imagen preview */}
+                        {/* Row 3: 3 columns — Precio, Lead Time, Part Number */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div>
                                 <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center ml-0.5">
@@ -156,15 +142,17 @@ const MasterRecordModal = ({ isOpen, onClose, onSave, initialData, managedLists,
                                     className="w-full px-3 py-2 border border-slate-700 rounded-lg bg-slate-800 text-white outline-none focus:ring-2 focus:ring-teal-500 placeholder-slate-500 text-xs"
                                 />
                             </div>
-                            <div className="flex items-end">
-                                {/* Image mini preview */}
-                                <div className="w-full h-[38px] rounded-lg border border-slate-700 bg-slate-800/50 flex items-center justify-center overflow-hidden">
-                                    {imagePreview ? (
-                                        <img src={formData.imageUrl} alt="" className="h-full object-contain p-0.5" onError={e => { e.target.style.display = 'none'; }} />
-                                    ) : (
-                                        <span className="text-[10px] text-slate-500 flex items-center gap-1"><ImageIcon className="w-3 h-3" /> Sin imagen</span>
-                                    )}
-                                </div>
+                            <div>
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center ml-0.5">
+                                    <Hash className="w-2.5 h-2.5 mr-1" /> Part Number
+                                </label>
+                                <input
+                                    value={formData.partNumber}
+                                    onChange={e => setFormData({ ...formData, partNumber: e.target.value })}
+                                    placeholder="Ej: 5069RTB64SCREW"
+                                    className="w-full px-3 py-2 border border-slate-700 rounded-lg font-mono uppercase focus:ring-2 focus:ring-indigo-500 outline-none transition-all bg-slate-800 text-white font-bold placeholder-slate-500 text-xs"
+                                    required
+                                />
                             </div>
                         </div>
 
@@ -181,6 +169,23 @@ const MasterRecordModal = ({ isOpen, onClose, onSave, initialData, managedLists,
                                 className="w-full px-3 py-2 border border-slate-700 rounded-lg bg-slate-800 text-white outline-none focus:ring-2 focus:ring-indigo-500 placeholder-slate-500 text-xs"
                             />
                         </div>
+
+                        {/* Row 5: Large Image Preview */}
+                        {imagePreview && (
+                            <div className="flex flex-col items-center justify-center p-3 border border-slate-800 rounded-xl bg-slate-950/40">
+                                <label className="self-start text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center ml-0.5">
+                                    <ImageIcon className="w-2.5 h-2.5 mr-1" /> Vista Previa de Imagen
+                                </label>
+                                <div className="relative max-w-sm max-h-60 rounded-lg overflow-hidden border border-slate-700 bg-slate-900 flex items-center justify-center p-3 shadow-lg">
+                                    <img
+                                        src={formData.imageUrl}
+                                        alt="Vista previa del repuesto"
+                                        className="max-h-52 object-contain rounded"
+                                        onError={e => { e.target.style.display = 'none'; }}
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Footer */}
