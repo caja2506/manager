@@ -13,7 +13,7 @@ import {
     Search, Trash2, ArrowLeft, PackagePlus, X,
     Loader2, Sparkles, SlidersHorizontal, Check,
     Tag, Camera, Download, Edit3, Layers, AlertTriangle,
-    GitMerge, ShoppingCart, ChevronDown, ChevronUp, CornerDownRight
+    GitMerge, ShoppingCart, ChevronDown, ChevronUp, ChevronRight, CornerDownRight
 } from 'lucide-react';
 
 // ============================================================
@@ -986,12 +986,23 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
                                                                             </td>
                                                                         )}
                                                                         <td className="p-3 text-center">
-                                                                            {renderVisualCell(row.representativeItem)}
+                                                                            <div className="flex items-center justify-center gap-1.5">
+                                                                                <button 
+                                                                                    onClick={toggleExpand} 
+                                                                                    className="p-1 hover:bg-slate-850 rounded text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer"
+                                                                                    title={isExpanded ? "Ocultar compras" : "Ver compras agrupadas"}
+                                                                                >
+                                                                                    {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                                                                </button>
+                                                                                {renderVisualCell(row.representativeItem)}
+                                                                            </div>
                                                                         </td>
                                                                         <td className="p-5 font-black text-lg text-slate-300">
                                                                             <div className="flex flex-col">
                                                                                 <span>{totalQty}</span>
-                                                                                <span className="text-[9px] text-slate-500 uppercase tracking-widest font-bold">Total</span>
+                                                                                <span className="text-[9px] text-indigo-400 uppercase tracking-widest font-black">
+                                                                                    {row.items.length} compras
+                                                                                </span>
                                                                             </div>
                                                                         </td>
                                                                         <td className="p-5">
@@ -1001,13 +1012,6 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
                                                                                 {details.brandName && <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-slate-400 bg-slate-800 border-slate-700"><Tag className="w-3 h-3 mr-1.5 flex-shrink-0" />{details.brandName}</div>}
                                                                                 {details.categoryName && <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-purple-400 bg-purple-950/20 border-purple-800/30"><Tag className="w-3 h-3 mr-1.5 flex-shrink-0" />{details.categoryName}</div>}
                                                                                 {providerName && <div className="flex items-center justify-center h-6 px-2 rounded-full border text-[9px] font-black uppercase tracking-tighter text-indigo-400 bg-indigo-950/20 border-indigo-900/30">Prov: {providerName}</div>}
-                                                                                <button
-                                                                                    onClick={toggleExpand}
-                                                                                    className="flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider text-indigo-400 bg-indigo-950/30 border-indigo-500/30 hover:bg-indigo-500/20 transition-all select-none"
-                                                                                >
-                                                                                    {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                                                                                    {isExpanded ? 'Ocultar compras' : `Ver compras (${row.items.length})`}
-                                                                                </button>
                                                                             </div>
                                                                         </td>
                                                                         <td className="p-5">
