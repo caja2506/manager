@@ -9,7 +9,7 @@ import { getAuth, GoogleAuthProvider, onAuthStateChanged } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
-    apiKey: "AIzaSyDGUTnCBWhPpyOrjAf5eQbQaQz0Dm18NXc",
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
     authDomain: "bom-ame-cr.firebaseapp.com",
     projectId: "bom-ame-cr",
     storageBucket: "bom-ame-cr.firebasestorage.app",

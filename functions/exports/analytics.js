@@ -112,7 +112,14 @@ function createAnalyticsExports(adminDb, secrets) {
 
                 const apiKey = geminiApiKey.value();
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
-                const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.4, maxOutputTokens: 2048 } }) });
+                const response = await fetch(url, { 
+                    method: "POST", 
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "Referer": "https://bom-ame-cr.web.app"
+                    }, 
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.4, maxOutputTokens: 2048 } }) 
+                });
                 if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
                 const result = await response.json();
                 const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;

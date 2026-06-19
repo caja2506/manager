@@ -163,7 +163,10 @@ Reglas:
 
             const res = await fetch(url, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Referer": "https://bom-ame-cr.web.app"
+                },
                 body: JSON.stringify({
                     contents: [{ parts: [{ text: prompt }] }],
                     generationConfig: { temperature: 0.7, responseMimeType: "application/json" },

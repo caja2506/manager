@@ -10,8 +10,17 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, getDocs, writeBatch } from 'firebase/firestore';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 
+import fs from 'fs';
+
+let FIREBASE_API_KEY = process.env.VITE_FIREBASE_API_KEY;
+if (!FIREBASE_API_KEY && fs.existsSync('.env.local')) {
+    const env = fs.readFileSync('.env.local', 'utf-8');
+    const match = env.match(/VITE_FIREBASE_API_KEY=(.+)/);
+    if (match) FIREBASE_API_KEY = match[1].trim();
+}
+
 const firebaseConfig = {
-    apiKey: "AIzaSyDGUTnCBWhPpyOrjAf5eQbQaQz0Dm18NXc",
+    apiKey: FIREBASE_API_KEY,
     authDomain: "bom-ame-cr.firebaseapp.com",
     projectId: "bom-ame-cr",
     storageBucket: "bom-ame-cr.firebasestorage.app",

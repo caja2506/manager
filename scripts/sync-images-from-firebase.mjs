@@ -11,7 +11,14 @@
 
 import * as readline from 'readline';
 
-const FIREBASE_API_KEY = 'AIzaSyDGUTnCBWhPpyOrjAf5eQbQaQz0Dm18NXc';
+import fs from 'fs';
+
+let FIREBASE_API_KEY = process.env.VITE_FIREBASE_API_KEY;
+if (!FIREBASE_API_KEY && fs.existsSync('.env.local')) {
+    const env = fs.readFileSync('.env.local', 'utf-8');
+    const match = env.match(/VITE_FIREBASE_API_KEY=(.+)/);
+    if (match) FIREBASE_API_KEY = match[1].trim();
+}
 const FIREBASE_PROJECT = 'bom-ame-cr';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/(default)/documents`;
 

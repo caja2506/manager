@@ -612,12 +612,12 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
 
                 {canEdit && (
                     <>
-                        <button onClick={() => setCatalogPickerOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-bold flex items-center shadow-lg active:scale-95 transition-all text-xs">
+                        <button onClick={() => setCatalogPickerOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white h-11 px-4 rounded-xl font-bold flex items-center shadow-lg active:scale-95 transition-all text-sm">
                             <PackagePlus className="w-4 h-4 mr-1.5" /> Catálogo
                         </button>
                         <div className="relative">
                             <input type="file" ref={pdfInputRef} onChange={(e) => handlePdfUpload(e, activeProject)} accept=".pdf" className="hidden" />
-                            <button onClick={() => pdfInputRef.current.click()} disabled={isProcessing} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold flex items-center shadow-lg active:scale-95 transition-all disabled:bg-slate-600 text-xs border border-slate-700">
+                            <button onClick={() => pdfInputRef.current.click()} disabled={isProcessing} className="bg-slate-800 hover:bg-slate-700 text-white h-11 px-4 rounded-xl font-bold flex items-center shadow-lg active:scale-95 transition-all disabled:bg-slate-600 text-sm border border-slate-700">
                                 {isProcessing ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <Sparkles className="w-4 h-4 mr-1.5 text-yellow-400 fill-yellow-400" />}
                                 {isProcessing ? "..." : "PDF"}
                             </button>
@@ -627,15 +627,15 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
                 <button
                     onClick={() => handleExportBomToExcel()}
                     disabled={!activeBomItems || activeBomItems.length === 0}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold flex items-center shadow-lg active:scale-95 transition-all text-xs disabled:opacity-40"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white h-11 px-4 rounded-xl font-bold flex items-center shadow-lg active:scale-95 transition-all text-sm disabled:opacity-40"
                 >
                     <Download className="w-4 h-4 mr-1.5" /> Excel
                 </button>
-                <div className="bg-emerald-500/15 border border-emerald-500/30 px-3 py-1.5 rounded-xl text-right flex items-center gap-2">
-                    <span className="text-[9px] font-black text-green-600 uppercase tracking-widest">
+                <div className="bg-emerald-500/15 border border-emerald-500/30 h-11 px-3 rounded-xl text-right flex items-center gap-2">
+                    <span className="text-[10px] font-black text-green-600 uppercase tracking-widest leading-none">
                         {activeBomTab === 'general' ? 'Inv. Total' : activeBomTab === 'mechanical' ? 'Inv. Mecánico' : 'Inv. Eléc & Neum'}
                     </span>
-                    <span className="text-lg font-black text-green-500 tracking-tighter leading-none">
+                    <span className="text-base font-black text-green-500 tracking-tighter leading-none">
                         ${(activeBomItems || [])
                             .filter(i => activeBomTab === 'general' || (activeBomTab === 'mechanical' ? resolveIsMechanical(i) : !resolveIsMechanical(i)))
                             .reduce((s, i) => s + (i.totalPrice || 0), 0)

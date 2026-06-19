@@ -21,7 +21,10 @@ function createAiExports(adminDb, secrets) {
             try {
                 const response = await fetch(url, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "Referer": "https://bom-ame-cr.web.app"
+                    },
                     body: JSON.stringify({
                         contents: [{ parts: [{ text: 'Responde únicamente con la palabra: CONECTADO' }] }],
                     }),
@@ -65,7 +68,10 @@ ${text}`;
             try {
                 const response = await fetch(url, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "Referer": "https://bom-ame-cr.web.app"
+                    },
                     body: JSON.stringify({
                         contents: [{ parts: [{ text: prompt }] }],
                         generationConfig: { response_mime_type: "application/json" },
@@ -234,7 +240,10 @@ ${text}`;
             try {
                 const response = await fetch(url, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "Referer": "https://bom-ame-cr.web.app"
+                    },
                     body: JSON.stringify({
                         contents: [{ parts: [{ text: prompt }] }],
                         generationConfig: { temperature: 0.4, maxOutputTokens: 4096, topP: 0.8, responseMimeType: "application/json" },
@@ -342,7 +351,10 @@ Reglas:
             try {
                 const response = await fetch(url, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "Referer": "https://bom-ame-cr.web.app"
+                    },
                     body: JSON.stringify({
                         contents: [{
                             parts: [
@@ -432,7 +444,10 @@ Devuelve SOLO el JSON sin delimitadores markdown.`;
             try {
                 const response = await fetch(url, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "Referer": "https://bom-ame-cr.web.app"
+                    },
                     body: JSON.stringify({
                         contents: [{ parts: [{ text: prompt }] }],
                         generationConfig: { response_mime_type: "application/json", temperature: 0.3 },
