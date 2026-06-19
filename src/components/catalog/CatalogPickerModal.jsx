@@ -9,6 +9,30 @@ const CatalogPickerModal = ({ onClose, catalogo, managedLists, onAddItems, exist
     const [selectedItems, setSelectedItems] = useState({}); // { id: quantity }
     const [filters, setFilters] = useState({ search: '', brand: '', category: '', provider: '' });
     const [isAdding, setIsAdding] = useState(false);
+    const [activeTab, setActiveTab] = useState('cots'); // 'cots' | 'custom'
+
+    // Contadores de ítems COTS y Custom sobre la lista completa de catálogo
+    const cotsCount = useMemo(() => {
+        return catalogo.filter(item => {
+            const providerId = item.defaultProvider?.id || item.default_provider_id || null;
+            if (providerId) {
+                const prov = managedLists.providers.find(p => p.id === providerId);
+                return !(prov && prov.is_workshop);
+            }
+            return true;
+        }).length;
+    }, [catalogo, managedLists.providers]);
+
+    const customCount = useMemo(() => {
+        return catalogo.filter(item => {
+            const providerId = item.defaultProvider?.id || item.default_provider_id || null;
+            if (providerId) {
+                const prov = managedLists.providers.find(p => p.id === providerId);
+                return prov && prov.is_workshop;
+            }
+            return false;
+        }).length;
+    }, [catalogo, managedLists.providers]);
 
     // Build a lookup map: masterPartRefId → total quantity already in project
     const existingMap = useMemo(() => {
@@ -37,9 +61,20 @@ const CatalogPickerModal = ({ onClose, catalogo, managedLists, onAddItems, exist
             const matchesCategory = !filters.category || item.category?.id === filters.category;
             const matchesProvider = !filters.provider || item.defaultProvider?.id === filters.provider;
 
-            return matchesSearch && matchesBrand && matchesCategory && matchesProvider;
+            // Filtrado dinámico por la pestaña seleccionada
+            let matchesTab = true;
+            const providerId = item.defaultProvider?.id || item.default_provider_id || null;
+            if (providerId) {
+                const prov = managedLists.providers.find(p => p.id === providerId);
+                const isWorkshop = prov && prov.is_workshop;
+                matchesTab = activeTab === 'cots' ? !isWorkshop : isWorkshop;
+            } else {
+                matchesTab = activeTab === 'cots';
+            }
+
+            return matchesSearch && matchesBrand && matchesCategory && matchesProvider && matchesTab;
         });
-    }, [catalogo, filters]);
+    }, [catalogo, filters, activeTab, managedLists.providers]);
 
     const handleToggleItem = (id) => {
         setSelectedItems(prev => {
@@ -94,6 +129,38 @@ const CatalogPickerModal = ({ onClose, catalogo, managedLists, onAddItems, exist
                         <SearchableDropdown compact options={categoryOptions} value={filters.category} onChange={val => setFilters({ ...filters, category: val })} placeholder="Categoría" />
                         <SearchableDropdown compact options={providerOptions} value={filters.provider} onChange={val => setFilters({ ...filters, provider: val })} placeholder="Proveedor" />
                     </div>
+
+                    {/* Selector de Pestañas COTS vs Custom */}
+                    <div className="flex border-b border-slate-700 gap-6 px-1 mt-5 -mb-6">
+                        <button
+                            onClick={() => { setActiveTab('cots'); setSelectedItems({}); }}
+                            className={`pb-4 text-sm font-black transition-all relative ${activeTab === 'cots' ? 'text-indigo-400' : 'text-slate-400 hover:text-slate-200'}`}
+                        >
+                            <div className="flex items-center gap-2">
+                                <span>Componentes COTS</span>
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeTab === 'cots' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-slate-800 text-slate-500'}`}>
+                                    {cotsCount}
+                                </span>
+                            </div>
+                            {activeTab === 'cots' && (
+                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500 rounded-full animate-in fade-in slide-in-from-bottom-1 duration-200" />
+                            )}
+                        </button>
+                        <button
+                            onClick={() => { setActiveTab('custom'); setSelectedItems({}); }}
+                            className={`pb-4 text-sm font-black transition-all relative ${activeTab === 'custom' ? 'text-amber-400' : 'text-slate-400 hover:text-slate-200'}`}
+                        >
+                            <div className="flex items-center gap-2">
+                                <span>Componentes Custom / Diseñados</span>
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeTab === 'custom' ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-800 text-slate-500'}`}>
+                                    {customCount}
+                                </span>
+                            </div>
+                            {activeTab === 'custom' && (
+                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500 rounded-full animate-in fade-in slide-in-from-bottom-1 duration-200" />
+                            )}
+                        </button>
+                    </div>
                 </div>
 
                 {/* List Area */}
@@ -132,8 +199,18 @@ const CatalogPickerModal = ({ onClose, catalogo, managedLists, onAddItems, exist
                                             <div className="flex-1 min-w-0">
                                                 <h3 className="font-bold text-white text-sm leading-tight line-clamp-2 mb-1">{item.name}</h3>
                                                 <p className="text-xs text-slate-400 font-mono mb-1 truncate">{item.partNumber}</p>
-                                                <div className="flex flex-wrap gap-1 min-h-[16px]">
-                                                    {brandName && <span className="px-1.5 py-0.5 bg-slate-800 text-slate-500 text-[10px] rounded font-bold uppercase">{brandName}</span>}
+                                                <div className="flex flex-wrap gap-1 items-center min-h-[16px] mt-1.5">
+                                                    {/* Tag dinámico COTS/Custom */}
+                                                    {(() => {
+                                                        const provId = item.defaultProvider?.id || item.default_provider_id || '';
+                                                        const isWorkshop = provId && managedLists.providers.find(p => p.id === provId)?.is_workshop;
+                                                        return isWorkshop ? (
+                                                            <span className="px-1.5 py-0.5 bg-amber-500/10 text-amber-400 text-[9px] rounded font-black uppercase tracking-tighter border border-amber-500/20">Custom</span>
+                                                        ) : (
+                                                            <span className="px-1.5 py-0.5 bg-sky-500/10 text-sky-400 text-[9px] rounded font-black uppercase tracking-tighter border border-sky-500/20">COTS</span>
+                                                        );
+                                                    })()}
+                                                    {brandName && <span className="px-1.5 py-0.5 bg-slate-800 text-slate-500 text-[9px] rounded font-bold uppercase">{brandName}</span>}
                                                 </div>
                                             </div>
                                         </div>
