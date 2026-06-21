@@ -631,9 +631,11 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
     const isSaved = (field) => savedField === `${task.id}-${field}`;
 
     // Options
-    const statusOptions = Object.entries(TASK_STATUS_CONFIG).map(([key, cfg]) => ({
-        value: key, label: cfg.label, color: cfg.color,
-    }));
+    const statusOptions = Object.entries(TASK_STATUS_CONFIG)
+        .filter(([key]) => key !== TASK_STATUS.BACKLOG)
+        .map(([key, cfg]) => ({
+            value: key, label: cfg.label, color: cfg.color,
+        }));
     const priorityOptions = Object.entries(TASK_PRIORITY_CONFIG).map(([key, cfg]) => ({
         value: key, label: cfg.label, color: cfg.color || '#64748b',
     }));

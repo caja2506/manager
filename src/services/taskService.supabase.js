@@ -173,7 +173,7 @@ export async function createTask(data, userId) {
             project_id: data.projectId || null,
             title: data.title || '',
             description: data.description || '',
-            status: data.status || 'backlog',
+            status: data.status || 'pending',
             priority: data.priority || 'medium',
             task_type_id: data.taskTypeId || null,
             assigned_to: data.assignedTo || null,

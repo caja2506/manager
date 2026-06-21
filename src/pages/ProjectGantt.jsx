@@ -751,7 +751,6 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                                 className="bg-slate-800 border border-slate-700 rounded-lg px-2 text-[10px] font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[110px] h-8 cursor-pointer"
                             >
                                 <option value="">Estado</option>
-                                <option value="backlog">Backlog</option>
                                 <option value="pending">Pendiente</option>
                                 <option value="in_progress">En Progreso</option>
                                 <option value="validation">Validación</option>
@@ -909,7 +908,6 @@ export default function ProjectGantt({ forceProjectId = null, renderMilestoneMod
                                 className="bg-slate-800 border border-slate-700 rounded-lg px-2 text-[10px] font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[110px] h-8 cursor-pointer"
                             >
                                 <option value="">Estado</option>
-                                <option value="backlog">Backlog</option>
                                 <option value="pending">Pendiente</option>
                                 <option value="in_progress">En Progreso</option>
                                 <option value="completed">Completado</option>

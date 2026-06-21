@@ -165,7 +165,7 @@ export default function TaskDetailModal({
                 assignedBy: task.assignedBy || userId || '',
                 assignedTo: task.assignedTo || '',
                 priority: task.priority || TASK_PRIORITY.MEDIUM,
-                status: task.status || TASK_STATUS.BACKLOG,
+                status: task.status || TASK_STATUS.PENDING,
                 taskTypeId: task.taskTypeId || '',
                 areaId: task.areaId || task.workAreaTypeId || '',
                 milestoneId: task.milestoneId || '',
