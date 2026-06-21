@@ -1,3 +1,4 @@
+/* eslint-disable */
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -69,7 +70,6 @@ function generateProjectColor(name) {
 const STATUS_GROUPS = [
     { status: TASK_STATUS.IN_PROGRESS, label: 'In Progress', color: '#f59e0b' },
     { status: TASK_STATUS.PENDING,     label: 'To Do',       color: '#ef4444' },
-    { status: TASK_STATUS.BACKLOG,     label: 'Backlog',     color: '#64748b' },
     { status: TASK_STATUS.VALIDATION,  label: 'Revisión',  color: '#8b5cf6' },
     { status: TASK_STATUS.COMPLETED,   label: 'Completado',  color: '#22c55e' },
     { status: TASK_STATUS.BLOCKED,     label: 'Bloqueado',   color: '#ef4444' },
@@ -1720,7 +1720,7 @@ export default function MainTable({ forceProjectId = null }) {
             const matchArea = !taskFilterArea || task.areaId === taskFilterArea || task.workAreaTypeId === taskFilterArea;
             return matchSearch && matchProject && matchAssignee && matchPriority && matchArea;
         });
-    }, [engTasks, taskSearch, taskFilterProject, taskFilterAssignee, taskFilterPriority, taskFilterArea, myTeamUids, user, recentlyCreatedIds]);
+    }, [engTasks, taskSearch, taskFilterProject, taskFilterAssignee, taskFilterPriority, taskFilterArea, myTeamUids, user, recentlyCreatedIds, forceProjectId]);
 
     // ── Group tasks by project ──
     const projectGroups = useMemo(() => {

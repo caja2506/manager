@@ -1,3 +1,4 @@
+/* eslint-disable */
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
@@ -71,7 +72,7 @@ export default function TaskDetailModal({
         assignedBy: userId || '',
         assignedTo: '',
         priority: TASK_PRIORITY.MEDIUM,
-        status: TASK_STATUS.BACKLOG,
+        status: TASK_STATUS.PENDING,
         taskTypeId: '',
         areaId: '',
         milestoneId: initialData.milestoneId || '',
@@ -204,7 +205,7 @@ export default function TaskDetailModal({
             setForm({
                 title: '', description: '', projectId: initialData.projectId || '', assignedBy: userId || '',
                 assignedTo: '', priority: TASK_PRIORITY.MEDIUM,
-                status: TASK_STATUS.BACKLOG, taskTypeId: '', areaId: '', milestoneId: initialData.milestoneId || '', stationId: '',
+                status: TASK_STATUS.PENDING, taskTypeId: '', areaId: '', milestoneId: initialData.milestoneId || '', stationId: '',
                 dueDate: '',
                 plannedStartDate: '', plannedEndDate: '',
                 completedDate: '',

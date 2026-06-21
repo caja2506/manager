@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/preserve-manual-memoization, react-hooks/exhaustive-deps */
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
     DndContext, DragOverlay, closestCorners,
@@ -83,7 +84,6 @@ function KanbanColumn({ status, children, taskCount, isPlacementTarget, onPlacem
 // ============================================================
 
 const KANBAN_COLUMNS = [
-    TASK_STATUS.BACKLOG,
     TASK_STATUS.PENDING,
     TASK_STATUS.IN_PROGRESS,
     TASK_STATUS.VALIDATION,

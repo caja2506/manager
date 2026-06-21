@@ -561,8 +561,8 @@ The system must support **Excel export** for:
 |-----------|---------|
 | React 19.2 + Vite 7.3 | Frontend framework & build tool |
 | Tailwind CSS 4.2 | Styling |
-| Cloud Firestore | Database |
-| Firebase Auth | Authentication |
+| Supabase (PostgreSQL & Realtime) | Database backend & real-time sync |
+| Firebase Auth | Authentication (Google Sign-In) with Supabase Token Bridge |
 | Firebase Cloud Functions v2 | Server-side logic |
 | lucide-react | Icons |
 | pdfjs-dist | PDF text extraction |
@@ -777,6 +777,7 @@ The following modules **MUST NOT** be modified during remediation, except for me
 6. **Always analyze before implementing** — read existing code before writing new code
 7. **Update this blueprint** after completing each phase
 8. **Follow UI Design Standards** — use shared module banners for related pages (see Appendix B)
+9. **Database Rule (No Firebase DB):** Firebase Firestore is completely deprecated as a database. All storage, real-time updates, and relational queries must go through **Supabase**. Firebase Auth is used only for authentication (Google Sign-In), and the ID tokens are synchronized with Supabase for Row Level Security (RLS) enforcement. Do not create new Firestore collections or write queries to Firestore.
 
 ---
 

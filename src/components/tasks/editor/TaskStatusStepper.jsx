@@ -12,7 +12,6 @@ import {
  */
 
 const STATUS_FLOW = [
-    TASK_STATUS.BACKLOG,
     TASK_STATUS.PENDING,
     TASK_STATUS.IN_PROGRESS,
     TASK_STATUS.VALIDATION,
@@ -51,7 +50,7 @@ export default function TaskStatusStepper({ currentStatus, onStatusChange, canEd
             {canEdit && (
                 <button
                     onClick={() => onStatusChange(
-                        isBlocked ? TASK_STATUS.IN_PROGRESS : TASK_STATUS.BACKLOG
+                        isBlocked ? TASK_STATUS.IN_PROGRESS : TASK_STATUS.PENDING
                     )}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all active:scale-95 ${isBlocked
                         ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-500'

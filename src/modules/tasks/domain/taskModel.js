@@ -154,7 +154,7 @@ export function createProjectDocument({
 
 export function createTaskDocument({
     projectId = null, subprojectId = null, title = '', description = '',
-    status = TASK_STATUS.BACKLOG, priority = TASK_PRIORITY.MEDIUM, taskTypeId = null,
+    status = TASK_STATUS.PENDING, priority = TASK_PRIORITY.MEDIUM, taskTypeId = null,
     milestoneId = null, areaId = null, countsForScore = false, stationId = null,
     assignedBy = null, assignedTo = null, estimatedHours = 0, actualHours = 0,
     dueDate = null, completedDate = null, blockedReason = '', tags = [], order = 0,

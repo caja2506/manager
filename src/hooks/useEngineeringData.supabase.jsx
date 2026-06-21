@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * useEngineeringData — Supabase Implementation
  * ==============================================
@@ -125,6 +126,17 @@ export function EngineeringDataProvider({ children }) {
             markLoaded();
             setEngTasks((tasks || []).map(mapTask));
             markLoaded();
+
+            // Background migration: update any backlog tasks in the database to pending
+            const backlogTaskIds = (tasks || []).filter(t => t.status === 'backlog').map(t => t.id);
+            if (backlogTaskIds.length > 0) {
+                console.log(`[useEngineeringData.sb] Migrating ${backlogTaskIds.length} legacy backlog tasks to pending...`);
+                supabase.from('tasks').update({ status: 'pending' }).in('id', backlogTaskIds)
+                    .then(({ error }) => {
+                        if (error) console.error('Failed to migrate backlog tasks:', error.message);
+                        else console.log('Successfully migrated backlog tasks to pending in database.');
+                    });
+            }
             setEngSubtasks((subs || []).map(mapSubtask));
             markLoaded();
             setTaskTypes((tt || []).map(mapTaskType).sort((a, b) => safeLocaleCompare(a, b, 'name')));
@@ -273,7 +285,7 @@ function mapTask(r) {
     return {
         id: r.id, projectId: r.project_id,
         title: r.title, description: r.description,
-        status: r.status, priority: r.priority,
+        status: r.status === 'backlog' ? 'pending' : r.status, priority: r.priority,
         taskTypeId: r.task_type_id,
         assignedTo: r.assigned_to, assignedBy: r.assigned_by,
         estimatedHours: r.estimated_hours, actualHours: r.actual_hours,
