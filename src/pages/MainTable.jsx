@@ -1359,39 +1359,10 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                             <div>Asig.</div>
                         </div>
 
-                        {tasks.length === 0 ? (
-                            <div className="px-4 py-5 text-center text-sm text-slate-600" style={{ borderLeft: `3px solid ${color}` }}>
-                                Sin tareas
-                            </div>
-                        ) : (
-                            tasks.map((task, idx) => (
-                                <TaskRow
-                                    key={task.id}
-                                    task={task}
-                                    engProjects={engProjects}
-                                    teamMembers={teamMembers}
-                                    subtasks={engSubtasks.filter(s => s.taskId === task.id)}
-                                    canEdit={canEdit}
-                                    canEditDates={canEditDates}
-                                    onOpenModal={onOpenModal}
-                                    groupColor={color}
-                                    isLast={idx === tasks.length - 1 && !canEdit}
-                                    savedField={savedField}
-                                    onSaved={onSaved}
-                                    taskTypes={taskTypes}
-                                    workAreaTypes={workAreaTypes}
-                                    isSelected={selectedTaskIds?.has(task.id)}
-                                    onToggleSelect={onToggleSelect}
-                                    commentCount={commentCounts?.[task.id] || 0}
-                                    taskComments={taskCommentsMap?.[task.id] || []}
-                                />
-                            ))
-                        )}
-
                         {/* Inline Add Task Row */}
                         {canEdit && (
                             <div
-                                className="grid items-center px-2 py-1.5 border-t border-slate-800/30 bg-[var(--bg-table-row)] min-w-[1100px]"
+                                className="grid items-center px-2 py-1.5 border-b border-slate-800/30 bg-[var(--bg-table-row)] min-w-[1100px]"
                                 style={{ gridTemplateColumns: GRID_COLS }}
                             >
                                 <div className="sticky left-0 z-10 bg-[var(--bg-table-row)] h-full flex items-center justify-center" style={{ borderLeft: `3px solid ${color}` }}></div>
@@ -1423,6 +1394,35 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                 {/* Rest of columns empty */}
                                 <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
                             </div>
+                        )}
+
+                        {tasks.length === 0 ? (
+                            <div className="px-4 py-5 text-center text-sm text-slate-600" style={{ borderLeft: `3px solid ${color}` }}>
+                                Sin tareas
+                            </div>
+                        ) : (
+                            tasks.map((task, idx) => (
+                                <TaskRow
+                                    key={task.id}
+                                    task={task}
+                                    engProjects={engProjects}
+                                    teamMembers={teamMembers}
+                                    subtasks={engSubtasks.filter(s => s.taskId === task.id)}
+                                    canEdit={canEdit}
+                                    canEditDates={canEditDates}
+                                    onOpenModal={onOpenModal}
+                                    groupColor={color}
+                                    isLast={idx === tasks.length - 1}
+                                    savedField={savedField}
+                                    onSaved={onSaved}
+                                    taskTypes={taskTypes}
+                                    workAreaTypes={workAreaTypes}
+                                    isSelected={selectedTaskIds?.has(task.id)}
+                                    onToggleSelect={onToggleSelect}
+                                    commentCount={commentCounts?.[task.id] || 0}
+                                    taskComments={taskCommentsMap?.[task.id] || []}
+                                />
+                            ))
                         )}
 
                         {/* Group Summary Row — Monday.com style */}
@@ -1490,6 +1490,48 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
 
                     {/* Mobile: card stack (hidden on desktop) */}
                     <div className="mt-2 space-y-3 md:hidden">
+                        {/* Mobile add task */}
+                        {canEdit && (
+                            addingTask ? (
+                                <div className="p-3 bg-slate-800/40 border border-slate-700 rounded-xl flex items-center gap-2">
+                                    <input
+                                        ref={addInputRef}
+                                        value={newTaskTitle}
+                                        onChange={e => setNewTaskTitle(e.target.value)}
+                                        onKeyDown={e => { 
+                                            if (e.key === 'Enter') handleAddTask(); 
+                                            if (e.key === 'Escape') { setAddingTask(false); setNewTaskTitle(''); } 
+                                        }}
+                                        placeholder="Nombre de la nueva tarea..."
+                                        className="flex-1 bg-transparent text-sm text-slate-300 placeholder:text-slate-600 outline-none"
+                                        autoFocus
+                                    />
+                                    <button 
+                                        onClick={handleAddTask} 
+                                        className="text-indigo-400 hover:text-indigo-300 shrink-0 text-xs font-bold px-2 py-1 bg-indigo-500/10 rounded"
+                                    >
+                                        Agregar
+                                    </button>
+                                    <button 
+                                        onClick={() => { setAddingTask(false); setNewTaskTitle(''); }} 
+                                        className="text-slate-500 hover:text-slate-300 shrink-0"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => { 
+                                        setAddingTask(true); 
+                                        setTimeout(() => addInputRef.current?.focus(), 50); 
+                                    }}
+                                    className="w-full py-3 text-sm text-slate-600 hover:text-indigo-400 flex items-center justify-center gap-2 bg-slate-800/20 border border-dashed border-slate-700 rounded-xl transition-colors"
+                                >
+                                    <Plus className="w-4 h-4" /> Agregar tarea
+                                </button>
+                            )
+                        )}
+
                         {tasks.length === 0 ? (
                             <div className="px-4 py-5 text-center text-sm text-slate-600 bg-slate-800/30 rounded-xl border border-slate-700/50">
                                 Sin tareas en esta sección
@@ -1510,15 +1552,6 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                                     onSaved={onSaved}
                                 />
                             ))
-                        )}
-                        {/* Mobile add task */}
-                        {canEdit && (
-                            <button
-                                onClick={() => { setAddingTask(true); }}
-                                className="w-full py-3 text-sm text-slate-600 hover:text-indigo-400 flex items-center justify-center gap-2 bg-slate-800/20 border border-dashed border-slate-700 rounded-xl transition-colors"
-                            >
-                                <Plus className="w-4 h-4" /> Agregar tarea
-                            </button>
                         )}
                     </div>
                 </>
@@ -1646,20 +1679,20 @@ export default function MainTable({ forceProjectId = null }) {
 
     const { pendingTransition, transitionError, isTransitioning, confirmTransition, cancelTransition } = useWorkflowTransition();
 
-    // Recently created tasks bypass filters for 30 seconds
+    // Recently created tasks bypass filters and sorting for 3 minutes (180000 ms)
     const [recentlyCreatedIds, setRecentlyCreatedIds] = useState(new Set());
 
     const handleTaskCreated = useCallback((newTaskId) => {
         if (!newTaskId) return;
         setRecentlyCreatedIds(prev => new Set(prev).add(newTaskId));
-        // Remove grace after 30 minutes
+        // Remove grace after 3 minutes
         setTimeout(() => {
             setRecentlyCreatedIds(prev => {
                 const next = new Set(prev);
                 next.delete(newTaskId);
                 return next;
             });
-        }, 1800000);
+        }, 180000);
     }, []);
 
     const filteredTasks = useMemo(() => {
@@ -1697,11 +1730,16 @@ export default function MainTable({ forceProjectId = null }) {
             if (!map[pid]) map[pid] = [];
             map[pid].push(t);
         });
-        // Sort tasks: first by status (active first, completed/cancelled last), then by priority
+        // Sort tasks: recently created first (grace period), then by status (active first), then by priority
         const statusOrder = { in_progress: 0, pending: 1, backlog: 2, validation: 3, blocked: 4, completed: 5, cancelled: 6 };
         const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
         Object.keys(map).forEach(key => {
             map[key].sort((a, b) => {
+                const aRecent = recentlyCreatedIds.has(a.id);
+                const bRecent = recentlyCreatedIds.has(b.id);
+                if (aRecent && !bRecent) return -1;
+                if (!aRecent && bRecent) return 1;
+
                 const sa = statusOrder[a.status] ?? 3;
                 const sb = statusOrder[b.status] ?? 3;
                 if (sa !== sb) return sa - sb;
@@ -1724,7 +1762,7 @@ export default function MainTable({ forceProjectId = null }) {
             return a.label.localeCompare(b.label);
         });
         return groups;
-    }, [filteredTasks, engProjects]);
+    }, [filteredTasks, engProjects, recentlyCreatedIds]);
 
     // Auto-expand groups with tasks, collapse empty ones
     const dataLoadedRef = useRef(false);
