@@ -78,19 +78,20 @@ export default function WipBlockModal({
                 {/* Body */}
                 <div className="p-5 space-y-4">
                     {/* Current Task Info */}
-                    <div className="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50">
-                        <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-2 flex-1 min-w-0">
-                                <Pause className="w-4 h-4 text-amber-400 shrink-0" />
-                                <div className="min-w-0">
-                                    <p className="text-[10px] uppercase tracking-wider text-slate-500 font-black">Se suspenderá</p>
-                                    <p className="text-sm font-bold text-amber-300 truncate">{currentTask?.title || 'Tarea actual'}</p>
-                                </div>
+                    <div className="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50 space-y-3">
+                        <div className="flex items-start gap-3">
+                            <Pause className="w-4 h-4 text-amber-500 shrink-0 mt-1" />
+                            <div className="min-w-0 flex-1">
+                                <p className="text-[9px] uppercase tracking-wider text-amber-500/80 font-black">Se suspenderá (en pausa)</p>
+                                <p className="text-xs font-bold text-slate-200 mt-0.5 whitespace-normal break-words leading-relaxed">{currentTask?.title || 'Tarea actual'}</p>
                             </div>
-                            <ArrowRight className="w-4 h-4 text-slate-500 shrink-0" />
-                            <div className="min-w-0">
-                                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-black">Se activará</p>
-                                <p className="text-sm font-bold text-emerald-300 truncate">{newTask?.title || 'Nueva tarea'}</p>
+                        </div>
+                        <div className="border-t border-slate-700/30 my-1" />
+                        <div className="flex items-start gap-3">
+                            <Play className="w-4 h-4 text-emerald-500 shrink-0 mt-1 fill-emerald-500/20" />
+                            <div className="min-w-0 flex-1">
+                                <p className="text-[9px] uppercase tracking-wider text-emerald-400 font-black">Se activará (en progreso)</p>
+                                <p className="text-xs font-bold text-emerald-300 mt-0.5 whitespace-normal break-words leading-relaxed">{newTask?.title || 'Nueva tarea'}</p>
                             </div>
                         </div>
                     </div>
