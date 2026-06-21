@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 /**
  * StationManager — CRUD de estaciones por proyecto
  * ==================================================
@@ -14,7 +15,7 @@ import {
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../firebase';
 import {
-    onProjectStations, addStation, updateStation, deleteStation, hasMultipleIndexers
+    onProjectStations, addStation, updateStation, deleteStation, hasMultipleIndexers, getProjectStations
 } from '../../services/stationService';
 
 const analyzeStationImageFn = httpsCallable(functions, 'analyzeStationImage');
@@ -23,7 +24,7 @@ const analyzeStationImageFn = httpsCallable(functions, 'analyzeStationImage');
 // IMPORT MODAL — paste image → analyze → review → confirm
 // ============================================================
 
-function ImportModal({ open, onClose, projectId, userId, existingCount }) {
+function ImportModal({ open, onClose, projectId, userId, existingCount, onImportComplete }) {
     const [pastedImage, setPastedImage] = useState(null);
     const [processing, setProcessing] = useState(false);
     const [result, setResult] = useState(null);
@@ -94,9 +95,12 @@ function ImportModal({ open, onClose, projectId, userId, existingCount }) {
                 setImportProgress(`${i + 1} / ${result.stations.length}`);
             }
             setImportDone(true);
+            if (onImportComplete) {
+                await onImportComplete();
+            }
         } catch (err) { setError(`Error importando: ${err.message}`); }
         setProcessing(false);
-    }, [result, projectId, existingCount, userId]);
+    }, [result, projectId, existingCount, userId, onImportComplete]);
 
     const step = importDone ? 'done' : result ? 'review' : pastedImage ? 'analyze' : 'paste';
 
@@ -298,7 +302,7 @@ function ImportModal({ open, onClose, projectId, userId, existingCount }) {
 // INLINE EDIT CELL — click to edit, blur to save
 // ============================================================
 
-function InlineEditCell({ value, stationId, field, type = 'text', projectId, canEdit, className = '' }) {
+function InlineEditCell({ value, onSave, type = 'text', canEdit, className = '' }) {
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState(value ?? '');
     const inputRef = useRef(null);
@@ -311,9 +315,9 @@ function InlineEditCell({ value, stationId, field, type = 'text', projectId, can
         const newVal = type === 'number' ? (Number(draft) || 1) : draft;
         if (newVal === value) return; // no change
         try {
-            await updateStation(projectId, stationId, { [field]: newVal });
+            await onSave(newVal);
         } catch (err) { console.error('Auto-save error:', err); setDraft(value ?? ''); }
-    }, [draft, value, projectId, stationId, field, type]);
+    }, [draft, value, onSave, type]);
 
     if (!canEdit) {
         return <span className={className}>{value || '—'}</span>;
@@ -373,14 +377,40 @@ export default function StationManager({ projectId, canEdit = false, userId = nu
         try {
             await addStation(projectId, { ...newStation, indx: Number(newStation.indx) || 1, order: stations.length }, userId);
             setNewStation({ indx: 1, stn: '', abbreviation: '', description: '' }); setShowForm(false);
+            const data = await getProjectStations(projectId);
+            setStations(data);
         } catch (err) { console.error('Error adding station:', err); }
         setSaving(false);
     }, [projectId, newStation, stations.length, userId]);
 
     const handleDelete = useCallback(async (stationId) => {
         setDeletingId(stationId);
-        try { await deleteStation(projectId, stationId); } catch (err) { console.error('Error deleting station:', err); }
+        setStations(prev => prev.filter(s => s.id !== stationId));
+        try {
+            await deleteStation(projectId, stationId);
+            const data = await getProjectStations(projectId);
+            setStations(data);
+        } catch (err) {
+            console.error('Error deleting station:', err);
+            const data = await getProjectStations(projectId);
+            setStations(data);
+        }
         setDeletingId(null);
+    }, [projectId]);
+
+    const handleUpdate = useCallback(async (stationId, field, newVal) => {
+        const mappedVal = field === 'indx' ? (Number(newVal) || 1) : newVal;
+        setStations(prev => prev.map(s => s.id === stationId ? { ...s, [field]: mappedVal } : s));
+        try {
+            await updateStation(projectId, stationId, { [field]: mappedVal });
+            const data = await getProjectStations(projectId);
+            setStations(data);
+        } catch (err) {
+            console.error('Error updating station:', err);
+            const data = await getProjectStations(projectId);
+            setStations(data);
+            throw err;
+        }
     }, [projectId]);
 
     const indexerGroups = stations.reduce((acc, s) => {
@@ -390,8 +420,16 @@ export default function StationManager({ projectId, canEdit = false, userId = nu
 
     return (
         <div className="bg-white dark:bg-slate-900/70 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-lg">
-            <ImportModal open={showImportModal} onClose={() => setShowImportModal(false)}
-                projectId={projectId} userId={userId} existingCount={stations.length} />
+             <ImportModal open={showImportModal} onClose={() => setShowImportModal(false)}
+                projectId={projectId} userId={userId} existingCount={stations.length}
+                onImportComplete={async () => {
+                    try {
+                        const data = await getProjectStations(projectId);
+                        setStations(data);
+                    } catch (err) {
+                        console.error('Error refreshing after import:', err);
+                    }
+                }} />
 
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
@@ -485,16 +523,16 @@ export default function StationManager({ projectId, canEdit = false, userId = nu
                                     {indexerGroups[idxKey].map(stn => (
                                         <div key={stn.id} className="grid grid-cols-12 gap-2 px-3 py-2 items-center hover:bg-slate-50 dark:hover:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800/50 last:border-0 transition-colors group">
                                             <div className="col-span-1 text-xs">
-                                                <InlineEditCell value={stn.indx || 1} stationId={stn.id} field="indx" type="number" projectId={projectId} canEdit={canEdit} className="text-slate-600 dark:text-slate-500" />
+                                                <InlineEditCell value={stn.indx || 1} onSave={val => handleUpdate(stn.id, 'indx', val)} type="number" canEdit={canEdit} className="text-slate-600 dark:text-slate-500" />
                                             </div>
                                             <div className="col-span-1 text-xs">
-                                                <InlineEditCell value={stn.stn} stationId={stn.id} field="stn" projectId={projectId} canEdit={canEdit} className="text-cyan-600 dark:text-cyan-400 font-mono font-bold" />
+                                                <InlineEditCell value={stn.stn} onSave={val => handleUpdate(stn.id, 'stn', val)} canEdit={canEdit} className="text-cyan-600 dark:text-cyan-400 font-mono font-bold" />
                                             </div>
                                             <div className="col-span-3 text-xs">
-                                                <InlineEditCell value={stn.description} stationId={stn.id} field="description" projectId={projectId} canEdit={canEdit} className="text-slate-700 dark:text-slate-300" />
+                                                <InlineEditCell value={stn.description} onSave={val => handleUpdate(stn.id, 'description', val)} canEdit={canEdit} className="text-slate-700 dark:text-slate-300" />
                                             </div>
                                             <div className="col-span-2 text-xs">
-                                                <InlineEditCell value={stn.abbreviation} stationId={stn.id} field="abbreviation" projectId={projectId} canEdit={canEdit} className="text-slate-500 dark:text-slate-400 font-semibold" />
+                                                <InlineEditCell value={stn.abbreviation} onSave={val => handleUpdate(stn.id, 'abbreviation', val)} canEdit={canEdit} className="text-slate-500 dark:text-slate-400 font-semibold" />
                                             </div>
                                             <div className="col-span-3 text-xs">
                                                 <span className="text-amber-600 dark:text-amber-400/80 font-mono text-[11px]">

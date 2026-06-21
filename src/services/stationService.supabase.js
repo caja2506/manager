@@ -6,12 +6,17 @@
  */
 
 import { supabase } from '../supabase';
+import { formatStationLabel } from '../modules/tasks/domain/taskModel';
 
 // ── Helpers ──
 
 export function hasMultipleIndexers(stations) {
     if (!stations || stations.length === 0) return false;
-    const indexers = new Set(stations.map(s => s.indx || 1));
+    const indexers = new Set(stations.map(s => {
+        if (s.indx === null || s.indx === undefined) return 1;
+        const val = Number(s.indx);
+        return isNaN(val) ? 1 : val;
+    }));
     return indexers.size > 1;
 }
 
@@ -96,7 +101,6 @@ export async function bulkImportStations(projectId, stationsArray, userId = null
 export function getStationOptions(stations) {
     if (!stations || stations.length === 0) return [];
     const multiIdx = hasMultipleIndexers(stations);
-    const { formatStationLabel } = require('../models/schemas');
     return stations
         .filter(s => s.active !== false)
         .map(s => ({
