@@ -4,11 +4,12 @@ import { Tag, Plus, Trash2, Loader2 } from 'lucide-react';
 // ========================================================
 // COMPONENTE: GESTOR DE LISTAS (MODAL)
 // ========================================================
-const ListManagerModal = ({ title, items: initialItems, onSave, onClose }) => {
+const ListManagerModal = ({ title, items: initialItems, onSave, onClose, canDelete = true }) => {
     const [managedItems, setManagedItems] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setManagedItems(
             (initialItems || []).map((item, index) => {
                 const name = typeof item === 'string' ? item : item.name;
@@ -86,9 +87,11 @@ const ListManagerModal = ({ title, items: initialItems, onSave, onClose }) => {
                                     <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Taller</span>
                                 </label>
                             )}
-                            <button onClick={() => handleRemoveItem(item.id)} className="p-3 text-red-500 hover:bg-red-500/15 rounded-lg">
-                                <Trash2 className="w-5 h-5" />
-                            </button>
+                            {canDelete && (
+                                <button onClick={() => handleRemoveItem(item.id)} className="p-3 text-red-500 hover:bg-red-500/15 rounded-lg">
+                                    <Trash2 className="w-5 h-5" />
+                                </button>
+                            )}
                         </div>
                     ))}
                 </div>
