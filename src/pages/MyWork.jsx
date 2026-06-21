@@ -6,7 +6,7 @@ import { format, startOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
     User, CalendarDays, ExternalLink, Play, Square, Pause, 
-    Check, AlertCircle, Clock, ChevronRight, BookOpen, Inbox, Info
+    Check, AlertCircle, ChevronRight, MessageSquare, ChevronDown, Calendar
 } from 'lucide-react';
 
 // Task modals
@@ -21,13 +21,13 @@ import { plannerService } from '../services/plannerService';
 import { supabase } from '../supabase';
 
 // Services
-import { updateTaskStatus } from '../services/taskService';
+import { updateTask, updateTaskStatus } from '../services/taskService';
 import { 
     getActiveTimerFromLogs, formatElapsed, stopTimer, startTimerSafe, clearLegacyTimer 
 } from '../services/timeService';
 
-// Schema & priorities config
-import { TASK_STATUS, TASK_PRIORITY } from '../models/schemas';
+// Configurations
+import { TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG } from '../models/schemas';
 
 // Greeting helper
 function getGreeting() {
@@ -37,18 +37,13 @@ function getGreeting() {
     return 'Buenas noches';
 }
 
-const PRIORITY_BADGES = {
-    critical: { label: 'CRÍTICA', bg: 'bg-red-500/15 text-red-400 border border-red-500/30' },
-    high:     { label: 'ALTA',    bg: 'bg-amber-500/15 text-amber-400 border border-amber-500/30' },
-    medium:   { label: 'MEDIA',   bg: 'bg-blue-500/15 text-blue-400 border border-blue-500/30' },
-    low:      { label: 'BAJA',    bg: 'bg-slate-800 text-slate-300 border border-slate-700' },
-};
+const GRID_COLS = '28px minmax(180px, 1.2fr) minmax(120px, 1fr) 32px 55px 86px 68px 56px minmax(100px, 140px) 76px 70px 36px';
 
-const PRIORITY_BORDERS = {
-    critical: 'border-l-4 border-l-red-500',
-    high:     'border-l-4 border-l-amber-500',
-    medium:   'border-l-4 border-l-blue-500',
-    low:      'border-l-4 border-l-slate-600',
+const PRIORITY_BADGES = {
+    critical: { label: 'CRÍTICA', bg: 'rgba(239, 68, 68, 0.15)', text: '#ef4444' },
+    high:     { label: 'ALTA',    bg: 'rgba(245, 158, 11, 0.15)', text: '#f59e0b' },
+    medium:   { label: 'MEDIA',   bg: 'rgba(59, 130, 246, 0.15)', text: '#3b82f6' },
+    low:      { label: 'BAJA',    bg: 'rgba(71, 85, 105, 0.15)',  text: '#94a3b8' },
 };
 
 export default function MyWork() {
@@ -170,10 +165,7 @@ export default function MyWork() {
         userId: user?.uid,
     });
 
-    const {
-        myTasks, todayTasks, blockedTasks, weeklyStats,
-        todayHours, myTodayLogs, todayPlanItems
-    } = myWorkData;
+    const { myTasks } = myWorkData;
 
     // ── Task Detail Modal state ──
     const [taskModalTask, setTaskModalTask] = useState(undefined); // undefined=closed, null=new, obj=edit
@@ -237,11 +229,12 @@ export default function MyWork() {
         }
         try {
             await updateTaskStatus(task.id, newStatus, task.projectId);
+            refetchTable('tasks');
         } catch (e) {
             console.error('Error updating status:', e);
             alert('No se pudo cambiar el estado: ' + (e.message || 'Error desconocido'));
         }
-    }, [engTasks, user?.uid]);
+    }, [engTasks, user?.uid, refetchTable]);
 
     // ── WIP switch confirm ──
     const handleWipConfirm = useCallback(async (blockData) => {
@@ -273,12 +266,13 @@ export default function MyWork() {
             setWipCurrentTask(null);
             setWipPendingTask(null);
             setWipPendingStatus(null);
+            refetchTable('tasks');
         } catch (err) {
             console.error('WIP switch error:', err);
             alert('Error en cambio WIP: ' + (err.message || 'Error desconocido'));
         }
         setWipSwitching(false);
-    }, [wipCurrentTask, wipPendingTask, wipPendingStatus, user?.uid]);
+    }, [wipCurrentTask, wipPendingTask, wipPendingStatus, user?.uid, refetchTable]);
 
     // ── Timer Start helper ──
     const handleStartTimer = useCallback(async (task) => {
@@ -304,6 +298,7 @@ export default function MyWork() {
             try {
                 await updateTaskStatus(task.id, 'in_progress', task.projectId, false);
                 await handleStartTimer(task);
+                refetchTable('tasks');
             } catch (e) {
                 console.error(e);
             }
@@ -311,7 +306,7 @@ export default function MyWork() {
             await handleStatusChange(task, 'in_progress');
             await handleStartTimer(task);
         }
-    }, [handleStatusChange, handleStartTimer]);
+    }, [handleStatusChange, handleStartTimer, refetchTable]);
 
     const handlePauseTask = useCallback(async (task) => {
         if (activeTimer && activeTimer.taskId === task.id) {
@@ -327,44 +322,30 @@ export default function MyWork() {
         await handleStatusChange(task, 'completed');
     }, [activeTimer, handleTimerStop, handleStatusChange]);
 
-    // ── Manual timer select ──
-    const [manualTaskSelect, setManualTaskSelect] = useState('');
-    const handleManualTimerStart = async () => {
-        if (!manualTaskSelect) return;
-        const task = myTasks.find(t => t.id === manualTaskSelect);
-        if (task) {
-            await handleStartTask(task);
-            setManualTaskSelect('');
+    // ── Priority update handler ──
+    const handlePriorityChange = useCallback(async (task, newPriority) => {
+        try {
+            await updateTask(task.id, { priority: newPriority });
+            refetchTable('tasks');
+        } catch (e) {
+            console.error('Error updating priority:', e);
+            alert('No se pudo cambiar la prioridad: ' + (e.message || 'Error desconocido'));
         }
-    };
+    }, [refetchTable]);
 
-    // ── Categorizar las tareas de manera limpia y visual ──
-    const immediateTasks = useMemo(() => {
-        return myTasks.filter(t => 
-            t.status === 'blocked' || 
-            t.priority === 'critical' || 
-            t.priority === 'high' || 
-            (t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'completed')
-        );
+    // ── Ordenar tareas por prioridad (Critical -> High -> Medium -> Low) ──
+    const sortedTasks = useMemo(() => {
+        const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+        return [...myTasks].sort((a, b) => {
+            const pa = priorityOrder[a.priority] ?? 2;
+            const pb = priorityOrder[b.priority] ?? 2;
+            return pa - pb;
+        });
     }, [myTasks]);
-
-    const todayTasksList = useMemo(() => {
-        return todayTasks.filter(t => !immediateTasks.some(it => it.id === t.id));
-    }, [todayTasks, immediateTasks]);
-
-    const otherTasksList = useMemo(() => {
-        return myTasks.filter(t => 
-            !immediateTasks.some(it => it.id === t.id) && 
-            !todayTasksList.some(tt => tt.id === t.id)
-        );
-    }, [myTasks, immediateTasks, todayTasksList]);
 
     // Lookup para render del cronómetro
     const activeTaskName = activeTimer?.taskId
-        ? (myTasks.find(t => t.id === activeTimer.taskId)?.title || activeTimer.taskTitle || 'Tarea en Progreso')
-        : null;
-    const activeProjectName = activeTimer?.projectId
-        ? (engProjects.find(p => p.id === activeTimer.projectId)?.name || activeTimer.projectName || 'Proyecto')
+        ? (myTasks.find(t => t.id === activeTimer.taskId)?.title || activeTimer.taskTitle || 'Tarea activa')
         : null;
 
     const todayLabel = format(new Date(), "EEEE, d 'de' MMMM", { locale: es });
@@ -386,6 +367,27 @@ export default function MyWork() {
                     </p>
                 </div>
 
+                {/* Cabecera Central: Mini Timer Activo */}
+                {activeTimer && (
+                    <div className="flex items-center gap-3 px-4 py-2 bg-slate-900 border border-slate-800 rounded-2xl shadow-md border-emerald-500/20">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 animate-ping" />
+                        <div className="text-[11px] font-black text-slate-300 truncate max-w-[150px] md:max-w-[280px]">
+                            Trabajando en: <span className="text-white font-bold">{activeTaskName}</span>
+                        </div>
+                        <div className="text-xs font-mono font-black text-emerald-400 shrink-0 border-l border-slate-800 pl-3">
+                            {elapsed}
+                        </div>
+                        <button
+                            onClick={handleTimerStop}
+                            disabled={isStopping}
+                            className="p-1 hover:bg-red-500/10 text-red-400 hover:text-red-300 rounded transition-all ml-1 shrink-0"
+                            title="Detener Registro"
+                        >
+                            <Square className="w-3.5 h-3.5 fill-red-400" />
+                        </button>
+                    </div>
+                )}
+
                 <a
                     href="/planner"
                     className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 border border-slate-800 hover:border-indigo-500/50 hover:text-indigo-400 text-slate-400 rounded-xl font-bold text-xs transition-all active:scale-95 self-start"
@@ -396,241 +398,247 @@ export default function MyWork() {
                 </a>
             </div>
 
-            {/* Layout de 2 Columnas */}
-            <div className="grid lg:grid-cols-3 gap-6">
-                
-                {/* Columna de Tareas (2/3) */}
-                <div className="lg:col-span-2 space-y-6">
-                    
-                    {/* Atención Inmediata */}
-                    {immediateTasks.length > 0 && (
-                        <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-5 space-y-4">
-                            <div className="flex items-center gap-2 text-red-400">
-                                <AlertCircle className="w-5 h-5" />
-                                <h2 className="text-sm font-black uppercase tracking-wider">Atención Inmediata</h2>
-                                <span className="bg-red-500/20 text-red-400 text-xs px-2 py-0.5 rounded-full font-bold">
-                                    {immediateTasks.length}
-                                </span>
-                            </div>
-                            <div className="space-y-3">
-                                {immediateTasks.map(task => (
-                                    <TaskRow 
-                                        key={task.id} 
-                                        task={task} 
-                                        isActive={activeTimer?.taskId === task.id}
-                                        onStart={handleStartTask}
-                                        onPause={handlePauseTask}
-                                        onComplete={handleCompleteTask}
-                                        onOpen={handleOpenTask}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Para Hoy */}
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 space-y-4">
-                        <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-                            <div className="flex items-center gap-2 text-indigo-400">
-                                <Clock className="w-4 h-4" />
-                                <h2 className="text-sm font-black uppercase tracking-wider text-slate-200">Tareas para Hoy</h2>
-                                <span className="bg-indigo-500/20 text-indigo-400 text-xs px-2 py-0.5 rounded-full font-bold">
-                                    {todayTasksList.length}
-                                </span>
-                            </div>
-                        </div>
-                        {todayTasksList.length > 0 ? (
-                            <div className="space-y-3">
-                                {todayTasksList.map(task => (
-                                    <TaskRow 
-                                        key={task.id} 
-                                        task={task} 
-                                        isActive={activeTimer?.taskId === task.id}
-                                        onStart={handleStartTask}
-                                        onPause={handlePauseTask}
-                                        onComplete={handleCompleteTask}
-                                        onOpen={handleOpenTask}
-                                    />
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-xs text-slate-500 italic py-2">No hay tareas programadas para hoy.</p>
-                        )}
-                    </div>
-
-                    {/* Resto de Tareas Asignadas */}
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 space-y-4">
-                        <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-                            <div className="flex items-center gap-2 text-slate-400">
-                                <BookOpen className="w-4 h-4" />
-                                <h2 className="text-sm font-black uppercase tracking-wider text-slate-200">Otras Tareas Asignadas</h2>
-                                <span className="bg-slate-800 text-slate-400 text-xs px-2 py-0.5 rounded-full font-bold">
-                                    {otherTasksList.length}
-                                </span>
-                            </div>
-                        </div>
-                        {otherTasksList.length > 0 ? (
-                            <div className="space-y-3">
-                                {otherTasksList.map(task => (
-                                    <TaskRow 
-                                        key={task.id} 
-                                        task={task} 
-                                        isActive={activeTimer?.taskId === task.id}
-                                        onStart={handleStartTask}
-                                        onPause={handlePauseTask}
-                                        onComplete={handleCompleteTask}
-                                        onOpen={handleOpenTask}
-                                    />
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-xs text-slate-500 italic py-2">No tienes otras tareas abiertas asignadas.</p>
-                        )}
-                    </div>
-
+            {/* Layout de Columna Única: Tabla con diseño MainTable */}
+            <div className="rounded-xl border border-slate-800/50 bg-slate-800/20 max-h-[78vh] overflow-auto">
+                <div
+                    className="grid items-center px-2 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-900/90 text-center sticky top-0 z-20 min-w-[1100px]"
+                    style={{ gridTemplateColumns: GRID_COLS }}
+                >
+                    <div className="sticky left-0 z-10 bg-slate-900 h-full flex items-center justify-center border-l-3 border-l-slate-700"></div>
+                    <div className="sticky left-[28px] z-10 text-left bg-slate-900 h-full flex items-center">Tarea</div>
+                    <div className="text-left px-2">Proyecto</div>
+                    <div className="text-center">💬</div>
+                    <div>STN</div>
+                    <div>Estado</div>
+                    <div>Tipo</div>
+                    <div>Avance</div>
+                    <div>Timeline</div>
+                    <div>Horas</div>
+                    <div>Prioridad</div>
+                    <div className="text-right pr-2">Acciones</div>
                 </div>
 
-                {/* Columna Control de Tiempos (1/3) */}
-                <div className="space-y-6">
-                    
-                    {/* Widget Cronómetro */}
-                    <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 shadow-xl relative overflow-hidden flex flex-col justify-between">
-                        {activeTimer ? (
-                            <>
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl -mr-10 -mt-10" />
-                                <div className="relative space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-                                            <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Cronómetro Activo</span>
-                                        </div>
-                                    </div>
-                                    <div className="py-2">
-                                        <h3 className="text-4xl font-mono font-black text-white tracking-tight leading-none drop-shadow-md">
-                                            {elapsed}
-                                        </h3>
-                                        <p className="text-[11px] text-indigo-300 font-bold mt-2 truncate">
-                                            {activeProjectName}
-                                        </p>
-                                        <p className="text-xs text-slate-300 font-black mt-0.5 line-clamp-2">
-                                            {activeTaskName}
-                                        </p>
-                                    </div>
-                                    <button
-                                        onClick={handleTimerStop}
-                                        disabled={isStopping}
-                                        className="w-full flex items-center justify-center gap-2 py-3 bg-red-600 hover:bg-red-500 active:scale-98 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all shadow-lg shadow-red-500/15"
+                <div className="min-w-[1100px] divide-y divide-slate-800/30">
+                    {sortedTasks.map((task, idx) => {
+                        const isTaskActive = activeTimer?.taskId === task.id;
+                        const isBlocked = task.status === 'blocked';
+                        const isCritical = task.priority === 'critical';
+                        
+                        const project = engProjects.find(p => p.id === task.projectId);
+                        const projectColor = project?.colorKey || '#6366f1';
+                        
+                        const statusCfg = TASK_STATUS_CONFIG[task.status] || {};
+                        const pStyle = PRIORITY_BADGES[task.priority] || PRIORITY_BADGES.medium;
+
+                        // Subtask progress
+                        const totalSubs = task.subtasks?.length || 0;
+                        const doneSubs = task.subtasks?.filter(s => s.completed || s.done).length || 0;
+                        const subsPct = totalSubs > 0 ? Math.round((doneSubs / totalSubs) * 100) : 0;
+
+                        // Timeline calculate
+                        const startRaw = task.plannedStartDate || task.createdAt;
+                        const endRaw = task.dueDate || task.plannedEndDate;
+                        const startDate = startRaw ? new Date(startRaw) : null;
+                        const endDate = endRaw ? new Date(endRaw) : null;
+                        const now = new Date();
+
+                        let timelinePct = 0;
+                        let timelineColor = '#6366f1';
+                        let daysLeft = null;
+                        if (startDate && endDate) {
+                            const total = Math.max(1, (endDate - startDate) / (1000 * 60 * 60 * 24));
+                            const elapsed = Math.max(0, (now - startDate) / (1000 * 60 * 60 * 24));
+                            timelinePct = Math.min(100, Math.max(0, (elapsed / total) * 100));
+                            daysLeft = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
+                            if (daysLeft < 0 && task.status !== 'completed' && task.status !== 'cancelled') timelineColor = '#ef4444';
+                            else if (timelinePct > 80) timelineColor = '#f59e0b';
+                        }
+                        const isOverdue = daysLeft !== null && daysLeft < 0 && task.status !== 'completed' && task.status !== 'cancelled';
+                        const formattedDueDate = endDate ? endDate.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' }) : '—';
+
+                        // % Avance
+                        const progressPct = task.percentComplete != null 
+                            ? Math.round(task.percentComplete) 
+                            : (task.status === 'completed' ? 100 : subsPct);
+                        const progressColor = progressPct === 100 ? '#22c55e' : progressPct >= 60 ? '#6366f1' : progressPct >= 30 ? '#f59e0b' : '#ef4444';
+
+                        // Hours
+                        const actual = task.actualHours || 0;
+                        const estimated = task.estimatedHours || 0;
+
+                        // Station name
+                        const stationLabel = task.stationId ? task.stationId.replace('station_', 'ST ').toUpperCase() : '—';
+
+                        // Task Type name
+                        const typeName = taskTypes?.find(tt => tt.id === task.taskTypeId)?.name || '—';
+
+                        return (
+                            <div
+                                key={task.id}
+                                className={`grid items-center px-2 py-2 hover:bg-slate-800/10 transition-colors text-xs text-center
+                                    ${isTaskActive ? 'bg-indigo-500/5 hover:bg-indigo-500/10' : 'bg-slate-900/10'}
+                                    ${isOverdue ? 'ring-1 ring-inset ring-rose-500/20' : ''}
+                                `}
+                                style={{ gridTemplateColumns: GRID_COLS }}
+                            >
+                                {/* Borde izquierdo de color + Checkbox virtual */}
+                                <div className="sticky left-0 z-10 bg-slate-950/40 h-full flex items-center justify-center" style={{ borderLeft: `3px solid ${isCritical ? '#ef4444' : '#6366f1'}` }}>
+                                    <span className={`w-2 h-2 rounded-full ${isTaskActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-700'}`} />
+                                </div>
+
+                                {/* Tarea */}
+                                <div className="sticky left-[28px] z-10 bg-slate-950/40 text-left px-1 flex items-center gap-1.5 font-semibold text-slate-200">
+                                    <span 
+                                        onClick={() => handleOpenTask(task)}
+                                        className="hover:text-indigo-400 cursor-pointer transition-colors truncate block max-w-full"
                                     >
-                                        <Square className="w-4 h-4 fill-white" />
-                                        Detener Registro
+                                        {task.title || 'Sin título'}
+                                    </span>
+                                    {totalSubs > 0 && (
+                                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded shrink-0 ${
+                                            subsPct === 100 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700/60 text-slate-400'
+                                        }`}>
+                                            {doneSubs}/{totalSubs}
+                                        </span>
+                                    )}
+                                    {isBlocked && (
+                                        <span className="text-[9px] font-black uppercase px-1 py-0.5 bg-red-600 text-white rounded shrink-0 scale-90">
+                                            Bloqueada
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Proyecto */}
+                                <div className="text-left px-2">
+                                    <span className="text-[10px] font-black px-2 py-0.5 bg-slate-900 border border-slate-800 rounded whitespace-nowrap" style={{ color: projectColor, borderColor: `${projectColor}30` }}>
+                                        {task.projectName}
+                                    </span>
+                                </div>
+
+                                {/* Comentarios Link */}
+                                <div 
+                                    className="flex items-center justify-center text-slate-500 hover:text-slate-200 cursor-pointer"
+                                    onClick={() => handleOpenTask(task)}
+                                >
+                                    <MessageSquare className="w-3.5 h-3.5" />
+                                </div>
+
+                                {/* Estación */}
+                                <div className="text-[10px] font-bold text-slate-400">{stationLabel}</div>
+
+                                {/* Estado Dropdown */}
+                                <div className="flex items-stretch px-0.5">
+                                    <select
+                                        value={task.status}
+                                        onChange={e => handleStatusChange(task, e.target.value)}
+                                        className="w-full text-center py-1 rounded text-[10px] font-black text-white cursor-pointer focus:outline-none"
+                                        style={{ background: statusCfg.color || '#64748b' }}
+                                    >
+                                        {Object.entries(TASK_STATUS_CONFIG)
+                                            .filter(([k]) => k !== 'backlog')
+                                            .map(([k, cfg]) => (
+                                                <option key={k} value={k} className="bg-slate-900 text-slate-200 text-xs font-semibold text-left">
+                                                    {cfg.label}
+                                                </option>
+                                            ))
+                                        }
+                                    </select>
+                                </div>
+
+                                {/* Tipo */}
+                                <div className="text-[10px] text-slate-400 truncate">{typeName}</div>
+
+                                {/* Avance */}
+                                <div className="flex items-center gap-1.5 px-2">
+                                    <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden shrink-0">
+                                        <div className="h-full rounded-full" style={{ width: `${progressPct}%`, backgroundColor: progressColor }} />
+                                    </div>
+                                    <span className="text-[9px] font-black text-slate-400">{progressPct}%</span>
+                                </div>
+
+                                {/* Timeline */}
+                                <div className="flex flex-col items-center justify-center gap-0.5">
+                                    <div className="flex items-center gap-1 text-[9px] font-bold">
+                                        <Calendar className="w-3 h-3 text-slate-500" style={{ color: timelineColor }} />
+                                        <span className={isOverdue ? 'text-red-400 font-black' : 'text-slate-400'}>{formattedDueDate}</span>
+                                    </div>
+                                    {daysLeft !== null && (
+                                        <span className={`text-[8px] font-black uppercase tracking-wider ${isOverdue ? 'text-red-400' : 'text-slate-500'}`}>
+                                            {isOverdue ? `${Math.abs(daysLeft)}d atraso` : `${daysLeft}d restantes`}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Horas */}
+                                <div className="text-[10px] font-bold text-slate-300">
+                                    {actual.toFixed(1)} <span className="text-slate-500">/</span> {estimated.toFixed(1)} h
+                                </div>
+
+                                {/* Prioridad Dropdown */}
+                                <div className="flex items-stretch px-0.5">
+                                    <select
+                                        value={task.priority}
+                                        onChange={e => handlePriorityChange(task, e.target.value)}
+                                        className="w-full text-center py-1 rounded text-[10px] font-black cursor-pointer focus:outline-none"
+                                        style={{ 
+                                            background: pStyle.bg,
+                                            color: pStyle.text
+                                        }}
+                                    >
+                                        {Object.entries(TASK_PRIORITY_CONFIG).map(([k, cfg]) => (
+                                            <option key={k} value={k} className="bg-slate-900 text-slate-200 text-xs font-semibold text-left">
+                                                {cfg.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Acciones */}
+                                <div className="flex items-center justify-end gap-1 px-1">
+                                    {isTaskActive ? (
+                                        <>
+                                            <button
+                                                onClick={() => handleCompleteTask(task)}
+                                                className="p-1 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white rounded transition-all"
+                                                title="Completar tarea"
+                                            >
+                                                <Check className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                                onClick={() => handlePauseTask(task)}
+                                                className="p-1 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 border border-slate-750 rounded transition-all"
+                                                title="Pausar tarea"
+                                            >
+                                                <Pause className="w-3.5 h-3.5" />
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <button
+                                            onClick={() => handleStartTask(task)}
+                                            className={`p-1 rounded transition-all active:scale-95 text-white ${
+                                                isBlocked ? 'bg-amber-600 hover:bg-amber-500' : 'bg-indigo-600 hover:bg-indigo-500'
+                                            }`}
+                                            title={isBlocked ? 'Desbloquear y empezar' : 'Iniciar tiempo'}
+                                        >
+                                            <Play className="w-3 h-3 fill-white" />
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => handleOpenTask(task)}
+                                        className="p-1 bg-slate-950 border border-slate-850 hover:border-slate-750 text-slate-400 hover:text-white rounded transition-all"
+                                    >
+                                        <ChevronRight className="w-3.5 h-3.5" />
                                     </button>
                                 </div>
-                            </>
-                        ) : (
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2">
-                                    <span className="w-2.5 h-2.5 rounded-full bg-slate-700" />
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sin temporizador activo</span>
-                                </div>
-                                <div className="py-2">
-                                    <h3 className="text-4xl font-mono font-black text-slate-600 tracking-tight leading-none">
-                                        0:00:00
-                                    </h3>
-                                    <p className="text-[11px] text-slate-500 mt-2">
-                                        Inicia el tiempo en cualquier tarea de la lista para registrar tu progreso.
-                                    </p>
-                                </div>
-                                
-                                {/* Manual Timer Trigger */}
-                                <div className="pt-2 border-t border-slate-800/80 space-y-2">
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Iniciar en otra tarea:</label>
-                                    <div className="flex gap-2">
-                                        <select
-                                            value={manualTaskSelect}
-                                            onChange={e => setManualTaskSelect(e.target.value)}
-                                            className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer h-9"
-                                        >
-                                            <option value="">Selecciona una tarea...</option>
-                                            {myTasks.map(t => (
-                                                <option key={t.id} value={t.id}>
-                                                    {t.projectName} - {t.title}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <button
-                                            onClick={handleManualTimerStart}
-                                            disabled={!manualTaskSelect}
-                                            className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white rounded-xl flex items-center justify-center transition-all active:scale-95"
-                                        >
-                                            <Play className="w-4 h-4 fill-white" />
-                                        </button>
-                                    </div>
-                                </div>
                             </div>
-                        )}
-                    </div>
-
-                    {/* Resumen de Horas */}
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 space-y-4">
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800 pb-2">Registro de Horas</h3>
-                        
-                        <div className="space-y-4">
-                            {/* Hoy */}
-                            <div>
-                                <div className="flex items-center justify-between text-xs font-bold mb-1.5">
-                                    <span className="text-slate-300">Hoy</span>
-                                    <span className="text-indigo-400">{todayHours.toFixed(2)} / 8.0 hrs</span>
-                                </div>
-                                <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden">
-                                    <div 
-                                        className="h-full bg-indigo-500 rounded-full transition-all duration-500" 
-                                        style={{ width: `${Math.min(100, (todayHours / 8.0) * 100)}%` }}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Semana */}
-                            <div>
-                                <div className="flex items-center justify-between text-xs font-bold mb-1.5">
-                                    <span className="text-slate-300">Esta Semana</span>
-                                    <span className="text-emerald-400">{weeklyStats.actualHours.toFixed(2)} / {weeklyStats.plannedHours.toFixed(2)} hrs</span>
-                                </div>
-                                <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden">
-                                    <div 
-                                        className="h-full bg-emerald-500 rounded-full transition-all duration-500" 
-                                        style={{ width: `${weeklyStats.utilizationPct}%` }}
-                                    />
-                                </div>
-                            </div>
+                        );
+                    })}
+                    {sortedTasks.length === 0 && (
+                        <div className="py-8 text-center text-xs text-slate-500 italic">
+                            No tienes tareas abiertas asignadas.
                         </div>
-                    </div>
-
-                    {/* Bitácora del Día */}
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 space-y-4">
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800 pb-2">Actividad de Hoy</h3>
-                        {myTodayLogs.length > 0 ? (
-                            <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
-                                {myTodayLogs.map(log => (
-                                    <div key={log.id} className="flex flex-col gap-1 p-2 bg-slate-950/60 border border-slate-850 rounded-xl">
-                                        <div className="flex items-center justify-between text-[11px] font-bold text-slate-300">
-                                            <span className="truncate max-w-[130px]">{log.taskTitle || 'Sin título'}</span>
-                                            <span className="text-indigo-400 shrink-0">{(log.totalHours || 0).toFixed(2)}h</span>
-                                        </div>
-                                        {log.notes && (
-                                            <p className="text-[9px] text-slate-500 line-clamp-1 italic">
-                                                {log.notes}
-                                            </p>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-[10px] text-slate-500 italic">Aún no has registrado horas hoy.</p>
-                        )}
-                    </div>
-
+                    )}
                 </div>
-
             </div>
 
             {/* Task Detail Modal */}
@@ -663,88 +671,6 @@ export default function MyWork() {
                 teamMembers={teamMembers}
                 isLoading={wipSwitching}
             />
-        </div>
-    );
-}
-
-// ── Componente Fila de Tarea Simplificada ──
-function TaskRow({ task, isActive, onStart, onPause, onComplete, onOpen }) {
-    const pStyle = PRIORITY_BADGES[task.priority] || PRIORITY_BADGES.medium;
-    const borderStyle = PRIORITY_BORDERS[task.priority] || PRIORITY_BORDERS.medium;
-    const isBlocked = task.status === 'blocked';
-
-    return (
-        <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-slate-950/60 hover:bg-slate-900 border border-slate-900 rounded-xl transition-all duration-200 ${borderStyle} ${isActive ? 'ring-1 ring-indigo-500 bg-slate-900/60' : ''}`}>
-            
-            {/* Información Tarea */}
-            <div className="flex-1 min-w-0 space-y-1.5">
-                <div className="flex flex-wrap items-center gap-2">
-                    {/* Proyecto */}
-                    <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded">
-                        {task.projectName}
-                    </span>
-                    {/* Prioridad */}
-                    <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${pStyle.bg}`}>
-                        {pStyle.label}
-                    </span>
-                    {/* Estado Bloqueado */}
-                    {isBlocked && (
-                        <span className="text-[9px] font-black uppercase px-1.5 py-0.5 bg-red-600 text-white rounded animate-pulse">
-                            BLOQUEADO
-                        </span>
-                    )}
-                </div>
-
-                <h3 
-                    onClick={() => onOpen(task)}
-                    className="text-xs font-black text-slate-200 hover:text-indigo-400 cursor-pointer transition-colors truncate max-w-full"
-                >
-                    {task.title}
-                </h3>
-            </div>
-
-            {/* Acciones */}
-            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                {isActive ? (
-                    <>
-                        <button
-                            onClick={() => onComplete(task)}
-                            className="h-8 px-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white rounded-lg flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-wider transition-all"
-                        >
-                            <Check className="w-3.5 h-3.5" />
-                            Completar
-                        </button>
-                        <button
-                            onClick={() => onPause(task)}
-                            className="h-8 px-3 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 border border-slate-700 rounded-lg flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-wider transition-all"
-                        >
-                            <Pause className="w-3.5 h-3.5" />
-                            Pausar
-                        </button>
-                    </>
-                ) : (
-                    <button
-                        onClick={() => onStart(task)}
-                        className={`h-8 px-3.5 rounded-lg flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 ${
-                            isBlocked
-                                ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-md shadow-amber-600/10'
-                                : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/10'
-                        }`}
-                    >
-                        <Play className="w-3.5 h-3.5 fill-white" />
-                        {isBlocked ? 'Desbloquear' : 'Iniciar'}
-                    </button>
-                )}
-                
-                {/* Botón de detalle */}
-                <button
-                    onClick={() => onOpen(task)}
-                    className="h-8 w-8 bg-slate-900 border border-slate-800 hover:border-slate-700 active:scale-95 text-slate-400 hover:text-white rounded-lg flex items-center justify-center transition-all"
-                >
-                    <ChevronRight className="w-4 h-4" />
-                </button>
-            </div>
-
         </div>
     );
 }
