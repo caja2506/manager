@@ -32,6 +32,11 @@ export default function TaskFooter({
                 
                 {/* Action buttons — always side-by-side, Save gets more space */}
                 <div className="flex items-center gap-2 lg:gap-3 flex-shrink-0">
+                    {!canSave && canEdit && (
+                        <span className="text-[11px] text-rose-450 font-bold animate-pulse flex items-center gap-1 mr-1 lg:mr-2">
+                            ⚠️ Falta el título
+                        </span>
+                    )}
                     <button
                         onClick={onClose}
                         className="px-4 py-2.5 border border-slate-700 bg-slate-800 rounded-xl font-bold text-sm text-white hover:bg-slate-700 hover:text-slate-200 transition-all whitespace-nowrap"

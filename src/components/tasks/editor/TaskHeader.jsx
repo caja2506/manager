@@ -91,8 +91,29 @@ export default function TaskHeader({
     };
     const pillColor = STATUS_PILL_COLORS[currentStatusCfg.color] || STATUS_PILL_COLORS['#64748b'];
 
+    const isTitleEmpty = !form.title?.trim();
+    const titleTextareaClasses = `flex-1 min-w-0 text-lg lg:text-xl font-black tracking-tight outline-none py-1.5 px-2.5 rounded-lg resize-none h-auto overflow-hidden transition-all duration-300
+        ${isTitleEmpty && canEdit
+            ? 'bg-rose-500/10 border border-rose-500/30 ring-2 ring-rose-500/10 animate-pulse text-rose-200 placeholder-rose-400/60'
+            : 'bg-transparent text-white placeholder-slate-400 border border-transparent focus:border-slate-700 focus:bg-slate-800/10'
+        }
+    `;
+
     return (
         <div className="p-3 lg:py-5 lg:px-8 border-b border-slate-800 flex-shrink-0 space-y-2 lg:space-y-4">
+            {canEdit && (
+                <div className="flex items-center justify-between px-1">
+                    <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 block">
+                        Título de la tarea <span className="text-rose-400 font-bold">*</span>
+                    </span>
+                    {isTitleEmpty && (
+                        <span className="text-[10px] font-bold text-rose-450 animate-pulse">
+                            Campo requerido
+                        </span>
+                    )}
+                </div>
+            )}
+
             {/* Row 1: Task ID + Title + Actions */}
             <div className="flex items-center gap-2 lg:gap-3">
 
@@ -105,8 +126,8 @@ export default function TaskHeader({
                 <textarea
                     value={form.title}
                     onChange={e => setForm({ ...form, title: e.target.value })}
-                    placeholder="Título de la tarea..."
-                    className="flex-1 min-w-0 text-lg lg:text-xl font-black tracking-tight outline-none bg-transparent text-white placeholder-slate-600 border-b border-transparent focus:border-slate-600 transition-colors py-1 resize-none h-auto overflow-hidden"
+                    placeholder="Escribe el título de la tarea..."
+                    className={titleTextareaClasses}
                     rows={1}
                     disabled={!canEdit}
                     autoFocus={isNew}
