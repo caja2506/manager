@@ -5,19 +5,20 @@
  * operational role assignments.
  */
 
-const paths = require("../automation/firestorePaths");
 const crypto = require("crypto");
 const { loadUser, loadAllUsers, updateUser } = require("../db/coreDataReader");
+const { getSupabase, toCamel } = require("../db/supabaseAdmin");
+const paths = require("../automation/firestorePaths");
 
 // ── Link Code Generation ──
 
 /**
  * Generate a unique 6-character link code for Telegram onboarding.
- * Code is stored in telegramLinkCodes collection with 24h expiry.
+ * Code is stored in telegram_link_codes table with 24h expiry.
  *
- * @param {FirebaseFirestore.Firestore} adminDb
+ * @param {any} adminDb - Deprecated, kept for signature compatibility
  * @param {string} userId - Firebase Auth UID
- * @returns {{ code: string, expiresAt: string }}
+ * @returns {Promise<{ code: string, expiresAt: string }>}
  */
 async function generateLinkCode(adminDb, userId) {
     const userData = await loadUser(userId);
@@ -25,34 +26,33 @@ async function generateLinkCode(adminDb, userId) {
         throw new Error(`User ${userId} not found in users collection`);
     }
 
-    // Invalidate any existing unused codes for this user
-    const existingSnap = await adminDb.collection("telegramLinkCodes")
-        .where("userId", "==", userId)
-        .where("used", "==", false)
-        .get();
+    const sb = getSupabase();
 
-    const batch = adminDb.batch();
-    for (const doc of existingSnap.docs) {
-        batch.update(doc.ref, { used: true, invalidatedAt: new Date().toISOString() });
+    // Invalidate (delete) any existing unused codes for this user
+    const { error: deleteError } = await sb.from("telegram_link_codes")
+        .delete()
+        .eq("user_id", userId);
+
+    if (deleteError) {
+        console.warn("[teamManagementHandler] Error invalidating old codes:", deleteError.message);
     }
-    if (!existingSnap.empty) await batch.commit();
 
     // Generate unique code
     const code = crypto.randomBytes(3).toString("hex").toUpperCase(); // 6 hex chars
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours
 
-    await adminDb.collection("telegramLinkCodes").add({
+    const { error: insertError } = await sb.from("telegram_link_codes").insert({
         code,
-        userId,
-        userName: userData.displayName || userData.name || userData.email || userId,
-        userEmail: userData.email || "",
-        createdAt: now.toISOString(),
-        expiresAt: expiresAt.toISOString(),
-        used: false,
-        usedAt: null,
-        usedByChatId: null,
+        user_id: userId,
+        email: userData.email || "",
+        expires_at: expiresAt.toISOString(),
     });
+
+    if (insertError) {
+        console.error("[teamManagementHandler] Error inserting link code:", insertError.message);
+        throw insertError;
+    }
 
     return {
         code,
@@ -66,36 +66,29 @@ async function generateLinkCode(adminDb, userId) {
 /**
  * Validate and consume a link code. Called when bot receives /link CODE.
  *
- * @param {FirebaseFirestore.Firestore} adminDb
+ * @param {any} adminDb - Deprecated, kept for signature compatibility
  * @param {string} code - The 6-char code
  * @param {string} chatId - Telegram chat ID
- * @returns {{ valid: boolean, userId?: string, userName?: string, userRole?: string, error?: string }}
+ * @returns {Promise<{ valid: boolean, userId?: string, userName?: string, userRole?: string, error?: string }>}
  */
 async function validateAndConsumeLinkCode(adminDb, code, chatId) {
     const codeUpper = code.toUpperCase().trim();
+    const sb = getSupabase();
 
     // Find the code
-    const snap = await adminDb.collection("telegramLinkCodes")
-        .where("code", "==", codeUpper)
-        .limit(1)
-        .get();
+    const { data: codeData, error: fetchError } = await sb.from("telegram_link_codes")
+        .select("*")
+        .eq("code", codeUpper)
+        .maybeSingle();
 
-    if (snap.empty) {
+    if (fetchError || !codeData) {
         return { valid: false, error: "code_not_found" };
     }
 
-    const codeDoc = snap.docs[0];
-    const codeData = codeDoc.data();
-
-    // Check if already used
-    if (codeData.used) {
-        return { valid: false, error: "code_already_used" };
-    }
-
     // Check expiry
-    if (new Date() > new Date(codeData.expiresAt)) {
-        // Mark as expired
-        await codeDoc.ref.update({ used: true, invalidatedAt: new Date().toISOString() });
+    if (new Date() > new Date(codeData.expires_at)) {
+        // Delete expired code
+        await sb.from("telegram_link_codes").delete().eq("code", codeUpper);
         return { valid: false, error: "code_expired" };
     }
 
@@ -104,53 +97,49 @@ async function validateAndConsumeLinkCode(adminDb, code, chatId) {
     // ── Link the user ──
 
     // 1. Update user doc in Supabase
-    const userData = await loadUser(codeData.userId);
+    const userData = await loadUser(codeData.user_id);
     if (!userData) {
         return { valid: false, error: "user_not_found" };
     }
 
     const now = new Date().toISOString();
-    await updateUser(codeData.userId, {
+    await updateUser(codeData.user_id, {
         telegramChatId: chatIdStr,
         isAutomationParticipant: true,
     });
 
-    // 2. Create/update Telegram session
-    const sessSnap = await adminDb.collection("telegramSessions")
-        .where("chatId", "==", chatIdStr)
-        .limit(1)
-        .get();
+    // 2. Create/update Telegram session in Supabase
+    const { data: sessionData } = await sb.from("telegram_sessions")
+        .select("*")
+        .eq("chat_id", chatIdStr)
+        .maybeSingle();
 
-    if (!sessSnap.empty) {
-        await sessSnap.docs[0].ref.update({
-            userId: codeData.userId,
-            isActive: true,
-            currentState: "idle",
-            updatedAt: now,
-        });
+    if (sessionData) {
+        await sb.from("telegram_sessions")
+            .update({
+                user_id: codeData.user_id,
+                step: "idle",
+                updated_at: now,
+            })
+            .eq("chat_id", chatIdStr);
     } else {
-        await adminDb.collection("telegramSessions").add({
-            chatId: chatIdStr,
-            userId: codeData.userId,
-            currentState: "idle",
-            isActive: true,
-            metadata: {},
-            createdAt: now,
-            updatedAt: now,
-        });
+        await sb.from("telegram_sessions")
+            .insert({
+                chat_id: chatIdStr,
+                user_id: codeData.user_id,
+                step: "idle",
+                created_at: now,
+                updated_at: now,
+            });
     }
 
-    // 3. Mark code as used
-    await codeDoc.ref.update({
-        used: true,
-        usedAt: now,
-        usedByChatId: chatIdStr,
-    });
+    // 3. Delete the consumed code
+    await sb.from("telegram_link_codes").delete().eq("code", codeUpper);
 
     return {
         valid: true,
-        userId: codeData.userId,
-        userName: userData.displayName || userData.name || userData.email || codeData.userId,
+        userId: codeData.user_id,
+        userName: userData.displayName || userData.name || userData.email || codeData.user_id,
         userRole: userData.operationalRole || "Sin rol asignado",
     };
 }
@@ -164,8 +153,7 @@ async function unlinkTelegramUser(adminDb, userId) {
     const userData = await loadUser(userId);
     if (!userData) throw new Error(`User ${userId} not found`);
 
-    const chatId = userData.telegramChatId ||
-        userData.providerLinks?.telegram?.chatId;
+    const chatId = userData.telegramChatId;
 
     // Clear Telegram link in Supabase
     await updateUser(userId, {
@@ -174,13 +162,14 @@ async function unlinkTelegramUser(adminDb, userId) {
 
     // Deactivate Telegram session if exists
     if (chatId) {
-        const sessSnap = await adminDb.collection("telegramSessions")
-            .where("chatId", "==", String(chatId))
-            .limit(1)
-            .get();
-        if (!sessSnap.empty) {
-            await sessSnap.docs[0].ref.update({ isActive: false, updatedAt: new Date().toISOString() });
-        }
+        const sb = getSupabase();
+        await sb.from("telegram_sessions")
+            .update({
+                user_id: null,
+                step: "unlinked",
+                updated_at: new Date().toISOString()
+            })
+            .eq("chat_id", String(chatId));
     }
 
     return { unlinked: true, userId };
@@ -280,19 +269,17 @@ async function getTeamMembers(adminDb) {
         updatedAt: d.updatedAt || null,
     }));
 
-    // 4. Get pending link codes
-    const codesSnap = await adminDb.collection("telegramLinkCodes")
-        .where("used", "==", false)
-        .get();
+    // 4. Get pending link codes from Supabase
+    const sb = getSupabase();
+    const { data: codesData } = await sb.from("telegram_link_codes").select("*");
 
     const pendingCodes = {};
     const nowDate = new Date();
-    for (const doc of codesSnap.docs) {
-        const c = doc.data();
-        if (new Date(c.expiresAt) > nowDate) {
-            pendingCodes[c.userId] = {
+    for (const c of (codesData || [])) {
+        if (new Date(c.expires_at) > nowDate) {
+            pendingCodes[c.user_id] = {
                 code: c.code,
-                expiresAt: c.expiresAt,
+                expiresAt: c.expires_at,
             };
         }
     }

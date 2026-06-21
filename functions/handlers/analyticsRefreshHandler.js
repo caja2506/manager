@@ -14,22 +14,22 @@ const { buildAllScorecards } = require("../analytics/scorecardService");
 const { evaluateRiskFlags, evaluateUserRiskFlags, persistRiskFlags } = require("../analytics/riskFlagEngine");
 const { generateRecommendations, persistRecommendations } = require("../analytics/recommendationEngine");
 const { PERIOD_TYPE } = require("../analytics/analyticsConstants");
-const paths = require("../automation/firestorePaths");
+const { getSupabase, toCamel } = require("../db/supabaseAdmin");
 
 /**
  * Run the full analytics refresh pipeline.
  *
- * @param {FirebaseFirestore.Firestore} adminDb
+ * @param {any} adminDb - Deprecated, kept for signature compatibility
  * @param {Object} [options]
  * @param {string} [options.periodType='daily'] - 'daily' | 'weekly' | 'monthly'
  * @param {string} [options.startDate] - Override start date
  * @param {string} [options.endDate] - Override end date
- * @returns {Object} Refresh summary
+ * @returns {Promise<Object>} Refresh summary
  */
 async function runAnalyticsRefresh(adminDb, options = {}) {
     const startMs = Date.now();
     const periodType = options.periodType || PERIOD_TYPE.DAILY;
-    const now = new Date();
+    const sb = getSupabase();
 
     console.log(`[analyticsRefresh] Starting ${periodType} refresh...`);
 
@@ -72,13 +72,36 @@ async function runAnalyticsRefresh(adminDb, options = {}) {
     );
     const recsWritten = await persistRecommendations(adminDb, recommendations, currentStart);
 
-    // 9. Log the refresh run
+    // 9. Log the refresh run in Supabase
     const latencyMs = Date.now() - startMs;
+    const totalWrites = (snapshotWrites.global || 0) + (snapshotWrites.users || 0) + (snapshotWrites.routines || 0) + (snapshotWrites.team || 0);
     const refreshLog = {
+        period_type: periodType,
+        period_start: currentStart,
+        period_end: currentEnd,
+        completed_at: new Date().toISOString(),
+        latency_ms: latencyMs,
+        snapshot_writes: totalWrites,
+        risk_flags_generated: allFlags.length,
+        recommendations_generated: recommendations.length,
+        trend_summary: trendSummary,
+        scorecard_count: Object.keys(scorecards).length,
+        data_counts: currentKpis.metadata.dataCounts,
+    };
+
+    const { error: logError } = await sb.from("analytics_refresh_logs").insert(refreshLog);
+    if (logError) {
+        console.error("[analyticsRefresh] Error logging refresh run:", logError.message);
+    }
+    
+    console.log(`[analyticsRefresh] Complete in ${latencyMs}ms. Flags: ${allFlags.length}, Recs: ${recommendations.length}`);
+
+    return {
+        success: true,
         periodType,
         periodStart: currentStart,
         periodEnd: currentEnd,
-        completedAt: new Date().toISOString(),
+        completedAt: refreshLog.completed_at,
         latencyMs,
         snapshotWrites,
         riskFlagsGenerated: allFlags.length,
@@ -86,17 +109,8 @@ async function runAnalyticsRefresh(adminDb, options = {}) {
         trendSummary,
         scorecardCount: Object.keys(scorecards).length,
         dataCounts: currentKpis.metadata.dataCounts,
-    };
-
-    await adminDb.collection(paths.ANALYTICS_REFRESH_LOGS).add(refreshLog);
-    console.log(`[analyticsRefresh] Complete in ${latencyMs}ms. Flags: ${allFlags.length}, Recs: ${recommendations.length}`);
-
-    return {
-        success: true,
-        ...refreshLog,
         globalKpis: currentKpis.global,
         trends: globalTrends,
-        trendSummary,
         riskFlags: allFlags.slice(0, 10),
         recommendations: recommendations.slice(0, 10),
         scorecards,
@@ -112,31 +126,28 @@ async function getAnalyticsDashboardData(adminDb, periodType = PERIOD_TYPE.DAILY
     const currentStart = periods.current.start;
     const currentEnd = periods.current.end;
 
-    // Load latest snapshots
+    // Load latest snapshots from Supabase
     const [globalSnapshot, userScores, routineScores, riskFlags, recommendations, refreshLogs] =
         await Promise.all([
-            loadLatestSnapshot(adminDb, paths.OPERATIONAL_KPI_SNAPSHOTS, currentStart, periodType, "global"),
-            loadLatestScores(adminDb, paths.USER_OPERATIONAL_SCORES, currentStart, periodType),
-            loadLatestScores(adminDb, paths.ROUTINE_OPERATIONAL_SCORES, currentStart, periodType),
-            loadActiveFlags(adminDb, currentStart),
-            loadActiveRecommendations(adminDb, currentStart),
-            loadRecentRefreshLogs(adminDb),
+            loadLatestSnapshot(currentStart, periodType, "global"),
+            loadLatestScores("user", currentStart, periodType),
+            loadLatestScores("routine", currentStart, periodType),
+            loadActiveFlags(currentStart),
+            loadActiveRecommendations(currentStart),
+            loadRecentRefreshLogs(),
         ]);
 
-    // Load previous for trends
-    const previousGlobal = await loadLatestSnapshot(
-        adminDb, paths.OPERATIONAL_KPI_SNAPSHOTS,
-        periods.previous.start, periodType, "global"
-    );
+    // Load previous global for trends
+    const previousGlobal = await loadLatestSnapshot(periods.previous.start, periodType, "global");
 
     const trends = globalSnapshot && previousGlobal
-        ? computeTrends(globalSnapshot.metrics || {}, previousGlobal.metrics || {})
+        ? computeTrends(globalSnapshot.metrics?.metrics || {}, previousGlobal.metrics?.metrics || {})
         : {};
     const trendSummary = summarizeTrends(trends);
 
     return {
         period: { start: currentStart, end: currentEnd, type: periodType },
-        globalKpis: globalSnapshot?.metrics || {},
+        globalKpis: globalSnapshot?.metrics?.metrics || {},
         userScores,
         routineScores,
         trends,
@@ -148,54 +159,89 @@ async function getAnalyticsDashboardData(adminDb, periodType = PERIOD_TYPE.DAILY
     };
 }
 
-// ── Internal helpers ──
+// ── Internal helpers (Supabase Migrated) ──
 
-async function loadLatestSnapshot(adminDb, collection, periodStart, periodType, entityId) {
-    const docId = `${periodStart}_${periodStart}_${periodType}_${entityId}`;
-    const doc = await adminDb.collection(collection).doc(docId).get();
-    if (doc.exists) return doc.data();
-
-    // Fallback: query for any snapshot matching period
-    const snap = await adminDb.collection(collection)
-        .where("periodStart", "==", periodStart)
-        .where("periodType", "==", periodType)
-        .where("entityId", "==", entityId)
+async function loadLatestSnapshot(periodStart, periodType, entityId) {
+    const sb = getSupabase();
+    const { data, error } = await sb.from("analytics_snapshots")
+        .select("*")
+        .eq("scope", entityId === "global" ? "global" : "compliance")
+        .eq("entity_id", entityId)
+        .eq("snapshot_date", periodStart)
+        .eq("metrics->>periodType", periodType)
         .limit(1)
-        .get();
-    return snap.empty ? null : snap.docs[0].data();
+        .maybeSingle();
+
+    if (error) {
+        console.warn("[analyticsRefreshHandler] loadLatestSnapshot error:", error.message);
+        return null;
+    }
+    return data ? toCamel(data) : null;
 }
 
-async function loadLatestScores(adminDb, collection, periodStart, periodType) {
-    const snap = await adminDb.collection(collection)
-        .where("periodStart", "==", periodStart)
-        .where("periodType", "==", periodType)
-        .limit(50)
-        .get();
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+async function loadLatestScores(scope, periodStart, periodType) {
+    const sb = getSupabase();
+    const { data, error } = await sb.from("analytics_snapshots")
+        .select("*")
+        .eq("scope", scope)
+        .eq("snapshot_date", periodStart)
+        .eq("metrics->>periodType", periodType)
+        .limit(100);
+
+    if (error) {
+        console.warn("[analyticsRefreshHandler] loadLatestScores error:", error.message);
+        return [];
+    }
+    
+    return (data || []).map(row => ({
+        id: row.id,
+        scope: row.scope,
+        entityId: row.entity_id,
+        snapshotDate: row.snapshot_date,
+        ...(row.metrics || {})
+    }));
 }
 
-async function loadActiveFlags(adminDb, periodStart) {
-    const snap = await adminDb.collection(paths.OPERATIONAL_RISK_FLAGS)
-        .where("periodStart", "==", periodStart)
-        .limit(30)
-        .get();
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+async function loadActiveFlags(periodStart) {
+    const sb = getSupabase();
+    const { data, error } = await sb.from("operational_risk_flags")
+        .select("*")
+        .eq("period_start", periodStart)
+        .limit(50);
+
+    if (error) {
+        console.warn("[analyticsRefreshHandler] loadActiveFlags error:", error.message);
+        return [];
+    }
+    return (data || []).map(toCamel);
 }
 
-async function loadActiveRecommendations(adminDb, periodStart) {
-    const snap = await adminDb.collection(paths.OPERATIONAL_RECOMMENDATIONS)
-        .where("periodStart", "==", periodStart)
-        .limit(20)
-        .get();
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+async function loadActiveRecommendations(periodStart) {
+    const sb = getSupabase();
+    const { data, error } = await sb.from("operational_recommendations")
+        .select("*")
+        .eq("period_start", periodStart)
+        .limit(30);
+
+    if (error) {
+        console.warn("[analyticsRefreshHandler] loadActiveRecommendations error:", error.message);
+        return [];
+    }
+    return (data || []).map(toCamel);
 }
 
-async function loadRecentRefreshLogs(adminDb) {
-    const snap = await adminDb.collection(paths.ANALYTICS_REFRESH_LOGS)
-        .orderBy("completedAt", "desc")
-        .limit(5)
-        .get();
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+async function loadRecentRefreshLogs() {
+    const sb = getSupabase();
+    const { data, error } = await sb.from("analytics_refresh_logs")
+        .select("*")
+        .order("completed_at", { ascending: false })
+        .limit(5);
+
+    if (error) {
+        console.warn("[analyticsRefreshHandler] loadRecentRefreshLogs error:", error.message);
+        return [];
+    }
+    return (data || []).map(toCamel);
 }
 
 function summarizeDataCounts(data) {
@@ -210,3 +256,4 @@ function summarizeDataCounts(data) {
 }
 
 module.exports = { runAnalyticsRefresh, getAnalyticsDashboardData };
+

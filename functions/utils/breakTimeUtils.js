@@ -26,18 +26,8 @@ let _bands = DEFAULTS;
  */
 async function loadBreakBands(adminDb) {
     try {
-        let data = null;
-        try {
-            const { loadSetting } = require("../db/coreDataReader");
-            data = await loadSetting("daySchedule");
-        } catch (e) {
-            console.warn("Error loading setting from Supabase:", e.message);
-        }
-
-        if (!data) {
-            const snap = await adminDb.doc("settings/daySchedule").get();
-            if (snap.exists) data = snap.data();
-        }
+        const { loadSetting } = require("../db/coreDataReader");
+        const data = await loadSetting("daySchedule");
 
         if (data && data.breakBands?.length) {
             _bands = data.breakBands.map(b => ({

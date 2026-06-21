@@ -210,17 +210,35 @@ function impact(current, delta, polarity) {
 }
 
 /**
- * Persist simulation result to Firestore.
+ * Persist simulation result to Supabase.
  */
 async function persistSimulation(adminDb, simulation, userId) {
-    const paths = require("../automation/firestorePaths");
-    const ref = adminDb.collection(paths.OPTIMIZATION_SIMULATIONS).doc();
-    await ref.set({
-        ...simulation,
-        simulatedBy: userId,
-        simulatedAt: new Date().toISOString(),
-    });
-    return ref.id;
+    const { getSupabase } = require("../db/supabaseAdmin");
+    const sb = getSupabase();
+
+    const { data, error } = await sb.from("optimization_history")
+        .insert({
+            period_type: "simulation",
+            recommendations: {
+                ...simulation,
+                simulatedBy: userId,
+                simulatedAt: new Date().toISOString()
+            },
+            data_counts: {},
+            workloads: {},
+            bottlenecks: {},
+            score: simulation.confidence || 0,
+            latency_ms: 0
+        })
+        .select()
+        .single();
+
+    if (error) {
+        console.error("[simulationEngine] Error persisting simulation to Supabase:", error.message);
+        throw error;
+    }
+    return data.id;
 }
 
 module.exports = { simulateChange, persistSimulation };
+

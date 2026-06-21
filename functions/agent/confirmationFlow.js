@@ -1,22 +1,24 @@
 /**
  * ARIA Agent — Confirmation Flow (Phase 5)
  * ==========================================
- * Manages the pending write action state for ARIA.
+ * Manages the pending write action state for ARIA in Supabase.
  *
  * When ARIA detects a write intent, it stores the pending action
- * in the Telegram session (Firestore). When the user responds
+ * in the Telegram session (Supabase). When the user responds
  * "Sí" or "No", the action is executed or cancelled.
  *
  * The pending action has a 5-minute timeout — if the user doesn't
  * respond, the action is automatically cancelled on next interaction.
  */
 
+const { getSupabase } = require("../db/supabaseAdmin");
+
 const PENDING_ACTION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Save a pending write action to the user's Telegram session.
  *
- * @param {FirebaseFirestore.Firestore} adminDb
+ * @param {any} _adminDb - Deprecated
  * @param {string} chatId
  * @param {Object} action - The pending action
  * @param {string} action.toolName - e.g., "createTask", "addTaskComment"
@@ -24,56 +26,62 @@ const PENDING_ACTION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
  * @param {string} action.confirmMessage - The message shown to the user
  * @returns {Promise<void>}
  */
-async function setPendingAction(adminDb, chatId, action) {
-    const paths = require("../automation/firestorePaths");
+async function setPendingAction(_adminDb, chatId, action) {
     const chatIdStr = String(chatId);
+    const sb = getSupabase();
 
-    const snap = await adminDb.collection(paths.TELEGRAM_SESSIONS)
-        .where("chatId", "==", chatIdStr)
-        .limit(1)
-        .get();
+    const { data: session, error } = await sb.from("telegram_sessions")
+        .select("metadata")
+        .eq("chat_id", chatIdStr)
+        .maybeSingle();
 
-    if (snap.empty) {
+    if (error || !session) {
         console.warn("[confirmationFlow] No session found for chatId:", chatIdStr);
         return;
     }
 
-    const sessionRef = snap.docs[0].ref;
-    await sessionRef.update({
-        "metadata.pendingAriaAction": {
-            toolName: action.toolName,
-            params: action.params,
-            confirmMessage: action.confirmMessage,
-            createdAt: new Date().toISOString(),
-        },
-        updatedAt: new Date().toISOString(),
-    });
+    const metadata = session.metadata || {};
+    metadata.pendingAriaAction = {
+        toolName: action.toolName,
+        params: action.params,
+        confirmMessage: action.confirmMessage,
+        createdAt: new Date().toISOString(),
+    };
 
-    console.log(`[confirmationFlow] Pending action set: ${action.toolName} for chat ${chatIdStr}`);
+    const { error: updateError } = await sb.from("telegram_sessions")
+        .update({
+            metadata,
+            updated_at: new Date().toISOString(),
+        })
+        .eq("chat_id", chatIdStr);
+
+    if (updateError) {
+        console.error("[confirmationFlow] Error setting pending action:", updateError.message);
+    } else {
+        console.log(`[confirmationFlow] Pending action set: ${action.toolName} for chat ${chatIdStr}`);
+    }
 }
 
 /**
  * Get the pending write action for a chat, if any.
  * Returns null if no action is pending or if it has expired.
  *
- * @param {FirebaseFirestore.Firestore} adminDb
+ * @param {any} _adminDb - Deprecated
  * @param {string} chatId
  * @returns {Promise<Object|null>} The pending action or null
  */
-async function getPendingAction(adminDb, chatId) {
-    const paths = require("../automation/firestorePaths");
+async function getPendingAction(_adminDb, chatId) {
     const chatIdStr = String(chatId);
+    const sb = getSupabase();
 
-    const snap = await adminDb.collection(paths.TELEGRAM_SESSIONS)
-        .where("chatId", "==", chatIdStr)
-        .limit(1)
-        .get();
+    const { data: session, error } = await sb.from("telegram_sessions")
+        .select("metadata")
+        .eq("chat_id", chatIdStr)
+        .maybeSingle();
 
-    if (snap.empty) return null;
+    if (error || !session) return null;
 
-    const session = snap.docs[0].data();
-    const pending = session?.metadata?.pendingAriaAction;
-
+    const pending = session.metadata?.pendingAriaAction;
     if (!pending || !pending.toolName) return null;
 
     // Check timeout
@@ -81,7 +89,7 @@ async function getPendingAction(adminDb, chatId) {
     if (Date.now() - createdAt > PENDING_ACTION_TIMEOUT_MS) {
         // Expired — auto-clear
         console.log(`[confirmationFlow] Pending action expired for chat ${chatIdStr}`);
-        await clearPendingAction(adminDb, chatId);
+        await clearPendingAction(null, chatId);
         return null;
     }
 
@@ -91,28 +99,36 @@ async function getPendingAction(adminDb, chatId) {
 /**
  * Clear the pending write action after execution or cancellation.
  *
- * @param {FirebaseFirestore.Firestore} adminDb
+ * @param {any} _adminDb - Deprecated
  * @param {string} chatId
  * @returns {Promise<void>}
  */
-async function clearPendingAction(adminDb, chatId) {
-    const paths = require("../automation/firestorePaths");
-    const { FieldValue } = require("firebase-admin/firestore");
+async function clearPendingAction(_adminDb, chatId) {
     const chatIdStr = String(chatId);
+    const sb = getSupabase();
 
-    const snap = await adminDb.collection(paths.TELEGRAM_SESSIONS)
-        .where("chatId", "==", chatIdStr)
-        .limit(1)
-        .get();
+    const { data: session, error } = await sb.from("telegram_sessions")
+        .select("metadata")
+        .eq("chat_id", chatIdStr)
+        .maybeSingle();
 
-    if (snap.empty) return;
+    if (error || !session) return;
 
-    await snap.docs[0].ref.update({
-        "metadata.pendingAriaAction": FieldValue.delete(),
-        updatedAt: new Date().toISOString(),
-    });
+    const metadata = session.metadata || {};
+    delete metadata.pendingAriaAction;
 
-    console.log(`[confirmationFlow] Pending action cleared for chat ${chatIdStr}`);
+    const { error: updateError } = await sb.from("telegram_sessions")
+        .update({
+            metadata,
+            updated_at: new Date().toISOString(),
+        })
+        .eq("chat_id", chatIdStr);
+
+    if (updateError) {
+        console.error("[confirmationFlow] Error clearing pending action:", updateError.message);
+    } else {
+        console.log(`[confirmationFlow] Pending action cleared for chat ${chatIdStr}`);
+    }
 }
 
 /**
@@ -140,3 +156,4 @@ module.exports = {
     parseConfirmationResponse,
     PENDING_ACTION_TIMEOUT_MS,
 };
+

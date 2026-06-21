@@ -1,22 +1,14 @@
 /**
  * Metrics Updater — Backend (CJS)
  * =================================
- * Atomic daily metrics management using FieldValue.increment.
+ * Atomic daily metrics management using Supabase automation_metrics_daily table.
  */
 
-const { FieldValue } = require("firebase-admin/firestore");
-const paths = require("./firestorePaths");
 const { AUTOMATION_CHANNELS, AUTOMATION_PROVIDERS } = require("./constants");
+const { getSupabase } = require("../db/supabaseAdmin");
 
 /**
- * Get metrics document ID for a date/channel.
- */
-function getMetricsDocId(date, channel = AUTOMATION_CHANNELS.TELEGRAM) {
-    return `${date}_${channel}`;
-}
-
-/**
- * Get today's date string in YYYY-MM-DD format (Mexico City timezone).
+ * Get today's date string in YYYY-MM-DD format (Costa Rica timezone).
  */
 function getTodayDate() {
     return new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
@@ -24,31 +16,69 @@ function getTodayDate() {
 
 /**
  * Increment one or more daily metrics atomically.
- * Creates the document if it doesn't exist (merge: true).
+ * Creates the document if it doesn't exist.
  *
- * @param {FirebaseFirestore.Firestore} adminDb
+ * @param {any} adminDb - Deprecated, kept for signature compatibility
  * @param {string} date - YYYY-MM-DD
  * @param {string} channel
- * @param {Object} increments - { messagesSent: 1, responsesReceived: 2, ... }
+ * @param {Object} increments - { totalExecutions: 1, successfulExecutions: 2, ... }
  */
 async function incrementMetrics(adminDb, date, channel, increments) {
-    const docId = getMetricsDocId(date, channel);
-    const ref = adminDb.collection(paths.AUTOMATION_METRICS_DAILY).doc(docId);
+    const sb = getSupabase();
+    const docId = date; // Deterministic YYYY-MM-DD
 
-    const update = { updatedAt: new Date().toISOString() };
-    for (const [field, amount] of Object.entries(increments)) {
-        if (typeof amount === "number" && amount !== 0) {
-            update[field] = FieldValue.increment(amount);
+    // 1. Fetch existing record
+    const { data: existing, error: fetchError } = await sb.from("automation_metrics_daily")
+        .select("*")
+        .eq("id", docId)
+        .maybeSingle();
+
+    if (fetchError) {
+        console.warn("[metricsUpdater] Error fetching existing metrics:", fetchError.message);
+    }
+
+    // 2. Prepare accumulated values
+    let totalExec = existing?.total_executions || 0;
+    let successExec = existing?.successful_executions || 0;
+    let failedExec = existing?.failed_executions || 0;
+    let details = existing?.details || {};
+
+    // Map increments
+    for (const [key, amount] of Object.entries(increments)) {
+        if (typeof amount !== "number") continue;
+
+        if (key === "totalExecutions" || key === "total_executions") {
+            totalExec += amount;
+        } else if (key === "successfulExecutions" || key === "successful_executions") {
+            successExec += amount;
+        } else if (key === "failedExecutions" || key === "failed_executions") {
+            failedExec += amount;
+        } else {
+            // Keep flexible metric inside details JSONB
+            details[key] = (details[key] || 0) + amount;
         }
     }
 
-    // merge:true creates doc if missing, merges fields if existing
-    await ref.set({
+    // Add channel/provider metadata inside details
+    details.channel = channel;
+    details.provider = AUTOMATION_PROVIDERS.TELEGRAM_BOT;
+
+    // 3. Upsert into Supabase
+    const payload = {
+        id: docId,
         date,
-        channel,
-        provider: AUTOMATION_PROVIDERS.TELEGRAM_BOT,
-        ...update,
-    }, { merge: true });
+        total_executions: totalExec,
+        successful_executions: successExec,
+        failed_executions: failedExec,
+        details
+    };
+
+    const { error: upsertError } = await sb.from("automation_metrics_daily")
+        .upsert(payload, { onConflict: "date" });
+
+    if (upsertError) {
+        console.error("[metricsUpdater] Error upserting metrics to Supabase:", upsertError.message);
+    }
 }
 
 /**
@@ -58,4 +88,5 @@ async function incrementTodayMetrics(adminDb, channel, increments) {
     return incrementMetrics(adminDb, getTodayDate(), channel, increments);
 }
 
-module.exports = { incrementMetrics, incrementTodayMetrics, getMetricsDocId, getTodayDate };
+module.exports = { incrementMetrics, incrementTodayMetrics, getTodayDate };
+

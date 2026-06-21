@@ -6,9 +6,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
-import { USE_SUPABASE } from '../services/_backend';
 import { supabase } from '../supabase';
-import { COLLECTIONS } from '../models/schemas';
 import { subDays, format, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -31,24 +29,12 @@ export default function useMilestoneHistory(milestoneId) {
 
         async function load() {
             try {
-                if (USE_SUPABASE) {
-                    const { data: ms } = await supabase.from('milestones').select('*').eq('id', milestoneId).single();
-                    if (!ms) { setError('Milestone no encontrado'); setLoading(false); return; }
-                    setMilestone(ms);
+                const { data: ms } = await supabase.from('milestones').select('*').eq('id', milestoneId).single();
+                if (!ms) { setError('Milestone no encontrado'); setLoading(false); return; }
+                setMilestone(ms);
 
-                    const { data: snaps } = await supabase.from('score_snapshots').select('*').eq('milestone_id', milestoneId).order('captured_at');
-                    setSnapshots((snaps || []).map(s => ({ ...s, milestoneId: s.milestone_id, milestoneScore: s.milestone_score, milestoneTrafficLight: s.milestone_traffic_light, capturedAt: s.captured_at, areaScores: s.area_scores, activeLocks: s.active_locks, snapshotType: s.snapshot_type, triggeredBy: s.triggered_by, changeReason: s.change_reason })));
-                } else {
-                    const { collection, query, where, orderBy, getDocs, doc, getDoc } = await import('firebase/firestore');
-                    const { db } = await import('../firebase');
-                    const msSnap = await getDoc(doc(db, COLLECTIONS.MILESTONES, milestoneId));
-                    if (!msSnap.exists()) { setError('Milestone no encontrado'); setLoading(false); return; }
-                    setMilestone({ id: msSnap.id, ...msSnap.data() });
-
-                    const q = query(collection(db, COLLECTIONS.SCORE_SNAPSHOTS), where('milestoneId', '==', milestoneId));
-                    const snap = await getDocs(q);
-                    setSnapshots(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.capturedAt || '').localeCompare(b.capturedAt || '')));
-                }
+                const { data: snaps } = await supabase.from('score_snapshots').select('*').eq('milestone_id', milestoneId).order('captured_at');
+                setSnapshots((snaps || []).map(s => ({ ...s, milestoneId: s.milestone_id, milestoneScore: s.milestone_score, milestoneTrafficLight: s.milestone_traffic_light, capturedAt: s.captured_at, areaScores: s.area_scores, activeLocks: s.active_locks, snapshotType: s.snapshot_type, triggeredBy: s.triggered_by, changeReason: s.change_reason })));
                 setLoading(false);
             } catch (err) {
                 setError(err.message);

@@ -25,33 +25,64 @@ const {
  * Unlike other handlers, this doesn't use sendToTargets because
  * targets are determined by checking pending reports.
  */
+const { getSupabase } = require("../db/supabaseAdmin");
+const { loadSetting } = require("../db/coreDataReader");
+
+/**
+ * Execute missing report escalation.
+ * Unlike other handlers, this doesn't use sendToTargets because
+ * targets are determined by checking pending reports.
+ */
 async function execute(adminDb, token, targets, context) {
     const { dryRun, runId } = context;
     const now = new Date();
     const today = now.toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
+    const sb = getSupabase();
 
     // Find pending reports for today
-    const pendingSnap = await adminDb.collection(paths.TELEGRAM_REPORTS)
-        .where("date", "==", today)
-        .where("status", "==", REPORT_STATUS.PENDING)
-        .get();
+    const { data: pendingReports, error: pendingErr } = await sb.from("telegram_reports")
+        .select("*")
+        .eq("date", today)
+        .eq("status", REPORT_STATUS.PENDING);
 
-    if (pendingSnap.empty) {
+    if (pendingErr) {
+        console.error("[escalation] Error fetching pending reports from Supabase:", pendingErr.message);
+        return { sentCount: 0, failedCount: 0, errors: [pendingErr.message], escalatedCount: 0 };
+    }
+
+    if (!pendingReports || pendingReports.length === 0) {
         console.log("[escalation] No pending reports found");
         return { sentCount: 0, failedCount: 0, errors: [], escalatedCount: 0 };
     }
 
     // Load telegramOps for grace period
-    const tgConfigSnap = await adminDb.collection(paths.SETTINGS).doc("telegramOps").get();
-    const gracePeriodMs = (tgConfigSnap.exists ? tgConfigSnap.data().gracePeriodMinutes : 30) * 60 * 1000;
+    let gracePeriodMinutes = 30;
+    try {
+        const tgConfig = await loadSetting("telegramOps");
+        if (tgConfig && tgConfig.gracePeriodMinutes !== undefined) {
+            gracePeriodMinutes = tgConfig.gracePeriodMinutes;
+        }
+    } catch (err) {
+        console.warn("[escalation] Failed to load telegramOps settings from Supabase:", err.message);
+    }
+    const gracePeriodMs = gracePeriodMinutes * 60 * 1000;
 
     let sentCount = 0;
     let failedCount = 0;
     let escalatedCount = 0;
     const errors = [];
 
-    for (const doc of pendingSnap.docs) {
-        const report = doc.data();
+    // Map rows to camelCase structure expected by the logic
+    const reports = pendingReports.map(r => ({
+        id: r.id,
+        userId: r.user_id,
+        status: r.status,
+        date: r.date,
+        createdAt: r.created_at,
+        sentAt: r.sent_at,
+    }));
+
+    for (const report of reports) {
         const createdAt = new Date(report.createdAt);
         const elapsed = now.getTime() - createdAt.getTime();
 
@@ -100,32 +131,46 @@ async function execute(adminDb, token, targets, context) {
                 }
 
                 // ── 3. Create escalation record ──
-                await adminDb.collection(paths.TELEGRAM_ESCALATIONS).add({
-                    type: ESCALATION_TYPE.MISSING_REPORT,
-                    userId: target.uid,
-                    chatId: target.chatId,
-                    supervisorId: supervisor?.uid || null,
-                    reportId: doc.id,
-                    status: ESCALATION_STATUS.PENDING,
-                    minutesLate,
-                    message: `Reporte pendiente - ${minutesLate} min tarde`,
-                    resolvedAt: null,
-                    createdAt: now.toISOString(),
-                    updatedAt: now.toISOString(),
+                const { error: insErr } = await sb.from("telegram_escalations").insert({
+                    reason: `Reporte pendiente - ${minutesLate} min tarde`,
+                    escalated_to: supervisor?.uid || null,
+                    resolved: false,
+                    details: {
+                        type: ESCALATION_TYPE.MISSING_REPORT,
+                        userId: target.uid,
+                        chatId: target.chatId,
+                        supervisorId: supervisor?.uid || null,
+                        reportId: report.id,
+                        status: ESCALATION_STATUS.PENDING,
+                        minutesLate,
+                        message: `Reporte pendiente - ${minutesLate} min tarde`,
+                        resolvedAt: null,
+                        createdAt: now.toISOString(),
+                        updatedAt: now.toISOString(),
+                    }
                 });
 
+                if (insErr) {
+                    throw new Error(`Failed to insert escalation record: ${insErr.message}`);
+                }
+
                 // ── 4. Update report status ──
-                await doc.ref.update({
-                    status: REPORT_STATUS.ESCALATED,
-                    updatedAt: now.toISOString(),
-                });
+                const { error: updErr } = await sb.from("telegram_reports")
+                    .update({
+                        status: REPORT_STATUS.ESCALATED
+                    })
+                    .eq("id", report.id);
+
+                if (updErr) {
+                    throw new Error(`Failed to update report status: ${updErr.message}`);
+                }
 
                 // ── 5. Transition state ──
                 await transitionState(adminDb, target.chatId, TELEGRAM_SESSION_EVENT.GRACE_PERIOD_EXPIRED);
 
                 // ── 6. Log ──
                 await logBotEvent(adminDb, target.chatId, TELEGRAM_BOT_LOG_EVENT.ESCALATION_TRIGGERED, {
-                    userId: target.uid, minutesLate, reportId: doc.id,
+                    userId: target.uid, minutesLate, reportId: report.id,
                 });
 
                 escalatedCount++;
@@ -135,7 +180,7 @@ async function execute(adminDb, token, targets, context) {
                 escalatedCount++;
             }
         } catch (err) {
-            console.error(`[escalation] Error for report ${doc.id}:`, err);
+            console.error(`[escalation] Error for report ${report.id}:`, err);
             errors.push(err.message);
             failedCount++;
         }

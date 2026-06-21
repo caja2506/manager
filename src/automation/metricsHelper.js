@@ -3,15 +3,12 @@
  * ==========================
  * 
  * Helpers for reading and incrementing daily automation metrics.
- * Designed around atomic Firestore updates using setDoc with merge.
+ * Designed around atomic Supabase updates.
  * 
  * @module automation/metricsHelper
  */
 
-import { doc, getDoc, setDoc, increment } from 'firebase/firestore';
-import { db } from '../firebase.js';
-import { AUTOMATION_METRICS_DAILY } from './firestorePaths.js';
-import { createAutomationMetricsDailyDocument } from './schemas.js';
+import { supabase } from '../supabase.js';
 import { AUTOMATION_CHANNELS, AUTOMATION_PROVIDERS } from './constants.js';
 
 /**
@@ -28,7 +25,6 @@ export function getMetricsDocId(date, channel = AUTOMATION_CHANNELS.TELEGRAM) {
 
 /**
  * Ensure a daily metrics document exists for the given date/channel.
- * Uses setDoc with merge to avoid overwriting.
  * 
  * @param {string} date - YYYY-MM-DD
  * @param {string} [channel]
@@ -40,16 +36,43 @@ export async function ensureMetricsDoc(
     provider = AUTOMATION_PROVIDERS.TELEGRAM_BOT
 ) {
     const docId = getMetricsDocId(date, channel);
-    const ref = doc(db, AUTOMATION_METRICS_DAILY, docId);
-    const snap = await getDoc(ref);
+    const { data, error } = await supabase
+        .from('automation_metrics_daily')
+        .select('id')
+        .eq('id', docId)
+        .maybeSingle();
 
-    if (!snap.exists()) {
-        const metricsDoc = createAutomationMetricsDailyDocument({
-            date,
-            channel,
-            provider,
-        });
-        await setDoc(ref, metricsDoc);
+    if (error) {
+        console.error('[metricsHelper] Error checking metrics document:', error);
+        return;
+    }
+
+    if (!data) {
+        const { error: insErr } = await supabase
+            .from('automation_metrics_daily')
+            .insert({
+                id: docId,
+                date,
+                details: {
+                    channel,
+                    provider,
+                    messagesSent: 0,
+                    messagesDelivered: 0,
+                    responsesReceived: 0,
+                    responsesOnTime: 0,
+                    responsesLate: 0,
+                    escalationsTriggered: 0,
+                    incidentsOpened: 0,
+                    audioReportsCount: 0,
+                    textReportsCount: 0,
+                    failedDeliveries: 0,
+                    activeRoutines: 0,
+                }
+            });
+
+        if (insErr) {
+            console.error('[metricsHelper] Error creating metrics document:', insErr);
+        }
     }
 }
 
@@ -62,17 +85,37 @@ export async function ensureMetricsDoc(
  */
 export async function incrementMetrics(date, channel, increments) {
     const docId = getMetricsDocId(date, channel);
-    const ref = doc(db, AUTOMATION_METRICS_DAILY, docId);
+    
+    // Get existing details
+    const { data, error } = await supabase
+        .from('automation_metrics_daily')
+        .select('details')
+        .eq('id', docId)
+        .maybeSingle();
 
-    // Build increment update
-    const update = { updatedAt: new Date().toISOString() };
+    if (error) {
+        console.error('[metricsHelper] Error loading metrics for increment:', error);
+        return;
+    }
+
+    const details = data?.details || {};
     for (const [field, amount] of Object.entries(increments)) {
         if (typeof amount === 'number' && amount !== 0) {
-            update[field] = increment(amount);
+            details[field] = (Number(details[field]) || 0) + amount;
         }
     }
 
-    await setDoc(ref, update, { merge: true });
+    const { error: upsErr } = await supabase
+        .from('automation_metrics_daily')
+        .upsert({
+            id: docId,
+            date,
+            details
+        });
+
+    if (upsErr) {
+        console.error('[metricsHelper] Error incrementing metrics:', upsErr);
+    }
 }
 
 /**
@@ -84,7 +127,19 @@ export async function incrementMetrics(date, channel, increments) {
  */
 export async function getDailyMetrics(date, channel = AUTOMATION_CHANNELS.TELEGRAM) {
     const docId = getMetricsDocId(date, channel);
-    const ref = doc(db, AUTOMATION_METRICS_DAILY, docId);
-    const snap = await getDoc(ref);
-    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+    const { data, error } = await supabase
+        .from('automation_metrics_daily')
+        .select('*')
+        .eq('id', docId)
+        .maybeSingle();
+
+    if (error || !data) return null;
+    
+    // Map details back to top-level fields for compatibility
+    return {
+        id: data.id,
+        date: data.date,
+        ...(data.details || {})
+    };
 }
+

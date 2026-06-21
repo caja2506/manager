@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Sunset, Sunrise, Save, Coffee, Plus, Trash2 } from 'lucide-react';
-import { USE_SUPABASE } from '../../services/_backend';
 import { supabase } from '../../supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { DEFAULT_TIMEZONE } from '../../utils/timezoneConfig';
@@ -28,37 +27,17 @@ export default function DayScheduleSettings() {
 
     // Subscribe to database
     useEffect(() => {
-        if (USE_SUPABASE) {
-            (async () => {
-                const { data } = await supabase.from('settings').select('*').eq('key', 'daySchedule').single();
-                if (data?.value) {
-                    const d = data.value;
-                    setConfig(d);
-                    setCloseTime(d.closeTime || '18:00');
-                    setOpenTime(d.openTime || '08:00');
-                    setEnabled(d.enabled !== false);
-                    if (d.breakBands?.length) setBreakBands(d.breakBands);
-                }
-            })();
-            return;
-        }
-        // Firebase fallback
-        let unsub;
         (async () => {
-            const { doc: fbDoc, onSnapshot: fbOnSnapshot } = await import('firebase/firestore');
-            const { db: fbDb } = await import('../../firebase');
-            unsub = fbOnSnapshot(fbDoc(fbDb, 'settings', 'daySchedule'), snap => {
-                if (snap.exists()) {
-                    const data = snap.data();
-                    setConfig(data);
-                    setCloseTime(data.closeTime || '18:00');
-                    setOpenTime(data.openTime || '08:00');
-                    setEnabled(data.enabled !== false);
-                    if (data.breakBands?.length) setBreakBands(data.breakBands);
-                }
-            });
+            const { data } = await supabase.from('settings').select('*').eq('key', 'daySchedule').single();
+            if (data?.value) {
+                const d = data.value;
+                setConfig(d);
+                setCloseTime(d.closeTime || '18:00');
+                setOpenTime(d.openTime || '08:00');
+                setEnabled(d.enabled !== false);
+                if (d.breakBands?.length) setBreakBands(d.breakBands);
+            }
         })();
-        return () => unsub?.();
     }, []);
 
     const handleSave = async () => {
@@ -71,13 +50,7 @@ export default function DayScheduleSettings() {
                 updatedAt: new Date().toISOString(),
                 updatedBy: user?.uid || null,
             };
-            if (USE_SUPABASE) {
-                await supabase.from('settings').upsert({ key: 'daySchedule', value: payload, category: 'schedule', updated_at: payload.updatedAt, updated_by: payload.updatedBy }, { onConflict: 'key' });
-            } else {
-                const { doc: fbDoc, setDoc: fbSetDoc } = await import('firebase/firestore');
-                const { db: fbDb } = await import('../../firebase');
-                await fbSetDoc(fbDoc(fbDb, 'settings', 'daySchedule'), payload, { merge: true });
-            }
+            await supabase.from('settings').upsert({ key: 'daySchedule', value: payload, category: 'schedule', updated_at: payload.updatedAt, updated_by: payload.updatedBy }, { onConflict: 'key' });
             setSaved(true);
             setTimeout(() => setSaved(false), 3000);
         } catch (e) {

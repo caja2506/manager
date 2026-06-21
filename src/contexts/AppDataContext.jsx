@@ -21,7 +21,7 @@ import React, { createContext, useContext, useState } from 'react';
 // --- Extracted modules ---
 import { useAutoBomData } from '../hooks/useAutoBomData';
 import {
-    handlePdfUpload as aiHandlePdfUpload,
+    executePdfUploadPipeline as aiHandlePdfUpload,
     executePdfImport,
     executeExcelImport,
     testGeminiConnection as aiTestConnection,
@@ -89,7 +89,7 @@ export function AppDataProvider({ children }) {
 
     const handlePdfUpload = async (e, activeProject) => {
         const file = e.target.files[0];
-        await aiHandlePdfUpload(file, activeProject, bomData.managedLists.providers, {
+        await aiHandlePdfUpload(file, bomData.managedLists.providers, {
             ...processingCallbacks,
             onReviewReady: ({ reviewData, supplierAnalysis }) => {
                 setPdfReviewData(reviewData);

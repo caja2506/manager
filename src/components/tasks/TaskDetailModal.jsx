@@ -1,4 +1,4 @@
-/* eslint-disable */
+ 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
@@ -25,7 +25,6 @@ import {
     fetchTaskPlannerItems,
 } from '../../services/engineeringDataService';
 import { deleteDependency } from '../../services/ganttService';
-import { USE_SUPABASE } from '../../services/_backend';
 import { supabase } from '../../supabase';
 
 // Editor subcomponents
@@ -127,43 +126,26 @@ export default function TaskDetailModal({
             return;
         }
 
-        if (USE_SUPABASE) {
-            // Initial fetch
-            (async () => {
-                const { data } = await supabase.from('peer_reviews').select('*').eq('id', prId).single();
-                if (data) setActivePeerReview(data);
-                else setActivePeerReview(null);
-            })();
-
-            // Realtime subscription
-            const channel = supabase
-                .channel(`pr-${prId}-${Date.now()}`)
-                .on('postgres_changes',
-                    { event: '*', schema: 'public', table: 'peer_reviews', filter: `id=eq.${prId}` },
-                    (payload) => {
-                        if (payload.eventType === 'DELETE') setActivePeerReview(null);
-                        else setActivePeerReview(payload.new);
-                    }
-                )
-                .subscribe();
-
-            return () => supabase.removeChannel(channel);
-        }
-
-        // Firebase fallback
-        let unsub;
+        // Initial fetch
         (async () => {
-            const { doc: fbDoc, onSnapshot: fbOnSnapshot } = await import('firebase/firestore');
-            const { db: fbDb } = await import('../../firebase');
-            unsub = fbOnSnapshot(fbDoc(fbDb, 'peerReviews', prId), (snap) => {
-                if (snap.exists()) setActivePeerReview({ id: snap.id, ...snap.data() });
-                else setActivePeerReview(null);
-            }, (err) => {
-                console.error('[TaskDetailModal] PR doc listener error:', err);
-                setActivePeerReview(null);
-            });
+            const { data } = await supabase.from('peer_reviews').select('*').eq('id', prId).single();
+            if (data) setActivePeerReview(data);
+            else setActivePeerReview(null);
         })();
-        return () => unsub?.();
+
+        // Realtime subscription
+        const channel = supabase
+            .channel(`pr-${prId}-${Date.now()}`)
+            .on('postgres_changes',
+                { event: '*', schema: 'public', table: 'peer_reviews', filter: `id=eq.${prId}` },
+                (payload) => {
+                    if (payload.eventType === 'DELETE') setActivePeerReview(null);
+                    else setActivePeerReview(payload.new);
+                }
+            )
+            .subscribe();
+
+        return () => supabase.removeChannel(channel);
     }, [task?.currentPeerReviewId]);
 
     // Load resource assignments for permission checks

@@ -1,16 +1,16 @@
 /**
  * AI Audit Logger — Backend (CJS)
  * ==================================
- * Logs every AI execution to Firestore for traceability.
- * Collection: aiExecutions
+ * Logs every AI execution to Supabase for traceability.
+ * Table: ai_executions
  */
 
-const paths = require("../automation/firestorePaths");
+const { getSupabase } = require("../db/supabaseAdmin");
 
 /**
  * Log an AI execution.
  *
- * @param {FirebaseFirestore.Firestore} adminDb
+ * @param {any} _adminDb - Deprecated, kept for compatibility
  * @param {Object} entry
  * @param {string} entry.featureType - 'report_extraction'|'briefing_generation'|'incident_classification'|'audio_transcription'
  * @param {string} [entry.provider='gemini']
@@ -28,33 +28,49 @@ const paths = require("../automation/firestorePaths");
  * @param {string} [entry.errorSummary]
  * @param {number} [entry.latencyMs]
  * @param {string} [entry.confidenceAction] - 'accept'|'confirm'|'fallback'
- * @returns {Promise<string>} - Document ID
+ * @param {number} [entry.inputTokens]
+ * @param {number} [entry.outputTokens]
+ * @returns {Promise<string>} - Document ID (UUID)
  */
-async function logAIExecution(adminDb, entry) {
+async function logAIExecution(_adminDb, entry) {
     const now = new Date().toISOString();
+    const sb = getSupabase();
 
     const doc = {
-        featureType: entry.featureType,
-        provider: entry.provider || "gemini",
-        model: entry.model || null,
-        routineKey: entry.routineKey || null,
-        runId: entry.runId || null,
-        userId: entry.userId || null,
-        sourceType: entry.sourceType || "text",
-        inputSummary: (entry.inputSummary || "").substring(0, 500),
-        rawInputStored: entry.rawInputStored || false,
-        outputSummary: (entry.outputSummary || "").substring(0, 500),
-        structuredOutput: entry.structuredOutput || null,
-        confidenceScore: entry.confidenceScore ?? null,
-        confidenceAction: entry.confidenceAction || null,
+        feature_type: entry.featureType,
+        source_type: entry.sourceType || "text",
         status: entry.status || "success",
-        errorSummary: entry.errorSummary || null,
-        latencyMs: entry.latencyMs || null,
-        createdAt: now,
+        latency_ms: entry.latencyMs || 0,
+        confidence_score: entry.confidenceScore ?? 1.0,
+        confidence_action: entry.confidenceAction || null,
+        input_tokens: entry.inputTokens || 0,
+        output_tokens: entry.outputTokens || 0,
+        created_by: entry.userId || null,
+        created_at: now,
+        details: {
+            provider: entry.provider || "gemini",
+            model: entry.model || null,
+            routineKey: entry.routineKey || null,
+            runId: entry.runId || null,
+            inputSummary: (entry.inputSummary || "").substring(0, 500),
+            rawInputStored: entry.rawInputStored || false,
+            outputSummary: (entry.outputSummary || "").substring(0, 500),
+            structuredOutput: entry.structuredOutput || null,
+            errorSummary: entry.errorSummary || null,
+        }
     };
 
-    const ref = await adminDb.collection(paths.AI_EXECUTIONS).add(doc);
-    return ref.id;
+    const { data, error } = await sb.from("ai_executions")
+        .insert(doc)
+        .select("id")
+        .single();
+
+    if (error) {
+        console.error("[aiAuditLogger] logAIExecution error:", error.message);
+        throw error;
+    }
+
+    return data.id;
 }
 
 /**
@@ -71,3 +87,4 @@ async function logAIFailure(adminDb, featureType, sourceType, error, extras = {}
 }
 
 module.exports = { logAIExecution, logAIFailure };
+

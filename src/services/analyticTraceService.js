@@ -7,9 +7,19 @@
  * @module services/analyticTraceService
  */
 
-import { collection, addDoc, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
-import { db } from '../firebase';
-import { COLLECTIONS } from '../models/schemas';
+import { supabase } from '../supabase';
+
+const mapTrace = (r) => ({
+    id: r.id,
+    eventType: r.event_type,
+    entityType: r.entity_type,
+    entityId: r.entity_id,
+    actorType: r.actor_type,
+    actorId: r.actor_id,
+    changes: r.changes,
+    metadata: r.metadata,
+    timestamp: r.timestamp,
+});
 
 /**
  * Record an AI monitoring trace event.
@@ -52,16 +62,20 @@ export async function recordAiTrace({
         metadata,
     };
 
-    await addDoc(collection(db, COLLECTIONS.AUDIT_TRAIL), {
-        eventType: 'ai_monitoring',
-        entityType,
-        entityId,
-        actorType: 'ai',
-        actorId: 'ai:monitoring-engine',
+    const { error } = await supabase.from('audit_trail').insert({
+        event_type: 'ai_monitoring',
+        entity_type: entityType,
+        entity_id: entityId,
+        actor_type: 'ai',
+        actor_id: 'ai:monitoring-engine',
         timestamp: trace.timestamp,
         changes: null,
         metadata: trace,
     });
+
+    if (error) {
+        console.error('[analyticTraceService] Error recording trace:', error);
+    }
 
     return trace;
 }
@@ -108,14 +122,19 @@ export async function recordMonitoringCycleTraces(monitoringResult) {
  * Get AI monitoring traces for an entity.
  */
 export async function getAiTraces(entityType, entityId, maxResults = 30) {
-    const q = query(
-        collection(db, COLLECTIONS.AUDIT_TRAIL),
-        where('eventType', '==', 'ai_monitoring'),
-        where('entityType', '==', entityType),
-        where('entityId', '==', entityId),
-        orderBy('timestamp', 'desc'),
-        limit(maxResults)
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const { data, error } = await supabase
+        .from('audit_trail')
+        .select('*')
+        .eq('event_type', 'ai_monitoring')
+        .eq('entity_type', entityType)
+        .eq('entity_id', entityId)
+        .order('timestamp', { ascending: false })
+        .limit(maxResults);
+
+    if (error) {
+        console.error('[analyticTraceService] Error loading traces:', error);
+        return [];
+    }
+    return (data || []).map(mapTrace);
 }
+

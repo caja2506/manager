@@ -3,7 +3,6 @@ import {
     DndContext, DragOverlay, closestCorners, KeyboardSensor, PointerSensor,
     useSensor, useSensors, defaultDropAnimationSideEffects, useDroppable
 } from '@dnd-kit/core';
-import { USE_SUPABASE } from '../../services/_backend';
 import { supabase } from '../../supabase';
 import { COLLECTIONS } from '../../models/schemas';
 import {
@@ -369,15 +368,8 @@ export default function AreaTaskKanban({ workAreaTypes, taskTypes }) {
         setIsSaving(true);
         try {
             let newId;
-            if (USE_SUPABASE) {
-                const { data } = await supabase.from('task_types').insert({ name: taskName }).select('id').single();
-                newId = data?.id;
-            } else {
-                const { collection, addDoc } = await import('firebase/firestore');
-                const { db } = await import('../../firebase');
-                const typeRef = await addDoc(collection(db, COLLECTIONS.TASK_TYPES), { name: taskName });
-                newId = typeRef.id;
-            }
+            const { data } = await supabase.from('task_types').insert({ name: taskName }).select('id').single();
+            newId = data?.id;
             
             const area = workAreaTypes.find(a => a.id === areaId);
             if (!area || !newId) return;
@@ -405,13 +397,7 @@ export default function AreaTaskKanban({ workAreaTypes, taskTypes }) {
 
         setIsSaving(true);
         try {
-            if (USE_SUPABASE) {
-                await supabase.from('task_types').update({ name: newName.trim() }).eq('id', taskId);
-            } else {
-                const { doc, updateDoc } = await import('firebase/firestore');
-                const { db } = await import('../../firebase');
-                await updateDoc(doc(db, COLLECTIONS.TASK_TYPES, taskId), { name: newName.trim() });
-            }
+            await supabase.from('task_types').update({ name: newName.trim() }).eq('id', taskId);
         } catch (error) {
             console.error("Error updating task type:", error);
             alert("No se pudo editar la tarea.");
@@ -428,13 +414,7 @@ export default function AreaTaskKanban({ workAreaTypes, taskTypes }) {
             onConfirm: async () => {
                 setIsSaving(true);
                 try {
-                    if (USE_SUPABASE) {
-                        await supabase.from('task_types').delete().eq('id', taskId);
-                    } else {
-                        const { doc, deleteDoc } = await import('firebase/firestore');
-                        const { db } = await import('../../firebase');
-                        await deleteDoc(doc(db, COLLECTIONS.TASK_TYPES, taskId));
-                    }
+                    await supabase.from('task_types').delete().eq('id', taskId);
                     
                     for (const area of workAreaTypes) {
                         const rawOriginals = area.taskTypeIds || area.defaultTaskTypes || [];

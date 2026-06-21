@@ -1,12 +1,25 @@
 /**
  * automationDataService.js
  * ========================
- * [Phase M.2] Firestore queries for AI automation components.
+ * [Phase M.2] Supabase queries for AI automation components.
  * Extracted from AIExecutionLogCard and AutomationAISummaryCard.
  */
 
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
-import { db } from '../firebase';
+import { supabase } from '../supabase';
+
+const mapExecution = (r) => ({
+    id: r.id,
+    featureType: r.feature_type,
+    sourceType: r.source_type,
+    status: r.status,
+    latencyMs: r.latency_ms,
+    confidenceScore: Number(r.confidence_score || 0),
+    confidenceAction: r.confidence_action,
+    inputTokens: r.input_tokens,
+    outputTokens: r.output_tokens,
+    createdBy: r.created_by,
+    createdAt: r.created_at,
+});
 
 /**
  * Load recent AI executions.
@@ -14,13 +27,17 @@ import { db } from '../firebase';
  * @returns {Promise<Array>}
  */
 export async function loadRecentAIExecutions(maxResults = 20) {
-    const q = query(
-        collection(db, 'aiExecutions'),
-        orderBy('createdAt', 'desc'),
-        limit(maxResults)
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const { data, error } = await supabase
+        .from('ai_executions')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(maxResults);
+
+    if (error) {
+        console.error('[automationDataService] error loading executions:', error);
+        return [];
+    }
+    return (data || []).map(mapExecution);
 }
 
 /**
@@ -31,15 +48,23 @@ export async function loadTodayAIMetrics() {
     const today = new Date().toISOString().split('T')[0];
     const startOfDay = new Date(today + 'T00:00:00Z').toISOString();
 
-    const q = query(
-        collection(db, 'aiExecutions'),
-        where('createdAt', '>=', startOfDay),
-        orderBy('createdAt', 'desc'),
-        limit(200)
-    );
+    const { data, error } = await supabase
+        .from('ai_executions')
+        .select('*')
+        .gte('created_at', startOfDay)
+        .order('created_at', { ascending: false })
+        .limit(200);
 
-    const snap = await getDocs(q);
-    const executions = snap.docs.map(d => d.data());
+    if (error) {
+        console.error('[automationDataService] error loading today metrics:', error);
+        return {
+            total: 0, success: 0, failure: 0, fallback: 0,
+            audioCount: 0, textCount: 0, briefingCount: 0, extractionCount: 0,
+            confirmationsRequested: 0, avgConfidence: 'N/A', avgLatency: 0
+        };
+    }
+
+    const executions = (data || []).map(mapExecution);
 
     return {
         total: executions.length,
@@ -61,3 +86,4 @@ export async function loadTodayAIMetrics() {
             : 0,
     };
 }
+

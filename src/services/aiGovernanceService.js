@@ -7,14 +7,9 @@
  * @module services/aiGovernanceService
  */
 
+import { supabase } from '../supabase';
 import {
-    collection, doc, setDoc, getDocs, getDoc, query, where
-} from 'firebase/firestore';
-import { db } from '../firebase';
-import {
-    COLLECTIONS,
     AI_GOVERNANCE_TYPE,
-    AI_EVENT_TYPE,
     createAiGovernanceDocument,
 } from '../models/schemas';
 
@@ -87,6 +82,19 @@ const DEFAULT_CAPABILITIES = [
     },
 ];
 
+const mapGovernance = (r) => ({
+    id: r.capability,
+    capability: r.capability,
+    name: r.name,
+    description: r.description,
+    type: r.type,
+    constraints: r.constraints,
+    enabled: r.enabled,
+    settingsFlag: r.settings_flag,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+});
+
 /**
  * Seed governance capabilities (idempotent).
  * Creates capability records if they don't exist.
@@ -98,10 +106,18 @@ export async function seedGovernanceCapabilities() {
     const skipped = [];
 
     for (const cap of DEFAULT_CAPABILITIES) {
-        const ref = doc(db, COLLECTIONS.AI_GOVERNANCE, cap.key);
-        const snap = await getDoc(ref);
+        const { data, error } = await supabase
+            .from('ai_governance')
+            .select('*')
+            .eq('capability', cap.key)
+            .maybeSingle();
 
-        if (!snap.exists()) {
+        if (error) {
+            console.error('[aiGovernanceService] Error checking governance capability:', error);
+            continue;
+        }
+
+        if (!data) {
             const govDoc = createAiGovernanceDocument({
                 capability: cap.key,
                 name: cap.name,
@@ -111,8 +127,24 @@ export async function seedGovernanceCapabilities() {
                 enabled: true,
                 settingsFlag: cap.settingsFlag,
             });
-            await setDoc(ref, govDoc);
-            created.push(cap.key);
+
+            // Map frontend document fields to snake_case table columns
+            const sbDoc = {
+                capability: govDoc.capability,
+                name: govDoc.name,
+                description: govDoc.description || '',
+                type: govDoc.type,
+                constraints: govDoc.constraints || {},
+                enabled: govDoc.enabled !== false,
+                settings_flag: govDoc.settingsFlag || null,
+            };
+
+            const { error: insErr } = await supabase.from('ai_governance').insert(sbDoc);
+            if (insErr) {
+                console.error('[aiGovernanceService] Error inserting capability:', insErr);
+            } else {
+                created.push(cap.key);
+            }
         } else {
             skipped.push(cap.key);
         }
@@ -140,14 +172,17 @@ export async function isCapabilityAllowed(capabilityKey, aiSettings = null) {
     }
 
     // 2. Check governance record
-    const ref = doc(db, COLLECTIONS.AI_GOVERNANCE, capabilityKey);
-    const snap = await getDoc(ref);
+    const { data, error } = await supabase
+        .from('ai_governance')
+        .select('*')
+        .eq('capability', capabilityKey)
+        .maybeSingle();
 
-    if (!snap.exists()) {
+    if (error || !data) {
         return { allowed: false, reason: 'Capability not registered in governance' };
     }
 
-    const gov = snap.data();
+    const gov = mapGovernance(data);
     if (!gov.enabled) {
         return { allowed: false, reason: 'Capability disabled by admin' };
     }
@@ -167,6 +202,15 @@ export async function isCapabilityAllowed(capabilityKey, aiSettings = null) {
  * @returns {Promise<Array>}
  */
 export async function getCapabilities() {
-    const snap = await getDocs(collection(db, COLLECTIONS.AI_GOVERNANCE));
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const { data, error } = await supabase
+        .from('ai_governance')
+        .select('*')
+        .order('capability');
+
+    if (error) {
+        console.error('[aiGovernanceService] error loading capabilities:', error);
+        return [];
+    }
+    return (data || []).map(mapGovernance);
 }
+

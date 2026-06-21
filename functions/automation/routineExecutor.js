@@ -1,7 +1,7 @@
 /**
  * Routine Executor — Backend (CJS)
  * ==================================
- * Core execution engine for automation routines.
+ * Core execution engine for automation routines in Supabase.
  * Orchestrates the full lifecycle: guard → run → resolve → handler → complete.
  *
  * The executor NEVER calls Telegram directly — it delegates to handlers
@@ -13,6 +13,8 @@ const { createRun, completeRun, updateRoutineLastRun } = require("./runTracker")
 const { resolveTargetsByRole } = require("./targetResolver");
 const { incrementTodayMetrics } = require("./metricsUpdater");
 const { RUN_STATUS, TRIGGER_TYPE, AUTOMATION_CHANNELS } = require("./constants");
+const { getSupabase } = require("../db/supabaseAdmin");
+const { loadSetting } = require("../db/coreDataReader");
 
 // Handler registry — maps routine key to handler module
 const HANDLER_REGISTRY = {
@@ -32,18 +34,19 @@ const HANDLER_REGISTRY = {
 /**
  * Execute a routine by key.
  *
- * @param {FirebaseFirestore.Firestore} adminDb
+ * @param {any} _adminDb - Deprecated
  * @param {string} token - Telegram bot token
  * @param {string} routineKey - Routine to execute
  * @param {string} triggerType - TRIGGER_TYPE value
  * @param {Object} [options] - { targetUserId, message, forceDryRun }
  * @returns {Promise<{success: boolean, runId: string, status: string, error?: string}>}
  */
-async function executeRoutine(adminDb, token, routineKey, triggerType, options = {}) {
+async function executeRoutine(_adminDb, token, routineKey, triggerType, options = {}) {
     const tag = `[routineExecutor:${routineKey}]`;
+    const sb = getSupabase();
 
     // ── 1. Guard: should this routine run? ──
-    const guard = await shouldRoutineRun(adminDb, routineKey);
+    const guard = await shouldRoutineRun(null, routineKey);
     if (!guard.shouldRun && triggerType !== TRIGGER_TYPE.MANUAL && triggerType !== TRIGGER_TYPE.DAY_SCHEDULE) {
         console.log(`${tag} Skipped: ${guard.reason}`);
         return { success: false, runId: null, status: "skipped", error: guard.reason };
@@ -55,13 +58,30 @@ async function executeRoutine(adminDb, token, routineKey, triggerType, options =
     let effectiveDebug = guard.effectiveDebug ?? false;
 
     if (!routine && (triggerType === TRIGGER_TYPE.MANUAL || triggerType === TRIGGER_TYPE.DAY_SCHEDULE)) {
-        const paths = require("./firestorePaths");
-        const snap = await adminDb.collection(paths.AUTOMATION_ROUTINES).doc(routineKey).get();
-        if (!snap.exists) {
+        const { data: routineData } = await sb.from("automation_routines")
+            .select("*")
+            .eq("key", routineKey)
+            .maybeSingle();
+
+        if (!routineData) {
             // Auto-seed the routine doc for DAY_SCHEDULE triggers
             if (triggerType === TRIGGER_TYPE.DAY_SCHEDULE) {
                 console.log(`${tag} Auto-seeding routine doc: ${routineKey}`);
-                await adminDb.collection(paths.AUTOMATION_ROUTINES).doc(routineKey).set({
+                const seed = {
+                    key: routineKey,
+                    name: routineKey,
+                    description: `Auto-created by scheduler`,
+                    enabled: true,
+                    schedule_type: "interval",
+                    channel: "none",
+                    target_role: "all",
+                    dry_run: false,
+                    debug_mode: false,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                };
+                await sb.from("automation_routines").insert(seed);
+                routine = {
                     key: routineKey,
                     name: routineKey,
                     description: `Auto-created by scheduler`,
@@ -71,19 +91,25 @@ async function executeRoutine(adminDb, token, routineKey, triggerType, options =
                     targetRole: "all",
                     dryRun: false,
                     debugMode: false,
-                    createdAt: new Date().toISOString(),
-                });
-                // Re-read after creation
-                const newSnap = await adminDb.collection(paths.AUTOMATION_ROUTINES).doc(routineKey).get();
-                routine = { ...newSnap.data(), key: routineKey };
+                };
             } else {
                 return { success: false, runId: null, status: "error", error: `Routine "${routineKey}" not found` };
             }
         } else {
-            routine = { ...snap.data(), key: routineKey };
+            routine = {
+                key: routineData.key,
+                name: routineData.name,
+                description: routineData.description,
+                enabled: routineData.enabled,
+                dryRun: routineData.dry_run,
+                debugMode: routineData.debug_mode,
+                scheduleType: routineData.schedule_type,
+                channel: routineData.channel,
+                targetRole: routineData.target_role,
+                allowedRoles: routineData.allowed_roles || [],
+            };
         }
-        const coreSnap = await adminDb.collection(paths.SETTINGS).doc(paths.SETTINGS_DOCS.AUTOMATION_CORE).get();
-        const coreConfig = coreSnap.exists ? coreSnap.data() : {};
+        const coreConfig = await loadSetting("automationCore") || {};
         effectiveDryRun = routine.dryRun || coreConfig.dryRun || false;
         effectiveDebug = routine.debugMode || coreConfig.debugMode || false;
     }
@@ -97,10 +123,10 @@ async function executeRoutine(adminDb, token, routineKey, triggerType, options =
     if (options.targetUserId) {
         // Single target (manual test)
         const { resolveTargetById } = require("./targetResolver");
-        const target = await resolveTargetById(adminDb, options.targetUserId);
+        const target = await resolveTargetById(null, options.targetUserId);
         if (target) targets = [target];
     } else if (routine.allowedRoles && routine.allowedRoles.length > 0) {
-        targets = await resolveTargetsByRole(adminDb, routine.allowedRoles);
+        targets = await resolveTargetsByRole(null, routine.allowedRoles);
     }
 
     // Routines that resolve their own targets internally (not via targetResolver)
@@ -111,9 +137,8 @@ async function executeRoutine(adminDb, token, routineKey, triggerType, options =
         return { success: false, runId: null, status: "no_targets", error: "No targets resolved" };
     }
 
-
     // ── 3. Create run ──
-    const runId = await createRun(adminDb, {
+    const runId = await createRun(null, {
         routineKey,
         triggerType,
         targetsCount: targets.length,
@@ -142,7 +167,7 @@ async function executeRoutine(adminDb, token, routineKey, triggerType, options =
             triggerType,
         };
 
-        result = await handler.execute(adminDb, token, targets, context);
+        result = await handler.execute(null, token, targets, context);
 
     } catch (err) {
         console.error(`${tag} Handler error:`, err);
@@ -160,7 +185,7 @@ async function executeRoutine(adminDb, token, routineKey, triggerType, options =
     }
 
     // ── 6. Complete run ──
-    await completeRun(adminDb, runId, finalStatus, {
+    await completeRun(null, runId, finalStatus, {
         errorSummary: result.errors.length > 0 ? result.errors.join("; ") : null,
         finalCounters: {
             sentCount: result.sentCount || 0,
@@ -170,16 +195,16 @@ async function executeRoutine(adminDb, token, routineKey, triggerType, options =
     });
 
     // ── 7. Update routine metadata ──
-    await updateRoutineLastRun(adminDb, routineKey, finalStatus,
+    await updateRoutineLastRun(null, routineKey, finalStatus,
         result.errors.length > 0 ? result.errors[0] : null
     );
 
     // ── 8. Update daily metrics ──
     try {
-        await incrementTodayMetrics(adminDb, AUTOMATION_CHANNELS.TELEGRAM, {
+        await incrementTodayMetrics(null, AUTOMATION_CHANNELS.TELEGRAM, {
             messagesSent: result.sentCount || 0,
             failedDeliveries: result.failedCount || 0,
-            activeRoutines: 0, // Will be computed separately if needed
+            activeRoutines: 0,
         });
     } catch (metricsErr) {
         console.warn(`${tag} Metrics update failed:`, metricsErr.message);
@@ -197,3 +222,4 @@ async function executeRoutine(adminDb, token, routineKey, triggerType, options =
 }
 
 module.exports = { executeRoutine, HANDLER_REGISTRY };
+

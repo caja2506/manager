@@ -301,17 +301,61 @@ ${text}`;
             await requireAdmin(adminDb, request);
             const { reportId } = request.data;
             if (!reportId) throw new HttpsError("invalid-argument", "reportId is required.");
-            const reportDoc = await adminDb.collection("telegramReports").doc(reportId).get();
-            if (!reportDoc.exists) throw new HttpsError("not-found", "Report not found.");
-            const report = reportDoc.data();
-            const rawText = report.rawText;
+
+            const { getSupabase } = require("../db/supabaseAdmin");
+            const sb = getSupabase();
+            const { data: report, error: fetchErr } = await sb.from("telegram_reports")
+                .select("*")
+                .eq("id", reportId)
+                .single();
+
+            if (fetchErr || !report) {
+                throw new HttpsError("not-found", `Report not found: ${fetchErr?.message || ""}`);
+            }
+
+            let rawText = "";
+            let userId = report.user_id;
+            try {
+                const parsedContent = JSON.parse(report.content);
+                rawText = parsedContent.rawText || report.content;
+            } catch {
+                rawText = report.content;
+            }
+
             if (!rawText) throw new HttpsError("failed-precondition", "Report has no rawText.");
+
             const { extractFromText } = require("../ai/aiExtractionService");
-            const result = await extractFromText(adminDb, geminiApiKey.value(), rawText, { userId: report.userId });
-            await adminDb.collection("telegramReports").doc(reportId).update({
-                aiReprocessed: true, aiReprocessedAt: new Date().toISOString(),
-                aiParsedData: result.extracted, aiConfidence: result.extracted.confidenceScore, aiSource: result.source,
-            });
+            const result = await extractFromText(adminDb, geminiApiKey.value(), rawText, { userId });
+
+            const updatedContent = {
+                rawText,
+                progressPercent: result.extracted.progressPercent,
+                hoursWorked: result.extracted.hoursWorked,
+                blocker: result.extracted.blockerPresent ? (result.extracted.blockerSummary || "Sí") : null,
+                blockerPresent: result.extracted.blockerPresent,
+                normalizedSummary: result.extracted.normalizedSummary || "",
+                aiConfidence: result.extracted.confidenceScore || null,
+                aiReprocessed: true,
+                aiReprocessedAt: new Date().toISOString(),
+                aiSource: result.source,
+            };
+
+            const { error: updErr } = await sb.from("telegram_reports")
+                .update({
+                    content: JSON.stringify(updatedContent),
+                    parsed_data: {
+                        ...result.extracted,
+                        aiReprocessed: true,
+                        aiReprocessedAt: new Date().toISOString(),
+                        aiSource: result.source,
+                    }
+                })
+                .eq("id", reportId);
+
+            if (updErr) {
+                throw new HttpsError("internal", `Failed to update report in Supabase: ${updErr.message}`);
+            }
+
             return { reportId, ...result };
         }
     );

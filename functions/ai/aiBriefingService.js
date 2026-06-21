@@ -1,7 +1,7 @@
 /**
  * AI Briefing Service — Backend (CJS)
  * ======================================
- * Generates role-specific briefings using Gemini.
+ * Generates role-specific briefings using Gemini in Supabase.
  * Falls back to Phase 2 deterministic templates on failure.
  */
 
@@ -15,7 +15,8 @@ const {
 const { logAIExecution, logAIFailure } = require("./aiAuditLogger");
 const { fallbackBriefing } = require("./aiFallbacks");
 const { OPERATIONAL_ROLES } = require("../automation/constants");
-const paths = require("../automation/firestorePaths");
+const { getSupabase } = require("../db/supabaseAdmin");
+const { loadSetting } = require("../db/coreDataReader");
 
 // Map role to prompt config
 const ROLE_PROMPTS = {
@@ -26,15 +27,11 @@ const ROLE_PROMPTS = {
 };
 
 /**
- * Load AI configuration from Firestore.
+ * Load AI configuration from Supabase settings.
  */
 async function loadAIConfig(adminDb) {
     try {
-        const snap = await adminDb
-            .collection(paths.SETTINGS)
-            .doc(paths.SETTINGS_DOCS.AUTOMATION_AI)
-            .get();
-        return snap.exists ? snap.data() : null;
+        return await loadSetting("automationAI");
     } catch {
         return null;
     }
@@ -60,12 +57,13 @@ async function loadBriefingData(adminDb, userId, role) {
     data.overdueCount = data.overdueTasks.length;
     data.blockedCount = data.blockedTasks.length;
 
-    // Open incidents (still Firestore — not a migrated table)
+    // Open incidents from Supabase
     try {
-        const incidentsSnap = await adminDb.collection(paths.OPERATION_INCIDENTS)
-            .where("status", "==", "open")
-            .get();
-        data.openIncidents = incidentsSnap.size;
+        const sb = getSupabase();
+        const { data: incidents, error } = await sb.from("operation_incidents")
+            .select("id")
+            .eq("status", "open");
+        data.openIncidents = error ? 0 : (incidents || []).length;
     } catch {
         data.openIncidents = 0;
     }
@@ -92,7 +90,7 @@ async function loadBriefingData(adminDb, userId, role) {
 /**
  * Generate a role-specific briefing using Gemini.
  *
- * @param {FirebaseFirestore.Firestore} adminDb
+ * @param {any} adminDb - Kept for signature compatibility
  * @param {string} apiKey
  * @param {string} role - OPERATIONAL_ROLES value
  * @param {Object} userData - { userId, userName }
@@ -107,14 +105,14 @@ async function generateBriefing(adminDb, apiKey, role, userData, context = {}) {
     }
 
     // Check if AI briefings are enabled
-    const aiConfig = await loadAIConfig(adminDb);
+    const aiConfig = await loadAIConfig(null);
     if (!aiConfig?.enabled || !aiConfig?.allowSmartBriefings) {
         return { message: fallbackBriefing(role, { userName: userData.userName }), source: "fallback" };
     }
 
     try {
         // Load data
-        const data = await loadBriefingData(adminDb, userData.userId, role);
+        const data = await loadBriefingData(null, userData.userId, role);
         data.userName = userData.userName;
 
         // Build prompt
@@ -130,7 +128,7 @@ async function generateBriefing(adminDb, apiKey, role, userData, context = {}) {
         });
 
         if (!result.ok) {
-            await logAIFailure(adminDb, "briefing_generation", "system_context", result.error, {
+            await logAIFailure(null, "briefing_generation", "system_context", result.error, {
                 userId: userData.userId,
                 routineKey: context.routineKey,
                 latencyMs: result.latencyMs,
@@ -139,7 +137,7 @@ async function generateBriefing(adminDb, apiKey, role, userData, context = {}) {
         }
 
         // Log success
-        await logAIExecution(adminDb, {
+        await logAIExecution(null, {
             featureType: "briefing_generation",
             sourceType: "system_context",
             model: aiConfig.briefingModel || null,
@@ -156,7 +154,7 @@ async function generateBriefing(adminDb, apiKey, role, userData, context = {}) {
         return { message: result.text, source: "ai" };
     } catch (err) {
         console.error("[aiBriefingService] Unexpected error:", err);
-        await logAIFailure(adminDb, "briefing_generation", "system_context", err, {
+        await logAIFailure(null, "briefing_generation", "system_context", err, {
             userId: userData.userId,
         });
         return { message: fallbackBriefing(role, { userName: userData.userName }), source: "fallback" };
@@ -164,3 +162,4 @@ async function generateBriefing(adminDb, apiKey, role, userData, context = {}) {
 }
 
 module.exports = { generateBriefing, loadAIConfig, loadBriefingData };
+

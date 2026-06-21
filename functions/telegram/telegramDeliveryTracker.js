@@ -1,15 +1,15 @@
 /**
  * Telegram Delivery Tracker — Backend (CJS)
  * ============================================
- * Tracks every outbound/inbound message for traceability.
+ * Tracks every outbound/inbound message for traceability in Supabase.
  */
 
-const paths = require("../automation/firestorePaths");
+const { getSupabase } = require("../db/supabaseAdmin");
 const { DELIVERY_STATUS } = require("../automation/constants");
 
 /**
  * Create a delivery record.
- * @returns {string} delivery document ID
+ * @returns {string} delivery document ID (UUID)
  */
 async function createDelivery(adminDb, {
     chatId,
@@ -22,25 +22,29 @@ async function createDelivery(adminDb, {
     telegramMessageId = null,
 }) {
     const now = new Date().toISOString();
-    const ref = await adminDb.collection(paths.TELEGRAM_DELIVERIES).add({
-        chatId: String(chatId),
-        userId,
-        routineKey,
-        runId,
+    const sb = getSupabase();
+
+    const { data, error } = await sb.from("telegram_deliveries").insert({
+        chat_id: String(chatId),
+        user_id: userId,
+        routine_key: routineKey,
+        run_id: runId,
         direction,
-        messageText,
-        deliveryStatus: DELIVERY_STATUS.PENDING,
-        telegramMessageId,
-        dryRun,
-        sentAt: now,
-        deliveredAt: null,
-        respondedAt: null,
-        failedAt: null,
-        errorMessage: null,
-        createdAt: now,
-        updatedAt: now,
-    });
-    return ref.id;
+        message_text: messageText,
+        delivery_status: DELIVERY_STATUS.PENDING,
+        telegram_message_id: telegramMessageId ? Number(telegramMessageId) : null,
+        dry_run: dryRun,
+        sent_at: now,
+        created_at: now,
+        updated_at: now,
+    }).select("id").single();
+
+    if (error) {
+        console.error("[telegramDeliveryTracker] createDelivery error:", error.message);
+        throw error;
+    }
+
+    return data.id;
 }
 
 /**
@@ -48,25 +52,42 @@ async function createDelivery(adminDb, {
  */
 async function markDelivered(adminDb, deliveryId, telegramMessageId = null) {
     const now = new Date().toISOString();
-    const update = {
-        deliveryStatus: DELIVERY_STATUS.DELIVERED,
-        deliveredAt: now,
-        updatedAt: now,
+    const sb = getSupabase();
+
+    const updates = {
+        delivery_status: DELIVERY_STATUS.DELIVERED,
+        delivered_at: now,
+        updated_at: now,
     };
-    if (telegramMessageId) update.telegramMessageId = telegramMessageId;
-    await adminDb.collection(paths.TELEGRAM_DELIVERIES).doc(deliveryId).update(update);
+    if (telegramMessageId) updates.telegram_message_id = Number(telegramMessageId);
+
+    const { error } = await sb.from("telegram_deliveries")
+        .update(updates)
+        .eq("id", deliveryId);
+
+    if (error) {
+        console.error("[telegramDeliveryTracker] markDelivered error:", error.message);
+    }
 }
 
 /**
  * Mark delivery as failed.
  */
 async function markFailed(adminDb, deliveryId, error) {
-    await adminDb.collection(paths.TELEGRAM_DELIVERIES).doc(deliveryId).update({
-        deliveryStatus: DELIVERY_STATUS.FAILED,
-        failedAt: new Date().toISOString(),
-        errorMessage: error || "Unknown error",
-        updatedAt: new Date().toISOString(),
-    });
+    const sb = getSupabase();
+
+    const { error: err } = await sb.from("telegram_deliveries")
+        .update({
+            delivery_status: DELIVERY_STATUS.FAILED,
+            failed_at: new Date().toISOString(),
+            error_message: error || "Unknown error",
+            updated_at: new Date().toISOString(),
+        })
+        .eq("id", deliveryId);
+
+    if (err) {
+        console.error("[telegramDeliveryTracker] markFailed error:", err.message);
+    }
 }
 
 /**
@@ -74,24 +95,35 @@ async function markFailed(adminDb, deliveryId, error) {
  * Links response to the most recent outbound delivery for this chatId + routineKey.
  */
 async function markResponded(adminDb, chatId, routineKey) {
-    const snap = await adminDb.collection(paths.TELEGRAM_DELIVERIES)
-        .where("chatId", "==", String(chatId))
-        .where("routineKey", "==", routineKey)
-        .where("direction", "==", "outbound")
-        .where("deliveryStatus", "==", DELIVERY_STATUS.DELIVERED)
-        .orderBy("sentAt", "desc")
+    const sb = getSupabase();
+
+    // Find the most recent outbound delivery that is delivered for this chatId and routineKey
+    const { data, error } = await sb.from("telegram_deliveries")
+        .select("id")
+        .eq("chat_id", String(chatId))
+        .eq("routine_key", routineKey)
+        .eq("direction", "outbound")
+        .eq("delivery_status", DELIVERY_STATUS.DELIVERED)
+        .order("sent_at", { ascending: false })
         .limit(1)
-        .get();
+        .maybeSingle();
 
-    if (snap.empty) return null;
+    if (error || !data) return null;
 
-    const docRef = snap.docs[0].ref;
-    await docRef.update({
-        deliveryStatus: DELIVERY_STATUS.RESPONDED,
-        respondedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-    });
-    return docRef.id;
+    const { error: updateErr } = await sb.from("telegram_deliveries")
+        .update({
+            delivery_status: DELIVERY_STATUS.RESPONDED,
+            responded_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        })
+        .eq("id", data.id);
+
+    if (updateErr) {
+        console.error("[telegramDeliveryTracker] markResponded error:", updateErr.message);
+    }
+
+    return data.id;
 }
 
 module.exports = { createDelivery, markDelivered, markFailed, markResponded };
+

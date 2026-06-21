@@ -1775,7 +1775,7 @@ export default function MainTable({ forceProjectId = null }) {
         });
         const timer = setTimeout(() => setCollapsedGroups(ns), 0);
         return () => clearTimeout(timer);
-    }, [projectGroups]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [projectGroups]);  
 
     const toggleGroup = (key) => setCollapsedGroups(prev => ({ ...prev, [key]: !prev[key] }));
     const activeFilterCount = [taskSearch, taskFilterProject, taskFilterAssignee, taskFilterPriority, taskFilterArea].filter(Boolean).length;

@@ -78,13 +78,34 @@ async function loadAnalyticsData(adminDb, startDate, endDate) {
 /**
  * Load documents from a collection filtered by a timestamp field.
  */
+const COLLECTION_TO_TABLE = {
+    "automationRuns": { table: "automation_runs", dateField: "started_at" },
+    "telegramDeliveries": { table: "telegram_deliveries", dateField: "created_at" },
+    "telegramReports": { table: "telegram_reports", dateField: "created_at" },
+    "telegramEscalations": { table: "telegram_escalations", dateField: "created_at" },
+    "operationIncidents": { table: "operation_incidents", dateField: "created_at" },
+    "aiExecutions": { table: "ai_executions", dateField: "created_at" },
+};
+
+/**
+ * Load documents from a collection filtered by a timestamp field.
+ */
 async function loadCollection(adminDb, collectionPath, timestampField, startISO, endISO) {
     try {
-        const snap = await adminDb.collection(collectionPath)
-            .where(timestampField, ">=", startISO)
-            .where(timestampField, "<=", endISO)
-            .get();
-        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const mapping = COLLECTION_TO_TABLE[collectionPath];
+        if (!mapping) {
+            console.warn(`[analyticsDataLoader] No mapping for collection ${collectionPath}. Falling back to empty array.`);
+            return [];
+        }
+        const { getSupabase, toCamel } = require("../db/supabaseAdmin");
+        const sb = getSupabase();
+        const { data, error } = await sb.from(mapping.table)
+            .select("*")
+            .gte(mapping.dateField, startISO)
+            .lte(mapping.dateField, endISO);
+
+        if (error) throw error;
+        return (data || []).map(toCamel);
     } catch (err) {
         console.warn(`[analyticsDataLoader] Error loading ${collectionPath}:`, err.message);
         return [];
@@ -117,8 +138,11 @@ async function loadAllUsers() {
  */
 async function loadAllRoutines(adminDb) {
     try {
-        const snap = await adminDb.collection(paths.AUTOMATION_ROUTINES).get();
-        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const { getSupabase, toCamel } = require("../db/supabaseAdmin");
+        const sb = getSupabase();
+        const { data, error } = await sb.from("automation_routines").select("*");
+        if (error) throw error;
+        return (data || []).map(toCamel);
     } catch (err) {
         console.warn("[analyticsDataLoader] Error loading routines:", err.message);
         return [];
@@ -130,11 +154,14 @@ async function loadAllRoutines(adminDb) {
  */
 async function loadDailyMetrics(adminDb, startDate, endDate) {
     try {
-        const snap = await adminDb.collection(paths.AUTOMATION_METRICS_DAILY)
-            .where("date", ">=", startDate)
-            .where("date", "<=", endDate)
-            .get();
-        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const { getSupabase, toCamel } = require("../db/supabaseAdmin");
+        const sb = getSupabase();
+        const { data, error } = await sb.from("automation_metrics_daily")
+            .select("*")
+            .gte("date", startDate)
+            .lte("date", endDate);
+        if (error) throw error;
+        return (data || []).map(toCamel);
     } catch (err) {
         console.warn("[analyticsDataLoader] Error loading daily metrics:", err.message);
         return [];

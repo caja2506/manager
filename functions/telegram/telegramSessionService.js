@@ -1,10 +1,10 @@
 /**
  * Telegram Session Service — Backend (CJS)
  * ===========================================
- * Session CRUD and state machine operations for Firestore.
+ * Session CRUD and state machine operations for Supabase.
  */
 
-const paths = require("../automation/firestorePaths");
+const { getSupabase } = require("../db/supabaseAdmin");
 const {
     TELEGRAM_SESSION_STATE,
     TELEGRAM_SESSION_EVENT,
@@ -90,18 +90,59 @@ const TRANSITIONS = {
  */
 async function getOrCreateSession(adminDb, chatId) {
     const chatIdStr = String(chatId);
-    const snap = await adminDb.collection(paths.TELEGRAM_SESSIONS)
-        .where("chatId", "==", chatIdStr)
-        .limit(1)
-        .get();
+    const sb = getSupabase();
 
-    if (!snap.empty) {
-        return { id: snap.docs[0].id, ...snap.docs[0].data() };
+    const { data: sessionData, error } = await sb.from("telegram_sessions")
+        .select("*")
+        .eq("chat_id", chatIdStr)
+        .maybeSingle();
+
+    if (error) {
+        console.warn("[telegramSessionService] getOrCreateSession error:", error.message);
+    }
+
+    if (sessionData) {
+        return {
+            id: sessionData.chat_id,
+            chatId: sessionData.chat_id,
+            userId: sessionData.user_id,
+            currentState: sessionData.current_state,
+            previousState: sessionData.previous_state,
+            stateChangedAt: sessionData.state_changed_at,
+            stateExpiresAt: sessionData.state_expires_at,
+            linkedAt: sessionData.linked_at,
+            lastActivityAt: sessionData.last_activity_at,
+            metadata: sessionData.metadata || {},
+            createdAt: sessionData.created_at,
+            updatedAt: sessionData.updated_at,
+        };
     }
 
     // Create new session
     const now = new Date().toISOString();
     const session = {
+        chat_id: chatIdStr,
+        user_id: null,
+        current_state: TELEGRAM_SESSION_STATE.IDLE,
+        previous_state: null,
+        state_changed_at: now,
+        state_expires_at: null,
+        linked_at: null,
+        last_activity_at: now,
+        metadata: {},
+        created_at: now,
+        updated_at: now,
+    };
+
+    const { error: insertError } = await sb.from("telegram_sessions").insert(session);
+    if (insertError) {
+        console.error("[telegramSessionService] Error inserting session:", insertError.message);
+    }
+
+    await logBotEvent(null, chatIdStr, TELEGRAM_BOT_LOG_EVENT.SESSION_CREATED, {});
+
+    return {
+        id: chatIdStr,
         chatId: chatIdStr,
         userId: null,
         currentState: TELEGRAM_SESSION_STATE.IDLE,
@@ -114,25 +155,20 @@ async function getOrCreateSession(adminDb, chatId) {
         createdAt: now,
         updatedAt: now,
     };
-
-    const ref = await adminDb.collection(paths.TELEGRAM_SESSIONS).add(session);
-    await logBotEvent(adminDb, chatIdStr, TELEGRAM_BOT_LOG_EVENT.SESSION_CREATED, {});
-
-    return { id: ref.id, ...session };
 }
 
 /**
  * Transition session state using the state machine.
  */
 async function transitionState(adminDb, chatId, event, extras = {}) {
-    const session = await getOrCreateSession(adminDb, chatId);
+    const session = await getOrCreateSession(null, chatId);
     const currentState = session.currentState;
 
     // Global ERROR transition
     if (event === TELEGRAM_SESSION_EVENT.ERROR) {
         const newState = TELEGRAM_SESSION_STATE.BLOCKED_FLOW;
-        await updateSessionState(adminDb, session.id, currentState, newState, extras);
-        await logBotEvent(adminDb, String(chatId), TELEGRAM_BOT_LOG_EVENT.STATE_TRANSITION, {
+        await updateSessionState(null, session.id, currentState, newState, extras);
+        await logBotEvent(null, String(chatId), TELEGRAM_BOT_LOG_EVENT.STATE_TRANSITION, {
             from: currentState, to: newState, event,
         });
         return { valid: true, state: newState, session };
@@ -146,8 +182,8 @@ async function transitionState(adminDb, chatId, event, extras = {}) {
     }
 
     const newState = stateTransitions[event];
-    await updateSessionState(adminDb, session.id, currentState, newState, extras);
-    await logBotEvent(adminDb, String(chatId), TELEGRAM_BOT_LOG_EVENT.STATE_TRANSITION, {
+    await updateSessionState(null, session.id, currentState, newState, extras);
+    await logBotEvent(null, String(chatId), TELEGRAM_BOT_LOG_EVENT.STATE_TRANSITION, {
         from: currentState, to: newState, event,
     });
 
@@ -159,35 +195,56 @@ async function transitionState(adminDb, chatId, event, extras = {}) {
  */
 async function updateSessionState(adminDb, sessionId, previousState, newState, extras = {}) {
     const now = new Date().toISOString();
-    await adminDb.collection(paths.TELEGRAM_SESSIONS).doc(sessionId).update({
-        currentState: newState,
-        previousState,
-        stateChangedAt: now,
-        lastActivityAt: now,
-        updatedAt: now,
-        ...extras,
-    });
+    const sb = getSupabase();
+
+    const updates = {
+        current_state: newState,
+        previous_state: previousState,
+        state_changed_at: now,
+        last_activity_at: now,
+        updated_at: now,
+    };
+
+    if (extras.userId !== undefined) updates.user_id = extras.userId;
+    if (extras.stateExpiresAt !== undefined) updates.state_expires_at = extras.stateExpiresAt;
+    if (extras.linkedAt !== undefined) updates.linked_at = extras.linkedAt;
+    if (extras.metadata !== undefined) updates.metadata = extras.metadata;
+
+    const { error } = await sb.from("telegram_sessions")
+        .update(updates)
+        .eq("chat_id", String(sessionId));
+
+    if (error) {
+        console.error("[telegramSessionService] updateSessionState error:", error.message);
+    }
 }
 
 /**
  * Reset session to IDLE.
  */
 async function resetSession(adminDb, chatId) {
-    return transitionState(adminDb, chatId, TELEGRAM_SESSION_EVENT.RESET);
+    return transitionState(null, chatId, TELEGRAM_SESSION_EVENT.RESET);
 }
 
 /**
  * Link a chatId to a userId.
  */
 async function linkIdentity(adminDb, chatId, userId) {
-    const session = await getOrCreateSession(adminDb, chatId);
+    const session = await getOrCreateSession(null, chatId);
     const now = new Date().toISOString();
+    const sb = getSupabase();
 
-    await adminDb.collection(paths.TELEGRAM_SESSIONS).doc(session.id).update({
-        userId,
-        linkedAt: now,
-        updatedAt: now,
-    });
+    const { error } = await sb.from("telegram_sessions")
+        .update({
+            user_id: userId,
+            linked_at: now,
+            updated_at: now,
+        })
+        .eq("chat_id", String(chatId));
+
+    if (error) {
+        console.error("[telegramSessionService] linkIdentity error:", error.message);
+    }
 
     // Also update user's Telegram link in Supabase
     await updateUser(userId, {
@@ -195,7 +252,7 @@ async function linkIdentity(adminDb, chatId, userId) {
         isAutomationParticipant: true,
     });
 
-    await logBotEvent(adminDb, String(chatId), TELEGRAM_BOT_LOG_EVENT.IDENTITY_LINKED, { userId });
+    await logBotEvent(null, String(chatId), TELEGRAM_BOT_LOG_EVENT.IDENTITY_LINKED, { userId });
 }
 
 /**
@@ -203,21 +260,20 @@ async function linkIdentity(adminDb, chatId, userId) {
  */
 async function findUserByChatId(adminDb, chatId) {
     const chatIdStr = String(chatId);
+    const sb = getSupabase();
 
-    // Check sessions first (single-field query, no composite index needed)
-    const snap = await adminDb.collection(paths.TELEGRAM_SESSIONS)
-        .where("chatId", "==", chatIdStr)
-        .limit(1)
-        .get();
+    const { data: session, error } = await sb.from("telegram_sessions")
+        .select("user_id")
+        .eq("chat_id", chatIdStr)
+        .maybeSingle();
 
-    if (!snap.empty) {
-        const userId = snap.docs[0].data().userId;
-        if (userId) return userId;
+    if (!error && session && session.user_id) {
+        return session.user_id;
     }
 
     // Fallback: search users in Supabase by telegramChatId
     const allUsers = await loadAllUsers();
-    const matchedUser = allUsers.find(u => u.telegramChatId === chatIdStr);
+    const matchedUser = allUsers.find(u => String(u.telegramChatId) === chatIdStr);
     if (matchedUser) {
         return matchedUser.id;
     }
@@ -229,16 +285,20 @@ async function findUserByChatId(adminDb, chatId) {
  * Log a bot event for traceability.
  */
 async function logBotEvent(adminDb, chatId, eventType, details = {}) {
-    // Sanitize: remove undefined values (Firestore rejects them)
     const cleanDetails = JSON.parse(JSON.stringify(details));
-    await adminDb.collection(paths.TELEGRAM_BOT_LOGS).add({
-        chatId: String(chatId),
-        eventType,
+    const sb = getSupabase();
+    const { error } = await sb.from("telegram_bot_logs").insert({
+        chat_id: String(chatId),
+        event_type: eventType,
         details: cleanDetails,
         direction: "internal",
         severity: "info",
-        createdAt: new Date().toISOString(),
+        created_at: new Date().toISOString(),
     });
+
+    if (error) {
+        console.error("[telegramSessionService] logBotEvent error:", error.message);
+    }
 }
 
 module.exports = {
@@ -249,3 +309,4 @@ module.exports = {
     findUserByChatId,
     logBotEvent,
 };
+

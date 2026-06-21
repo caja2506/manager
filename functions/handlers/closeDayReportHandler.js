@@ -19,6 +19,7 @@ const templates = require("../telegram/telegramTemplates");
 const paths = require("../automation/firestorePaths");
 const { OPERATIONAL_ROLES } = require("../automation/constants");
 const { loadBreakBands, getBreakHoursInRange } = require("../utils/breakTimeUtils");
+const { getSupabase } = require("../db/supabaseAdmin");
 const {
     loadAllTimeLogs, loadAllTasks, loadAllProjects, loadAllDelays,
     updateTimeLog, recalculateTaskHours,
@@ -38,16 +39,38 @@ async function execute(adminDb, token, targets, context) {
     await loadBreakBands(adminDb);
 
     // ── 1. Load all data ──
-    // Core data from Supabase, telegram reports from Firestore
-    const [allTimeLogs, allTasks, allProjects, allDelays, reportsSnap] = await Promise.all([
+    // Core data and telegram reports from Supabase
+    const sb = getSupabase();
+    const startISO = `${today}T00:00:00-06:00`;
+    const endISO = `${today}T23:59:59.999-06:00`;
+
+    const [allTimeLogs, allTasks, allProjects, allDelays, reportsResult] = await Promise.all([
         loadAllTimeLogs(),
         loadAllTasks(),
         loadAllProjects(),
         loadAllDelays(),
-        adminDb.collection(paths.TELEGRAM_REPORTS).where("date", "==", today).get(),
+        sb.from("telegram_reports")
+            .select("*")
+            .gte("created_at", startISO)
+            .lte("created_at", endISO),
     ]);
 
-    const todayReports = reportsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const todayReports = (reportsResult.data || []).map(r => {
+        let contentObj = {};
+        try {
+            contentObj = JSON.parse(r.content || "{}");
+        } catch {
+            contentObj = { rawText: r.content };
+        }
+        return {
+            id: r.id,
+            userId: r.user_id,
+            reportType: r.report_type,
+            createdAt: r.created_at,
+            sentAt: r.sent_at,
+            ...contentObj
+        };
+    });
 
     // ── 2. Stop all active timers ──
     const activeTimers = allTimeLogs.filter(log => !log.endTime && log.startTime);

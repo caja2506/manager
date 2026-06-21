@@ -157,24 +157,23 @@ async function evaluate({ telegramToken, nvidiaKey, deepseekKey, adminDb }) {
             })(),
         ]);
 
-        // ── 2. Build userId→chatId map from Firestore telegramSessions ──
+        // ── 2. Build userId→chatId map from Supabase telegram_sessions ──
         // This is the authoritative source for Telegram links.
+        const { getSupabase } = require("../db/supabaseAdmin");
+        const sb = getSupabase();
         let telegramMap = {}; // userId → chatId
-        if (adminDb) {
-            try {
-                const sessionsSnap = await adminDb.collection("telegramSessions").get();
-                for (const doc of sessionsSnap.docs) {
-                    const s = doc.data();
-                    if (s.userId && s.chatId) {
-                        telegramMap[s.userId] = String(s.chatId);
-                    }
+        try {
+            const { data: sessions, error } = await sb.from("telegram_sessions")
+                .select("user_id, chat_id")
+                .not("user_id", "is", null);
+            if (!error && sessions) {
+                for (const s of sessions) {
+                    telegramMap[s.user_id] = String(s.chat_id);
                 }
-                console.log(`${tag} ${Object.keys(telegramMap).length} users with Telegram chatId from Firestore`);
-            } catch (e) {
-                console.warn(`${tag} Could not load Firestore sessions:`, e.message);
             }
-        } else {
-            console.warn(`${tag} adminDb not provided — cannot resolve Telegram chatIds`);
+            console.log(`${tag} ${Object.keys(telegramMap).length} users with Telegram chatId from Supabase`);
+        } catch (e) {
+            console.warn(`${tag} Could not load Supabase sessions:`, e.message);
         }
 
         // Merge telegramChatId into user objects

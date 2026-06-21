@@ -78,7 +78,7 @@ const { createTelegramExports } = require("./exports/telegram");
 const telegramExports = createTelegramExports(adminDb, secrets);
 exports.telegramWebhookEndpoint = telegramExports.telegramWebhookEndpoint;
 exports.linkTelegramUser = telegramExports.linkTelegramUser;
-exports.onDelayCreated = telegramExports.onDelayCreated;
+exports.notifyTelegramDelayCreated = telegramExports.notifyTelegramDelayCreated;
 exports.quickReportApi = telegramExports.quickReportApi;
 exports.setupQuickReportMenuButton = telegramExports.setupQuickReportMenuButton;
 

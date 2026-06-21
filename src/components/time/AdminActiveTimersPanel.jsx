@@ -5,7 +5,6 @@ import {
     Sunset, Sunrise
 } from 'lucide-react';
 import { stopTimer, formatElapsed, closeDay, openDay } from '../../services/timeService';
-import { USE_SUPABASE } from '../../services/_backend';
 import { supabase } from '../../supabase';
 import { COLLECTIONS } from '../../models/schemas';
 
@@ -233,13 +232,7 @@ function ActiveTimerRow({ log, teamMembers, tasks, projects }) {
         setIsSaving(true);
         try {
             const newStart = new Date(editStartTime).toISOString();
-            if (USE_SUPABASE) {
-                await supabase.from('time_logs').update({ start_time: newStart }).eq('id', log.id);
-            } else {
-                const { updateDoc, doc } = await import('firebase/firestore');
-                const { db } = await import('../../firebase');
-                await updateDoc(doc(db, COLLECTIONS.TIME_LOGS, log.id), { startTime: newStart });
-            }
+            await supabase.from('time_logs').update({ start_time: newStart }).eq('id', log.id);
             setIsEditing(false);
         } catch (e) {
             console.error('Error updating start time:', e);

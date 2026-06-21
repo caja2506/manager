@@ -7,7 +7,6 @@
 
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
-import { USE_SUPABASE } from './_backend';
 import { supabase } from '../supabase';
 import { normalizePartNumber, findSimilarProviders } from '../utils/normalizers';
 
@@ -21,13 +20,6 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 // Cloud Function references (with extended client timeouts to match server config)
 const analyzeQuotePdfFn = httpsCallable(functions, 'analyzeQuotePdf', { timeout: 180000 });
 const testGeminiConnectionFn = httpsCallable(functions, 'testGeminiConnection', { timeout: 30000 });
-
-/** Helper to lazily get Firebase modules */
-async function getFirebase() {
-    const { collection, doc, getDocs, writeBatch, updateDoc } = await import('firebase/firestore');
-    const { db } = await import('../firebase');
-    return { collection, doc, getDocs, writeBatch, updateDoc, db };
-}
 
 // ============================================================
 // PDF — Text Extraction
@@ -59,103 +51,106 @@ export async function extractPdfText(file) {
 /**
  * Send extracted text to the Gemini Cloud Function for analysis.
  * @param {string} text — plain text extracted from PDF
- * @returns {Promise<object>} — parsed AI response data
+ * @returns {Promise<object>} — JSON object returned by Gemini
  */
 export async function analyzePdfWithAI(text) {
     const result = await analyzeQuotePdfFn({ text });
-    return result.data.data;
+    if (!result.data || result.data.error) {
+        throw new Error(result.data?.error || 'Error al analizar el PDF con IA.');
+    }
+    return result.data;
 }
 
-// ============================================================
-// PDF — Review Item Builder
-// ============================================================
-
 /**
- * Build review items by matching AI-extracted items against the existing catalog.
- * @param {object} aiData — data returned by `analyzePdfWithAI` (must have `.items`)
- * @param {Array}  currentCatalog — array of catalog documents with `{ id, partNumber, ... }`
- * @param {Array}  providers — array of provider documents for supplier matching
- * @returns {{ reviewItems: Array, supplierAnalysis: object }}
+ * Match Gemini items with local catalog to flag new/existing items.
+ * Helper for UI review modal.
  */
-export function buildReviewItems(aiData, currentCatalog, providers) {
-    const reviewItems = aiData.items.map(item => {
-        const normalizedPn = normalizePartNumber(item.pn);
-        const existing = currentCatalog.find(p =>
-            p.partNumber && normalizePartNumber(p.partNumber) === normalizedPn
-        );
-        return {
-            pn: normalizedPn,
-            description: String(item.description || '').trim(),
-            quantity: Number(item.quantity) || 1,
-            unitPrice: Number(item.unitPrice) || 0,
-            leadTimeWeeks: item.leadTimeWeeks != null ? Number(item.leadTimeWeeks) : null,
-            isNew: !existing,
-            existingPartId: existing?.id || null,
-        };
+function buildReviewItems(aiData, catalog, providers) {
+    const reviewItems = (aiData.items || []).map(item => {
+        const pn = String(item.partNumber || '').trim();
+        const normPn = String(pn).replace(/\s+/g, '').toUpperCase();
+
+        const match = catalog.find(c => {
+            const cPn = String(c.partNumber || c.part_number || '').trim();
+            const normCPn = String(cPn).replace(/\s+/g, '').toUpperCase();
+            return normCPn === normPn;
+        });
+
+        if (match) {
+            return {
+                id: Math.random().toString(),
+                description: item.description || '',
+                pn,
+                quantity: Number(item.quantity) || 1,
+                unitPrice: Number(item.unitPrice) || 0,
+                leadTimeWeeks: item.leadTimeWeeks ?? null,
+                isNew: false,
+                existingPartId: match.id,
+                existingPartName: match.name,
+                existingPartNumber: match.partNumber || match.part_number,
+                existingPrice: match.lastPrice || match.last_price || 0,
+            };
+        } else {
+            return {
+                id: Math.random().toString(),
+                description: item.description || '',
+                pn,
+                quantity: Number(item.quantity) || 1,
+                unitPrice: Number(item.unitPrice) || 0,
+                leadTimeWeeks: item.leadTimeWeeks ?? null,
+                isNew: true,
+            };
+        }
     });
 
-    const supplierAnalysis = findSimilarProviders(aiData.supplier, providers);
+    const supplierAnalysis = {
+        name: aiData.supplier || '',
+        matchedProvider: null,
+        suggestions: [],
+    };
+
+    if (aiData.supplier) {
+        const matches = findSimilarProviders(aiData.supplier, providers);
+        if (matches.length > 0) {
+            supplierAnalysis.matchedProvider = matches[0];
+            supplierAnalysis.suggestions = matches;
+        }
+    }
 
     return { reviewItems, supplierAnalysis };
 }
 
-// ============================================================
-// PDF — Full Upload Pipeline
-// ============================================================
-
 /**
- * Complete PDF upload handler — extract text, analyze with AI, build review items.
- * Mirrors the original `handlePdfUpload` from AppDataContext.
- *
- * @param {File}     file           — PDF file
- * @param {object}   activeProject  — current BOM project `{ id, ... }`
- * @param {Array}    providers      — managed providers list for supplier matching
- * @param {object}   callbacks      — UI state callbacks
- * @param {Function} callbacks.setIsProcessing
- * @param {Function} callbacks.setIsDiagnosticOpen
- * @param {Function} callbacks.setProcessingStatus
- * @param {Function} callbacks.setLastError
- * @param {Function} callbacks.onReviewReady — called with `{ reviewData, supplierAnalysis }`
- * @returns {Promise<void>}
+ * Process a PDF upload: extract text, send to Gemini, map with catalog, and callback.
  */
-export async function handlePdfUpload(file, activeProject, providers, callbacks) {
+export async function executePdfUploadPipeline(file, providers, callbacks) {
     const {
         setIsProcessing,
-        setIsDiagnosticOpen,
         setProcessingStatus,
         setLastError,
         onReviewReady,
     } = callbacks;
 
-    if (!file || !activeProject) return;
+    if (!file) return;
 
     setIsProcessing(true);
-    setIsDiagnosticOpen(true);
     setProcessingStatus('Extrayendo texto del PDF...');
     setLastError(null);
 
     try {
         const text = await extractPdfText(file);
-
         setProcessingStatus('Enviando texto a Cloud Function...');
         const aiData = await analyzePdfWithAI(text);
 
         if (aiData.items) {
             setProcessingStatus('Analizando datos...');
 
-            let currentCatalog;
-            if (USE_SUPABASE) {
-                const { data } = await supabase.from('catalogo_maestro').select('*');
-                // Map snake_case → camelCase so buildReviewItems can match on partNumber
-                currentCatalog = (data || []).map(r => ({
-                    ...r,
-                    partNumber: r.part_number || '',
-                }));
-            } else {
-                const { collection, getDocs, db } = await getFirebase();
-                const catalogSnapshot = await getDocs(collection(db, 'catalogo_maestro'));
-                currentCatalog = catalogSnapshot.docs.map(d => ({ ...d.data(), id: d.id }));
-            }
+            const { data } = await supabase.from('catalogo_maestro').select('*');
+            // Map snake_case → camelCase so buildReviewItems can match on partNumber
+            const currentCatalog = (data || []).map(r => ({
+                ...r,
+                partNumber: r.part_number || '',
+            }));
 
             const { reviewItems, supplierAnalysis } = buildReviewItems(aiData, currentCatalog, providers);
 
@@ -179,7 +174,7 @@ export async function handlePdfUpload(file, activeProject, providers, callbacks)
 // ============================================================
 
 /**
- * Batch-write confirmed PDF import data to Firestore.
+ * Batch-write confirmed PDF import data to Supabase.
  * Creates new catalog entries, updates existing ones, and adds BOM items.
  *
  * @param {object} reviewedData          — `{ items, prcr, supplierDecision }`
@@ -190,87 +185,39 @@ export async function executePdfImport(reviewedData, activeProject) {
     const { items, prcr, supplierDecision, poId } = reviewedData;
     if (items.length === 0) return;
 
-    if (USE_SUPABASE) {
-        let supplierId = null;
-        if (supplierDecision.action === 'use_existing' && supplierDecision.selectedProviderId) {
-            supplierId = supplierDecision.selectedProviderId;
-        } else if (supplierDecision.name) {
-            const { data: newProv } = await supabase.from('proveedores').insert({ name: supplierDecision.name }).select('id').single();
-            supplierId = newProv?.id || null;
-        }
-
-        for (const item of items) {
-            let partId;
-            if (item.isNew) {
-                const { data: newCat } = await supabase.from('catalogo_maestro').insert({
-                    name: item.description, part_number: item.pn, last_price: item.unitPrice,
-                    lead_time_weeks: item.leadTimeWeeks, default_provider_id: supplierId,
-                }).select('id').single();
-                partId = newCat?.id;
-            } else {
-                partId = item.existingPartId;
-                const upd = { last_price: item.unitPrice };
-                if (item.leadTimeWeeks != null) upd.lead_time_weeks = item.leadTimeWeeks;
-                if (supplierId) upd.default_provider_id = supplierId;
-                await supabase.from('catalogo_maestro').update(upd).eq('id', partId);
-            }
-
-            await supabase.from('items_bom').insert({
-                project_id: activeProject.id, master_part_ref_id: partId,
-                quantity: item.quantity, unit_price: item.unitPrice,
-                total_price: item.quantity * item.unitPrice,
-                lead_time_weeks: item.leadTimeWeeks, proveedor_id: supplierId,
-                prcr: prcr || '', status: 'En Cotización', added_at: new Date().toISOString(),
-                po_id: poId || null
-            });
-        }
-        return;
-    }
-
-    // Firebase fallback
-    const { collection, doc, writeBatch, db } = await getFirebase();
-    const batch = writeBatch(db);
-
     let supplierId = null;
     if (supplierDecision.action === 'use_existing' && supplierDecision.selectedProviderId) {
         supplierId = supplierDecision.selectedProviderId;
     } else if (supplierDecision.name) {
-        const newProviderRef = doc(collection(db, 'proveedores'));
-        batch.set(newProviderRef, { name: supplierDecision.name });
-        supplierId = newProviderRef.id;
+        const { data: newProv } = await supabase.from('proveedores').insert({ name: supplierDecision.name }).select('id').single();
+        supplierId = newProv?.id || null;
     }
 
     for (const item of items) {
         let partId;
         if (item.isNew) {
-            const catRef = doc(collection(db, 'catalogo_maestro'));
-            batch.set(catRef, {
-                name: item.description, partNumber: item.pn, lastPrice: item.unitPrice,
-                leadTimeWeeks: item.leadTimeWeeks,
-                defaultProvider: supplierId ? doc(db, 'proveedores', supplierId) : null,
-                brand: null, category: null
-            });
-            partId = catRef.id;
+            const { data: newCat } = await supabase.from('catalogo_maestro').insert({
+                name: item.description, part_number: item.pn, last_price: item.unitPrice,
+                lead_time_weeks: item.leadTimeWeeks, default_provider_id: supplierId,
+            }).select('id').single();
+            partId = newCat?.id;
         } else {
             partId = item.existingPartId;
-            const updateData = { lastPrice: item.unitPrice };
-            if (item.leadTimeWeeks != null) updateData.leadTimeWeeks = item.leadTimeWeeks;
-            if (supplierId) updateData.defaultProvider = doc(db, 'proveedores', supplierId);
-            batch.update(doc(db, 'catalogo_maestro', partId), updateData);
+            const upd = { last_price: item.unitPrice };
+            if (item.leadTimeWeeks != null) upd.lead_time_weeks = item.leadTimeWeeks;
+            if (supplierId) upd.default_provider_id = supplierId;
+            await supabase.from('catalogo_maestro').update(upd).eq('id', partId);
         }
 
-        const bomRef = doc(collection(db, 'items_bom'));
-        batch.set(bomRef, {
-            projectId: activeProject.id, masterPartRef: doc(db, 'catalogo_maestro', partId),
-            quantity: item.quantity, unitPrice: item.unitPrice, totalPrice: item.quantity * item.unitPrice,
-            leadTimeWeeks: item.leadTimeWeeks,
-            proveedor: supplierId ? doc(db, 'proveedores', supplierId) : null,
-            prcr: prcr || '', status: 'En Cotización', addedAt: new Date().toISOString(),
-            poId: poId || null
+        await supabase.from('items_bom').insert({
+            project_id: activeProject.id, master_part_ref_id: partId,
+            quantity: item.quantity, unit_price: item.unitPrice,
+            total_price: item.quantity * item.unitPrice,
+            lead_time_weeks: item.leadTimeWeeks, proveedor_id: supplierId,
+            prcr: prcr || '', status: 'En Cotización', added_at: new Date().toISOString(),
+            po_id: poId || null
         });
     }
-
-    await batch.commit();
 }
 
 // ============================================================
@@ -279,7 +226,6 @@ export async function executePdfImport(reviewedData, activeProject) {
 
 /**
  * Complete Excel import handler — read file, parse rows, upsert catalog entries.
- * Mirrors the original `handleExcelUpload` from AppDataContext.
  *
  * @param {File}     file        — Excel file
  * @param {object}   callbacks   — UI state callbacks
@@ -320,47 +266,37 @@ export async function executeExcelImport(file, callbacks) {
 
         setProcessingStatus(`Procesando ${json.length} filas...`);
 
-        // Excel import always uses Firebase batch (complex doc references)
-        const { collection, doc, getDocs, writeBatch, updateDoc, db } = await getFirebase();
-        const batch = writeBatch(db);
-
-        const catalogSnapshot = await getDocs(collection(db, 'catalogo_maestro'));
-        const currentCatalogMap = new Map();
-        catalogSnapshot.docs.forEach(d => {
-            const docData = d.data();
-            if (docData.partNumber) {
-                currentCatalogMap.set(String(docData.partNumber).replace(/\s+/g, '').toUpperCase(), { id: d.id, ...docData });
-            }
-        });
-
-        const [marcasSnap, categoriasSnap, proveedoresSnap] = await Promise.all([
-            getDocs(collection(db, 'marcas')),
-            getDocs(collection(db, 'categorias')),
-            getDocs(collection(db, 'proveedores')),
+        // Fetch existing lists from Supabase
+        const [marcasRes, categoriasRes, proveedoresRes] = await Promise.all([
+            supabase.from('marcas').select('*'),
+            supabase.from('categorias').select('*'),
+            supabase.from('proveedores').select('*'),
         ]);
 
-        const getListMap = (snap) => new Map(snap.docs.map(d => [d.data().name.toLowerCase(), d.ref]));
-
-        const listRefs = {
-            marcas: getListMap(marcasSnap),
-            categorias: getListMap(categoriasSnap),
-            proveedores: getListMap(proveedoresSnap),
+        const listIds = {
+            marcas: new Map((marcasRes.data || []).map(d => [d.name.toLowerCase().trim(), d.id])),
+            categorias: new Map((categoriasRes.data || []).map(d => [d.name.toLowerCase().trim(), d.id])),
+            proveedores: new Map((proveedoresRes.data || []).map(d => [d.name.toLowerCase().trim(), d.id])),
         };
 
-        const newRefs = { marcas: new Map(), categorias: new Map(), proveedores: new Map() };
-
-        const findOrCreateRef = (collectionName, name) => {
+        const findOrCreateId = async (tableName, name) => {
             if (!name || typeof name !== 'string' || !name.trim()) return null;
-            const trimmedName = name.trim();
-            const lowerCaseName = trimmedName.toLowerCase();
+            const trimmed = name.trim();
+            const key = trimmed.toLowerCase();
+            if (listIds[tableName].has(key)) return listIds[tableName].get(key);
 
-            if (listRefs[collectionName].has(lowerCaseName)) return listRefs[collectionName].get(lowerCaseName);
-            if (newRefs[collectionName].has(lowerCaseName)) return newRefs[collectionName].get(lowerCaseName);
-
-            const newDocRef = doc(collection(db, collectionName));
-            batch.set(newDocRef, { name: trimmedName });
-            newRefs[collectionName].set(lowerCaseName, newDocRef);
-            return newDocRef;
+            const { data, error } = await supabase
+                .from(tableName)
+                .insert({ name: trimmed })
+                .select('id')
+                .single();
+            if (error) {
+                console.error(`Error inserting into ${tableName}:`, error);
+                return null;
+            }
+            const newId = data.id;
+            listIds[tableName].set(key, newId);
+            return newId;
         };
 
         const getValue = (row, keys) => {
@@ -372,6 +308,36 @@ export async function executeExcelImport(file, callbacks) {
             return undefined;
         };
 
+        // Extract unique entity names to insert them first
+        const uniqueBrands = new Set();
+        const uniqueCategories = new Set();
+        const uniqueProviders = new Set();
+
+        for (const row of json) {
+            const brandName = getValue(row, ['Marcas', 'Brand']);
+            const categoryName = getValue(row, ['Categorías', 'Category']);
+            const providerName = getValue(row, ['Proveedores', 'Supplier', 'Provider']);
+            if (brandName) uniqueBrands.add(brandName);
+            if (categoryName) uniqueCategories.add(categoryName);
+            if (providerName) uniqueProviders.add(providerName);
+        }
+
+        setProcessingStatus('Sincronizando marcas, categorías y proveedores...');
+        for (const brand of uniqueBrands) {
+            await findOrCreateId('marcas', brand);
+        }
+        for (const cat of uniqueCategories) {
+            await findOrCreateId('categorias', cat);
+        }
+        for (const prov of uniqueProviders) {
+            await findOrCreateId('proveedores', prov);
+        }
+
+        // Fetch current catalog to match existing rows
+        const { data: catalogData } = await supabase.from('catalogo_maestro').select('*');
+        const currentCatalogMap = new Map((catalogData || []).map(d => [String(d.part_number).replace(/\s+/g, '').toUpperCase(), d]));
+
+        const rowsToUpsert = [];
         for (const row of json) {
             const pn = getValue(row, ['PN', 'P/N', 'Part Number']);
             const name = getValue(row, ['Description of component', 'Description', 'name']);
@@ -382,39 +348,54 @@ export async function executeExcelImport(file, callbacks) {
 
             if (!pn || !name) continue;
 
-            const brandRef = findOrCreateRef('marcas', brandName);
-            const categoryRef = findOrCreateRef('categorias', categoryName);
-            const providerRef = findOrCreateRef('proveedores', providerName);
-
             const normalizedPn = String(pn).replace(/\s+/g, '').toUpperCase();
-            const existingPart = currentCatalogMap.get(normalizedPn);
+            const existing = currentCatalogMap.get(normalizedPn);
 
-            const partData = {
+            const brand_id = brandName ? listIds.marcas.get(brandName.trim().toLowerCase()) : null;
+            const category_id = categoryName ? listIds.categorias.get(categoryName.trim().toLowerCase()) : null;
+            const default_provider_id = providerName ? listIds.proveedores.get(providerName.trim().toLowerCase()) : null;
+
+            const rowData = {
                 name: String(name).trim(),
-                partNumber: normalizedPn,
-                lastPrice: Number(price) || 0,
-                brand: brandRef,
-                category: categoryRef,
-                defaultProvider: providerRef
+                part_number: normalizedPn,
+                last_price: Number(price) || 0,
+                brand_id,
+                category_id,
+                default_provider_id
             };
 
-            if (existingPart) {
-                batch.update(doc(db, 'catalogo_maestro', existingPart.id), partData);
-            } else {
-                const newPartRef = doc(collection(db, 'catalogo_maestro'));
-                batch.set(newPartRef, partData);
+            if (existing) {
+                rowData.id = existing.id; // Preserve existing database ID
             }
+
+            rowsToUpsert.push(rowData);
         }
 
-        setProcessingStatus('Guardando datos...');
-        await batch.commit();
+        setProcessingStatus('Guardando catálogo en la base de datos...');
+        if (rowsToUpsert.length > 0) {
+            const { error: upsertError } = await supabase
+                .from('catalogo_maestro')
+                .upsert(rowsToUpsert, { onConflict: 'part_number' });
+            if (upsertError) throw upsertError;
+        }
+
         setProcessingStatus(`✨ ¡Catálogo actualizado con ${json.length} registros!`);
 
-        // Refresh catalog data
-        const updatedCatalogSnap = await getDocs(collection(db, 'catalogo_maestro'));
-        const updatedCatalog = updatedCatalogSnap.docs
-            .map(d => ({ ...d.data(), id: d.id }))
-            .sort((a, b) => safeLocaleCompare(a, b, 'name'));
+        // Refresh catalog data and map to camelCase for the frontend
+        const { data: finalCatalog, error: finalError } = await supabase.from('catalogo_maestro').select('*');
+        if (finalError) throw finalError;
+
+        const updatedCatalog = (finalCatalog || []).map(r => ({
+            id: r.id,
+            name: r.name,
+            partNumber: r.part_number,
+            lastPrice: r.last_price,
+            leadTimeWeeks: r.lead_time_weeks,
+            imageUrl: r.image_url,
+            brand: r.brand_id ? { id: r.brand_id } : null,
+            category: r.category_id ? { id: r.category_id } : null,
+            defaultProvider: r.default_provider_id ? { id: r.default_provider_id } : null,
+        })).sort((a, b) => safeLocaleCompare(a, b, 'name'));
 
         if (onCatalogRefresh) onCatalogRefresh(updatedCatalog);
 

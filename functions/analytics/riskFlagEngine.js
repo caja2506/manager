@@ -158,27 +158,56 @@ function buildSuggestedAction(kpiName, severity) {
 }
 
 /**
- * Persist risk flags to Firestore.
+ * Persist risk flags to Supabase.
  */
 async function persistRiskFlags(adminDb, flags, periodStart) {
     if (!flags.length) return 0;
 
-    // Clear previous flags for this period
-    const existing = await adminDb.collection(paths.OPERATIONAL_RISK_FLAGS)
-        .where("periodStart", "==", periodStart)
-        .get();
-    const deleteBatch = adminDb.batch();
-    existing.docs.forEach(d => deleteBatch.delete(d.ref));
-    if (!existing.empty) await deleteBatch.commit();
+    const { getSupabase } = require("../db/supabaseAdmin");
+    const sb = getSupabase();
 
-    // Write new flags
-    const batch = adminDb.batch();
-    for (const flag of flags.slice(0, 50)) { // Safety limit
-        const ref = adminDb.collection(paths.OPERATIONAL_RISK_FLAGS).doc();
-        batch.set(ref, { ...flag, periodStart });
+    // Clear previous flags for this period
+    const { error: deleteError } = await sb.from("operational_risk_flags")
+        .delete()
+        .eq("period_start", periodStart);
+
+    if (deleteError) {
+        console.error("[riskFlagEngine] Error clearing previous risk flags:", deleteError.message);
     }
-    await batch.commit();
+
+    // Map flags to table structure
+    const records = flags.map(flag => {
+        const scope = flag.entityType || "global";
+        const entityId = flag.entityId || "global";
+        
+        return {
+            kpi_name: flag.kpiName || "multi_kpi_deterioration",
+            value: flag.value !== undefined ? flag.value : 0,
+            threshold: flag.threshold !== undefined ? flag.threshold : 0,
+            severity: flag.severity,
+            is_deteriorating: flag.isDeteriorating || false,
+            justification: flag.justification || "",
+            suggested_action: flag.suggestedAction || (scope === "user" ? "Revisar desempeño individual de tareas con el usuario." : "Revisar métricas y tomar acción correctiva."),
+            scope: scope,
+            entity_id: entityId,
+            period_start: periodStart
+        };
+    });
+
+    // Write new flags in batches of 100
+    const batchSize = 100;
+    for (let i = 0; i < records.length; i += batchSize) {
+        const batch = records.slice(i, i + batchSize);
+        const { error: insertError } = await sb.from("operational_risk_flags").insert(batch);
+        if (insertError) {
+            console.error(`[riskFlagEngine] Error inserting risk flags batch [${i}]:`, insertError.message);
+            throw insertError;
+        }
+    }
+
+    console.log(`[riskFlagEngine] Persisted to Supabase: ${flags.length} flags.`);
     return flags.length;
 }
 
 module.exports = { evaluateRiskFlags, evaluateUserRiskFlags, persistRiskFlags };
+

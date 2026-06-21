@@ -1,18 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-import { USE_SUPABASE } from '../services/_backend';
 import { supabase } from '../supabase';
-
-// Firebase fallback (only loaded when not using Supabase)
-let fbGetDoc, fbSetDoc, fbDoc, fbDb;
-if (!USE_SUPABASE) {
-    const fbFirestore = await import('firebase/firestore');
-    fbGetDoc = fbFirestore.getDoc;
-    fbSetDoc = fbFirestore.setDoc;
-    fbDoc = fbFirestore.doc;
-    const fbModule = await import('../firebase');
-    fbDb = fbModule.db;
-}
 
 const ThemeContext = createContext({ theme: 'dark', toggleTheme: () => {}, isDark: true });
 
@@ -43,13 +31,8 @@ export function ThemeProvider({ children }) {
         (async () => {
             try {
                 let saved;
-                if (USE_SUPABASE) {
-                    const { data } = await supabase.from('users').select('theme').eq('id', user.uid).single();
-                    saved = data?.theme;
-                } else {
-                    const snap = await fbGetDoc(fbDoc(fbDb, 'users', user.uid));
-                    if (snap.exists()) saved = snap.data()?.theme;
-                }
+                const { data } = await supabase.from('users').select('theme').eq('id', user.uid).single();
+                saved = data?.theme;
                 if (!cancelled && saved && (saved === 'dark' || saved === 'light')) {
                     setTheme(saved);
                 }
@@ -65,11 +48,7 @@ export function ThemeProvider({ children }) {
             const next = prev === 'dark' ? 'light' : 'dark';
             // Persist to database in background
             if (user?.uid) {
-                if (USE_SUPABASE) {
-                    supabase.from('users').update({ theme: next }).eq('id', user.uid).then();
-                } else {
-                    fbSetDoc(fbDoc(fbDb, 'users', user.uid), { theme: next }, { merge: true }).catch(() => {});
-                }
+                supabase.from('users').update({ theme: next }).eq('id', user.uid).then();
             }
             return next;
         });

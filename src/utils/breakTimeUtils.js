@@ -7,7 +7,6 @@
  * V4: Dual-backend — reads from Supabase or Firebase depending on config.
  */
 
-import { USE_SUPABASE } from '../services/_backend';
 import { supabase } from '../supabase';
 import { DEFAULT_TIMEZONE } from './timezoneConfig';
 
@@ -35,26 +34,12 @@ function _applyScheduleData(data) {
     }
 }
 
-/**
- * Subscribe to settings/daySchedule once.
- * All subsequent calls to getBreakBands() use the cached value.
- */
 function ensureSubscription() {
     if (_subscribed) return;
     _subscribed = true;
     try {
-        if (USE_SUPABASE) {
-            supabase.from('settings').select('value').eq('key', 'daySchedule').single()
-                .then(({ data }) => { if (data?.value) _applyScheduleData(data.value); });
-        } else {
-            import('firebase/firestore').then(({ doc, onSnapshot }) => {
-                import('../firebase').then(({ db }) => {
-                    onSnapshot(doc(db, 'settings', 'daySchedule'), snap => {
-                        if (snap.exists()) _applyScheduleData(snap.data());
-                    });
-                });
-            });
-        }
+        supabase.from('settings').select('value').eq('key', 'daySchedule').single()
+            .then(({ data }) => { if (data?.value) _applyScheduleData(data.value); });
     } catch {
         // DB not available, keep defaults
     }

@@ -71,32 +71,36 @@ async function sendEmail(apiKey, options) {
 }
 
 /**
- * Send email and log the delivery to Firestore.
+ * Send email and log the delivery to Supabase.
  *
- * @param {FirebaseFirestore.Firestore} adminDb
+ * @param {any} _adminDb - Deprecated
  * @param {string} apiKey - Resend API key
  * @param {Object} emailOptions - Same as sendEmail options
  * @param {Object} [meta] - Additional metadata (routineKey, runId, etc.)
  * @returns {Promise<{ok: boolean, id?: string, error?: string}>}
  */
-async function sendAndLogEmail(adminDb, apiKey, emailOptions, meta = {}) {
+async function sendAndLogEmail(_adminDb, apiKey, emailOptions, meta = {}) {
     const result = await sendEmail(apiKey, emailOptions);
+    const { getSupabase } = require("../db/supabaseAdmin");
+    const sb = getSupabase();
 
-    // Log delivery to Firestore
+    // Log delivery to Supabase
     try {
-        await adminDb.collection(DELIVERY_COLLECTION).add({
-            channel: "email",
-            provider: "resend",
-            to: emailOptions.to,
+        const recipients = Array.isArray(emailOptions.to) ? emailOptions.to.join(", ") : emailOptions.to;
+        const { error } = await sb.from("email_deliveries").insert({
+            recipient: recipients,
             subject: emailOptions.subject,
-            from: emailOptions.from || "reportes@analyzeops.com",
+            sender: emailOptions.from || "reportes@analyzeops.com",
             status: result.ok ? "sent" : "failed",
-            resendId: result.id || null,
-            error: result.error || null,
-            routineKey: meta.routineKey || null,
-            runId: meta.runId || null,
-            createdAt: new Date().toISOString(),
+            resend_id: result.id || null,
+            error_message: result.error || null,
+            routine_key: meta.routineKey || null,
+            run_id: meta.runId || null,
+            created_at: new Date().toISOString(),
         });
+        if (error) {
+            console.warn("[emailProvider] Failed to log delivery to Supabase:", error.message);
+        }
     } catch (logErr) {
         console.warn("[emailProvider] Failed to log delivery:", logErr.message);
     }
@@ -105,3 +109,4 @@ async function sendAndLogEmail(adminDb, apiKey, emailOptions, meta = {}) {
 }
 
 module.exports = { sendEmail, sendAndLogEmail };
+

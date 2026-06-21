@@ -16,6 +16,7 @@ const { OPERATIONAL_ROLES } = require("../automation/constants");
 const { sendAndLogEmail } = require("../email/emailProvider");
 const { dailyPerformanceReport } = require("../email/emailTemplates");
 const { sendToUser } = require("../telegram/telegramProvider");
+const { getSupabase } = require("../db/supabaseAdmin");
 
 // ── Break bands (must match frontend breakTimeUtils.js) ──
 const BREAK_BANDS = [
@@ -61,10 +62,12 @@ async function execute(adminDb, token, targets, context) {
         loadAllSubtasks, loadAllProjects, loadWeeklyPlanItemsForDate,
     } = require("../db/coreDataReader");
 
+    const sb = getSupabase();
+
     const [
         allTasks, allTimeLogs, allDelays, allUsers, allSubtasks, allProjects,
         planItemsToday, planItemsTomorrow,
-        telegramReportsSnap, commentsSnap, yesterdayCommentsSnap,
+        reportsResult, commentsTodayResult, commentsYesterdayResult,
     ] = await Promise.all([
         loadAllTasks(),
         loadAllTimeLogs(),
@@ -74,27 +77,52 @@ async function execute(adminDb, token, targets, context) {
         loadAllProjects(),
         loadWeeklyPlanItemsForDate(today),
         loadWeeklyPlanItemsForDate(tomorrow),
-        adminDb.collection(paths.TELEGRAM_REPORTS)
-            .where("reportDate", "==", today).get(),
-        // Fetch today's comments
-        adminDb.collectionGroup("comments")
-            .where("createdAt", ">=", startOfDay.toISOString())
-            .where("createdAt", "<=", endOfDay.toISOString())
-            .get(),
-        // Fetch yesterday's comments
-        adminDb.collectionGroup("comments")
-            .where("createdAt", ">=", yesterdayStart.toISOString())
-            .where("createdAt", "<=", yesterdayEnd.toISOString())
-            .get(),
+        sb.from("telegram_reports")
+            .select("*")
+            .gte("created_at", startOfDay.toISOString())
+            .lte("created_at", endOfDay.toISOString()),
+        sb.from("comments")
+            .select("*")
+            .gte("created_at", startOfDay.toISOString())
+            .lte("created_at", endOfDay.toISOString()),
+        sb.from("comments")
+            .select("*")
+            .gte("created_at", yesterdayStart.toISOString())
+            .lte("created_at", yesterdayEnd.toISOString()),
     ]);
-    const telegramReportsToday = telegramReportsSnap.docs.map(d => d.data());
-    const todayComments = commentsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const yesterdayComments = yesterdayCommentsSnap.docs.map(d => {
-        // Extract taskId from the doc path: tasks/{taskId}/comments/{commentId}
-        const pathParts = d.ref.path.split('/');
-        const taskId = pathParts.length >= 2 ? pathParts[pathParts.length - 3] : null;
-        return { id: d.id, taskId, ...d.data() };
+
+    const telegramReportsToday = (reportsResult.data || []).map(r => {
+        let contentObj = {};
+        try {
+            contentObj = JSON.parse(r.content || "{}");
+        } catch {
+            contentObj = { rawText: r.content };
+        }
+        return {
+            id: r.id,
+            userId: r.user_id,
+            reportType: r.report_type,
+            createdAt: r.created_at,
+            sentAt: r.sent_at,
+            ...contentObj
+        };
     });
+
+    const todayComments = (commentsTodayResult.data || []).map(c => ({
+        id: c.id,
+        taskId: c.task_id,
+        userId: c.user_id,
+        content: c.content,
+        createdAt: c.created_at,
+    }));
+
+    const yesterdayComments = (commentsYesterdayResult.data || []).map(c => ({
+        id: c.id,
+        taskId: c.task_id,
+        userId: c.user_id,
+        content: c.content,
+        createdAt: c.created_at,
+    }));
 
     console.log(`[perfReport] Loaded: ${allTasks.length} tasks, ${allTimeLogs.length} timeLogs, ${allSubtasks.length} subtasks, ${allProjects.length} projects, ${planItemsToday.length} planItems today, ${planItemsTomorrow.length} tomorrow, ${todayComments.length} comments today, ${yesterdayComments.length} comments yesterday`);
 
@@ -219,30 +247,33 @@ async function execute(adminDb, token, targets, context) {
     }
 
     // ══════════════════════════════════════════
-    // 5.5 PERSIST NOTIFICATIONS TO FIRESTORE
+    // 5.5 PERSIST NOTIFICATIONS TO SUPABASE
     // ══════════════════════════════════════════
     if (!dryRun) {
         try {
-            const notifBatch = adminDb.batch();
-            let notifCount = 0;
-            const notifCollection = adminDb.collection(paths.NOTIFICATIONS);
+            const notificationsToInsert = [];
             const todayStr = now.toISOString().substring(0, 10);
 
-            // Helper: create a notification doc
+            // Helper: create a notification object
             const addNotif = (userId, type, title, message, metadata = {}) => {
                 if (!userId) return;
-                const ref = notifCollection.doc();
-                notifBatch.set(ref, {
-                    userId,
+                
+                const notif = {
+                    user_id: userId,
                     type,
                     title,
                     message,
                     read: false,
-                    createdAt: now.toISOString(),
-                    ruleKey: `${type}_${todayStr}`,
-                    ...metadata,
-                });
-                notifCount++;
+                    created_at: now.toISOString(),
+                    updated_at: now.toISOString(),
+                };
+                
+                if (metadata.taskId) notif.task_id = metadata.taskId;
+                if (metadata.projectId) notif.project_id = metadata.projectId;
+                if (metadata.triggeredBy) notif.triggered_by = metadata.triggeredBy;
+                if (metadata.link) notif.link = metadata.link;
+                
+                notificationsToInsert.push(notif);
             };
 
             // A) Overdue tasks → notify assignee
@@ -254,7 +285,7 @@ async function execute(adminDb, token, targets, context) {
                         'risk_alert',
                         `Tarea vencida: ${t.title}`,
                         `Venció hace ${t.daysOverdue} día${t.daysOverdue !== 1 ? 's' : ''}. Actualiza el estado o solicita extensión.`,
-                        { taskId: task.id, entityId: task.id }
+                        { taskId: task.id }
                     );
                 }
             }
@@ -269,7 +300,7 @@ async function execute(adminDb, token, targets, context) {
                             'task_blocked',
                             `Tarea bloqueada: ${task.title}`,
                             'Registra la causa del bloqueo y solicita apoyo si es necesario.',
-                            { taskId: task.id, entityId: task.id }
+                            { taskId: task.id }
                         );
                     }
                 }
@@ -283,8 +314,7 @@ async function execute(adminDb, token, targets, context) {
                         userDoc.id,
                         alert.severity === 'critical' ? 'audit_critical' : 'audit_warning',
                         `Revisión de productividad`,
-                        `${alert.hours}h registradas. ${alert.details.join(' ')}`,
-                        { entityId: userDoc.id }
+                        `${alert.hours}h registradas. ${alert.details.join(' ')}`
                     );
                 }
             }
@@ -308,14 +338,18 @@ async function execute(adminDb, token, targets, context) {
                         'reminder',
                         `Sin registro de horas: ${task.title}`,
                         'Llevas 3+ días sin registrar horas en esta tarea. Actualiza tu progreso.',
-                        { taskId: task.id, entityId: task.id }
+                        { taskId: task.id }
                     );
                 }
             }
 
-            if (notifCount > 0) {
-                await notifBatch.commit();
-                console.log(`[perfReport] Persisted ${notifCount} notifications to Firestore`);
+            if (notificationsToInsert.length > 0) {
+                const { error: notifErr } = await sb.from("notifications").insert(notificationsToInsert);
+                if (notifErr) {
+                    console.warn("[perfReport] Error writing notifications to Supabase:", notifErr.message);
+                } else {
+                    console.log(`[perfReport] Persisted ${notificationsToInsert.length} notifications to Supabase`);
+                }
             }
         } catch (err) {
             console.warn("[perfReport] Failed to persist notifications:", err.message);

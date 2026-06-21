@@ -5,18 +5,9 @@
  * Stored in settings/wipConfig.
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { USE_SUPABASE } from '../../services/_backend';
 import { supabase } from '../../supabase';
 import { auth } from '../../firebase';
 import { ListChecks, Save, Loader2 } from 'lucide-react';
-
-// Firebase fallback
-let fbGetDoc, fbSetDoc, fbDoc, fbDb;
-if (!USE_SUPABASE) {
-    const fb = await import('firebase/firestore');
-    fbGetDoc = fb.getDoc; fbSetDoc = fb.setDoc; fbDoc = fb.doc;
-    fbDb = (await import('../../firebase')).db;
-}
 
 export default function WipConfigPanel() {
     const [wipLimit, setWipLimit] = useState(1);
@@ -29,19 +20,10 @@ export default function WipConfigPanel() {
     useEffect(() => {
         async function load() {
             try {
-                if (USE_SUPABASE) {
-                    const { data } = await supabase.from('settings').select('*').eq('key', 'wipConfig').single();
-                    if (data?.value) {
-                        setWipLimit(data.value.globalWipLimit || 1);
-                        setEnabled(data.value.enabled !== false);
-                    }
-                } else {
-                    const snap = await fbGetDoc(fbDoc(fbDb, 'settings', 'wipConfig'));
-                    if (snap.exists()) {
-                        const data = snap.data();
-                        setWipLimit(data.globalWipLimit || 1);
-                        setEnabled(data.enabled !== false);
-                    }
+                const { data } = await supabase.from('settings').select('*').eq('key', 'wipConfig').single();
+                if (data?.value) {
+                    setWipLimit(data.value.globalWipLimit || 1);
+                    setEnabled(data.value.enabled !== false);
                 }
             } catch (err) {
                 console.warn('[WipConfig] Load error:', err.message);
@@ -61,11 +43,7 @@ export default function WipConfigPanel() {
                 updatedAt: new Date().toISOString(),
                 updatedBy: auth.currentUser?.uid || null,
             };
-            if (USE_SUPABASE) {
-                await supabase.from('settings').upsert({ key: 'wipConfig', value: payload, category: 'wip', updated_at: payload.updatedAt, updated_by: payload.updatedBy }, { onConflict: 'key' });
-            } else {
-                await fbSetDoc(fbDoc(fbDb, 'settings', 'wipConfig'), payload);
-            }
+            await supabase.from('settings').upsert({ key: 'wipConfig', value: payload, category: 'wip', updated_at: payload.updatedAt, updated_by: payload.updatedBy }, { onConflict: 'key' });
             setSaved(true);
             setTimeout(() => setSaved(false), 2000);
         } catch (err) {

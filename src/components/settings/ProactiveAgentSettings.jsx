@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Brain, Save, Sunset, Sunrise, ToggleLeft, ToggleRight, Loader2 } from 'lucide-react';
-import { USE_SUPABASE } from '../../services/_backend';
 import { supabase } from '../../supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { DEFAULT_TIMEZONE } from '../../utils/timezoneConfig';
@@ -24,40 +23,20 @@ export default function ProactiveAgentSettings() {
     useEffect(() => {
         let mounted = true;
 
-        if (USE_SUPABASE) {
-            (async () => {
-                const { data } = await supabase.from('settings').select('*').eq('key', 'proactiveAgent').single();
-                if (mounted && data?.value) {
-                    const d = data.value;
-                    setConfig(d);
-                    setEnabled(d.enabled !== false);
-                    setStartTime(d.startTime || '08:00');
-                    setEndTime(d.endTime || '18:00');
-                }
-                if (mounted) setLoading(false);
-            })();
-            return () => { mounted = false; };
-        }
-        
-        // Firebase fallback
-        let unsub;
         (async () => {
-            const { doc: fbDoc, onSnapshot: fbOnSnapshot } = await import('firebase/firestore');
-            const { db: fbDb } = await import('../../firebase');
-            unsub = fbOnSnapshot(fbDoc(fbDb, 'settings', 'proactiveAgent'), snap => {
-                if (mounted && snap.exists()) {
-                    const data = snap.data();
-                    setConfig(data);
-                    setEnabled(data.enabled !== false);
-                    setStartTime(data.startTime || '08:00');
-                    setEndTime(data.endTime || '18:00');
-                }
-                if (mounted) setLoading(false);
-            });
+            const { data } = await supabase.from('settings').select('*').eq('key', 'proactiveAgent').single();
+            if (mounted && data?.value) {
+                const d = data.value;
+                setConfig(d);
+                setEnabled(d.enabled !== false);
+                setStartTime(d.startTime || '08:00');
+                setEndTime(d.endTime || '18:00');
+            }
+            if (mounted) setLoading(false);
         })();
+
         return () => {
             mounted = false;
-            unsub?.();
         };
     }, []);
 
@@ -74,19 +53,13 @@ export default function ProactiveAgentSettings() {
                 updatedBy: user?.uid || null,
             };
             
-            if (USE_SUPABASE) {
-                await supabase.from('settings').upsert({ 
-                    key: 'proactiveAgent', 
-                    value: payload, 
-                    category: 'ai', 
-                    updated_at: payload.updatedAt, 
-                    updated_by: payload.updatedBy 
-                }, { onConflict: 'key' });
-            } else {
-                const { doc: fbDoc, setDoc: fbSetDoc } = await import('firebase/firestore');
-                const { db: fbDb } = await import('../../firebase');
-                await fbSetDoc(fbDoc(fbDb, 'settings', 'proactiveAgent'), payload, { merge: true });
-            }
+            await supabase.from('settings').upsert({ 
+                key: 'proactiveAgent', 
+                value: payload, 
+                category: 'ai', 
+                updated_at: payload.updatedAt, 
+                updated_by: payload.updatedBy 
+            }, { onConflict: 'key' });
             
             setSaved(true);
             setTimeout(() => setSaved(false), 3000);

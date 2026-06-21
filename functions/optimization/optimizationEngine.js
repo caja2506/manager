@@ -270,18 +270,30 @@ function detectOpportunities({ globalKpis, byUser, byRoutine, trends, riskFlags 
 }
 
 /**
- * Persist opportunities to Firestore.
+ * Persist opportunities to Supabase as operational_recommendations.
  */
 async function persistOpportunities(adminDb, opportunities, periodStart) {
-    const paths = require("../automation/firestorePaths");
     if (!opportunities.length) return 0;
+    const { getSupabase } = require("../db/supabaseAdmin");
+    const sb = getSupabase();
+    
+    const records = opportunities.map(opp => ({
+        type: opp.type || "opportunity",
+        priority: opp.confidence && opp.confidence > 0.75 ? "high" : "medium",
+        title: opp.rule || "Optimización detectada",
+        description: opp.problemDetected || "",
+        metric_backing: opp.supportingMetrics ? JSON.stringify(opp.supportingMetrics) : "",
+        suggested_actions: opp.suggestedAction ? [opp.suggestedAction] : [],
+        scope: opp.entityType || "global",
+        entity_id: opp.entityId || "global",
+        period_start: periodStart
+    }));
 
-    const batch = adminDb.batch();
-    for (const opp of opportunities.slice(0, 15)) {
-        const ref = adminDb.collection(paths.OPTIMIZATION_OPPORTUNITIES).doc();
-        batch.set(ref, { ...opp, periodStart });
+    const { error } = await sb.from("operational_recommendations").insert(records);
+    if (error) {
+        console.error("[optimizationEngine] Error persisting opportunities to Supabase:", error.message);
+        throw error;
     }
-    await batch.commit();
     return opportunities.length;
 }
 
@@ -294,3 +306,4 @@ function getVal(kpis, name) {
 }
 
 module.exports = { detectOpportunities, persistOpportunities };
+

@@ -40,8 +40,9 @@ function createDataExportExports(adminDb) {
                 return;
             }
             try {
-                const keysDoc = await adminDb.collection("settings").doc("apiKeys").get();
-                const validKeys = keysDoc.exists ? (keysDoc.data().exportKeys || []) : [];
+                const { loadSetting } = require("../db/coreDataReader");
+                const keysData = await loadSetting("apiKeys");
+                const validKeys = keysData?.exportKeys || [];
                 if (!validKeys.includes(providedKey)) {
                     res.status(403).json({ error: "Invalid API key." });
                     return;
@@ -53,44 +54,71 @@ function createDataExportExports(adminDb) {
             }
 
             try {
-                // ── Fetch all data in parallel ──
-                const [tasksSnap, projectsSnap, membersSnap, taskTypesSnap, workAreasSnap, subtasksSnap] = await Promise.all([
-                    adminDb.collection("tasks").get(),
-                    adminDb.collection("projects").get(),
-                    adminDb.collection("teamMembers").get(),
-                    adminDb.collection("taskTypes").get(),
-                    adminDb.collection("workAreaTypes").get(),
-                    adminDb.collection("subtasks").get(),
+                // ── Fetch all data in parallel from Supabase ──
+                const { getSupabase } = require("../db/supabaseAdmin");
+                const sb = getSupabase();
+
+                const [tasksResult, projectsResult, usersResult, taskTypesResult, workAreaTypesResult, subtasksResult] = await Promise.all([
+                    sb.from("tasks").select("*"),
+                    sb.from("projects").select("*"),
+                    sb.from("users").select("*"),
+                    sb.from("task_types").select("*"),
+                    sb.from("work_area_types").select("*"),
+                    sb.from("subtasks").select("*"),
                 ]);
 
+                if (tasksResult.error) throw tasksResult.error;
+                if (projectsResult.error) throw projectsResult.error;
+                if (usersResult.error) throw usersResult.error;
+                if (taskTypesResult.error) throw taskTypesResult.error;
+                if (workAreaTypesResult.error) throw workAreaTypesResult.error;
+                if (subtasksResult.error) throw subtasksResult.error;
+
                 const projects = {};
-                projectsSnap.docs.forEach(d => { projects[d.id] = d.data().name || ""; });
+                (projectsResult.data || []).forEach(d => { projects[d.id] = d.name || ""; });
 
                 const members = {};
-                membersSnap.docs.forEach(d => {
-                    const data = d.data();
-                    members[data.uid || d.id] = data.displayName || data.email || "";
+                (usersResult.data || []).forEach(d => {
+                    members[d.id] = d.display_name || d.email || "";
                 });
 
                 const taskTypesMap = {};
-                taskTypesSnap.docs.forEach(d => { taskTypesMap[d.id] = d.data().name || ""; });
+                (taskTypesResult.data || []).forEach(d => { taskTypesMap[d.id] = d.name || ""; });
 
                 const workAreasMap = {};
-                workAreasSnap.docs.forEach(d => { workAreasMap[d.id] = d.data().name || ""; });
+                (workAreaTypesResult.data || []).forEach(d => { workAreasMap[d.id] = d.name || ""; });
 
                 // Subtask counts per task
                 const subtaskCounts = {};
                 const subtaskDone = {};
-                subtasksSnap.docs.forEach(d => {
-                    const data = d.data();
-                    const tid = data.taskId;
+                (subtasksResult.data || []).forEach(d => {
+                    const tid = d.task_id;
                     if (!tid) return;
                     subtaskCounts[tid] = (subtaskCounts[tid] || 0) + 1;
-                    if (data.completed || data.done) subtaskDone[tid] = (subtaskDone[tid] || 0) + 1;
+                    if (d.completed) subtaskDone[tid] = (subtaskDone[tid] || 0) + 1;
                 });
 
-                // ── Apply filters ──
-                let tasks = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                // ── Map tasks and apply filters ──
+                let tasks = (tasksResult.data || []).map(t => ({
+                    id: t.id,
+                    title: t.title,
+                    status: t.status,
+                    projectId: t.project_id,
+                    assignedTo: t.assigned_to,
+                    workAreaTypeId: t.area_id,
+                    taskTypeId: t.task_type_id,
+                    progressPct: t.progress,
+                    estimatedHours: t.estimated_hours,
+                    actualHours: t.actual_hours,
+                    priority: t.priority,
+                    assignedBy: t.assigned_by,
+                    plannedStartDate: t.start_date,
+                    plannedEndDate: t.end_date,
+                    dueDate: t.due_date,
+                    createdAt: t.created_at,
+                    description: t.description,
+                    milestoneId: t.milestone_id,
+                }));
 
                 const statusFilter = req.query.status;
                 if (statusFilter) {

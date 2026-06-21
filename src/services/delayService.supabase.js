@@ -11,6 +11,7 @@ import { supabase } from '../supabase';
 import { updateTaskStatus, updateTask } from './taskService';
 import { calculateProjectRisk } from './riskService';
 import { logActivity, ACTIVITY_TYPES } from './activityLogService';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 // ============================================================
 // DELAY CAUSES (Configurable by admin)
@@ -105,6 +106,21 @@ export async function createDelay(data, userId) {
         } catch (err) {
             console.warn('[delayService.sb] Auto-block transition failed:', err.message);
         }
+    }
+
+    // Trigger Telegram notification via Cloud Function Callable
+    try {
+        const functions = getFunctions();
+        const notifyFn = httpsCallable(functions, 'notifyTelegramDelayCreated');
+        await notifyFn({
+            projectId: data.projectId || null,
+            taskId: data.taskId || null,
+            causeName: data.causeName || 'Retraso reportado',
+            comment: data.comment || '',
+            createdBy: userId,
+        });
+    } catch (notifyErr) {
+        console.warn('[delayService.sb] Telegram notification trigger failed:', notifyErr.message);
     }
 
     return result.id;

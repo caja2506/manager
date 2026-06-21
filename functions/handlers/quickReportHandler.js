@@ -5,18 +5,14 @@
  * 
  * getQuickReportData: returns user's active tasks + subtasks for today
  * submitQuickReport: saves progress reports and updates task/subtask data
- *
- * [SUPABASE MIGRATION] Core data (tasks, subtasks, time_logs, users)
- * now read/written via coreDataReader (Supabase).
- * Telegram reports still written to Firestore.
  */
 
-const paths = require("../automation/firestorePaths");
 const {
     loadAllUsers, loadUser, loadUserTasks, loadTaskSubtasks,
     loadTaskUserTimeLogs, updateTask, updateSubtask, insertTimeLog, insertTask,
     transitionTaskStatus,
 } = require("../db/coreDataReader");
+const { getSupabase } = require("../db/supabaseAdmin");
 
 /**
  * Load active tasks + subtasks for a user identified by Telegram chatId.
@@ -40,18 +36,16 @@ async function getQuickReportData(adminDb, chatId) {
         });
     }
 
-    // ── 2. Fallback: try telegramSessions (Firestore) ──
+    // ── 2. Fallback: try telegram_sessions (Supabase) ──
     if (!foundUser) {
-        const sessionSnap = await adminDb.collection(paths.TELEGRAM_SESSIONS)
-            .where("chatId", "==", chatIdStr)
-            .limit(1)
-            .get();
+        const sb = getSupabase();
+        const { data: session, error } = await sb.from("telegram_sessions")
+            .select("user_id")
+            .eq("chat_id", chatIdStr)
+            .maybeSingle();
 
-        if (!sessionSnap.empty) {
-            const session = sessionSnap.docs[0].data();
-            if (session.userId) {
-                foundUser = await loadUser(session.userId);
-            }
+        if (!error && session && session.user_id) {
+            foundUser = await loadUser(session.user_id);
         }
     }
 
@@ -219,16 +213,24 @@ async function submitQuickReport(adminDb, reportData) {
         updatedCount++;
     }
 
-    // Create telegram report record in Firestore (automation-only data)
-    await adminDb.collection(paths.TELEGRAM_REPORTS).add({
-        userId,
-        chatId: String(chatId),
-        reportDate: todayStr,
+    // Create telegram report record in Supabase
+    const sb = getSupabase();
+    const reportContent = {
         source: "webapp_quick_report",
         tasksReported: updatedCount,
         note: note || null,
-        createdAt: now.toISOString(),
+    };
+    const { error: reportError } = await sb.from("telegram_reports").insert({
+        user_id: userId,
+        report_type: "quick_report",
+        content: JSON.stringify(reportContent),
+        sent_at: now.toISOString(),
+        created_at: now.toISOString(),
     });
+
+    if (reportError) {
+        console.error("[quickReport] Error writing telegram report to Supabase:", reportError.message);
+    }
 
     return {
         success: true,
@@ -240,7 +242,7 @@ async function submitQuickReport(adminDb, reportData) {
 /**
  * Create a quick task from the Mini App.
  * @param {Object} data - { chatId, title }
- * @returns {{ success, taskId, title }}
+ * @returns {Promise<{ success: boolean, taskId?: string, title?: string, error?: string }>}
  */
 async function createQuickTask(adminDb, data) {
     const { chatId, title } = data;
@@ -288,3 +290,4 @@ async function createQuickTask(adminDb, data) {
 }
 
 module.exports = { getQuickReportData, submitQuickReport, createQuickTask };
+

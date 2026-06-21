@@ -61,44 +61,36 @@ async function ariaHeartbeatHandler({ telegramToken, nvidiaKey, deepseekKey, adm
 
         // ── 2.5 Check 3-hour frequency limit for proactive evaluation ──
         let skipProactive = false;
-        let lastRunDoc = null;
-        if (adminDb) {
-            try {
-                const docRef = adminDb.collection("settings").doc("proactiveAgentLastRun");
-                lastRunDoc = await docRef.get();
-                if (lastRunDoc.exists) {
-                    const lastRunAt = lastRunDoc.data().lastRunAt;
-                    if (lastRunAt) {
-                        const diffMs = Date.now() - new Date(lastRunAt).getTime();
-                        // 3 hours limit (minus 5 minutes buffer to avoid clock drift issues)
-                        const limitMs = 3 * 3600 * 1000 - 5 * 60 * 1000;
-                        if (diffMs < limitMs) {
-                            console.log(`${tag} Proactive evaluation within 3-hour cooldown (${Math.round(diffMs / 60000)}m ago). Skipping nudges.`);
-                            skipProactive = true;
-                        }
-                    }
+        let lastRunData = null;
+        try {
+            lastRunData = await coreReader.loadSetting("proactiveAgentLastRun");
+            if (lastRunData && lastRunData.lastRunAt) {
+                const diffMs = Date.now() - new Date(lastRunData.lastRunAt).getTime();
+                // 3 hours limit (minus 5 minutes buffer to avoid clock drift issues)
+                const limitMs = 3 * 3600 * 1000 - 5 * 60 * 1000;
+                if (diffMs < limitMs) {
+                    console.log(`${tag} Proactive evaluation within 3-hour cooldown (${Math.round(diffMs / 60000)}m ago). Skipping nudges.`);
+                    skipProactive = true;
                 }
-            } catch (e) {
-                console.warn(`${tag} Error reading proactiveAgentLastRun setting:`, e.message);
             }
+        } catch (e) {
+            console.warn(`${tag} Error reading proactiveAgentLastRun setting:`, e.message);
         }
 
         // ── 3. Run proactive engine (nudges) ──
         let result = { sent: 0, skipped: 0, errors: 0 };
         if (!skipProactive) {
             const { evaluate } = require("../agent/proactiveEngine");
-            result = await evaluate({ telegramToken, nvidiaKey, deepseekKey, adminDb });
+            result = await evaluate({ telegramToken, nvidiaKey, deepseekKey, adminDb: null });
             console.log(`${tag} Nudges — sent=${result.sent} skipped=${result.skipped} errors=${result.errors}`);
 
             // Save last run time
-            if (adminDb) {
-                try {
-                    await adminDb.collection("settings").doc("proactiveAgentLastRun").set({
-                        lastRunAt: new Date().toISOString(),
-                    }, { merge: true });
-                } catch (e) {
-                    console.warn(`${tag} Error updating proactiveAgentLastRun setting:`, e.message);
-                }
+            try {
+                await coreReader.saveSetting("proactiveAgentLastRun", {
+                    lastRunAt: new Date().toISOString(),
+                });
+            } catch (e) {
+                console.warn(`${tag} Error updating proactiveAgentLastRun setting:`, e.message);
             }
         } else {
             console.log(`${tag} Proactive evaluation was skipped due to 3-hour limit.`);

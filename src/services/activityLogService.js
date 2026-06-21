@@ -5,9 +5,7 @@
  * Note: Refactored to remove top-level await to fix production deadlocks.
  */
 
-import { USE_SUPABASE } from './_backend';
 import * as supabaseImpl from './activityLogService.supabase.js';
-import * as firebaseImpl from './activityLogService.firebase.js';
 
 export const ACTIVITY_TYPES = {
     SUBTASK_COMPLETED: 'subtask_completed',
@@ -46,8 +44,9 @@ export const ACTIVITY_TYPE_CONFIG = {
     [ACTIVITY_TYPES.DESCRIPTION_CHANGED]: { icon: '📝', color: '#64748b', label: 'Descripción editada' },
     [ACTIVITY_TYPES.TASK_PREEMPTED]: { icon: '⚡', color: '#a855f7', label: 'Interrumpida por prioridad' },
 };
-export const logActivity = (...args) => (USE_SUPABASE ? supabaseImpl : firebaseImpl).logActivity(...args);
-export const fetchTaskActivityLog = (...args) => (USE_SUPABASE ? supabaseImpl : firebaseImpl).fetchTaskActivityLog(...args);
-export const fetchAllActivityLogs = (...args) => (USE_SUPABASE ? supabaseImpl : firebaseImpl).fetchAllActivityLogs(...args);
-export const updateActivityLog = (...args) => (USE_SUPABASE ? supabaseImpl : firebaseImpl).updateActivityLog(...args);
-export const deleteActivityLog = (...args) => (USE_SUPABASE ? supabaseImpl : firebaseImpl).deleteActivityLog(...args);
+
+export const logActivity = (...args) => supabaseImpl.logActivity(...args);
+export const fetchTaskActivityLog = (...args) => supabaseImpl.fetchTaskActivityLog(...args);
+export const fetchAllActivityLogs = (...args) => supabaseImpl.fetchAllActivityLogs(...args);
+export const updateActivityLog = (...args) => supabaseImpl.updateActivityLog(...args);
+export const deleteActivityLog = (...args) => supabaseImpl.deleteActivityLog(...args);

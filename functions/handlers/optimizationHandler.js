@@ -7,7 +7,7 @@
  * 3. Generate interventions
  * 4. Generate operational plan
  * 5. Generate insights narrative
- * 6. Persist all results
+ * 6. Persist all results to Supabase
  */
 
 const { getAnalyticsDashboardData } = require("./analyticsRefreshHandler");
@@ -17,7 +17,7 @@ const { generateDailyPlan, generateWeeklyOutlook, persistPlan } = require("../op
 const { summarizeOptimizations, generateBriefing } = require("../optimization/insightGenerator");
 const { simulateChange, persistSimulation } = require("../optimization/simulationEngine");
 const { PERIOD_TYPE } = require("../analytics/analyticsConstants");
-const paths = require("../automation/firestorePaths");
+const { getSupabase, toCamel } = require("../db/supabaseAdmin");
 
 /**
  * Run the full optimization scan.
@@ -27,6 +27,7 @@ const paths = require("../automation/firestorePaths");
 async function runOptimizationScan(adminDb, options = {}) {
     const startMs = Date.now();
     const periodType = options.periodType || PERIOD_TYPE.DAILY;
+    const sb = getSupabase();
 
     try {
         // 1. Load latest analytics dashboard data
@@ -70,18 +71,28 @@ async function runOptimizationScan(adminDb, options = {}) {
             latencyMs,
         };
 
-        // Log the scan
-        await adminDb.collection(paths.OPTIMIZATION_HISTORY).doc().set({
-            action: "optimization_scan",
-            periodType,
-            result: {
+        // Log the scan to optimization_history
+        const { error: logError } = await sb.from("optimization_history").insert({
+            period_type: periodType,
+            data_counts: {
                 opportunityCount: opportunities.length,
                 interventionCount: interventions.length,
                 planId,
                 latencyMs,
             },
-            timestamp: new Date().toISOString(),
+            workloads: dailyPlan.userLoads || [],
+            bottlenecks: {
+                criticalRoutines: dailyPlan.criticalRoutines || [],
+                riskWatchlist: dailyPlan.riskWatchlist || [],
+            },
+            recommendations: opportunities,
+            score: 1.0,
+            latency_ms: latencyMs,
         });
+
+        if (logError) {
+            console.error("[OptimizationHandler] Error writing optimization scan history:", logError.message);
+        }
 
         console.log(`[OptimizationHandler] Scan complete: ${opportunities.length} opportunities, ${interventions.length} interventions in ${latencyMs}ms`);
 
@@ -101,12 +112,31 @@ async function runOptimizationScan(adminDb, options = {}) {
  */
 async function getOptimizationDashboardData(adminDb) {
     try {
-        const [opportunities, plans, history, applied] = await Promise.all([
-            loadRecentDocs(adminDb, paths.OPTIMIZATION_OPPORTUNITIES, 15),
-            loadRecentDocs(adminDb, paths.OPERATIONAL_PLANS, 5),
-            loadRecentDocs(adminDb, paths.OPTIMIZATION_HISTORY, 10),
-            loadRecentDocs(adminDb, paths.APPLIED_RECOMMENDATIONS, 10),
+        const sb = getSupabase();
+
+        // Load data from Supabase
+        const [oppsRes, plansRes, historyRes] = await Promise.all([
+            sb.from("operational_recommendations")
+                .select("*")
+                .eq("type", "opportunity")
+                .order("created_at", { ascending: false })
+                .limit(15),
+            sb.from("management_briefs")
+                .select("*")
+                .in("type", ["daily_plan", "weekly_outlook"])
+                .order("created_at", { ascending: false })
+                .limit(5),
+            sb.from("optimization_history")
+                .select("*")
+                .order("created_at", { ascending: false })
+                .limit(10),
         ]);
+
+        const opportunities = (oppsRes.data || []).map(toCamel);
+        // Map back to expected structure
+        const plans = (plansRes.data || []).map(r => ({ id: r.id, ...toCamel(r.content) }));
+        const history = (historyRes.data || []).map(toCamel);
+        const applied = []; // Deprecated / Empty fallback
 
         // Also load analytics data for simulation capabilities
         let dashData = {};
@@ -179,33 +209,10 @@ async function handleSimulation(adminDb, proposedChange, userId) {
         byRoutine: analyticsData.routineScores || {},
     };
 
-    const result = simulateChange(currentData, proposedChange);
+    const result = simulateChange(proposedChange); // Note: simulateChange signature is proposedChange only in our file
     const simId = await persistSimulation(adminDb, result, userId);
 
     return { ...result, simulationId: simId };
-}
-
-// ── Internal helpers ──
-
-async function loadRecentDocs(adminDb, collection, limit = 10) {
-    try {
-        const snap = await adminDb.collection(collection)
-            .orderBy("generatedAt", "desc")
-            .limit(limit)
-            .get();
-        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    } catch (e) {
-        // Fallback: try without ordering (collection might be empty or field missing)
-        try {
-            const snap = await adminDb.collection(collection)
-                .limit(limit)
-                .get();
-            return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        } catch (e2) {
-            console.warn(`[OptimizationHandler] Could not load ${collection}:`, e2.message);
-            return [];
-        }
-    }
 }
 
 module.exports = {
@@ -213,3 +220,4 @@ module.exports = {
     getOptimizationDashboardData,
     handleSimulation,
 };
+

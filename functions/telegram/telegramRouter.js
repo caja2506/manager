@@ -19,6 +19,7 @@ const { createDelivery, markResponded } = require("./telegramDeliveryTracker");
 const { incrementTodayMetrics } = require("../automation/metricsUpdater");
 const paths = require("../automation/firestorePaths");
 const coreReader = require("../db/coreDataReader");
+const { getSupabase } = require("../db/supabaseAdmin");
 const {
     TELEGRAM_SESSION_STATE,
     TELEGRAM_SESSION_EVENT,
@@ -184,10 +185,12 @@ async function routeInboundMessage(adminDb, token, chatId, text, rawMessage, ext
                 await sendMessage(token, chatIdStr, "⚠️ Ingresa un número válido de horas (ej: <b>2</b> o <b>1.5</b>)");
             } else {
                 // Save overtime hours in session metadata and show task selection
-                await adminDb.collection(paths.TELEGRAM_SESSIONS).doc(session.id).update({
-                    "metadata.overtimeHours": otHours,
-                    updatedAt: new Date().toISOString(),
-                });
+                await getSupabase().from("telegram_sessions")
+                    .update({
+                        metadata: { ...session.metadata, overtimeHours: otHours },
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq("chat_id", session.id);
                 await transitionState(adminDb, chatIdStr, TELEGRAM_SESSION_EVENT.OVERTIME_HOURS_ENTERED);
                 await showOvertimeTaskKeyboard(adminDb, token, chatIdStr, session);
             }
@@ -201,7 +204,7 @@ async function routeInboundMessage(adminDb, token, chatId, text, rawMessage, ext
             break;
 
         case TELEGRAM_SESSION_STATE.IDLE:
-        default:
+        default: {
             if (isAudio) {
                 await sendMessage(token, chatIdStr, "🔄 <i>Procesando tu nota de voz...</i>");
                 try {
@@ -237,19 +240,23 @@ async function routeInboundMessage(adminDb, token, chatId, text, rawMessage, ext
                     }
                     
                     // Limpiar acción pendiente
-                    await adminDb.collection(paths.TELEGRAM_SESSIONS).doc(session.id).update({
-                        "metadata.pendingAriaAction": null,
-                        updatedAt: new Date().toISOString(),
-                    });
+                    await getSupabase().from("telegram_sessions")
+                        .update({
+                            metadata: { ...session.metadata, pendingAriaAction: null },
+                            updated_at: new Date().toISOString(),
+                        })
+                        .eq("chat_id", session.id);
                     return;
                 } else if (conf === "no") {
                     await sendMessage(token, chatIdStr, "❌ Acción cancelada.");
                     
                     // Limpiar acción pendiente
-                    await adminDb.collection(paths.TELEGRAM_SESSIONS).doc(session.id).update({
-                        "metadata.pendingAriaAction": null,
-                        updatedAt: new Date().toISOString(),
-                    });
+                    await getSupabase().from("telegram_sessions")
+                        .update({
+                            metadata: { ...session.metadata, pendingAriaAction: null },
+                            updated_at: new Date().toISOString(),
+                        })
+                        .eq("chat_id", session.id);
                     return;
                 }
             }
@@ -275,11 +282,13 @@ async function routeInboundMessage(adminDb, token, chatId, text, rawMessage, ext
                 });
 
                 if (ariaResult.pendingWrite) {
-                    // Guardar en la sesión de Firestore
-                    await adminDb.collection(paths.TELEGRAM_SESSIONS).doc(session.id).update({
-                        "metadata.pendingAriaAction": ariaResult.pendingWrite,
-                        updatedAt: new Date().toISOString(),
-                    });
+                    // Guardar en la sesión de Supabase
+                    await getSupabase().from("telegram_sessions")
+                        .update({
+                            metadata: { ...session.metadata, pendingAriaAction: ariaResult.pendingWrite },
+                            updated_at: new Date().toISOString(),
+                        })
+                        .eq("chat_id", session.id);
 
                     // Obtener teclado inline de confirmación
                     const { getConfirmKeyboard } = require("../agent/writeTools");
@@ -302,6 +311,7 @@ async function routeInboundMessage(adminDb, token, chatId, text, rawMessage, ext
                 );
             }
             break;
+        }
     }
 
     // Update metrics
@@ -464,10 +474,17 @@ async function handleReportSubmission(adminDb, token, chatId, userId, text, sess
     // ── Confidence gating ──
     if (action === "confirm") {
         // Store pending data in session metadata and ask for confirmation
-        await adminDb.collection(paths.TELEGRAM_SESSIONS).doc(session.id).update({
-            metadata: { pendingExtraction: extracted, rawText: text, inputType: "text" },
-            updatedAt: now,
-        });
+        await getSupabase().from("telegram_sessions")
+            .update({
+                metadata: {
+                    ...session.metadata,
+                    pendingExtraction: extracted,
+                    rawText: text,
+                    inputType: "text"
+                },
+                updated_at: now,
+            })
+            .eq("chat_id", session.id);
         await transitionState(adminDb, chatId, TELEGRAM_SESSION_EVENT.REPORT_SUBMITTED);
 
         const confirmMsg = CONFIRMATION_MESSAGE.buildMessage(extracted);
@@ -539,14 +556,17 @@ async function handleAudioReport(adminDb, token, chatId, userId, message, sessio
 
     // Confidence gating
     if (result.action === "confirm") {
-        await adminDb.collection(paths.TELEGRAM_SESSIONS).doc(session.id).update({
-            metadata: {
-                pendingExtraction: result.extracted,
-                rawText: result.transcript || "[audio]",
-                inputType: "audio",
-            },
-            updatedAt: now,
-        });
+        await getSupabase().from("telegram_sessions")
+            .update({
+                metadata: {
+                    ...session.metadata,
+                    pendingExtraction: result.extracted,
+                    rawText: result.transcript || "[audio]",
+                    inputType: "audio",
+                },
+                updated_at: now,
+            })
+            .eq("chat_id", session.id);
         await transitionState(adminDb, chatId, TELEGRAM_SESSION_EVENT.REPORT_SUBMITTED);
 
         const confirmMsg = CONFIRMATION_MESSAGE.buildMessage(result.extracted);
@@ -659,24 +679,16 @@ async function handleBlockCause(adminDb, token, chatId, userId, text, session, e
     }
 
     // Create incident
-    await adminDb.collection(paths.OPERATION_INCIDENTS).add({
-        incidentType: "blocker",
-        channel: "telegram",
-        provider: "telegram_bot",
-        userId,
-        title: `Bloqueo reportado por ${userId}`,
+    const { error: incErr } = await getSupabase().from("operation_incidents").insert({
+        reported_by: userId,
         description: text,
-        cause: classification.suggestedCause || text,
+        severity: classification.suggestedSeverity || "warning",
         status: "open",
-        severity: classification.suggestedSeverity || "medium",
-        aiClassified: useAI,
-        aiConfidence: classification.confidenceScore || null,
-        reportedVia: "telegram",
-        reportedAt: now,
-        resolvedAt: null,
-        createdAt: now,
-        updatedAt: now,
+        created_at: now,
     });
+    if (incErr) {
+        console.error("[telegramRouter] Error creating incident in Supabase:", incErr.message);
+    }
 
     // Transition
     await transitionState(adminDb, chatId, TELEGRAM_SESSION_EVENT.BLOCK_CAUSE_RECEIVED);
@@ -806,24 +818,31 @@ function buildSubtaskMessageText(taskTitle, timerInfo, subtasks, toggledIds) {
 async function saveReport(adminDb, token, chatId, userId, userName, data) {
     const { inputType, rawText, extracted, today, now, confirmed } = data;
 
-    await adminDb.collection(paths.TELEGRAM_REPORTS).add({
-        userId,
-        chatId: String(chatId),
-        date: today,
-        inputType,
-        rawText: rawText?.substring(0, 2000) || "",
-        parsedData: extracted,
-        progressPercent: extracted.progressPercent,
-        hoursWorked: extracted.hoursWorked,
-        blocker: extracted.blockerPresent ? (extracted.blockerSummary || "Sí") : null,
-        blockerPresent: extracted.blockerPresent,
-        normalizedSummary: extracted.normalizedSummary || "",
-        aiConfidence: extracted.confidenceScore || null,
+    const reportDoc = {
+        user_id: userId,
+        report_type: "daily",
+        content: JSON.stringify({
+            rawText: rawText?.substring(0, 2000) || "",
+            progressPercent: extracted.progressPercent,
+            hoursWorked: extracted.hoursWorked,
+            blocker: extracted.blockerPresent ? (extracted.blockerSummary || "Sí") : null,
+            blockerPresent: extracted.blockerPresent,
+            normalizedSummary: extracted.normalizedSummary || "",
+            aiConfidence: extracted.confidenceScore || null,
+        }),
         status: REPORT_STATUS.RECEIVED,
-        onTime: true,
-        createdAt: now,
-        updatedAt: now,
-    });
+        date: today,
+        input_type: inputType,
+        parsed_data: extracted,
+        on_time: true,
+        sent_at: now,
+        created_at: now,
+    };
+
+    const { error: repErr } = await getSupabase().from("telegram_reports").insert(reportDoc);
+    if (repErr) {
+        console.error("[telegramRouter] Error inserting telegram report in Supabase:", repErr.message);
+    }
 
     await transitionState(adminDb, chatId, TELEGRAM_SESSION_EVENT.REPORT_CONFIRMED);
     await markResponded(adminDb, chatId, "technician_evening_check");
@@ -936,10 +955,12 @@ async function routeCallbackQuery(adminDb, token, chatId, callbackData, callback
         }
 
         // Limpiar acción pendiente en sesión
-        await adminDb.collection(paths.TELEGRAM_SESSIONS).doc(session.id).update({
-            "metadata.pendingAriaAction": null,
-            updatedAt: new Date().toISOString(),
-        });
+        await getSupabase().from("telegram_sessions")
+            .update({
+                metadata: { ...session.metadata, pendingAriaAction: null },
+                updated_at: new Date().toISOString(),
+            })
+            .eq("chat_id", session.id);
         return;
     }
 
@@ -1103,13 +1124,18 @@ async function routeCallbackQuery(adminDb, token, chatId, callbackData, callback
         const timerInfo = await getTimerHoursForTaskToday(adminDb, taskRef, userId, today);
 
         // Store selected task + timer info in session metadata
-        await adminDb.collection(paths.TELEGRAM_SESSIONS).doc(session.id).update({
-            "metadata.selectedTaskId": taskRef,
-            "metadata.selectedTaskTitle": taskData.title || "Sin título",
-            "metadata.timerHoursDetected": timerInfo.hasTimerHours,
-            "metadata.timerHoursAmount": timerInfo.totalHours,
-            updatedAt: new Date().toISOString(),
-        });
+        await getSupabase().from("telegram_sessions")
+            .update({
+                metadata: {
+                    ...session.metadata,
+                    selectedTaskId: taskRef,
+                    selectedTaskTitle: taskData.title || "Sin título",
+                    timerHoursDetected: timerInfo.hasTimerHours,
+                    timerHoursAmount: timerInfo.totalHours
+                },
+                updated_at: new Date().toISOString(),
+            })
+            .eq("chat_id", session.id);
 
         // Check if task has subtasks — show subtask toggle screen first
         const subtasks = await loadSubtasksForTask(adminDb, taskRef);
@@ -1117,11 +1143,16 @@ async function routeCallbackQuery(adminDb, token, chatId, callbackData, callback
 
         if (pendingSubtasks.length > 0) {
             // Store subtask data in session for toggle tracking
-            await adminDb.collection(paths.TELEGRAM_SESSIONS).doc(session.id).update({
-                "metadata.subtaskIds": subtasks.map(st => st.id),
-                "metadata.toggledSubtaskIds": [],
-                updatedAt: new Date().toISOString(),
-            });
+            await getSupabase().from("telegram_sessions")
+                .update({
+                    metadata: {
+                        ...session.metadata,
+                        subtaskIds: subtasks.map(st => st.id),
+                        toggledSubtaskIds: []
+                    },
+                    updated_at: new Date().toISOString(),
+                })
+                .eq("chat_id", session.id);
 
             await transitionState(adminDb, chatIdStr, TELEGRAM_SESSION_EVENT.SUBTASKS_SHOWN);
 
@@ -1233,10 +1264,12 @@ async function routeCallbackQuery(adminDb, token, chatId, callbackData, callback
         }
 
         // Save toggled state to session
-        await adminDb.collection(paths.TELEGRAM_SESSIONS).doc(freshSession.id).update({
-            "metadata.toggledSubtaskIds": Array.from(toggledIds),
-            updatedAt: new Date().toISOString(),
-        });
+        await getSupabase().from("telegram_sessions")
+            .update({
+                metadata: { ...freshSession.metadata, toggledSubtaskIds: Array.from(toggledIds) },
+                updated_at: new Date().toISOString(),
+            })
+            .eq("chat_id", freshSession.id);
 
         // Re-render the message with updated keyboard
         const msgText = buildSubtaskMessageText(taskTitle, timerInfo, subtasks, toggledIds);
@@ -1353,11 +1386,16 @@ async function handleCreateTask(adminDb, token, chatId, userId, text, session, r
     const taskRef = { id: newTask?.id };
 
     // Store in session
-    await adminDb.collection(paths.TELEGRAM_SESSIONS).doc(session.id).update({
-        "metadata.selectedTaskId": taskRef.id,
-        "metadata.selectedTaskTitle": taskTitle.trim(),
-        updatedAt: now,
-    });
+    await getSupabase().from("telegram_sessions")
+        .update({
+            metadata: {
+                ...session.metadata,
+                selectedTaskId: taskRef.id,
+                selectedTaskTitle: taskTitle.trim()
+            },
+            updated_at: now,
+        })
+        .eq("chat_id", session.id);
 
     await transitionState(adminDb, chatId, TELEGRAM_SESSION_EVENT.TASK_CREATED);
     await sendMessage(token, chatId,
@@ -1468,26 +1506,31 @@ async function saveTaskReport(adminDb, token, chatId, userId, userName, data) {
 
     // 1. Create telegramReports record
     try {
-        const reportDoc = JSON.parse(JSON.stringify({
-            userId: userId || "unknown",
-            taskId: taskId || null,
-            chatId: String(chatId),
-            date: today,
-            inputType: inputType || "unknown",
-            rawText: (rawText || "").substring(0, 2000),
-            parsedData: safe,
-            progressPercent: progress,
-            hoursWorked: hours,
-            blocker: hasBlocker ? (safe.blockerSummary || "Sí") : null,
-            blockerPresent: hasBlocker,
-            normalizedSummary: safe.normalizedSummary || "",
-            aiConfidence: safe.confidenceScore || null,
+        const reportDoc = {
+            user_id: userId || "unknown",
+            task_id: taskId || null,
+            report_type: "task",
+            content: JSON.stringify({
+                rawText: rawText?.substring(0, 2000) || "",
+                progressPercent: progress,
+                hoursWorked: hours,
+                blocker: hasBlocker ? (safe.blockerSummary || "Sí") : null,
+                blockerPresent: hasBlocker,
+                normalizedSummary: safe.normalizedSummary || "",
+                aiConfidence: safe.confidenceScore || null,
+            }),
             status: "received",
-            onTime: true,
-            createdAt: now,
-            updatedAt: now,
-        }));
-        await adminDb.collection(paths.TELEGRAM_REPORTS).add(reportDoc);
+            date: today,
+            input_type: inputType || "unknown",
+            parsed_data: safe,
+            on_time: true,
+            sent_at: now,
+            created_at: now,
+        };
+        const { error: repErr } = await getSupabase().from("telegram_reports").insert(reportDoc);
+        if (repErr) {
+            throw new Error(`Failed to insert telegram report: ${repErr.message}`);
+        }
     } catch (e) {
         console.error("[saveTaskReport] STEP 1 telegramReports failed:", e.message);
         throw e;
@@ -1556,10 +1599,12 @@ async function saveTaskReport(adminDb, token, chatId, userId, userName, data) {
         const session = await getOrCreateSession(adminDb, chatId);
         const reportedTasks = session.metadata?.reportedTasks || [];
         reportedTasks.push({ taskId, title: taskTitle, progress, hours, blocker: hasBlocker });
-        await adminDb.collection(paths.TELEGRAM_SESSIONS).doc(session.id).update({
-            "metadata.reportedTasks": reportedTasks,
-            updatedAt: now,
-        });
+        await getSupabase().from("telegram_sessions")
+            .update({
+                metadata: { ...session.metadata, reportedTasks },
+                updated_at: now,
+            })
+            .eq("chat_id", session.id);
     } catch (e) {
         console.error("[saveTaskReport] STEP 4 session update failed:", e.message);
     }
@@ -1668,14 +1713,12 @@ async function handleOvertimeForTask(adminDb, token, chatId, userId, taskId, ses
     reportedTasks.forEach(rt => { totalRegular += (rt.hours || 0); });
 
     // Clean up session metadata
-    const sessionDoc = await adminDb.collection(paths.TELEGRAM_SESSIONS)
-        .where("chatId", "==", String(chatId)).limit(1).get();
-    if (!sessionDoc.empty) {
-        await sessionDoc.docs[0].ref.update({
+    await getSupabase().from("telegram_sessions")
+        .update({
             metadata: {},
-            updatedAt: now,
-        });
-    }
+            updated_at: now,
+        })
+        .eq("chat_id", String(chatId));
 
     await sendMessageWithReplyKeyboard(token, chatId,
         `✅ <b>${overtimeHours}h extra</b> registradas en <b>${taskTitle}</b>\n\n` +
@@ -1690,18 +1733,18 @@ async function handleOvertimeForTask(adminDb, token, chatId, userId, taskId, ses
  */
 async function forceResetSession(adminDb, chatId) {
     const chatIdStr = String(chatId);
-    const snap = await adminDb.collection(paths.TELEGRAM_SESSIONS)
-        .where("chatId", "==", chatIdStr)
-        .limit(1)
-        .get();
-
-    if (!snap.empty) {
-        await snap.docs[0].ref.update({
-            currentState: TELEGRAM_SESSION_STATE.IDLE,
+    const { error } = await getSupabase().from("telegram_sessions")
+        .update({
+            current_state: TELEGRAM_SESSION_STATE.IDLE,
             metadata: {},
-            updatedAt: new Date().toISOString(),
-        });
+            updated_at: new Date().toISOString(),
+        })
+        .eq("chat_id", chatIdStr);
+    
+    if (!error) {
         console.log(`[telegramRouter] Force-reset session for chatId=${chatIdStr} to idle`);
+    } else {
+        console.error(`[telegramRouter] Force-reset session error for chatId=${chatIdStr}:`, error.message);
     }
 }
 

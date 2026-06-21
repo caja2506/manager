@@ -1,23 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, ShieldAlert } from 'lucide-react';
-import {
-    doc, onSnapshot, updateDoc, collection,
-    query, orderBy, limit, getDocs
-} from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { db, functions } from '../firebase';
+import { functions } from '../firebase';
 import { useRole } from '../contexts/RoleContext.jsx';
+import { supabase } from '../supabase';
 
 // --- Automation imports ---
-import {
-    SETTINGS_COLLECTION,
-    SETTINGS_DOCS,
-    AUTOMATION_ROUTINES,
-    AUTOMATION_RUNS,
-    AUTOMATION_METRICS_DAILY,
-    TELEGRAM_DELIVERIES,
-} from '../automation/firestorePaths.js';
 import { bootstrapAutomation } from '../automation/bootstrapAutomation.js';
 import { getMetricsDocId } from '../automation/metricsHelper.js';
 import { fetchAnalyticsDashboard } from '../automation/analyticsService.js';
@@ -31,11 +20,14 @@ import AutomationControlShell from '../components/automation/AutomationControlSh
  * Automation Operations & Accountability Foundation.
  * 
  * Reads:
- * - settings/automationCore
- * - settings/telegramOps
- * - automationRoutines (all)
- * - automationRuns (last 20)
- * - automationMetricsDaily (today)
+ * - settings/automationCore (Supabase settings table)
+ * - settings/telegramOps (Supabase settings table)
+ * - settings/automationAI (Supabase settings table)
+ * - automation_routines (all)
+ * - automation_runs (last 20)
+ * - automation_metrics_daily (today)
+ * - telegram_deliveries (last 25)
+ * - users (all)
  * 
  * Calls bootstrapAutomation() on first load (idempotent).
  */
@@ -73,11 +65,62 @@ export default function AutomationControlCenter() {
         }
     }, [hasAccess, roleLoading, navigate]);
 
+    // Helpers to map DB records to frontend-compatible structures
+    const mapRoutine = (r) => ({
+        id: r.key,
+        key: r.key,
+        name: r.name,
+        description: r.description,
+        channel: r.channel,
+        provider: r.provider,
+        enabled: r.enabled,
+        scheduleType: r.schedule_type,
+        scheduleConfig: r.schedule_config,
+        delayMinutes: r.delay_minutes,
+        gracePeriodMinutes: r.grace_period_minutes,
+        personalityMode: r.personality_mode,
+        allowedRoles: r.allowed_roles,
+        dryRun: r.dry_run,
+        debugMode: r.debug_mode,
+        priority: r.priority,
+        lastRunAt: r.last_run_at,
+        lastStatus: r.last_status,
+        lastError: r.last_error,
+        metadata: r.metadata,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+    });
+
+    const mapRun = (r) => ({
+        id: r.id,
+        routineKey: r.routine_key,
+        status: r.status,
+        triggeredBy: r.triggered_by,
+        startedAt: r.started_at,
+        completedAt: r.completed_at,
+        durationMs: r.duration_ms,
+        errorMessage: r.error_message,
+        createdAt: r.created_at,
+        ...(r.details || {}),
+    });
+
+    const mapDelivery = (d) => ({
+        id: d.id,
+        chatId: d.chat_id,
+        userId: d.user_id,
+        messageType: d.message_type,
+        messagePreview: d.message_preview,
+        status: d.status,
+        errorMessage: d.error_message,
+        sentAt: d.sent_at,
+        createdAt: d.created_at,
+    });
+
     // --- Bootstrap + Subscriptions ---
     useEffect(() => {
         if (roleLoading || !hasAccess) return;
 
-        let unsubCore, unsubTg, unsubAI, unsubRoutines, unsubRuns, unsubDeliveries, unsubMembers;
+        let chSettings, chRoutines, chRuns, chDeliveries, chMembers;
         let mounted = true;
 
         async function init() {
@@ -86,81 +129,85 @@ export default function AutomationControlCenter() {
                 const summary = await bootstrapAutomation();
                 if (mounted) setBootstrapSummary(summary);
 
-                // Subscribe to automationCore
-                unsubCore = onSnapshot(
-                    doc(db, SETTINGS_COLLECTION, SETTINGS_DOCS.AUTOMATION_CORE),
-                    snap => { if (mounted) setCoreConfig(snap.exists() ? snap.data() : null); }
-                );
+                // ── 1. Fetch & Subscribe to settings ──
+                const { data: settingsData } = await supabase.from('settings').select('*').in('key', ['automationCore', 'telegramOps', 'automationAI']);
+                if (mounted && settingsData) {
+                    const core = settingsData.find(s => s.key === 'automationCore');
+                    const tg = settingsData.find(s => s.key === 'telegramOps');
+                    const ai = settingsData.find(s => s.key === 'automationAI');
+                    if (core) setCoreConfig(core.value);
+                    if (tg) setTelegramConfig(tg.value);
+                    if (ai) setAiConfig(ai.value);
+                }
 
-                // Subscribe to telegramOps
-                unsubTg = onSnapshot(
-                    doc(db, SETTINGS_COLLECTION, SETTINGS_DOCS.TELEGRAM_OPS),
-                    snap => { if (mounted) setTelegramConfig(snap.exists() ? snap.data() : null); }
-                );
+                chSettings = supabase.channel('acc-settings')
+                    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings' }, payload => {
+                        if (!mounted) return;
+                        const { key, value } = payload.new;
+                        if (key === 'automationCore') setCoreConfig(value);
+                        if (key === 'telegramOps') setTelegramConfig(value);
+                        if (key === 'automationAI') setAiConfig(value);
+                    })
+                    .subscribe();
 
-                // Subscribe to automationAI settings
-                unsubAI = onSnapshot(
-                    doc(db, SETTINGS_COLLECTION, SETTINGS_DOCS.AUTOMATION_AI),
-                    snap => { if (mounted) setAiConfig(snap.exists() ? snap.data() : null); }
-                );
+                // ── 2. Fetch & Subscribe to routines ──
+                const { data: routinesData } = await supabase.from('automation_routines').select('*').order('priority');
+                if (mounted && routinesData) {
+                    setRoutines(routinesData.map(mapRoutine));
+                }
 
-                // Subscribe to routines
-                unsubRoutines = onSnapshot(
-                    collection(db, AUTOMATION_ROUTINES),
-                    snap => {
-                        if (mounted) {
-                            setRoutines(
-                                snap.docs
-                                    .map(d => ({ id: d.id, ...d.data() }))
-                                    .sort((a, b) => (a.priority || 5) - (b.priority || 5))
-                            );
-                        }
-                    }
-                );
+                chRoutines = supabase.channel('acc-routines')
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'automation_routines' }, async () => {
+                        const { data } = await supabase.from('automation_routines').select('*').order('priority');
+                        if (mounted) setRoutines((data || []).map(mapRoutine));
+                    })
+                    .subscribe();
 
-                // Subscribe to recent runs (real-time)
-                const runsQuery = query(
-                    collection(db, AUTOMATION_RUNS),
-                    orderBy('createdAt', 'desc'),
-                    limit(20)
-                );
-                unsubRuns = onSnapshot(runsQuery, snap => {
-                    if (mounted) {
-                        setRecentRuns(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-                    }
-                });
+                // ── 3. Fetch & Subscribe to runs ──
+                const { data: runsData } = await supabase.from('automation_runs').select('*').order('created_at', { ascending: false }).limit(20);
+                if (mounted && runsData) {
+                    setRecentRuns(runsData.map(mapRun));
+                }
 
-                // Subscribe to recent deliveries
-                const deliveriesQuery = query(
-                    collection(db, TELEGRAM_DELIVERIES),
-                    orderBy('createdAt', 'desc'),
-                    limit(25)
-                );
-                unsubDeliveries = onSnapshot(deliveriesQuery, snap => {
-                    if (mounted) {
-                        setRecentDeliveries(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-                    }
-                });
+                chRuns = supabase.channel('acc-runs')
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'automation_runs' }, async () => {
+                        const { data } = await supabase.from('automation_runs').select('*').order('created_at', { ascending: false }).limit(20);
+                        if (mounted) setRecentRuns((data || []).map(mapRun));
+                    })
+                    .subscribe();
 
-                // Subscribe to team members (for test messages)
-                unsubMembers = onSnapshot(
-                    collection(db, 'users'),
-                    snap => {
-                        if (mounted) {
-                            setTeamMembers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-                        }
-                    }
-                );
+                // ── 4. Fetch & Subscribe to deliveries ──
+                const { data: delivData } = await supabase.from('telegram_deliveries').select('*').order('created_at', { ascending: false }).limit(25);
+                if (mounted && delivData) {
+                    setRecentDeliveries(delivData.map(mapDelivery));
+                }
 
-                // Fetch today's metrics
+                chDeliveries = supabase.channel('acc-deliveries')
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'telegram_deliveries' }, async () => {
+                        const { data } = await supabase.from('telegram_deliveries').select('*').order('created_at', { ascending: false }).limit(25);
+                        if (mounted) setRecentDeliveries((data || []).map(mapDelivery));
+                    })
+                    .subscribe();
+
+                // ── 5. Fetch & Subscribe to team members ──
+                const { data: usersData } = await supabase.from('users').select('*').order('name');
+                if (mounted && usersData) {
+                    setTeamMembers(usersData);
+                }
+
+                chMembers = supabase.channel('acc-members')
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, async () => {
+                        const { data } = await supabase.from('users').select('*').order('name');
+                        if (mounted) setTeamMembers(data || []);
+                    })
+                    .subscribe();
+
+                // ── 6. Fetch today's metrics ──
                 const today = new Date().toISOString().split('T')[0];
                 const metricsDocId = getMetricsDocId(today, 'telegram');
-                const metricsRef = doc(db, AUTOMATION_METRICS_DAILY, metricsDocId);
-                const directSnap = await import('firebase/firestore').then(({ getDoc }) =>
-                    getDoc(metricsRef)
-                ).catch(() => null);
-                if (mounted && directSnap?.exists?.()) {
-                    setTodayMetrics(directSnap.data());
+                const { data: met } = await supabase.from('automation_metrics_daily').select('*').eq('id', metricsDocId).maybeSingle();
+                if (mounted && met) {
+                    setTodayMetrics({ id: met.id, date: met.date, ...(met.details || {}) });
                 }
 
                 if (mounted) setLoading(false);
@@ -177,13 +224,11 @@ export default function AutomationControlCenter() {
 
         return () => {
             mounted = false;
-            unsubCore?.();
-            unsubTg?.();
-            unsubAI?.();
-            unsubRoutines?.();
-            unsubRuns?.();
-            unsubDeliveries?.();
-            unsubMembers?.();
+            if (chSettings) supabase.removeChannel(chSettings);
+            if (chRoutines) supabase.removeChannel(chRoutines);
+            if (chRuns) supabase.removeChannel(chRuns);
+            if (chDeliveries) supabase.removeChannel(chDeliveries);
+            if (chMembers) supabase.removeChannel(chMembers);
         };
     }, [isAdmin]);
 
@@ -191,10 +236,9 @@ export default function AutomationControlCenter() {
     const handleToggleCoreEnabled = useCallback(async () => {
         if (!coreConfig) return;
         try {
-            await updateDoc(
-                doc(db, SETTINGS_COLLECTION, SETTINGS_DOCS.AUTOMATION_CORE),
-                { enabled: !coreConfig.enabled, updatedAt: new Date().toISOString() }
-            );
+            const nextValue = { ...coreConfig, enabled: !coreConfig.enabled, updatedAt: new Date().toISOString() };
+            await supabase.from('settings').update({ value: nextValue }).eq('key', 'automationCore');
+            setCoreConfig(nextValue);
         } catch (err) {
             console.error('[AutomationControlCenter] Toggle core failed:', err);
         }
@@ -202,10 +246,10 @@ export default function AutomationControlCenter() {
 
     const handleToggleRoutine = useCallback(async (routine) => {
         try {
-            await updateDoc(
-                doc(db, AUTOMATION_ROUTINES, routine.id),
-                { enabled: !routine.enabled, updatedAt: new Date().toISOString() }
-            );
+            await supabase
+                .from('automation_routines')
+                .update({ enabled: !routine.enabled, updated_at: new Date().toISOString() })
+                .eq('key', routine.id);
         } catch (err) {
             console.error('[AutomationControlCenter] Toggle routine failed:', err);
         }
@@ -213,10 +257,10 @@ export default function AutomationControlCenter() {
 
     const handleUpdateRoutineSchedule = useCallback(async (routineId, scheduleConfig) => {
         try {
-            await updateDoc(
-                doc(db, AUTOMATION_ROUTINES, routineId),
-                { scheduleConfig, updatedAt: new Date().toISOString() }
-            );
+            await supabase
+                .from('automation_routines')
+                .update({ schedule_config: scheduleConfig, updated_at: new Date().toISOString() })
+                .eq('key', routineId);
             console.log(`[ACC] Schedule updated for ${routineId}:`, scheduleConfig);
         } catch (err) {
             console.error('[AutomationControlCenter] Schedule update failed:', err);
@@ -227,15 +271,13 @@ export default function AutomationControlCenter() {
     const handleToggleDryRun = useCallback(async (target) => {
         try {
             if (target === 'core') {
-                await updateDoc(
-                    doc(db, SETTINGS_COLLECTION, SETTINGS_DOCS.AUTOMATION_CORE),
-                    { dryRun: !(coreConfig?.dryRun ?? true), updatedAt: new Date().toISOString() }
-                );
+                const nextValue = { ...coreConfig, dryRun: !(coreConfig?.dryRun ?? true), updatedAt: new Date().toISOString() };
+                await supabase.from('settings').update({ value: nextValue }).eq('key', 'automationCore');
+                setCoreConfig(nextValue);
             } else if (target === 'telegram') {
-                await updateDoc(
-                    doc(db, SETTINGS_COLLECTION, SETTINGS_DOCS.TELEGRAM_OPS),
-                    { dryRun: !(telegramConfig?.dryRun ?? true), updatedAt: new Date().toISOString() }
-                );
+                const nextValue = { ...telegramConfig, dryRun: !(telegramConfig?.dryRun ?? true), updatedAt: new Date().toISOString() };
+                await supabase.from('settings').update({ value: nextValue }).eq('key', 'telegramOps');
+                setTelegramConfig(nextValue);
             }
         } catch (err) {
             console.error('[AutomationControlCenter] Toggle dryRun failed:', err);
@@ -245,15 +287,13 @@ export default function AutomationControlCenter() {
     const handleToggleDebugMode = useCallback(async (target) => {
         try {
             if (target === 'core') {
-                await updateDoc(
-                    doc(db, SETTINGS_COLLECTION, SETTINGS_DOCS.AUTOMATION_CORE),
-                    { debugMode: !(coreConfig?.debugMode ?? false), updatedAt: new Date().toISOString() }
-                );
+                const nextValue = { ...coreConfig, debugMode: !(coreConfig?.debugMode ?? false), updatedAt: new Date().toISOString() };
+                await supabase.from('settings').update({ value: nextValue }).eq('key', 'automationCore');
+                setCoreConfig(nextValue);
             } else if (target === 'telegram') {
-                await updateDoc(
-                    doc(db, SETTINGS_COLLECTION, SETTINGS_DOCS.TELEGRAM_OPS),
-                    { debugMode: !(telegramConfig?.debugMode ?? false), updatedAt: new Date().toISOString() }
-                );
+                const nextValue = { ...telegramConfig, debugMode: !(telegramConfig?.debugMode ?? false), updatedAt: new Date().toISOString() };
+                await supabase.from('settings').update({ value: nextValue }).eq('key', 'telegramOps');
+                setTelegramConfig(nextValue);
             }
         } catch (err) {
             console.error('[AutomationControlCenter] Toggle debugMode failed:', err);

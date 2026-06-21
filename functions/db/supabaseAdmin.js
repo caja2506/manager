@@ -126,7 +126,6 @@ const CAMEL_TO_SNAKE = {
     startDateTime: "start_date_time",
     endDateTime: "end_date_time",
     plannedHours: "planned_hours",
-    projectId: "project_id",
     taskTitle: "task_title",
     projectName: "project_name",
     taskTitleSnapshot: "task_title_snapshot",

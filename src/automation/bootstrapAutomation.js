@@ -3,7 +3,7 @@
  * =====================
  * 
  * Idempotent seed function for initializing the automation subsystem
- * in Firestore. Safe to call multiple times — never overwrites existing
+ * in Supabase. Safe to call multiple times — never overwrites existing
  * documents.
  * 
  * Call this from the Automation Control Center on first load,
@@ -12,25 +12,24 @@
  * @module automation/bootstrapAutomation
  */
 
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase';
-import {
-    SETTINGS_COLLECTION,
-    SETTINGS_DOCS,
-    AUTOMATION_ROUTINES,
-} from './firestorePaths.js';
+import { supabase } from '../supabase';
 import { createAutomationCoreConfig, createTelegramOpsConfig } from './schemas.js';
 import { DEFAULT_ROUTINES } from './routineRegistry.js';
 
 /**
- * Fields from the registry that should be synced to existing Firestore docs.
- * These are "source-of-truth" metadata fields managed in code.
- * User-controlled fields (enabled, dryRun, debugMode, lastRunAt, etc.) are preserved.
+ * Fields from the registry that should be synced to existing Supabase records.
  */
 const SYNC_FIELDS = [
-    'name', 'description', 'allowedRoles', 'channel', 'provider',
-    'scheduleType', 'delayMinutes', 'gracePeriodMinutes',
-    'personalityMode', 'priority',
+    { code: 'name', db: 'name' },
+    { code: 'description', db: 'description' },
+    { code: 'allowedRoles', db: 'allowed_roles' },
+    { code: 'channel', db: 'channel' },
+    { code: 'provider', db: 'provider' },
+    { code: 'scheduleType', db: 'schedule_type' },
+    { code: 'delayMinutes', db: 'delay_minutes' },
+    { code: 'gracePeriodMinutes', db: 'grace_period_minutes' },
+    { code: 'personalityMode', db: 'personality_mode' },
+    { code: 'priority', db: 'priority' },
 ];
 
 /**
@@ -45,82 +44,128 @@ export async function bootstrapAutomation() {
     const skipped = [];
     const synced = [];
 
+    // Helper to seed settings table
+    const seedSettings = async (key, defaultValue) => {
+        const { data, error } = await supabase
+            .from('settings')
+            .select('*')
+            .eq('key', key)
+            .maybeSingle();
+
+        if (error) {
+            console.error(`[bootstrap] Error reading settings/${key}:`, error);
+            return;
+        }
+
+        if (!data) {
+            const { error: insErr } = await supabase
+                .from('settings')
+                .insert({ key, value: defaultValue, category: 'automation' });
+            if (insErr) {
+                console.error(`[bootstrap] Error creating settings/${key}:`, insErr);
+            } else {
+                created.push(`settings/${key}`);
+            }
+        } else {
+            skipped.push(`settings/${key}`);
+        }
+    };
+
     // ── 1. Create automationCore settings ──
-    const coreRef = doc(db, SETTINGS_COLLECTION, SETTINGS_DOCS.AUTOMATION_CORE);
-    const coreSnap = await getDoc(coreRef);
-    if (!coreSnap.exists()) {
-        await setDoc(coreRef, createAutomationCoreConfig());
-        created.push(`${SETTINGS_COLLECTION}/${SETTINGS_DOCS.AUTOMATION_CORE}`);
-    } else {
-        skipped.push(`${SETTINGS_COLLECTION}/${SETTINGS_DOCS.AUTOMATION_CORE}`);
-    }
+    await seedSettings('automationCore', createAutomationCoreConfig());
 
     // ── 2. Create telegramOps settings ──
-    const tgRef = doc(db, SETTINGS_COLLECTION, SETTINGS_DOCS.TELEGRAM_OPS);
-    const tgSnap = await getDoc(tgRef);
-    if (!tgSnap.exists()) {
-        await setDoc(tgRef, createTelegramOpsConfig());
-        created.push(`${SETTINGS_COLLECTION}/${SETTINGS_DOCS.TELEGRAM_OPS}`);
-    } else {
-        skipped.push(`${SETTINGS_COLLECTION}/${SETTINGS_DOCS.TELEGRAM_OPS}`);
-    }
+    await seedSettings('telegramOps', createTelegramOpsConfig());
 
     // ── 2.5. Create automationAI settings ──
-    const aiRef = doc(db, SETTINGS_COLLECTION, SETTINGS_DOCS.AUTOMATION_AI);
-    const aiSnap = await getDoc(aiRef);
-    if (!aiSnap.exists()) {
-        const now = new Date().toISOString();
-        await setDoc(aiRef, {
-            enabled: true,
-            provider: 'gemini',
-            defaultModel: 'gemini-2.5-flash',
-            multimodalModel: 'gemini-2.5-flash',
-            textModel: 'gemini-2.5-flash',
-            briefingModel: 'gemini-2.5-flash',
-            extractionModel: 'gemini-2.5-flash',
-            confidenceThreshold: 0.8,
-            confirmationThreshold: 0.5,
-            allowAudioProcessing: true,
-            allowSmartBriefings: true,
-            allowSmartEscalationHints: true,
-            debugPrompts: false,
-            storeRawTranscripts: false,
-            redactSensitiveText: false,
-            createdAt: now,
-            updatedAt: now,
-        });
-        created.push(`${SETTINGS_COLLECTION}/${SETTINGS_DOCS.AUTOMATION_AI}`);
-    } else {
-        skipped.push(`${SETTINGS_COLLECTION}/${SETTINGS_DOCS.AUTOMATION_AI}`);
-    }
+    const now = new Date().toISOString();
+    await seedSettings('automationAI', {
+        enabled: true,
+        provider: 'gemini',
+        defaultModel: 'gemini-2.5-flash',
+        multimodalModel: 'gemini-2.5-flash',
+        textModel: 'gemini-2.5-flash',
+        briefingModel: 'gemini-2.5-flash',
+        extractionModel: 'gemini-2.5-flash',
+        confidenceThreshold: 0.8,
+        confirmationThreshold: 0.5,
+        allowAudioProcessing: true,
+        allowSmartBriefings: true,
+        allowSmartEscalationHints: true,
+        debugPrompts: false,
+        storeRawTranscripts: false,
+        redactSensitiveText: false,
+        createdAt: now,
+        updatedAt: now,
+    });
 
     // ── 3. Create OR sync default routines ──
     for (const routine of DEFAULT_ROUTINES) {
-        const routineRef = doc(db, AUTOMATION_ROUTINES, routine.key);
-        const routineSnap = await getDoc(routineRef);
-        if (!routineSnap.exists()) {
-            await setDoc(routineRef, routine);
-            created.push(`${AUTOMATION_ROUTINES}/${routine.key}`);
+        const { data: existing, error } = await supabase
+            .from('automation_routines')
+            .select('*')
+            .eq('key', routine.key)
+            .maybeSingle();
+
+        if (error) {
+            console.error(`[bootstrap] Error reading routine ${routine.key}:`, error);
+            continue;
+        }
+
+        if (!existing) {
+            const sbDoc = {
+                key: routine.key,
+                name: routine.name,
+                description: routine.description || '',
+                enabled: routine.enabled !== false,
+                dry_run: routine.dryRun !== false,
+                debug_mode: routine.debugMode === true,
+                allowed_roles: routine.allowedRoles || [],
+                channel: routine.channel || '',
+                provider: routine.provider || '',
+                schedule_type: routine.scheduleType || '',
+                delay_minutes: Number(routine.delayMinutes || 0),
+                grace_period_minutes: Number(routine.gracePeriodMinutes || 0),
+                personality_mode: routine.personalityMode || '',
+                priority: routine.priority || 'medium',
+            };
+
+            const { error: insErr } = await supabase.from('automation_routines').insert(sbDoc);
+            if (insErr) {
+                console.error(`[bootstrap] Error creating routine ${routine.key}:`, insErr);
+            } else {
+                created.push(`automation_routines/${routine.key}`);
+            }
         } else {
             // Sync: merge registry metadata into existing doc
-            const existing = routineSnap.data();
             const updates = {};
             for (const field of SYNC_FIELDS) {
-                if (routine[field] !== undefined) {
-                    const registryVal = JSON.stringify(routine[field]);
-                    const firestoreVal = JSON.stringify(existing[field]);
-                    if (registryVal !== firestoreVal) {
-                        updates[field] = routine[field];
+                const regVal = routine[field.code];
+                const dbVal = existing[field.db];
+                if (regVal !== undefined) {
+                    const regValStr = JSON.stringify(regVal);
+                    const dbValStr = JSON.stringify(dbVal);
+                    if (regValStr !== dbValStr) {
+                        updates[field.db] = regVal;
                     }
                 }
             }
+
             if (Object.keys(updates).length > 0) {
-                updates.updatedAt = new Date().toISOString();
-                await updateDoc(routineRef, updates);
-                synced.push(`${AUTOMATION_ROUTINES}/${routine.key}`);
-                console.log(`[bootstrap] Synced ${routine.key}:`, Object.keys(updates));
+                updates.updated_at = new Date().toISOString();
+                const { error: updErr } = await supabase
+                    .from('automation_routines')
+                    .update(updates)
+                    .eq('key', routine.key);
+
+                if (updErr) {
+                    console.error(`[bootstrap] Error syncing routine ${routine.key}:`, updErr);
+                } else {
+                    synced.push(`automation_routines/${routine.key}`);
+                    console.log(`[bootstrap] Synced ${routine.key}:`, Object.keys(updates));
+                }
             } else {
-                skipped.push(`${AUTOMATION_ROUTINES}/${routine.key}`);
+                skipped.push(`automation_routines/${routine.key}`);
             }
         }
     }
@@ -146,3 +191,4 @@ export async function bootstrapAutomation() {
 
     return summary;
 }
+

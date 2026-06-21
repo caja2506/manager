@@ -5,6 +5,8 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { requireAdmin } = require("../middleware/authGuard");
+const { getSupabase } = require("../db/supabaseAdmin");
+const { loadAllTasks, loadAllProjects } = require("../db/coreDataReader");
 
 const MODEL_NAME = "gemini-2.5-flash";
 
@@ -12,14 +14,12 @@ function createAnalyticsExports(adminDb, secrets) {
     const { geminiApiKey } = secrets;
 
     const scheduledAudit = onSchedule(
-        { schedule: "0 6 * * *", timeZone: "America/Costa_Rica", timeoutSeconds: 120 },
+        { schedule: "0 6 * * *", timeZone: "America/Costa_Rica", timeoutSeconds: 120, secrets: ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] },
         async () => {
             console.log("Starting scheduled daily audit...");
             try {
-                const tasksSnap = await adminDb.collection("tasks").get();
-                const tasks = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-                const projectsSnap = await adminDb.collection("projects").get();
-                const projects = projectsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                const tasks = await loadAllTasks();
+                const projects = await loadAllProjects();
 
                 const now = new Date();
                 const findings = [];
@@ -73,17 +73,57 @@ function createAnalyticsExports(adminDb, secrets) {
 
                 const scores = { methodologyCompliance: methodologyScore, planningReliability: planningScore, estimationAccuracy, dataDiscipline, projectHealth: Math.max(0, 100 - (findings.filter(f => f.severity === "critical").length * 10)), calculatedAt: now.toISOString() };
 
-                const batch = adminDb.batch();
+                const sb = getSupabase();
                 const runId = `audit-scheduled-${Date.now()}`;
-                for (let i = 0; i < Math.min(findings.length, 450); i++) {
-                    const ref = adminDb.collection("auditFindings").doc();
-                    batch.set(ref, { ...findings[i], auditRunId: runId, status: "open", createdAt: now.toISOString() });
+
+                if (findings.length > 0) {
+                    const records = findings.slice(0, 450).map(f => ({
+                        audit_run_id: runId,
+                        rule_id: f.ruleId,
+                        severity: f.severity,
+                        title: f.title,
+                        message: f.message,
+                        entity_type: f.entityType,
+                        entity_id: f.entityId,
+                        status: "open",
+                    }));
+                    await sb.from("audit_findings").insert(records);
                 }
-                const eventRef = adminDb.collection("auditEvents").doc();
-                batch.set(eventRef, { eventType: "audit_run", entityType: "system", entityId: "department", userId: "system", timestamp: now.toISOString(), source: "scheduled", correlationId: runId, details: { totalFindings: findings.length, bySeverity: { critical: findings.filter(f => f.severity === "critical").length, warning: findings.filter(f => f.severity === "warning").length, info: findings.filter(f => f.severity === "info").length }, scores } });
-                const snapRef = adminDb.collection("analyticsSnapshots").doc();
-                batch.set(snapRef, { scope: "compliance", entityId: "department", snapshotDate: now.toISOString().split("T")[0], metrics: { ...scores, totalTasks: tasks.length, activeTasks: totalActive, totalProjects: projects.length, totalFindings: findings.length }, createdAt: now.toISOString(), createdBy: "system" });
-                await batch.commit();
+
+                await sb.from("audit_events").insert({
+                    event_type: "audit_run",
+                    entity_type: "system",
+                    entity_id: "department",
+                    user_id: "system",
+                    timestamp: now.toISOString(),
+                    source: "scheduled",
+                    correlation_id: runId,
+                    details: {
+                        totalFindings: findings.length,
+                        bySeverity: {
+                            critical: findings.filter(f => f.severity === "critical").length,
+                            warning: findings.filter(f => f.severity === "warning").length,
+                            info: findings.filter(f => f.severity === "info").length
+                        },
+                        scores
+                    }
+                });
+
+                await sb.from("analytics_snapshots").insert({
+                    id: `compliance_department_${now.toISOString().split("T")[0]}`,
+                    scope: "compliance",
+                    entity_id: "department",
+                    snapshot_date: now.toISOString().split("T")[0],
+                    period_type: "daily",
+                    metrics: {
+                        ...scores,
+                        totalTasks: tasks.length,
+                        activeTasks: totalActive,
+                        totalProjects: projects.length,
+                        totalFindings: findings.length,
+                    }
+                });
+
                 console.log(`Scheduled audit complete: ${findings.length} findings, scores saved.`);
             } catch (err) {
                 console.error("Scheduled audit failed:", err);
@@ -92,17 +132,27 @@ function createAnalyticsExports(adminDb, secrets) {
     );
 
     const weeklyBriefGenerator = onSchedule(
-        { schedule: "0 7 * * 1", timeZone: "America/Costa_Rica", timeoutSeconds: 120, secrets: [geminiApiKey] },
+        { schedule: "0 7 * * 1", timeZone: "America/Costa_Rica", timeoutSeconds: 120, secrets: [geminiApiKey, "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] },
         async () => {
             console.log("Starting weekly brief generation...");
             try {
-                const snapQuery = adminDb.collection("analyticsSnapshots").where("scope", "==", "compliance").orderBy("createdAt", "desc").limit(2);
-                const snapDocs = await snapQuery.get();
-                const latestSnap = snapDocs.docs[0]?.data();
-                const previousSnap = snapDocs.docs[1]?.data();
-                const auditQuery = adminDb.collection("auditEvents").where("eventType", "==", "audit_run").orderBy("timestamp", "desc").limit(1);
-                const auditDocs = await auditQuery.get();
-                const latestAudit = auditDocs.docs[0]?.data();
+                const sb = getSupabase();
+                const { data: snapDocs } = await sb.from("analytics_snapshots")
+                    .select("*")
+                    .eq("scope", "compliance")
+                    .order("created_at", { ascending: false })
+                    .limit(2);
+
+                const latestSnap = snapDocs?.[0];
+                const previousSnap = snapDocs?.[1];
+
+                const { data: auditDocs } = await sb.from("audit_events")
+                    .select("*")
+                    .eq("event_type", "audit_run")
+                    .order("timestamp", { ascending: false })
+                    .limit(1);
+
+                const latestAudit = auditDocs?.[0];
                 if (!latestSnap || !latestAudit) { console.log("No audit data available for weekly brief. Skipping."); return; }
 
                 const metrics = latestSnap.metrics || {};
@@ -128,8 +178,14 @@ function createAnalyticsExports(adminDb, secrets) {
                 let briefData;
                 try { briefData = JSON.parse(text); } catch { const match = text.match(/\{[\s\S]*\}/); briefData = match ? JSON.parse(match[0]) : { executiveSummary: text }; }
 
-                const briefRef = adminDb.collection("managementBriefs").doc();
-                await briefRef.set({ type: "weekly", generatedBy: "gemini", model: MODEL_NAME, content: briefData, snapshotData: { metrics, scores, auditSummary: { totalFindings: auditSummary.totalFindings, bySeverity: auditSummary.bySeverity } }, createdAt: new Date().toISOString(), weekOf: new Date().toISOString().split("T")[0] });
+                await sb.from("management_briefs").insert({
+                    type: "weekly",
+                    generated_by: "gemini",
+                    model: MODEL_NAME,
+                    content: briefData,
+                    snapshot_data: { metrics, scores, auditSummary: { totalFindings: auditSummary.totalFindings, bySeverity: auditSummary.bySeverity } },
+                    week_of: new Date().toISOString().split("T")[0]
+                });
                 console.log("Weekly brief generated and stored successfully.");
             } catch (err) {
                 console.error("Weekly brief generation failed:", err);

@@ -5,7 +5,8 @@
  * Decouples Cloud Scheduler cron from business logic.
  */
 
-const paths = require("./firestorePaths");
+const { loadSetting } = require("../db/coreDataReader");
+const { getSupabase, toCamel } = require("../db/supabaseAdmin");
 
 /**
  * Check if a routine should run right now.
@@ -16,49 +17,41 @@ const paths = require("./firestorePaths");
  * 3. Current day is an active weekday (per telegramOps config)
  * 4. Returns config context for the executor
  *
- * @param {FirebaseFirestore.Firestore} adminDb
+ * @param {any} adminDb - Deprecated, kept for signature compatibility
  * @param {string} routineKey
  * @returns {Promise<{shouldRun: boolean, reason: string, routine?: Object, coreConfig?: Object, tgConfig?: Object}>}
  */
 async function shouldRoutineRun(adminDb, routineKey) {
-    // 1. Load core config
-    const coreSnap = await adminDb
-        .collection(paths.SETTINGS)
-        .doc(paths.SETTINGS_DOCS.AUTOMATION_CORE)
-        .get();
-
-    if (!coreSnap.exists) {
+    // 1. Load core config from settings
+    const coreConfig = await loadSetting("automationCore");
+    if (!coreConfig) {
         return { shouldRun: false, reason: "automationCore config not found" };
     }
-    const coreConfig = coreSnap.data();
 
     if (!coreConfig.enabled) {
         return { shouldRun: false, reason: "automationCore is disabled" };
     }
 
-    // 2. Load routine
-    const routineSnap = await adminDb
-        .collection(paths.AUTOMATION_ROUTINES)
-        .doc(routineKey)
-        .get();
+    // 2. Load routine from automation_routines
+    const sb = getSupabase();
+    const { data: routineData, error: routineError } = await sb.from("automation_routines")
+        .select("*")
+        .eq("key", routineKey)
+        .maybeSingle();
 
-    if (!routineSnap.exists) {
+    if (routineError || !routineData) {
         return { shouldRun: false, reason: `Routine "${routineKey}" not found` };
     }
-    const routine = routineSnap.data();
+    const routine = toCamel(routineData);
 
     if (!routine.enabled) {
         return { shouldRun: false, reason: `Routine "${routineKey}" is disabled` };
     }
 
-    // 3. Load telegramOps for weekday rules
-    const tgSnap = await adminDb
-        .collection(paths.SETTINGS)
-        .doc(paths.SETTINGS_DOCS.TELEGRAM_OPS)
-        .get();
-    const tgConfig = tgSnap.exists ? tgSnap.data() : {};
+    // 3. Load telegramOps from settings
+    const tgConfig = await loadSetting("telegramOps") || {};
 
-    // Check weekday (Mexico City timezone)
+    // Check weekday (Costa Rica/configured timezone)
     const activeDays = tgConfig.weekdayRules?.activeDays || [1, 2, 3, 4, 5];
     const tz = tgConfig.timezone || coreConfig.defaultTimezone || "America/Costa_Rica";
     const nowInTz = new Date().toLocaleDateString("en-US", { timeZone: tz, weekday: "long" });
@@ -85,3 +78,4 @@ async function shouldRoutineRun(adminDb, routineKey) {
 }
 
 module.exports = { shouldRoutineRun };
+

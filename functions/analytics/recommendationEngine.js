@@ -167,26 +167,48 @@ function generateRecommendations(globalKpis, trends, riskFlags, routineKpis) {
 }
 
 /**
- * Persist recommendations to Firestore.
+ * Persist recommendations to Supabase.
  */
 async function persistRecommendations(adminDb, recommendations, periodStart) {
     if (!recommendations.length) return 0;
 
-    // Clear previous recommendations for this period
-    const existing = await adminDb.collection(paths.OPERATIONAL_RECOMMENDATIONS)
-        .where("periodStart", "==", periodStart)
-        .get();
-    const deleteBatch = adminDb.batch();
-    existing.docs.forEach(d => deleteBatch.delete(d.ref));
-    if (!existing.empty) await deleteBatch.commit();
+    const { getSupabase } = require("../db/supabaseAdmin");
+    const sb = getSupabase();
 
-    // Write new
-    const batch = adminDb.batch();
-    for (const rec of recommendations.slice(0, 20)) {
-        const ref = adminDb.collection(paths.OPERATIONAL_RECOMMENDATIONS).doc();
-        batch.set(ref, { ...rec, periodStart });
+    // Clear previous recommendations for this period
+    const { error: deleteError } = await sb.from("operational_recommendations")
+        .delete()
+        .eq("period_start", periodStart);
+
+    if (deleteError) {
+        console.error("[recommendationEngine] Error clearing previous recommendations:", deleteError.message);
     }
-    await batch.commit();
+
+    // Map recommendations to table structure
+    const records = recommendations.map(rec => ({
+        type: rec.type,
+        priority: rec.priority,
+        title: rec.title,
+        description: rec.description,
+        metric_backing: rec.metricBacking || "",
+        suggested_actions: rec.suggestedActions || [],
+        scope: rec.scope || "global",
+        entity_id: rec.entityId || "global",
+        period_start: periodStart
+    }));
+
+    // Write new in batches of 100
+    const batchSize = 100;
+    for (let i = 0; i < records.length; i += batchSize) {
+        const batch = records.slice(i, i + batchSize);
+        const { error: insertError } = await sb.from("operational_recommendations").insert(batch);
+        if (insertError) {
+            console.error(`[recommendationEngine] Error inserting recommendations batch [${i}]:`, insertError.message);
+            throw insertError;
+        }
+    }
+
+    console.log(`[recommendationEngine] Persisted to Supabase: ${recommendations.length} recommendations.`);
     return recommendations.length;
 }
 
@@ -197,3 +219,4 @@ function getKpiValue(kpis, name) {
 }
 
 module.exports = { generateRecommendations, persistRecommendations };
+

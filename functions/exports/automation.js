@@ -19,6 +19,7 @@ function createAutomationExports(adminDb, secrets) {
         { schedule: "*/15 * * * *", timeZone: "America/Costa_Rica", timeoutSeconds: 180, secrets: [telegramBotToken, geminiApiKey, resendApiKey, supabaseUrl, supabaseServiceRoleKey, nvidiaApiKey, deepseekApiKey] },
         async () => {
             initSupabase();
+            const { getSupabase } = require("../db/supabaseAdmin");
             console.log("[scheduler] Unified scheduler tick...");
             try {
                 const { executeRoutine } = require("../automation/routineExecutor");
@@ -27,7 +28,8 @@ function createAutomationExports(adminDb, secrets) {
                 const { DEFAULT_TIMEZONE } = require("../utils/timezoneConfig");
                 const token = telegramBotToken.value();
 
-                const routinesSnap = await adminDb.collection(routinePaths.AUTOMATION_ROUTINES).get();
+                const sb = getSupabase();
+                const { data: routines } = await sb.from("automation_routines").select("*");
                 const now = new Date();
                 const tz = DEFAULT_TIMEZONE;
                 const nowInTz = new Date(now.toLocaleString("en-US", { timeZone: tz }));
@@ -39,9 +41,8 @@ function createAutomationExports(adminDb, secrets) {
                 // ── Cron-based routines (skip day-schedule managed ones) ──
                 const DAY_SCHEDULE_ROUTINES = new Set(["close_day_report", "open_day"]);
 
-                for (const doc of routinesSnap.docs) {
-                    const routine = doc.data();
-                    const key = routine.key || doc.id;
+                for (const routine of (routines || [])) {
+                    const key = routine.key;
 
                     // Skip routines managed by daySchedule settings
                     if (DAY_SCHEDULE_ROUTINES.has(key)) continue;
@@ -106,18 +107,7 @@ function createAutomationExports(adminDb, secrets) {
                 // ── Day Schedule: close_day_report + open_day ──
                 try {
                     const { loadSetting } = require("../db/coreDataReader");
-                    let ds = await loadSetting("daySchedule");
-
-                    if (!ds) {
-                        const dayScheduleSnap = await adminDb
-                            .collection(routinePaths.SETTINGS)
-                            .doc(routinePaths.SETTINGS_DOCS.DAY_SCHEDULE)
-                            .get();
-                        if (dayScheduleSnap.exists) {
-                            ds = dayScheduleSnap.data();
-                        }
-                    }
-
+                    const ds = await loadSetting("daySchedule");
                     if (ds) {
                         if (ds.enabled) {
                             const dsTz = ds.timezone || "America/Costa_Rica";

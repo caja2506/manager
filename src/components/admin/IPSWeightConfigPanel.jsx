@@ -6,7 +6,6 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { USE_SUPABASE } from '../../services/_backend';
 import { supabase } from '../../supabase';
 import { COLLECTIONS } from '../../models/schemas';
 import { DEFAULT_WEIGHTS } from '../../core/analytics/performanceScore';
@@ -38,19 +37,12 @@ function deepClone(obj) {
 }
 
 /**
- * Load custom weights from Firestore settings
+ * Load custom weights from Supabase settings
  */
 export async function loadCustomWeights() {
     try {
-        if (USE_SUPABASE) {
-            const { data } = await supabase.from('settings').select('value').eq('key', SETTINGS_KEY).single();
-            return data?.value || null;
-        } else {
-            const { doc: fbDoc, getDoc: fbGetDoc } = await import('firebase/firestore');
-            const { db } = await import('../../firebase');
-            const snap = await fbGetDoc(fbDoc(db, COLLECTIONS.SETTINGS, SETTINGS_KEY));
-            if (snap.exists()) return snap.data().value || null;
-        }
+        const { data } = await supabase.from('settings').select('value').eq('key', SETTINGS_KEY).single();
+        return data?.value || null;
     } catch (e) {
         console.warn('[IPS Config] Could not load custom weights:', e.message);
     }
@@ -117,21 +109,11 @@ export default function IPSWeightConfigPanel() {
                     throw new Error(`${ROLE_META[role]?.label || role}: suma = ${sum.toFixed(2)} (debe ser ≈ 1.00)`);
                 }
             }
-            if (USE_SUPABASE) {
-                await supabase.from('settings').upsert({
-                    key: SETTINGS_KEY, value: weights,
-                    description: 'Pesos de dimensiones IPS por rol',
-                    category: 'performance', updated_at: new Date().toISOString(),
-                }, { onConflict: 'key' });
-            } else {
-                const { doc: fbDoc, setDoc: fbSetDoc } = await import('firebase/firestore');
-                const { db } = await import('../../firebase');
-                await fbSetDoc(fbDoc(db, COLLECTIONS.SETTINGS, SETTINGS_KEY), {
-                    key: SETTINGS_KEY, value: weights,
-                    description: 'Pesos de dimensiones IPS por rol',
-                    category: 'performance', updatedAt: new Date().toISOString(),
-                });
-            }
+            await supabase.from('settings').upsert({
+                key: SETTINGS_KEY, value: weights,
+                description: 'Pesos de dimensiones IPS por rol',
+                category: 'performance', updated_at: new Date().toISOString(),
+            }, { onConflict: 'key' });
             setSaved(true);
             setTimeout(() => setSaved(false), 3000);
         } catch (e) {

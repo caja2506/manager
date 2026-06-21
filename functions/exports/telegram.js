@@ -36,96 +36,133 @@ function createTelegramExports(adminDb, secrets) {
     );
 
     const linkTelegramUser = onCall(
-        { timeoutSeconds: 15 },
+        { secrets: [supabaseUrl, supabaseServiceRoleKey], timeoutSeconds: 15 },
         async (request) => {
             if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
             await requireAdmin(adminDb, request);
             const { userId, chatId } = request.data;
             if (!userId || !chatId) throw new HttpsError("invalid-argument", "userId and chatId are required.");
 
+            initSupabase();
+            const { getSupabase } = require("../db/supabaseAdmin");
+            const sb = getSupabase();
             const chatIdStr = String(chatId);
             const now = new Date().toISOString();
 
-            const sessSnap = await adminDb.collection("telegramSessions").where("chatId", "==", chatIdStr).limit(1).get();
-            if (!sessSnap.empty) {
-                await sessSnap.docs[0].ref.update({ userId, updatedAt: now });
+            // 1. Update/create Telegram session in Supabase
+            const { data: sessionData } = await sb.from("telegram_sessions")
+                .select("*")
+                .eq("chat_id", chatIdStr)
+                .maybeSingle();
+
+            if (sessionData) {
+                await sb.from("telegram_sessions")
+                    .update({ user_id: userId, updated_at: now })
+                    .eq("chat_id", chatIdStr);
             } else {
-                await adminDb.collection("telegramSessions").add({ chatId: chatIdStr, userId, currentState: "idle", isActive: true, metadata: {}, createdAt: now, updatedAt: now });
+                await sb.from("telegram_sessions")
+                    .insert({ chat_id: chatIdStr, user_id: userId, step: "idle", created_at: now, updated_at: now });
             }
 
-            const userRef = adminDb.collection("users").doc(userId);
-            const userSnap = await userRef.get();
-            if (userSnap.exists) {
-                await userRef.update({ telegramChatId: chatIdStr, isAutomationParticipant: true, updatedAt: now });
+            // 2. Update user doc in Supabase
+            const { updateUser, loadUser, loadAllUsers } = require("../db/coreDataReader");
+            const u = await loadUser(userId);
+            if (u) {
+                await updateUser(userId, { telegramChatId: chatIdStr, isAutomationParticipant: true });
             }
 
-            const allUsers = await adminDb.collection("users").limit(20).get();
-            const userList = allUsers.docs.map(d => ({ id: d.id, name: d.data().name, email: d.data().email, telegramChatId: d.data().telegramChatId || null }));
-            return { linked: true, userId, chatId: chatIdStr, allUsers: userList };
+            const allUsers = await loadAllUsers();
+            const userList = allUsers.map(u => ({
+                id: u.id,
+                name: u.displayName || u.name || u.email,
+                email: u.email,
+                telegramChatId: u.telegramChatId || null
+            }));
+
+            return { linked: true, userId, chatId: chatIdStr, allUsers: userList.slice(0, 20) };
         }
     );
 
-    const onDelayCreated = onDocumentCreated(
-        { document: "delays/{delayId}", secrets: [telegramBotToken, supabaseUrl, supabaseServiceRoleKey] },
-        async (event) => {
+
+    const notifyTelegramDelayCreated = onCall(
+        { secrets: [telegramBotToken, supabaseUrl, supabaseServiceRoleKey], timeoutSeconds: 30 },
+        async (request) => {
+            if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
             initSupabase();
-            const snap = event.data;
-            if (!snap) return;
-            const delay = snap.data();
-            const delayId = event.params.delayId;
-            console.log(`[onDelayCreated] New delay: ${delayId}`, JSON.stringify(delay));
+            const delay = request.data;
+            if (!delay) throw new HttpsError("invalid-argument", "delay data is required.");
 
             // ── Guard: check if blocker_notification routine is enabled ──
-            const paths = require("../automation/firestorePaths");
-            const coreSnap = await adminDb.collection(paths.SETTINGS).doc(paths.SETTINGS_DOCS.AUTOMATION_CORE).get();
-            if (coreSnap.exists && !coreSnap.data().enabled) {
-                console.log("[onDelayCreated] automationCore is disabled, skipping blocker notification.");
-                return;
+            const { loadSetting } = require("../db/coreDataReader");
+            const coreConfig = await loadSetting("automationCore");
+            if (coreConfig && !coreConfig.enabled) {
+                console.log("[notifyTelegramDelayCreated] automationCore is disabled.");
+                return { success: false, reason: "automationCore is disabled" };
             }
-            const routineSnap = await adminDb.collection(paths.AUTOMATION_ROUTINES).doc("block_incident_alert").get();
-            if (routineSnap.exists && !routineSnap.data().enabled) {
-                console.log("[onDelayCreated] block_incident_alert routine is disabled, skipping notification.");
-                return;
+
+            const { getSupabase } = require("../db/supabaseAdmin");
+            const sb = getSupabase();
+            const { data: routine } = await sb.from("automation_routines")
+                .select("enabled")
+                .eq("key", "block_incident_alert")
+                .maybeSingle();
+
+            if (routine && !routine.enabled) {
+                console.log("[notifyTelegramDelayCreated] block_incident_alert is disabled.");
+                return { success: false, reason: "block_incident_alert is disabled" };
             }
 
             const token = telegramBotToken.value();
-            if (!token) { console.warn("[onDelayCreated] No Telegram bot token configured, skipping notification."); return; }
+            if (!token) return { success: false, reason: "No Telegram bot token configured" };
 
             try {
                 const { sendToUser } = require("../telegram/telegramProvider");
                 let reporterName = "Alguien";
-                if (delay.createdBy) { const userDoc = await adminDb.collection("users").doc(delay.createdBy).get(); if (userDoc.exists) { const u = userDoc.data(); reporterName = u.name || u.displayName || u.email || reporterName; } }
+                if (delay.createdBy) {
+                    const { loadUser } = require("../db/coreDataReader");
+                    const u = await loadUser(delay.createdBy);
+                    if (u) reporterName = u.displayName || u.name || u.email || reporterName;
+                }
                 let taskName = delay.taskId || "";
-                if (delay.taskId) { const taskDoc = await adminDb.collection("tasks").doc(delay.taskId).get(); if (taskDoc.exists) taskName = taskDoc.data().title || taskName; }
+                if (delay.taskId) {
+                    const { loadTask } = require("../db/coreDataReader");
+                    const t = await loadTask(delay.taskId);
+                    if (t) taskName = t.title || taskName;
+                }
                 let projectName = delay.projectId || "";
-                if (delay.projectId) { const projDoc = await adminDb.collection("projects").doc(delay.projectId).get(); if (projDoc.exists) projectName = projDoc.data().name || projectName; }
+                if (delay.projectId) {
+                    const { loadProject } = require("../db/coreDataReader");
+                    const p = await loadProject(delay.projectId);
+                    if (p) projectName = p.name || projectName;
+                }
 
                 const message = `🚨 *Nuevo Bloqueo Reportado*\n\n📋 *Causa:* ${delay.causeName || "Sin especificar"}\n` +
                     (taskName ? `🎯 *Tarea:* ${taskName}\n` : "") + (projectName ? `📁 *Proyecto:* ${projectName}\n` : "") +
-                    (delay.notes ? `📝 *Notas:* ${delay.notes}\n` : "") +
+                    (delay.comment ? `📝 *Notas:* ${delay.comment}\n` : "") +
                     `👤 *Reportado por:* ${reporterName}\n🕒 *Fecha:* ${new Date().toLocaleString("es-CR", { timeZone: "America/Costa_Rica" })}`;
 
-                const sessionsSnap = await adminDb.collection("telegramSessions").get();
+                const { loadAllUsers } = require("../db/coreDataReader");
+                const allUsers = await loadAllUsers();
+
                 let sent = 0;
-                for (const sessDoc of sessionsSnap.docs) {
-                    const sess = sessDoc.data();
-                    if (!sess.chatId && !sess.telegramChatId) continue;
-                    const chatId = sess.chatId || sess.telegramChatId;
-                    const uid = sess.uid || sess.userId;
-                    if (!uid) continue;
-                    const userRbacRole = await getUserRbacRole(adminDb, uid);
-                    const userDoc = await adminDb.collection("users").doc(uid).get();
-                    const userData = userDoc.exists ? userDoc.data() : {};
-                    const teamRole = userData.teamRole || userData.operationalRole;
-                    const isManagerOrLead = userRbacRole === "admin" || teamRole === "manager" || teamRole === "team_lead";
+                for (const u of allUsers) {
+                    if (!u.telegramChatId || !u.id) continue;
+                    const isManagerOrLead = u.rbacRole === "admin" || u.teamRole === "manager" || u.teamRole === "team_lead" || u.operationalRole === "manager" || u.operationalRole === "team_lead";
                     if (isManagerOrLead) {
-                        try { await sendToUser(adminDb, token, uid, chatId, message, { routineKey: "blocker_notification" }); sent++; console.log(`[onDelayCreated] Notified ${uid} (chatId: ${chatId})`); }
-                        catch (err) { console.error(`[onDelayCreated] Failed to notify ${uid}:`, err.message); }
+                        try {
+                            await sendToUser(adminDb, token, u.id, u.telegramChatId, message, { routineKey: "block_incident_alert" });
+                            sent++;
+                            console.log(`[notifyTelegramDelayCreated] Notified ${u.id} (chatId: ${u.telegramChatId})`);
+                        } catch (err) {
+                            console.error(`[notifyTelegramDelayCreated] Failed to notify ${u.id}:`, err.message);
+                        }
                     }
                 }
-                console.log(`[onDelayCreated] Blocker notification sent to ${sent} users.`);
+                console.log(`[notifyTelegramDelayCreated] Blocker notification sent to ${sent} users.`);
+                return { success: true, sent };
             } catch (err) {
-                console.error("[onDelayCreated] Error sending blocker notification:", err);
+                console.error("[notifyTelegramDelayCreated] Error sending blocker notification:", err);
+                throw new HttpsError("internal", err.message);
             }
         }
     );
@@ -187,7 +224,7 @@ function createTelegramExports(adminDb, secrets) {
         }
     );
 
-    return { telegramWebhookEndpoint, linkTelegramUser, onDelayCreated, quickReportApi, setupQuickReportMenuButton };
+    return { telegramWebhookEndpoint, linkTelegramUser, notifyTelegramDelayCreated, quickReportApi, setupQuickReportMenuButton };
 }
 
 module.exports = { createTelegramExports };

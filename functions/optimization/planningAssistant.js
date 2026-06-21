@@ -135,12 +135,29 @@ function generateWeeklyOutlook(data, weekStart) {
 }
 
 /**
- * Persist plan to Firestore.
+ * Persist plan to Supabase as management_briefs.
  */
 async function persistPlan(adminDb, plan) {
-    const ref = adminDb.collection(paths.OPERATIONAL_PLANS).doc();
-    await ref.set(plan);
-    return ref.id;
+    const { getSupabase } = require("../db/supabaseAdmin");
+    const sb = getSupabase();
+    
+    const { data, error } = await sb.from("management_briefs")
+        .insert({
+            type: plan.planType || "daily_plan",
+            generated_by: "optimization_engine",
+            model: "heuristic",
+            content: plan,
+            week_of: plan.date || plan.weekStart || new Date().toISOString().slice(0, 10),
+            snapshot_data: {}
+        })
+        .select()
+        .single();
+
+    if (error) {
+        console.error("[planningAssistant] Error persisting plan to Supabase:", error.message);
+        throw error;
+    }
+    return data.id;
 }
 
 // ── Helpers ──
@@ -159,3 +176,4 @@ function getMonday() {
 }
 
 module.exports = { generateDailyPlan, generateWeeklyOutlook, persistPlan };
+

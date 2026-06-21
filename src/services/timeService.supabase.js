@@ -19,17 +19,64 @@ import { calculateProjectRisk } from './riskService';
 import { logActivity, ACTIVITY_TYPES } from './activityLogService';
 import { getEffectiveHours, getBreakHoursInRange } from '../utils/breakTimeUtils';
 
-// Re-export pure functions (no DB dependency — identical in both backends)
-export {
-    getActiveTimerFromLogs,
-    getAllActiveTimersForUser,
-    getActiveTimerForTask,
-    canManageOthersTimers,
-    isSupervisorOf,
-    clearLegacyTimer,
-    formatDuration,
-    formatElapsed,
-} from './timeService.firebase';
+// Pure functions (no DB dependency)
+export function getActiveTimerFromLogs(timeLogs, userId) {
+    if (!timeLogs || !userId) return null;
+    return timeLogs.find(log => log.userId === userId && !log.endTime) || null;
+}
+
+export function getAllActiveTimersForUser(timeLogs, userId) {
+    if (!timeLogs || !userId) return [];
+    return timeLogs.filter(log => log.userId === userId && !log.endTime);
+}
+
+export function getActiveTimerForTask(timeLogs, taskId) {
+    if (!timeLogs || !taskId) return null;
+    return timeLogs.find(log => log.taskId === taskId && !log.endTime) || null;
+}
+
+export function canManageOthersTimers(role, teamRole) {
+    if (role === 'admin') return true;
+    if (teamRole === 'manager' || teamRole === 'team_lead') return true;
+    return false;
+}
+
+export function isSupervisorOf(userId, targetUserId, teamMembers, resourceAssignments) {
+    if (!userId || !targetUserId || userId === targetUserId) return false;
+    const target = (teamMembers || []).find(m => (m.uid || m.id) === targetUserId);
+    if (target && target.reportsTo === userId) return true;
+    if (resourceAssignments) {
+        const assignment = resourceAssignments.find(
+            a => a.engineerId === targetUserId && a.supervisorId === userId
+        );
+        if (assignment) return true;
+    }
+    return false;
+}
+
+export function clearLegacyTimer() {
+    // No-op — legacy timers only exist in Firestore
+}
+
+export function formatDuration(hours) {
+    if (!hours || hours <= 0) return '0m';
+    const h = Math.floor(hours);
+    const m = Math.round((hours - h) * 60);
+    if (h === 0) return `${m}m`;
+    if (m === 0) return `${h}h`;
+    return `${h}h ${m}m`;
+}
+
+export function formatElapsed(startTime) {
+    if (!startTime) return '0:00';
+    const start = new Date(startTime);
+    const now = new Date();
+    const diffMs = now - start;
+    const totalMinutes = Math.floor(diffMs / 60000);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${hours}:${String(minutes).padStart(2, '0')}`;
+}
 
 // ============================================================
 // ACTIVE TIMER — same as original but for Supabase query fallback
@@ -163,7 +210,6 @@ export async function handleTaskStatusTimerSync({
     taskTitle = '', projectName = '', displayName = '', onConfirm,
 }) {
     if (newStatus === 'in_progress') {
-        const { getActiveTimerForTask } = await import('./timeService.firebase');
         const existing = getActiveTimerForTask(timeLogs, taskId);
         if (existing) return null;
 
@@ -175,7 +221,6 @@ export async function handleTaskStatusTimerSync({
     }
 
     if (['completed', 'cancelled', 'blocked', 'pending', 'backlog'].includes(newStatus)) {
-        const { getActiveTimerForTask } = await import('./timeService.firebase');
         let activeLog = getActiveTimerForTask(timeLogs, taskId);
 
         // Fallback: query DB directly
