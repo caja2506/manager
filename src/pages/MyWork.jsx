@@ -16,18 +16,21 @@ import WipBlockModal from '../components/tasks/WipBlockModal';
 // Data hook
 import { useMyWorkData } from '../hooks/useMyWorkData';
 
+import { createPortal } from 'react-dom';
+import { onProjectStations, hasMultipleIndexers } from '../services/stationService';
+
 // Planner service & Supabase
 import { plannerService } from '../services/plannerService';
 import { supabase } from '../supabase';
 
 // Services
-import { updateTask, updateTaskStatus, toggleSubtask, createSubtask } from '../services/taskService';
+import { updateTask, updateTaskStatus, toggleSubtask, createSubtask, createTask } from '../services/taskService';
 import { 
     getActiveTimerFromLogs, formatElapsed, stopTimer, startTimerSafe, clearLegacyTimer 
 } from '../services/timeService';
 
 // Configurations
-import { TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG } from '../models/schemas';
+import { TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG, formatStationLabel } from '../models/schemas';
 
 // Greeting helper
 function getGreeting() {
@@ -47,12 +50,283 @@ const PRIORITY_BADGES = {
     low:      { label: 'BAJA',    bg: 'rgba(71, 85, 105, 0.15)',  text: '#94a3b8' },
 };
 
+// ============================================================
+// INLINE EDITING COMPONENTS (FROM MAINTABLE)
+// ============================================================
+
+function InlineEditText({ value, onSave, className = '', placeholder = '', ariaLabel = '' }) {
+    const [editing, setEditing] = useState(false);
+    const [draft, setDraft] = useState(value);
+    const inputRef = useRef(null);
+
+    useEffect(() => { setDraft(value); }, [value]);
+    useEffect(() => { if (editing && inputRef.current) inputRef.current.focus(); }, [editing]);
+
+    const handleSave = () => {
+        setEditing(false);
+        if (draft !== value) onSave(draft);
+    };
+
+    if (!editing) {
+        return (
+            <div
+                onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+                role="button"
+                tabIndex={0}
+                aria-label={ariaLabel || `Editar ${placeholder || 'campo'}`}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setEditing(true); } }}
+                className={`cursor-text hover:bg-slate-850/60 rounded px-1 py-0.5 -mx-1 transition-colors ${className}`}
+            >
+                {value || <span className="text-slate-650 italic">{placeholder}</span>}
+            </div>
+        );
+    }
+
+    return (
+        <input
+            ref={inputRef}
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onBlur={handleSave}
+            onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') { setDraft(value); setEditing(false); } }}
+            onClick={e => e.stopPropagation()}
+            className="w-full bg-slate-800 border border-indigo-500/50 rounded px-1.5 py-0.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-indigo-500/50"
+            placeholder={placeholder}
+            aria-label={ariaLabel || placeholder}
+        />
+    );
+}
+
+function InlineDropdown({ value, options, onSelect, renderValue, className = '' }) {
+    const [open, setOpen] = useState(false);
+    const triggerRef = useRef(null);
+    const menuRef = useRef(null);
+    const [pos, setPos] = useState({ top: 0, left: 0, openUp: false });
+
+    useEffect(() => {
+        if (!open) return;
+        const handler = (e) => {
+            if (triggerRef.current?.contains(e.target)) return;
+            if (menuRef.current?.contains(e.target)) return;
+            setOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [open]);
+
+    const handleOpen = () => {
+        if (open) { setOpen(false); return; }
+        if (triggerRef.current) {
+            const rect = triggerRef.current.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const openUp = spaceBelow < 220;
+            const shiftLeft = (window.innerWidth - rect.left) < 240;
+            
+            setPos({
+                top: openUp ? undefined : Math.min(rect.bottom + 4, window.innerHeight - 220),
+                bottom: openUp ? Math.max(8, window.innerHeight - rect.top + 4) : undefined,
+                left: shiftLeft ? undefined : Math.max(8, rect.left),
+                right: shiftLeft ? Math.max(8, window.innerWidth - rect.right) : undefined,
+                openUp,
+            });
+        }
+        setOpen(true);
+    };
+
+    return (
+        <div className={`relative w-full h-full ${className}`} onClick={e => e.stopPropagation()}>
+            <button ref={triggerRef} onClick={handleOpen} className="w-full h-full hover:bg-slate-850/60 rounded transition-colors flex items-center justify-center">
+                {renderValue(value)}
+            </button>
+            {open && createPortal(
+                <div
+                    ref={menuRef}
+                    className="fixed bg-slate-800 border border-slate-700 rounded-lg shadow-2xl py-1 min-w-[160px] max-h-[220px] overflow-auto animate-in fade-in zoom-in-95 duration-150"
+                    style={{
+                        zIndex: 9999,
+                        left: pos.left !== undefined ? pos.left : undefined,
+                        right: pos.right !== undefined ? pos.right : undefined,
+                        top: pos.top !== undefined ? pos.top : undefined,
+                        bottom: pos.bottom !== undefined ? pos.bottom : undefined,
+                    }}
+                >
+                    {options.map(opt => (
+                        <button
+                            key={opt.value}
+                            onClick={() => { onSelect(opt.value); setOpen(false); }}
+                            className={`w-full text-left px-3 py-2 text-xs font-medium hover:bg-slate-700/80 flex items-center gap-2 transition-colors ${opt.value === value ? 'text-indigo-400 bg-indigo-500/10' : 'text-slate-300'}`}
+                        >
+                            {opt.color && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: opt.color }} />}
+                            {opt.label}
+                            {opt.value === value && <Check className="w-3 h-3 ml-auto text-indigo-400" />}
+                        </button>
+                    ))}
+                </div>,
+                document.body
+            )}
+        </div>
+    );
+}
+
+function InlineEditNumber({ value, onSave, suffix = 'h' }) {
+    const [editing, setEditing] = useState(false);
+    const [draft, setDraft] = useState(value || 0);
+    const inputRef = useRef(null);
+
+    useEffect(() => {
+        if (editing && inputRef.current) {
+            inputRef.current.focus();
+            inputRef.current.select();
+        }
+    }, [editing]);
+
+    const handleSave = () => {
+        setEditing(false);
+        const num = parseFloat(draft) || 0;
+        if (num !== value) onSave(num);
+    };
+
+    if (!editing) {
+        return (
+            <span
+                onClick={e => { e.stopPropagation(); setDraft(value || 0); setEditing(true); }}
+                className="cursor-text hover:bg-slate-850/60 rounded px-0.5 transition-colors text-slate-500"
+            >
+                {value ? `${value}${suffix}` : '—'}
+            </span>
+        );
+    }
+
+    return (
+        <input
+            ref={inputRef}
+            type="number"
+            step="0.5"
+            min="0"
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onBlur={handleSave}
+            onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') { setDraft(value || 0); setEditing(false); } }}
+            onClick={e => e.stopPropagation()}
+            className="w-14 bg-slate-850 border border-indigo-500/50 rounded px-1 py-0.5 text-[10px] text-slate-200 outline-none focus:ring-1 focus:ring-indigo-500/50"
+        />
+    );
+}
+
+function InlineDatePicker({ value, onSave }) {
+    const inputRef = useRef(null);
+    const display = value ? new Date(value).toLocaleDateString('es-MX', { month: 'short', day: 'numeric' }) : '—';
+
+    return (
+        <span className="relative" onClick={e => e.stopPropagation()}>
+            <button onClick={() => inputRef.current?.showPicker?.()} className="text-[10px] text-slate-450 hover:text-white hover:bg-slate-850/60 rounded px-0.5 transition-colors whitespace-nowrap">
+                {display}
+            </button>
+            <input
+                ref={inputRef}
+                type="date"
+                value={value?.split('T')[0] || ''}
+                onChange={e => { if (e.target.value) onSave(e.target.value); }}
+                className="absolute opacity-0 w-0 h-0 pointer-events-none"
+            />
+        </span>
+    );
+}
+
+const _stationCache = {};
+
+function StationCell({ task, canEdit, onSave }) {
+    const [stations, setStations] = useState(() => _stationCache[task.projectId] || []);
+
+    useEffect(() => {
+        let active = true;
+        if (!task.projectId) {
+            Promise.resolve().then(() => {
+                if (active) setStations(prev => prev.length > 0 ? [] : prev);
+            });
+            return;
+        }
+
+        const cached = _stationCache[task.projectId];
+        if (cached) {
+            Promise.resolve().then(() => {
+                if (active) setStations(prev => prev !== cached ? cached : prev);
+            });
+        }
+
+        const unsub = onProjectStations(task.projectId, (data) => {
+            if (active) {
+                _stationCache[task.projectId] = data;
+                setStations(data);
+            }
+        });
+        return () => {
+            active = false;
+            unsub();
+        };
+    }, [task.projectId]);
+
+    const multiIdx = useMemo(() => hasMultipleIndexers(stations), [stations]);
+
+    const label = useMemo(() => {
+        if (!task.stationId || stations.length === 0) return '';
+        const stn = stations.find(s => s.id === task.stationId);
+        if (!stn) return '';
+        return formatStationLabel(stn, multiIdx);
+    }, [task.stationId, stations, multiIdx]);
+
+    const stationOptions = useMemo(() => [
+        { value: '', label: 'Sin estación' },
+        ...stations.filter(s => s.active !== false).map(s => {
+            const base = formatStationLabel(s, multiIdx);
+            let text = base;
+            if (s.description) text = `${base} — ${s.description}`;
+            else if (s.abbreviation) text = `${base} — ${s.abbreviation}`;
+            return { value: s.id, label: text };
+        }),
+    ], [stations, multiIdx]);
+
+    if (!task.projectId || stations.length === 0) {
+        return (
+            <div className="flex items-center justify-center min-w-0">
+                <span className="text-[10px] text-slate-700">—</span>
+            </div>
+        );
+    }
+
+    if (canEdit) {
+        return (
+            <div className="flex items-center justify-center min-w-0">
+                <InlineDropdown
+                    value={task.stationId || ''}
+                    options={stationOptions}
+                    onSelect={v => onSave(v || null)}
+                    renderValue={() => (
+                        <span className={`text-[10px] font-bold truncate ${label ? 'text-cyan-400' : 'text-slate-700'}`}>
+                            {label || '—'}
+                        </span>
+                    )}
+                />
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex items-center justify-center min-w-0">
+            <span className={`text-[10px] font-bold truncate ${label ? 'text-cyan-400' : 'text-slate-700'}`}>
+                {label || '—'}
+            </span>
+        </div>
+    );
+}
+
 export default function MyWork() {
     const { user } = useAuth();
     const { canEdit, canDelete } = useRole();
     const {
         engTasks, engProjects, engSubtasks,
         taskTypes, teamMembers, timeLogs, delayCauses,
+        workAreaTypes,
         refetch: refetchTable,
     } = useEngineeringData();
 
@@ -77,6 +351,63 @@ export default function MyWork() {
     }, [weekStartStr]);
 
     const itemsInCreationRef = useRef(new Set());
+
+    // ── Quick add task states ──
+    const [quickTitle, setQuickTitle] = useState('');
+    const [quickProjectId, setQuickProjectId] = useState('');
+    const [quickStationId, setQuickStationId] = useState('');
+    const [quickStatus, setQuickStatus] = useState('pending');
+    const [quickTaskTypeId, setQuickTaskTypeId] = useState('');
+    const [quickDueDate, setQuickDueDate] = useState('');
+    const [quickEstimatedHours, setQuickEstimatedHours] = useState('');
+    const [quickPriority, setQuickPriority] = useState('medium');
+    const [quickStations, setQuickStations] = useState([]);
+
+    // Auto-fetch stations for the selected project in quick task creator
+    useEffect(() => {
+        if (!quickProjectId) {
+            setQuickStations([]);
+            setQuickStationId('');
+            return;
+        }
+        const unsub = onProjectStations(quickProjectId, (data) => {
+            setQuickStations(data.filter(s => s.active !== false));
+        });
+        return unsub;
+    }, [quickProjectId]);
+
+    const handleQuickAddTask = async () => {
+        if (!quickTitle.trim()) return;
+        try {
+            const taskData = {
+                title: quickTitle.trim(),
+                projectId: quickProjectId || null,
+                stationId: quickStationId || null,
+                status: quickStatus || 'pending',
+                taskTypeId: quickTaskTypeId || null,
+                dueDate: quickDueDate || null,
+                estimatedHours: quickEstimatedHours ? parseFloat(quickEstimatedHours) : null,
+                priority: quickPriority || 'medium',
+                assignedTo: user?.uid, // Automatically assigned to current user
+            };
+            await createTask(taskData, user?.uid);
+            
+            // Reset fields
+            setQuickTitle('');
+            setQuickStationId('');
+            setQuickTaskTypeId('');
+            setQuickDueDate('');
+            setQuickEstimatedHours('');
+            setQuickPriority('medium');
+            setQuickStatus('pending');
+
+            // Refetch
+            refetchTable('tasks');
+        } catch (err) {
+            console.error('Failed to create quick task:', err);
+            alert('No se pudo crear la tarea: ' + (err.message || 'Error desconocido'));
+        }
+    };
 
     // ── One-time cleanup of legacy localStorage timer ──
     useEffect(() => {
@@ -207,7 +538,6 @@ export default function MyWork() {
     // ── Active Timer & tick ──
     const activeTimer = getActiveTimerFromLogs(timeLogs, user?.uid);
     const [elapsed, setElapsed] = useState('0:00:00');
-    const [isStarting, setIsStarting] = useState(false);
     const [isStopping, setIsStopping] = useState(false);
     const intervalRef = useRef(null);
 
@@ -301,7 +631,6 @@ export default function MyWork() {
     // ── Timer Start helper ──
     const handleStartTimer = useCallback(async (task) => {
         if (!task) return;
-        setIsStarting(true);
         try {
             await startTimerSafe({
                 taskId: task.id,
@@ -313,7 +642,6 @@ export default function MyWork() {
         } catch (e) {
             console.error('Error starting timer:', e);
         }
-        setIsStarting(false);
     }, [user?.uid]);
 
     // ── Acciones Rápidas directas de la Tarjeta ──
@@ -357,6 +685,21 @@ export default function MyWork() {
         }
     }, [refetchTable]);
 
+    // ── Generic field update handler ──
+    const saveField = useCallback(async (task, field, value) => {
+        try {
+            if (field === 'status') {
+                await handleStatusChange(task, value);
+            } else {
+                await updateTask(task.id, { [field]: value });
+                refetchTable('tasks');
+            }
+        } catch (e) {
+            console.error(`Error al actualizar ${field}:`, e);
+            alert('No se pudo actualizar el campo: ' + (e.message || 'Error desconocido'));
+        }
+    }, [handleStatusChange, refetchTable]);
+
     // ── Ordenar tareas por prioridad (Critical -> High -> Medium -> Low) ──
     const sortedTasks = useMemo(() => {
         const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -379,16 +722,18 @@ export default function MyWork() {
         <div className="space-y-6 animate-in fade-in duration-300">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight flex items-center gap-2">
-                        <div className="w-10 h-10 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
-                            <User className="w-5 h-5 text-indigo-400" />
-                        </div>
-                        Mi Trabajo
-                    </h1>
-                    <p className="text-xs md:text-sm font-bold text-slate-400 mt-1 capitalize">
-                        {getGreeting()}, {userName} · {todayLabel}
-                    </p>
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
+                        <User className="w-5 h-5 text-indigo-400" />
+                    </div>
+                    <div>
+                        <p className="text-sm md:text-base font-bold text-slate-200 capitalize leading-tight">
+                            {getGreeting()}, {userName}
+                        </p>
+                        <p className="text-xs font-bold text-slate-450 mt-0.5">
+                            {todayLabel}
+                        </p>
+                    </div>
                 </div>
 
                 {/* Cabecera Central: Mini Timer Activo */}
@@ -460,7 +805,155 @@ export default function MyWork() {
                 )}
 
                 <div className={isMobile ? "divide-y divide-slate-800/20 min-w-[930px]" : "min-w-[1100px] divide-y divide-slate-800/30"}>
-                    {sortedTasks.map((task, idx) => {
+                    {/* Fila de Creación Rápida */}
+                    {canEdit && (
+                        isMobile ? (
+                            <div className="flex flex-col gap-1.5 py-3 px-4 border-b border-slate-800/30 bg-slate-900/40 text-xs min-w-[930px]">
+                                <div className="flex items-center gap-2">
+                                    <Plus className="w-4 h-4 text-indigo-400 shrink-0" />
+                                    <input
+                                        type="text"
+                                        placeholder="Nueva tarea..."
+                                        value={quickTitle}
+                                        onChange={e => setQuickTitle(e.target.value)}
+                                        onKeyDown={e => { if (e.key === 'Enter') handleQuickAddTask(); }}
+                                        className="flex-1 bg-slate-800 border border-slate-700/50 rounded px-2 py-1 text-slate-200 outline-none"
+                                    />
+                                    <select
+                                        value={quickProjectId}
+                                        onChange={e => setQuickProjectId(e.target.value)}
+                                        className="bg-slate-800 border border-slate-700/50 rounded px-2 py-1 text-slate-300 outline-none w-36"
+                                    >
+                                        <option value="">Proyecto...</option>
+                                        {engProjects.map(p => (
+                                            <option key={p.id} value={p.id}>{p.name}</option>
+                                        ))}
+                                    </select>
+                                    <button
+                                        onClick={handleQuickAddTask}
+                                        disabled={!quickTitle.trim() || !quickProjectId}
+                                        className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded font-bold transition-all shrink-0"
+                                    >
+                                        Crear
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div
+                                className="grid items-center px-2 py-1.5 border-b border-slate-850 bg-slate-900/40 text-center text-xs min-w-[1100px]"
+                                style={{ gridTemplateColumns: GRID_COLS }}
+                            >
+                                <div className="sticky left-0 z-10 bg-slate-900 h-full flex items-center justify-center border-l-3 border-l-indigo-600">
+                                    <Plus className="w-3.5 h-3.5 text-indigo-400" />
+                                </div>
+                                <div className="sticky left-[28px] z-10 bg-slate-900 pr-1 min-w-0 flex items-center h-full">
+                                    <input
+                                        type="text"
+                                        placeholder="Nombre de la nueva tarea..."
+                                        value={quickTitle}
+                                        onChange={e => setQuickTitle(e.target.value)}
+                                        onKeyDown={e => { if (e.key === 'Enter') handleQuickAddTask(); }}
+                                        className="w-full bg-slate-800 border border-slate-700/50 rounded px-2 py-1 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-indigo-500/50"
+                                    />
+                                </div>
+                                <div className="text-left px-2">
+                                    <select
+                                        value={quickProjectId}
+                                        onChange={e => setQuickProjectId(e.target.value)}
+                                        className="w-full bg-slate-800 border border-slate-700/50 rounded px-1 py-0.5 text-[11px] text-slate-300 focus:outline-none"
+                                    >
+                                        <option value="">Proyecto...</option>
+                                        {engProjects.map(p => (
+                                            <option key={p.id} value={p.id}>{p.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="text-center text-slate-600">—</div>
+                                <div>
+                                    <select
+                                        value={quickStationId}
+                                        onChange={e => setQuickStationId(e.target.value)}
+                                        className="w-full bg-slate-800 border border-slate-700/50 rounded px-1 py-0.5 text-[11px] text-slate-300 focus:outline-none"
+                                        disabled={!quickProjectId}
+                                    >
+                                        <option value="">STN...</option>
+                                        {quickStations.map(s => (
+                                            <option key={s.id} value={s.id}>
+                                                {s.stationNumber != null ? `STN ${s.stationNumber}` : s.id}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="flex items-stretch px-0.5">
+                                    <select
+                                        value={quickStatus}
+                                        onChange={e => setQuickStatus(e.target.value)}
+                                        className="w-full bg-slate-800 border border-slate-700/50 rounded px-1 py-0.5 text-[11px] text-slate-350 focus:outline-none text-center font-bold"
+                                    >
+                                        {Object.entries(TASK_STATUS_CONFIG)
+                                            .filter(([k]) => k !== 'backlog')
+                                            .map(([k, cfg]) => (
+                                                <option key={k} value={k}>{cfg.label}</option>
+                                            ))
+                                        }
+                                    </select>
+                                </div>
+                                <div className="flex items-stretch px-0.5">
+                                    <select
+                                        value={quickTaskTypeId}
+                                        onChange={e => setQuickTaskTypeId(e.target.value)}
+                                        className="w-full bg-slate-800 border border-slate-700/50 rounded px-1 py-0.5 text-[11px] text-slate-350 focus:outline-none text-center"
+                                    >
+                                        <option value="">Tipo...</option>
+                                        {taskTypes.map(t => (
+                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="text-center text-slate-650">—</div>
+                                <div className="flex items-center justify-center">
+                                    <input
+                                        type="date"
+                                        value={quickDueDate}
+                                        onChange={e => setQuickDueDate(e.target.value)}
+                                        className="bg-slate-800 border border-slate-700/50 rounded px-1 py-0.5 text-[10px] text-slate-350 focus:outline-none w-24 text-center"
+                                    />
+                                </div>
+                                <div className="flex items-center justify-center">
+                                    <input
+                                        type="number"
+                                        placeholder="Est."
+                                        value={quickEstimatedHours}
+                                        onChange={e => setQuickEstimatedHours(e.target.value)}
+                                        className="w-14 bg-slate-800 border border-slate-700/50 rounded px-1 py-0.5 text-xs text-slate-300 focus:outline-none text-center"
+                                        min="0"
+                                        step="0.5"
+                                    />
+                                </div>
+                                <div className="flex items-stretch px-0.5">
+                                    <select
+                                        value={quickPriority}
+                                        onChange={e => setQuickPriority(e.target.value)}
+                                        className="w-full bg-slate-800 border border-slate-700/50 rounded px-1 py-0.5 text-[11px] text-slate-350 focus:outline-none text-center font-bold"
+                                    >
+                                        {Object.entries(TASK_PRIORITY_CONFIG).map(([k, cfg]) => (
+                                            <option key={k} value={k}>{cfg.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="flex items-center justify-center">
+                                    <button
+                                        onClick={handleQuickAddTask}
+                                        disabled={!quickTitle.trim() || !quickProjectId}
+                                        className="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded text-[10px] font-bold transition-all"
+                                    >
+                                        Crear
+                                    </button>
+                                </div>
+                            </div>
+                        )
+                    )}
+                    {sortedTasks.map((task) => {
                         const isTaskActive = activeTimer?.taskId === task.id;
                         const isBlocked = task.status === 'blocked';
                         const isCritical = task.priority === 'critical';
@@ -471,7 +964,6 @@ export default function MyWork() {
                         const projectColor = project?.colorKey || '#6366f1';
                         
                         const statusCfg = TASK_STATUS_CONFIG[task.status] || {};
-                        const pStyle = PRIORITY_BADGES[task.priority] || PRIORITY_BADGES.medium;
 
                         // Subtask progress
                         const totalSubs = task.subtasks?.length || 0;
@@ -509,13 +1001,7 @@ export default function MyWork() {
                         const actual = task.actualHours || 0;
                         const estimated = task.estimatedHours || 0;
 
-                        // Station name
-                        const stationLabel = task.stationId ? task.stationId.replace('station_', 'ST ').toUpperCase() : '—';
-
-                        // Task Type name
-                        const typeName = taskTypes?.find(tt => tt.id === task.taskTypeId)?.name || '—';
-
-                                               if (isMobile) {
+                        if (isMobile) {
                             return (
                                 <React.Fragment key={task.id}>
                                     <div
@@ -528,7 +1014,7 @@ export default function MyWork() {
                                         {/* Renglón 1: Título de Tarea (Fijo horizontalmente con borde de prioridad) */}
                                         <div 
                                             className="sticky left-0 w-[calc(100vw-36px)] shrink-0 z-10 flex items-center gap-2 pl-5 pr-3 bg-inherit"
-                                            style={{ borderLeft: `3px solid ${isCritical ? '#ef4444' : '#6366f1'}` }}
+                                            style={{ borderLeft: `3px solid ${isCritical ? '#ef4444' : projectColor}` }}
                                         >
                                             {/* Chevron de Subtareas */}
                                             {totalSubs > 0 ? (
@@ -545,15 +1031,24 @@ export default function MyWork() {
                                             ) : (
                                                 <span className="w-3.5 shrink-0" />
                                             )}
-
+ 
                                             {/* Título de la tarea */}
-                                            <span 
-                                                onClick={(e) => { e.stopPropagation(); handleOpenTask(task); }}
-                                                className="hover:text-indigo-400 font-semibold text-slate-200 flex-1 truncate text-[12.5px] pr-1"
-                                            >
-                                                {task.title || 'Sin título'}
-                                            </span>
-
+                                            {canEdit ? (
+                                                <InlineEditText
+                                                    value={task.title || ''}
+                                                    onSave={v => saveField(task, 'title', v)}
+                                                    className="text-[12.5px] font-semibold text-slate-200 flex-1 whitespace-normal break-words py-1 pr-1"
+                                                    placeholder="Sin título"
+                                                />
+                                            ) : (
+                                                <span 
+                                                    onClick={(e) => { e.stopPropagation(); handleOpenTask(task); }}
+                                                    className="hover:text-indigo-400 font-semibold text-slate-200 flex-1 whitespace-normal break-words py-1 text-[12.5px] pr-1"
+                                                >
+                                                    {task.title || 'Sin título'}
+                                                </span>
+                                            )}
+ 
                                             {/* Badge Subtareas */}
                                             {totalSubs > 0 && (
                                                 <span className={`text-[9px] font-black px-1.5 py-0.5 rounded shrink-0 ${
@@ -562,14 +1057,14 @@ export default function MyWork() {
                                                     {doneSubs}/{totalSubs}
                                                 </span>
                                             )}
-
+ 
                                             {/* Badge Bloqueada */}
                                             {isBlocked && (
                                                 <span className="text-[9px] font-black uppercase px-1 py-0.5 bg-red-600 text-white rounded shrink-0 scale-90">
                                                     Bloqueada
                                                 </span>
                                             )}
-
+ 
                                             {/* Icono Comentarios */}
                                             <div 
                                                 className="flex items-center justify-center text-slate-500 hover:text-slate-200 cursor-pointer p-1 shrink-0"
@@ -578,7 +1073,7 @@ export default function MyWork() {
                                             >
                                                 <MessageSquare className="w-3.5 h-3.5" />
                                             </div>
-
+ 
                                             {/* Controles del timer (Acciones) */}
                                             <div className="flex items-center gap-1 shrink-0 ml-1" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
                                                 {isTaskActive ? (
@@ -611,7 +1106,7 @@ export default function MyWork() {
                                                 )}
                                             </div>
                                         </div>
-
+ 
                                         {/* Renglón 2: Atributos en Grid (Desplazables horizontalmente de forma unificada) */}
                                         <div 
                                             className="grid items-center gap-2 text-center text-[10px] pl-6 pr-2 min-w-[930px]"
@@ -621,82 +1116,156 @@ export default function MyWork() {
                                         >
                                             {/* Proyecto */}
                                             <div className="text-left">
-                                                <span className="text-[9px] font-black px-2 py-0.5 bg-slate-900 border border-slate-800 rounded whitespace-nowrap" style={{ color: projectColor, borderColor: `${projectColor}30` }}>
-                                                    {task.projectName}
-                                                </span>
+                                                {canEdit ? (
+                                                    <InlineDropdown
+                                                        value={task.projectId || ''}
+                                                        options={engProjects.map(p => ({ value: p.id, label: p.name }))}
+                                                        onSelect={v => saveField(task, 'projectId', v || null)}
+                                                        renderValue={() => (
+                                                            <span className="text-[9px] font-black px-2 py-0.5 bg-slate-900 border border-slate-800 rounded whitespace-nowrap" style={{ color: projectColor, borderColor: `${projectColor}30` }}>
+                                                                {task.projectName}
+                                                            </span>
+                                                        )}
+                                                    />
+                                                ) : (
+                                                    <span className="text-[9px] font-black px-2 py-0.5 bg-slate-900 border border-slate-800 rounded whitespace-nowrap" style={{ color: projectColor, borderColor: `${projectColor}30` }}>
+                                                        {task.projectName}
+                                                    </span>
+                                                )}
                                             </div>
-
+ 
                                             {/* Estado */}
                                             <div className="flex items-stretch px-0.5">
-                                                <select
-                                                    value={task.status}
-                                                    onChange={e => handleStatusChange(task, e.target.value)}
-                                                    className="w-full text-center py-0.5 rounded text-[9px] font-black text-white cursor-pointer focus:outline-none"
-                                                    style={{ background: statusCfg.color || '#64748b' }}
-                                                >
-                                                    {Object.entries(TASK_STATUS_CONFIG)
-                                                        .filter(([k]) => k !== 'backlog')
-                                                        .map(([k, cfg]) => (
-                                                            <option key={k} value={k} className="bg-slate-900 text-slate-200 text-xs font-semibold text-left">
-                                                                {cfg.label}
-                                                            </option>
-                                                        ))
-                                                    }
-                                                </select>
+                                                {canEdit ? (
+                                                    <InlineDropdown
+                                                        value={task.status}
+                                                        options={Object.entries(TASK_STATUS_CONFIG)
+                                                            .filter(([k]) => k !== 'backlog')
+                                                            .map(([k, cfg]) => ({ value: k, label: cfg.label, color: cfg.color }))}
+                                                        onSelect={v => handleStatusChange(task, v)}
+                                                        renderValue={(val) => {
+                                                            const cfg = TASK_STATUS_CONFIG[val] || {};
+                                                            return (
+                                                                <div className="w-full h-full flex items-center justify-center rounded text-[9px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                                                    style={{ background: cfg.color || '#64748b' }}>
+                                                                    {cfg.label || val}
+                                                                </div>
+                                                            );
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center rounded text-[9px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                                        style={{ background: statusCfg.color || '#64748b' }}>
+                                                        {statusCfg.label || task.status}
+                                                    </div>
+                                                )}
                                             </div>
-
+ 
                                             {/* Prioridad */}
-                                            <div className="flex items-stretch px-0.5">
-                                                <select
-                                                    value={task.priority}
-                                                    onChange={e => handlePriorityChange(task, e.target.value)}
-                                                    className="w-full text-center py-0.5 rounded text-[9px] font-black cursor-pointer focus:outline-none"
-                                                    style={{ 
-                                                        background: pStyle.bg,
-                                                        color: pStyle.text
-                                                    }}
-                                                >
-                                                    {Object.entries(TASK_PRIORITY_CONFIG).map(([k, cfg]) => (
-                                                        <option key={k} value={k} className="bg-slate-900 text-slate-200 text-xs font-semibold text-left">
-                                                            {cfg.label}
-                                                        </option>
-                                                    ))}
-                                                </select>
+                                            <div className="flex items-stretch px-0.5 font-bold text-white">
+                                                {canEdit ? (
+                                                    <InlineDropdown
+                                                        value={task.priority || 'medium'}
+                                                        options={Object.entries(TASK_PRIORITY_CONFIG).map(([k, cfg]) => ({ value: k, label: cfg.label, color: cfg.color || '#64748b' }))}
+                                                        onSelect={v => handlePriorityChange(task, v)}
+                                                        renderValue={(val) => {
+                                                            const colors = { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' };
+                                                            const c = colors[val] || '#579bfc';
+                                                            const cfg = TASK_PRIORITY_CONFIG[val] || {};
+                                                            return (
+                                                                <div className="w-full h-full flex items-center justify-center rounded text-[9px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                                                    style={{ background: c }}>
+                                                                    {cfg.label || val}
+                                                                </div>
+                                                            );
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center rounded text-[9px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                                        style={{ background: { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' }[task.priority] || '#579bfc' }}>
+                                                        {(TASK_PRIORITY_CONFIG[task.priority] || {}).label || '—'}
+                                                    </div>
+                                                )}
                                             </div>
-
+ 
                                             {/* Estación (STN) */}
-                                            <div className="text-[9px] font-bold text-slate-400 bg-slate-900/60 px-1 py-0.5 rounded border border-slate-800/40">
-                                                {stationLabel}
-                                            </div>
-
+                                            <StationCell task={task} canEdit={canEdit} onSave={v => saveField(task, 'stationId', v)} />
+ 
                                             {/* Tipo */}
-                                            <div className="text-[9px] text-slate-450 bg-slate-900/60 px-1 py-0.5 rounded border border-slate-800/40 truncate">
-                                                {typeName}
+                                            <div className="min-w-0 overflow-hidden flex items-center justify-center">
+                                                {(() => {
+                                                    const selectedArea = (workAreaTypes || []).find(a => a.id === task.workAreaTypeId);
+                                                    const allowedValues = selectedArea?.defaultTaskTypes || [];
+                                                    const filteredTypes = allowedValues.length > 0
+                                                        ? (taskTypes || []).filter(t => 
+                                                              allowedValues.includes(t.id) || 
+                                                              allowedValues.includes(t.name) || 
+                                                              (t.firestoreId && allowedValues.includes(t.firestoreId)) ||
+                                                              allowedValues.some(val => 
+                                                                  (t.name && val?.toString().toLowerCase() === t.name.toLowerCase()) ||
+                                                                  (t.firestoreId && val?.toString().toLowerCase() === t.firestoreId.toLowerCase())
+                                                              )
+                                                          )
+                                                        : (taskTypes || []);
+                                                    const tt = (taskTypes || []).find(t => t.id === task.taskTypeId);
+                                                    const typeOptions = [
+                                                        { value: '', label: 'Sin tipo' },
+                                                        ...filteredTypes.map(t => ({ value: t.id, label: t.name })),
+                                                    ];
+                                                    return canEdit ? (
+                                                        <InlineDropdown
+                                                            value={task.taskTypeId || ''}
+                                                            options={typeOptions}
+                                                            onSelect={v => saveField(task, 'taskTypeId', v || null)}
+                                                            renderValue={() => (
+                                                                <span className="text-[9px] text-slate-455 truncate block text-center font-semibold leading-tight">{tt?.name || '—'}</span>
+                                                            )}
+                                                        />
+                                                    ) : (
+                                                        <span className="text-[9px] text-slate-455 truncate block text-center">{tt?.name || '—'}</span>
+                                                    );
+                                                })()}
                                             </div>
-
+ 
                                             {/* Avance */}
                                             <div className="flex items-center gap-1 px-1">
                                                 <div className="w-full h-1 bg-slate-950 rounded-full overflow-hidden shrink-0">
                                                     <div className="h-full rounded-full" style={{ width: `${progressPct}%`, backgroundColor: progressColor }} />
                                                 </div>
-                                                <span className="text-[8.5px] font-black text-slate-450">{progressPct}%</span>
+                                                <span className="text-[8.5px] font-black text-slate-455">{progressPct}%</span>
                                             </div>
-
+ 
                                             {/* Timeline */}
                                             <div className="flex items-center justify-center gap-1 text-[8.5px] font-bold text-slate-400 bg-slate-900/40 px-1 py-0.5 rounded">
-                                                <Calendar className="w-2.5 h-2.5 text-slate-500" style={{ color: timelineColor }} />
-                                                <span className={isOverdue ? 'text-red-400 font-black' : ''}>{formattedDueDate}</span>
+                                                {canEdit ? (
+                                                    <>
+                                                        <InlineDatePicker value={startRaw} onSave={v => saveField(task, 'plannedStartDate', v)} />
+                                                        <span className="text-slate-650 shrink-0">→</span>
+                                                        <InlineDatePicker value={endRaw} onSave={v => saveField(task, 'dueDate', v)} />
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Calendar className="w-2.5 h-2.5 text-slate-500" style={{ color: timelineColor }} />
+                                                        <span className={isOverdue ? 'text-red-400 font-black' : ''}>{formattedDueDate}</span>
+                                                    </>
+                                                )}
                                             </div>
-
+ 
                                             {/* Horas */}
-                                            <div className="text-[9px] font-bold text-slate-350 bg-slate-900/60 px-1 py-0.5 rounded border border-slate-800/20">
-                                                {actual.toFixed(1)}/{estimated.toFixed(1)} h
+                                            <div className="flex items-center justify-center gap-0.5 text-[9px] min-w-0 w-full font-bold text-slate-350">
+                                                <span className="text-slate-400 shrink-0">{actual.toFixed(1)}h</span>
+                                                <span className="text-slate-650 shrink-0">/</span>
+                                                {canEdit ? (
+                                                    <InlineEditNumber value={estimated} onSave={v => saveField(task, 'estimatedHours', v)} />
+                                                ) : (
+                                                    <span className="text-slate-400 shrink-0">{estimated}h</span>
+                                                )}
                                             </div>
-
+ 
                                             {/* Espacio o Placeholder para acciones */}
                                             <div className="text-[9px] text-slate-500 italic select-none">Fija ↑</div>
                                         </div>
-
+ 
                                         {/* Subtareas */}
                                         {isExpanded && totalSubs > 0 && (
                                             <div className="sticky left-0 w-[calc(100vw-36px)] shrink-0 z-10 pl-6 pr-3 bg-inherit">
@@ -722,13 +1291,12 @@ export default function MyWork() {
                                     `}
                                     style={{ gridTemplateColumns: GRID_COLS }}
                                 >
-                                    {/* Borde izquierdo de color + Checkbox virtual */}
-                                    <div className="sticky left-0 z-10 bg-slate-950/40 h-full flex items-center justify-center" style={{ borderLeft: `3px solid ${isCritical ? '#ef4444' : '#6366f1'}` }}>
-                                        <span className={`w-2 h-2 rounded-full ${isTaskActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-700'}`} />
+                                    {/* Borde izquierdo de color */}
+                                    <div className="sticky left-0 z-10 bg-slate-950/40 h-full flex items-center justify-center" style={{ borderLeft: `3px solid ${isCritical ? '#ef4444' : projectColor}` }}>
                                     </div>
-
+ 
                                     {/* Tarea */}
-                                    <div className="sticky left-[28px] z-10 bg-slate-950/40 text-left px-1 flex items-center gap-1.5 font-semibold text-slate-200">
+                                    <div className="sticky left-[28px] z-10 bg-slate-950/40 text-left px-1 flex items-center gap-1.5 font-semibold text-slate-200 min-w-0">
                                         {totalSubs > 0 ? (
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); toggleTaskExpanded(task.id); }}
@@ -743,12 +1311,21 @@ export default function MyWork() {
                                         ) : (
                                             <span className="w-3.5 shrink-0" />
                                         )}
-                                        <span 
-                                            onClick={(e) => { e.stopPropagation(); handleOpenTask(task); }}
-                                            className="hover:text-indigo-400 cursor-pointer transition-colors truncate block max-w-full"
-                                        >
-                                            {task.title || 'Sin título'}
-                                        </span>
+                                        {canEdit ? (
+                                            <InlineEditText
+                                                value={task.title || ''}
+                                                onSave={v => saveField(task, 'title', v)}
+                                                className="text-xs font-semibold text-slate-200 flex-1 whitespace-normal break-words py-1"
+                                                placeholder="Sin título"
+                                            />
+                                        ) : (
+                                            <span 
+                                                onClick={(e) => { e.stopPropagation(); handleOpenTask(task); }}
+                                                className="hover:text-indigo-400 cursor-pointer transition-colors whitespace-normal break-words py-1 flex-1"
+                                            >
+                                                {task.title || 'Sin título'}
+                                            </span>
+                                        )}
                                         {totalSubs > 0 && (
                                             <span className={`text-[9px] font-black px-1.5 py-0.5 rounded shrink-0 ${
                                                 subsPct === 100 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700/60 text-slate-400'
@@ -762,14 +1339,27 @@ export default function MyWork() {
                                             </span>
                                         )}
                                     </div>
-
+ 
                                     {/* Proyecto */}
                                     <div className="text-left px-2">
-                                        <span className="text-[10px] font-black px-2 py-0.5 bg-slate-900 border border-slate-800 rounded whitespace-nowrap" style={{ color: projectColor, borderColor: `${projectColor}30` }}>
-                                            {task.projectName}
-                                        </span>
+                                        {canEdit ? (
+                                            <InlineDropdown
+                                                value={task.projectId || ''}
+                                                options={engProjects.map(p => ({ value: p.id, label: p.name }))}
+                                                onSelect={v => saveField(task, 'projectId', v || null)}
+                                                renderValue={() => (
+                                                    <span className="text-[10px] font-black px-2 py-0.5 bg-slate-900 border border-slate-800 rounded whitespace-nowrap" style={{ color: projectColor, borderColor: `${projectColor}30` }}>
+                                                        {task.projectName}
+                                                    </span>
+                                                )}
+                                            />
+                                        ) : (
+                                            <span className="text-[10px] font-black px-2 py-0.5 bg-slate-900 border border-slate-800 rounded whitespace-nowrap" style={{ color: projectColor, borderColor: `${projectColor}30` }}>
+                                                {task.projectName}
+                                            </span>
+                                        )}
                                     </div>
-
+ 
                                     {/* Comentarios Link */}
                                     <div 
                                         className="flex items-center justify-center text-slate-500 hover:text-slate-200 cursor-pointer"
@@ -778,45 +1368,96 @@ export default function MyWork() {
                                     >
                                         <MessageSquare className="w-3.5 h-3.5" />
                                     </div>
-
+ 
                                     {/* Estación */}
-                                    <div className="text-[10px] font-bold text-slate-400">{stationLabel}</div>
-
+                                    <StationCell task={task} canEdit={canEdit} onSave={v => saveField(task, 'stationId', v)} />
+ 
                                     {/* Estado Dropdown */}
                                     <div className="flex items-stretch px-0.5" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
-                                        <select
-                                            value={task.status}
-                                            onChange={e => handleStatusChange(task, e.target.value)}
-                                            className="w-full text-center py-1 rounded text-[10px] font-black text-white cursor-pointer focus:outline-none"
-                                            style={{ background: statusCfg.color || '#64748b' }}
-                                        >
-                                            {Object.entries(TASK_STATUS_CONFIG)
-                                                .filter(([k]) => k !== 'backlog')
-                                                .map(([k, cfg]) => (
-                                                    <option key={k} value={k} className="bg-slate-900 text-slate-200 text-xs font-semibold text-left">
-                                                        {cfg.label}
-                                                    </option>
-                                                ))
-                                            }
-                                        </select>
+                                        {canEdit ? (
+                                            <InlineDropdown
+                                                value={task.status}
+                                                options={Object.entries(TASK_STATUS_CONFIG)
+                                                    .filter(([k]) => k !== 'backlog')
+                                                    .map(([k, cfg]) => ({ value: k, label: cfg.label, color: cfg.color }))}
+                                                onSelect={v => handleStatusChange(task, v)}
+                                                renderValue={(val) => {
+                                                    const cfg = TASK_STATUS_CONFIG[val] || {};
+                                                    return (
+                                                        <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[24px]"
+                                                            style={{ background: cfg.color || '#64748b' }}>
+                                                            {cfg.label || val}
+                                                        </div>
+                                                    );
+                                                }}
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[24px]"
+                                                style={{ background: statusCfg.color || '#64748b' }}>
+                                                {statusCfg.label || task.status}
+                                            </div>
+                                        )}
                                     </div>
-
+ 
                                     {/* Tipo */}
-                                    <div className="text-[10px] text-slate-400 truncate">{typeName}</div>
-
+                                    <div className="min-w-0 overflow-hidden flex items-center justify-center">
+                                        {(() => {
+                                            const selectedArea = (workAreaTypes || []).find(a => a.id === task.workAreaTypeId);
+                                            const allowedValues = selectedArea?.defaultTaskTypes || [];
+                                            const filteredTypes = allowedValues.length > 0
+                                                ? (taskTypes || []).filter(t => 
+                                                      allowedValues.includes(t.id) || 
+                                                      allowedValues.includes(t.name) || 
+                                                      (t.firestoreId && allowedValues.includes(t.firestoreId)) ||
+                                                      allowedValues.some(val => 
+                                                          (t.name && val?.toString().toLowerCase() === t.name.toLowerCase()) ||
+                                                          (t.firestoreId && val?.toString().toLowerCase() === t.firestoreId.toLowerCase())
+                                                      )
+                                                  )
+                                                : (taskTypes || []);
+                                            const tt = (taskTypes || []).find(t => t.id === task.taskTypeId);
+                                            const typeOptions = [
+                                                { value: '', label: 'Sin tipo' },
+                                                ...filteredTypes.map(t => ({ value: t.id, label: t.name })),
+                                            ];
+                                            return canEdit ? (
+                                                <InlineDropdown
+                                                    value={task.taskTypeId || ''}
+                                                    options={typeOptions}
+                                                    onSelect={v => saveField(task, 'taskTypeId', v || null)}
+                                                    renderValue={() => (
+                                                        <span className="text-[10px] text-slate-400 truncate block text-center font-semibold leading-tight">{tt?.name || '—'}</span>
+                                                    )}
+                                                />
+                                            ) : (
+                                                <span className="text-[10px] text-slate-400 truncate block text-center">{tt?.name || '—'}</span>
+                                            );
+                                        })()}
+                                    </div>
+ 
                                     {/* Avance */}
                                     <div className="flex items-center gap-1.5 px-2">
                                         <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden shrink-0">
                                             <div className="h-full rounded-full" style={{ width: `${progressPct}%`, backgroundColor: progressColor }} />
                                         </div>
-                                        <span className="text-[9px] font-black text-slate-400">{progressPct}%</span>
+                                        <span className="text-[9px] font-black text-slate-450">{progressPct}%</span>
                                     </div>
-
+ 
                                     {/* Timeline */}
-                                    <div className="flex flex-col items-center justify-center gap-0.5">
-                                        <div className="flex items-center gap-1 text-[9px] font-bold">
-                                            <Calendar className="w-3 h-3 text-slate-500" style={{ color: timelineColor }} />
-                                            <span className={isOverdue ? 'text-red-400 font-black' : 'text-slate-400'}>{formattedDueDate}</span>
+                                    <div className="min-w-0 overflow-hidden flex flex-col items-center justify-center gap-0.5">
+                                        <div className="flex items-center justify-center gap-1 text-[9px] font-bold min-w-0 w-full">
+                                            {canEdit ? (
+                                                <>
+                                                    <InlineDatePicker value={startRaw} onSave={v => saveField(task, 'plannedStartDate', v)} />
+                                                    <span className="text-slate-650 shrink-0">→</span>
+                                                    <InlineDatePicker value={endRaw} onSave={v => saveField(task, 'dueDate', v)} />
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Calendar className="w-3 h-3 text-slate-500" style={{ color: timelineColor }} />
+                                                    <span className={isOverdue ? 'text-red-400 font-black' : 'text-slate-400'}>{formattedDueDate}</span>
+                                                </>
+                                            )}
                                         </div>
                                         {daysLeft !== null && (
                                             <span className={`text-[8px] font-black uppercase tracking-wider ${isOverdue ? 'text-red-400' : 'text-slate-550'}`}>
@@ -824,31 +1465,45 @@ export default function MyWork() {
                                             </span>
                                         )}
                                     </div>
-
+ 
                                     {/* Horas */}
-                                    <div className="text-[10px] font-bold text-slate-300">
-                                        {actual.toFixed(1)} <span className="text-slate-500">/</span> {estimated.toFixed(1)} h
+                                    <div className="flex items-center justify-center gap-0.5 text-[10px] min-w-0 w-full font-bold text-slate-350">
+                                        <span className="text-slate-400 shrink-0">{actual.toFixed(1)}h</span>
+                                        <span className="text-slate-650 shrink-0">/</span>
+                                        {canEdit ? (
+                                            <InlineEditNumber value={estimated} onSave={v => saveField(task, 'estimatedHours', v)} />
+                                        ) : (
+                                            <span className="text-slate-450 shrink-0">{estimated}h</span>
+                                        )}
                                     </div>
-
+ 
                                     {/* Prioridad Dropdown */}
-                                    <div className="flex items-stretch px-0.5" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
-                                        <select
-                                            value={task.priority}
-                                            onChange={e => handlePriorityChange(task, e.target.value)}
-                                            className="w-full text-center py-1 rounded text-[10px] font-black cursor-pointer focus:outline-none"
-                                            style={{ 
-                                                background: pStyle.bg,
-                                                color: pStyle.text
-                                            }}
-                                        >
-                                            {Object.entries(TASK_PRIORITY_CONFIG).map(([k, cfg]) => (
-                                                <option key={k} value={k} className="bg-slate-900 text-slate-200 text-xs font-semibold text-left">
-                                                    {cfg.label}
-                                                </option>
-                                            ))}
-                                        </select>
+                                    <div className="flex items-stretch px-0.5 font-black text-white" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+                                        {canEdit ? (
+                                            <InlineDropdown
+                                                value={task.priority || 'medium'}
+                                                options={Object.entries(TASK_PRIORITY_CONFIG).map(([k, cfg]) => ({ value: k, label: cfg.label, color: cfg.color || '#64748b' }))}
+                                                onSelect={v => handlePriorityChange(task, v)}
+                                                renderValue={(val) => {
+                                                    const colors = { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' };
+                                                    const c = colors[val] || '#579bfc';
+                                                    const cfg = TASK_PRIORITY_CONFIG[val] || {};
+                                                    return (
+                                                        <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[24px]"
+                                                            style={{ background: c }}>
+                                                            {cfg.label || val}
+                                                        </div>
+                                                    );
+                                                }}
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[24px]"
+                                                style={{ background: { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' }[task.priority] || '#579bfc' }}>
+                                                {(TASK_PRIORITY_CONFIG[task.priority] || {}).label || '—'}
+                                            </div>
+                                        )}
                                     </div>
-
+ 
                                     {/* Acciones */}
                                     <div className="flex items-center justify-end gap-1 px-1" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
                                         {isTaskActive ? (
