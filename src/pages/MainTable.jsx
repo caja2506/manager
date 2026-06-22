@@ -714,7 +714,7 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
     const now = new Date();
 
     let timelinePct = 0;
-    let timelineColor = '#6366f1';
+    let timelineColor = '#22c55e'; // Verde por defecto para "a tiempo"
     let daysLeft = null;
     if (startDate && endDate) {
         const total = Math.max(1, (endDate - startDate) / (1000 * 60 * 60 * 24));
@@ -723,6 +723,10 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
         daysLeft = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
         if (daysLeft < 0 && task.status !== 'completed' && task.status !== 'cancelled') timelineColor = '#ef4444';
         else if (timelinePct > 80) timelineColor = '#f59e0b';
+    }
+    if (task.status === 'completed') {
+        timelinePct = 100;
+        timelineColor = '#22c55e';
     }
 
     const isCritical = task.priority === 'critical';
@@ -1020,35 +1024,49 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
 
                         {/* 7. Timeline */}
                         <div className="min-w-0 overflow-hidden flex items-center justify-center py-1 h-full">
-                            <div className={`rounded-full px-3 py-1 text-[9px] font-bold text-center flex items-center justify-center gap-1 min-w-[95px] max-w-fit mx-auto shadow-sm ${
-                                task.status === 'completed' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-200'
-                            }`}>
-                                {task.status === 'completed' && <Check className="w-3 h-3 text-white shrink-0 mr-0.5" />}
-                                {canEdit ? (
-                                    <div className="flex items-center justify-center gap-1 min-w-0">
-                                        {(canEditDates || !startRaw) ? (
-                                            <InlineDatePicker
-                                                value={startRaw}
-                                                onSave={v => saveField('plannedStartDate', v)}
-                                                className="text-[9px] text-inherit hover:bg-white/10 rounded px-0.5 transition-colors whitespace-nowrap"
-                                            />
-                                        ) : (
-                                            <span className="text-inherit text-[9px] whitespace-nowrap">{fmtDate(startDate)}</span>
-                                        )}
-                                        <span className="text-slate-500 shrink-0">→</span>
-                                        {(canEditDates || !endRaw) ? (
-                                            <InlineDatePicker
-                                                value={endRaw}
-                                                onSave={v => saveField('dueDate', v)}
-                                                className="text-[9px] text-inherit hover:bg-white/10 rounded px-0.5 transition-colors whitespace-nowrap"
-                                            />
-                                        ) : (
-                                            <span className="text-inherit text-[9px] whitespace-nowrap">{fmtDate(endDate)}</span>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <span className="truncate whitespace-nowrap">{formatTimelineRange(startRaw, endRaw)}</span>
+                            <div 
+                                className="relative overflow-hidden w-full h-[22px] rounded-full bg-slate-900 border border-slate-800 shadow-inner flex items-center justify-center select-none cursor-pointer mx-auto"
+                                style={{ minWidth: '95px', maxWidth: '140px' }}
+                            >
+                                {timelinePct > 0 && (
+                                    <div 
+                                        className="absolute left-0 top-0 bottom-0 transition-all duration-300"
+                                        style={{ 
+                                            width: `${timelinePct}%`, 
+                                            backgroundColor: timelineColor 
+                                        }} 
+                                    />
                                 )}
+                                <div className="relative z-10 w-full h-full flex items-center justify-center px-2 text-white font-bold">
+                                    {task.status === 'completed' && <Check className="w-3 h-3 text-white shrink-0 mr-1" />}
+                                    {canEdit ? (
+                                        <div className="flex items-center justify-center gap-0.5 text-white font-bold text-[9px] w-full">
+                                            {(canEditDates || !startRaw) ? (
+                                                <InlineDatePicker
+                                                    value={startRaw}
+                                                    onSave={v => saveField('plannedStartDate', v)}
+                                                    className="text-inherit hover:underline px-0.5 font-bold whitespace-nowrap bg-transparent"
+                                                />
+                                            ) : (
+                                                <span className="text-inherit text-[9px] font-bold whitespace-nowrap">{fmtDate(startDate)}</span>
+                                            )}
+                                            <span className="opacity-60 shrink-0 text-[8px]">-</span>
+                                            {(canEditDates || !endRaw) ? (
+                                                <InlineDatePicker
+                                                    value={endRaw}
+                                                    onSave={v => saveField('dueDate', v)}
+                                                    className="text-inherit hover:underline px-0.5 font-bold whitespace-nowrap bg-transparent"
+                                                />
+                                            ) : (
+                                                <span className="text-inherit text-[9px] font-bold whitespace-nowrap">{fmtDate(endDate)}</span>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <span className="whitespace-nowrap text-white font-bold text-[9px]">
+                                            {formatTimelineRange(startRaw, endRaw)}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
@@ -1377,35 +1395,49 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
 
                 {/* Timeline */}
                 <div className="min-w-0 overflow-hidden flex items-center justify-center py-2 h-full" onClick={e => e.stopPropagation()}>
-                    <div className={`rounded-full px-3 py-1.5 text-[10px] font-bold text-center flex items-center justify-center gap-1 min-w-[95px] max-w-fit mx-auto shadow-sm ${
-                        task.status === 'completed' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-200'
-                    }`}>
-                        {task.status === 'completed' && <Check className="w-3.5 h-3.5 text-white shrink-0 mr-0.5" />}
-                        {canEdit ? (
-                            <div className="flex items-center justify-center gap-1 min-w-0">
-                                {(canEditDates || !startRaw) ? (
-                                    <InlineDatePicker
-                                        value={startRaw}
-                                        onSave={v => saveField('plannedStartDate', v)}
-                                        className="text-[10px] text-inherit hover:bg-white/10 rounded px-0.5 transition-colors whitespace-nowrap"
-                                    />
-                                ) : (
-                                    <span className="text-inherit text-[10px] whitespace-nowrap">{fmtDate(startDate)}</span>
-                                )}
-                                <span className="text-slate-500 shrink-0">→</span>
-                                {(canEditDates || !endRaw) ? (
-                                    <InlineDatePicker
-                                        value={endRaw}
-                                        onSave={v => saveField('dueDate', v)}
-                                        className="text-[10px] text-inherit hover:bg-white/10 rounded px-0.5 transition-colors whitespace-nowrap"
-                                    />
-                                ) : (
-                                    <span className="text-inherit text-[10px] whitespace-nowrap">{fmtDate(endDate)}</span>
-                                )}
-                            </div>
-                        ) : (
-                            <span className="truncate whitespace-nowrap">{formatTimelineRange(startRaw, endRaw)}</span>
+                    <div 
+                        className="relative overflow-hidden w-full h-[22px] rounded-full bg-slate-900 border border-slate-800 shadow-inner flex items-center justify-center select-none cursor-pointer mx-auto"
+                        style={{ minWidth: '95px', maxWidth: '140px' }}
+                    >
+                        {timelinePct > 0 && (
+                            <div 
+                                className="absolute left-0 top-0 bottom-0 transition-all duration-300"
+                                style={{ 
+                                    width: `${timelinePct}%`, 
+                                    backgroundColor: timelineColor 
+                                }} 
+                            />
                         )}
+                        <div className="relative z-10 w-full h-full flex items-center justify-center px-2 text-white font-bold">
+                            {task.status === 'completed' && <Check className="w-3.5 h-3.5 text-white shrink-0 mr-1" />}
+                            {canEdit ? (
+                                <div className="flex items-center justify-center gap-0.5 text-white font-bold text-[10px] w-full">
+                                    {(canEditDates || !startRaw) ? (
+                                        <InlineDatePicker
+                                            value={startRaw}
+                                            onSave={v => saveField('plannedStartDate', v)}
+                                            className="text-inherit hover:underline px-0.5 font-bold whitespace-nowrap bg-transparent"
+                                        />
+                                    ) : (
+                                        <span className="text-inherit text-[10px] font-bold whitespace-nowrap">{fmtDate(startDate)}</span>
+                                    )}
+                                    <span className="opacity-60 shrink-0 text-[9px]">-</span>
+                                    {(canEditDates || !endRaw) ? (
+                                        <InlineDatePicker
+                                            value={endRaw}
+                                            onSave={v => saveField('dueDate', v)}
+                                            className="text-inherit hover:underline px-0.5 font-bold whitespace-nowrap bg-transparent"
+                                        />
+                                    ) : (
+                                        <span className="text-inherit text-[10px] font-bold whitespace-nowrap">{fmtDate(endDate)}</span>
+                                    )}
+                                </div>
+                            ) : (
+                                <span className="whitespace-nowrap text-white font-bold text-[10px]">
+                                    {formatTimelineRange(startRaw, endRaw)}
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
 

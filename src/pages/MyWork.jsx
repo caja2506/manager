@@ -40,7 +40,7 @@ function getGreeting() {
     return 'Buenas noches';
 }
 
-const GRID_COLS = '28px minmax(200px, 1.2fr) minmax(120px, 1fr) 32px 50px 86px 68px 86px 56px minmax(105px, 140px) 76px 85px 60px';
+const GRID_COLS = '28px minmax(200px, 1.2fr) 32px minmax(120px, 1fr) 50px 86px 68px 86px 56px minmax(105px, 140px) 76px 85px 60px';
 const MOBILE_GRID_COLS = '140px 100px 95px 65px 86px 90px 100px 115px 85px 75px';
 
 const PRIORITY_BADGES = {
@@ -870,8 +870,8 @@ export default function MyWork() {
                     >
                         <div className="sticky left-0 z-10 bg-slate-900 h-full flex items-center justify-center border-l-3 border-l-slate-700"></div>
                         <div className="sticky left-[28px] z-10 text-left bg-slate-900 h-full flex items-center">Tarea</div>
-                        <div className="text-left px-2">Proyecto</div>
                         <div className="text-center">💬</div>
+                        <div className="text-left px-2">Proyecto</div>
                         <div>STN</div>
                         <div>Área</div>
                         <div>Tipo</div>
@@ -918,10 +918,12 @@ export default function MyWork() {
                                             value={quickProjectId}
                                             options={engProjects.map(p => ({ value: p.id, label: p.name }))}
                                             onSelect={v => setQuickProjectId(v)}
+                                            triggerClassName="w-full text-left font-black text-[9px] whitespace-nowrap hover:bg-slate-800/50 rounded px-2 py-1 transition-colors cursor-pointer"
                                             renderValue={(val) => {
                                                 const pObj = engProjects.find(p => p.id === val);
+                                                const projectColor = pObj?.colorKey || '#6366f1';
                                                 return (
-                                                    <span className={`text-[9px] font-black px-2 py-0.5 bg-slate-900 border border-slate-800 rounded whitespace-nowrap ${val ? 'text-indigo-400' : 'text-slate-500'}`}>
+                                                    <span style={{ color: val ? projectColor : '#94a3b8' }}>
                                                         {pObj?.name || 'Proyecto...'}
                                                     </span>
                                                 );
@@ -1077,22 +1079,24 @@ export default function MyWork() {
                                         className="w-full bg-slate-850 border border-slate-700/55 rounded px-2 py-1 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-indigo-500/50"
                                     />
                                 </div>
+                                <div className="text-center text-slate-600 h-full flex items-center justify-center py-2">—</div>
                                 <div className="text-left px-2 flex items-center h-full py-2">
                                     <InlineDropdown
                                         value={quickProjectId}
                                         options={engProjects.map(p => ({ value: p.id, label: p.name }))}
                                         onSelect={v => setQuickProjectId(v)}
+                                        triggerClassName="w-full text-left font-black text-[10px] whitespace-nowrap hover:bg-slate-800/50 rounded px-2 py-1 transition-colors cursor-pointer"
                                         renderValue={(val) => {
                                             const pObj = engProjects.find(p => p.id === val);
+                                            const projectColor = pObj?.colorKey || '#6366f1';
                                             return (
-                                                <span className={`text-[10px] font-bold truncate block text-center ${val ? 'text-indigo-400' : 'text-slate-500'}`}>
+                                                <span style={{ color: val ? projectColor : '#94a3b8' }}>
                                                     {pObj?.name || 'Proyecto...'}
                                                 </span>
                                             );
                                         }}
                                     />
                                 </div>
-                                <div className="text-center text-slate-600 h-full flex items-center justify-center py-2">—</div>
                                 <div className="flex items-center justify-center h-full py-2 min-w-0">
                                     <InlineDropdown
                                         value={quickStationId}
@@ -1249,7 +1253,7 @@ export default function MyWork() {
                         const now = new Date();
 
                         let timelinePct = 0;
-                        let timelineColor = '#6366f1';
+                        let timelineColor = '#22c55e'; // Verde por defecto para "a tiempo"
                         let daysLeft = null;
                         if (startDate && endDate) {
                             const total = Math.max(1, (endDate - startDate) / (1000 * 60 * 60 * 24));
@@ -1259,8 +1263,11 @@ export default function MyWork() {
                             if (daysLeft < 0 && task.status !== 'completed' && task.status !== 'cancelled') timelineColor = '#ef4444';
                             else if (timelinePct > 80) timelineColor = '#f59e0b';
                         }
+                        if (task.status === 'completed') {
+                            timelinePct = 100;
+                            timelineColor = '#22c55e';
+                        }
                         const isOverdue = daysLeft !== null && daysLeft < 0 && task.status !== 'completed' && task.status !== 'cancelled';
-                        const formattedDueDate = endDate ? endDate.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' }) : '—';
 
                         // % Avance
                         const progressPct = task.percentComplete != null 
@@ -1386,20 +1393,21 @@ export default function MyWork() {
                                             onDoubleClick={(e) => e.stopPropagation()}
                                         >
                                             {/* Proyecto */}
-                                            <div className="text-left flex items-center h-full py-1.5">
+                                            <div className="text-left px-2 flex items-center h-full py-2">
                                                 {canEdit ? (
                                                     <InlineDropdown
                                                         value={task.projectId || ''}
                                                         options={engProjects.map(p => ({ value: p.id, label: p.name }))}
                                                         onSelect={v => saveField(task, 'projectId', v || null)}
+                                                        triggerClassName="w-full text-left font-black text-[10px] whitespace-nowrap hover:bg-slate-800/50 rounded px-2 py-1 transition-colors cursor-pointer"
                                                         renderValue={() => (
-                                                            <span className="text-[9px] font-black px-2 py-0.5 bg-slate-900 border border-slate-800 rounded whitespace-nowrap" style={{ color: projectColor, borderColor: `${projectColor}30` }}>
+                                                            <span style={{ color: projectColor }}>
                                                                 {task.projectName}
                                                             </span>
                                                         )}
                                                     />
                                                 ) : (
-                                                    <span className="text-[9px] font-black px-2 py-0.5 bg-slate-900 border border-slate-800 rounded whitespace-nowrap" style={{ color: projectColor, borderColor: `${projectColor}30` }}>
+                                                    <span className="text-[10px] font-black whitespace-nowrap" style={{ color: projectColor }}>
                                                         {task.projectName}
                                                     </span>
                                                 )}
@@ -1553,28 +1561,42 @@ export default function MyWork() {
                                             </div>
 
                                             {/* Timeline */}
-                                            <div className="min-w-0 overflow-hidden flex items-center justify-center h-full py-1.5">
-                                                <div className={`flex items-center justify-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold shadow-sm transition-all select-none min-w-[90px] max-w-fit mx-auto
-                                                    ${task.status === 'completed' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-200'}`}
+                                            <div className="min-w-0 overflow-hidden flex items-center justify-center h-full py-2">
+                                                <div 
+                                                    className="relative overflow-hidden w-full h-[22px] rounded-full bg-slate-900 border border-slate-800 shadow-inner flex items-center justify-center select-none cursor-pointer mx-auto"
+                                                    style={{ minWidth: '95px', maxWidth: '140px' }}
                                                 >
-                                                    {task.status === 'completed' && <Check className="w-2.5 h-2.5 text-white shrink-0 mr-0.5" />}
-                                                    {canEdit ? (
-                                                        <div className="flex items-center gap-0.5">
-                                                            <InlineDatePicker
-                                                                value={startRaw}
-                                                                onSave={v => saveField(task, 'plannedStartDate', v)}
-                                                                className="text-inherit hover:underline px-0.5 font-bold text-[9px]"
-                                                            />
-                                                            <span className="opacity-60 shrink-0 text-[8px]">-</span>
-                                                            <InlineDatePicker
-                                                                value={endRaw}
-                                                                onSave={v => saveField(task, 'dueDate', v)}
-                                                                className="text-inherit hover:underline px-0.5 font-bold text-[9px]"
-                                                            />
-                                                        </div>
-                                                    ) : (
-                                                        <span className="whitespace-nowrap">{formatTimelineRange(startRaw, endRaw)}</span>
+                                                    {timelinePct > 0 && (
+                                                        <div 
+                                                            className="absolute left-0 top-0 bottom-0 transition-all duration-300"
+                                                            style={{ 
+                                                                width: `${timelinePct}%`, 
+                                                                backgroundColor: timelineColor 
+                                                            }} 
+                                                        />
                                                     )}
+                                                    <div className="relative z-10 w-full h-full flex items-center justify-center px-2 text-white font-bold">
+                                                        {task.status === 'completed' && <Check className="w-3 h-3 text-white shrink-0 mr-1" />}
+                                                        {canEdit ? (
+                                                            <div className="flex items-center justify-center gap-0.5 text-white font-bold text-[10px] w-full">
+                                                                <InlineDatePicker
+                                                                    value={startRaw}
+                                                                    onSave={v => saveField(task, 'plannedStartDate', v)}
+                                                                    className="text-inherit hover:underline px-0.5 font-bold whitespace-nowrap bg-transparent"
+                                                                />
+                                                                <span className="opacity-60 shrink-0 text-[9px]">-</span>
+                                                                <InlineDatePicker
+                                                                    value={endRaw}
+                                                                    onSave={v => saveField(task, 'dueDate', v)}
+                                                                    className="text-inherit hover:underline px-0.5 font-bold whitespace-nowrap bg-transparent"
+                                                                />
+                                                            </div>
+                                                        ) : (
+                                                            <span className="whitespace-nowrap text-white font-bold text-[10px]">
+                                                                {formatTimelineRange(startRaw, endRaw)}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
 
@@ -1667,26 +1689,6 @@ export default function MyWork() {
                                         )}
                                     </div>
 
-                                    {/* Proyecto */}
-                                    <div className="text-left px-2 flex items-center h-full py-2">
-                                        {canEdit ? (
-                                            <InlineDropdown
-                                                value={task.projectId || ''}
-                                                options={engProjects.map(p => ({ value: p.id, label: p.name }))}
-                                                onSelect={v => saveField(task, 'projectId', v || null)}
-                                                renderValue={() => (
-                                                    <span className="text-[10px] font-black px-2 py-0.5 bg-slate-900 border border-slate-800 rounded whitespace-nowrap" style={{ color: projectColor, borderColor: `${projectColor}30` }}>
-                                                        {task.projectName}
-                                                    </span>
-                                                )}
-                                            />
-                                        ) : (
-                                            <span className="text-[10px] font-black px-2 py-0.5 bg-slate-900 border border-slate-800 rounded whitespace-nowrap" style={{ color: projectColor, borderColor: `${projectColor}30` }}>
-                                                {task.projectName}
-                                            </span>
-                                        )}
-                                    </div>
-
                                     {/* Comentarios Link */}
                                     <div 
                                         className="flex items-center justify-center text-slate-500 hover:text-slate-200 cursor-pointer h-full py-2"
@@ -1694,6 +1696,27 @@ export default function MyWork() {
                                         onDoubleClick={(e) => e.stopPropagation()}
                                     >
                                         <MessageSquare className="w-3.5 h-3.5" />
+                                    </div>
+
+                                    {/* Proyecto */}
+                                    <div className="text-left px-2 flex items-center h-full py-2">
+                                        {canEdit ? (
+                                            <InlineDropdown
+                                                value={task.projectId || ''}
+                                                options={engProjects.map(p => ({ value: p.id, label: p.name }))}
+                                                onSelect={v => saveField(task, 'projectId', v || null)}
+                                                triggerClassName="w-full text-left font-black text-[10px] whitespace-nowrap hover:bg-slate-800/50 rounded px-2 py-1 transition-colors cursor-pointer"
+                                                renderValue={() => (
+                                                    <span style={{ color: projectColor }}>
+                                                        {task.projectName}
+                                                    </span>
+                                                )}
+                                            />
+                                        ) : (
+                                            <span className="text-[10px] font-black whitespace-nowrap" style={{ color: projectColor }}>
+                                                {task.projectName}
+                                            </span>
+                                        )}
                                     </div>
 
                                     {/* Estación */}
@@ -1817,27 +1840,41 @@ export default function MyWork() {
 
                                     {/* Timeline */}
                                     <div className="min-w-0 overflow-hidden flex items-center justify-center h-full py-2">
-                                        <div className={`flex items-center justify-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold shadow-sm transition-all select-none min-w-[95px] max-w-fit mx-auto
-                                            ${task.status === 'completed' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-200'}`}
+                                        <div 
+                                            className="relative overflow-hidden w-full h-[22px] rounded-full bg-slate-900 border border-slate-800 shadow-inner flex items-center justify-center select-none cursor-pointer mx-auto"
+                                            style={{ minWidth: '95px', maxWidth: '140px' }}
                                         >
-                                            {task.status === 'completed' && <Check className="w-3 h-3 text-white shrink-0" />}
-                                            {canEdit ? (
-                                                <div className="flex items-center gap-0.5">
-                                                    <InlineDatePicker
-                                                        value={startRaw}
-                                                        onSave={v => saveField(task, 'plannedStartDate', v)}
-                                                        className="text-inherit hover:underline px-0.5 font-bold text-[10px]"
-                                                    />
-                                                    <span className="opacity-60 shrink-0 text-[9px]">-</span>
-                                                    <InlineDatePicker
-                                                        value={endRaw}
-                                                        onSave={v => saveField(task, 'dueDate', v)}
-                                                        className="text-inherit hover:underline px-0.5 font-bold text-[10px]"
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <span className="whitespace-nowrap">{formatTimelineRange(startRaw, endRaw)}</span>
+                                            {timelinePct > 0 && (
+                                                <div 
+                                                    className="absolute left-0 top-0 bottom-0 transition-all duration-300"
+                                                    style={{ 
+                                                        width: `${timelinePct}%`, 
+                                                        backgroundColor: timelineColor 
+                                                    }} 
+                                                />
                                             )}
+                                            <div className="relative z-10 w-full h-full flex items-center justify-center px-2 text-white font-bold">
+                                                {task.status === 'completed' && <Check className="w-3 h-3 text-white shrink-0 mr-1" />}
+                                                {canEdit ? (
+                                                    <div className="flex items-center justify-center gap-0.5 text-white font-bold text-[10px] w-full">
+                                                        <InlineDatePicker
+                                                            value={startRaw}
+                                                            onSave={v => saveField(task, 'plannedStartDate', v)}
+                                                            className="text-inherit hover:underline px-0.5 font-bold whitespace-nowrap bg-transparent"
+                                                        />
+                                                        <span className="opacity-60 shrink-0 text-[9px]">-</span>
+                                                        <InlineDatePicker
+                                                            value={endRaw}
+                                                            onSave={v => saveField(task, 'dueDate', v)}
+                                                            className="text-inherit hover:underline px-0.5 font-bold whitespace-nowrap bg-transparent"
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <span className="whitespace-nowrap text-white font-bold text-[10px]">
+                                                        {formatTimelineRange(startRaw, endRaw)}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
 
