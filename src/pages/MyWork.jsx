@@ -1831,11 +1831,13 @@ export default function MyWork() {
                                     </div>
 
                                     {/* Avance */}
-                                    <div className="flex items-center gap-1.5 px-2 h-full py-2">
-                                        <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden shrink-0">
-                                            <div className="h-full rounded-full" style={{ width: `${progressPct}%`, backgroundColor: progressColor }} />
+                                    <div className="flex items-center justify-center py-1.5 h-full">
+                                        <div className="flex flex-col items-center gap-0.5 w-full px-1">
+                                            <span className="text-[9px] font-black" style={{ color: progressColor }}>{progressPct}%</span>
+                                            <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                                                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progressPct}%`, background: progressColor }} />
+                                            </div>
                                         </div>
-                                        <span className="text-[9px] font-black text-slate-450">{progressPct}%</span>
                                     </div>
 
                                     {/* Timeline */}
