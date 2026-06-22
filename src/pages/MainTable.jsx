@@ -77,7 +77,7 @@ const STATUS_GROUPS = [
 ];
 
 // 13-column grid: ☐ | Task | Comments | Owner | STN | Status | Área | Tipo | Avance | Timeline | Hours | Priority | Asig.
-const GRID_COLS = '30px 28px minmax(200px, 1fr) minmax(120px, 200px) 36px 55px 86px 68px 68px 56px minmax(105px,150px) minmax(65px,95px) 76px 36px';
+const GRID_COLS = '28px minmax(200px, 1fr) minmax(120px, 200px) 36px 55px 86px 68px 68px 56px minmax(105px,150px) minmax(65px,95px) 76px 36px';
 const MOBILE_GRID_COLS = '120px 65px 65px 100px 85px 90px 100px 125px 85px 95px 65px';
 
 // ============================================================
@@ -1081,7 +1081,7 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
         <>
             <div
                 onDoubleClick={() => onOpenModal(task)}
-                className={`grid items-stretch px-2 py-1.5 transition-all duration-150 group/row min-w-[1130px]
+                className={`grid items-stretch px-2 py-1.5 transition-all duration-150 group/row min-w-[1100px]
                     ${!isLast ? 'border-b border-slate-800/30' : ''} 
                     ${isCritical ? 'bg-[var(--bg-table-row-critical)] hover:bg-[var(--bg-table-row-critical-hover)]' : 'bg-[var(--bg-table-row)] hover:bg-[var(--bg-table-row-hover)]'}
                     ${isOverdue ? 'ring-1 ring-inset ring-rose-500/20' : ''}
@@ -1091,11 +1091,8 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
                 }}
             >
 
-                {/* Columna de relleno para barra lateral del proyecto */}
-                <div className="sticky left-0 z-10 bg-inherit" style={{ borderLeft: `3px solid ${isCritical ? '#ef4444' : groupColor}` }}></div>
-
                 {/* Checkbox / Select */}
-                <div className="sticky left-[30px] z-10 bg-inherit flex items-center justify-center" onClick={e => e.stopPropagation()}>
+                <div className="sticky left-0 z-10 bg-inherit flex items-center justify-center" onClick={e => e.stopPropagation()} style={{ borderLeft: `3px solid ${isCritical ? '#ef4444' : groupColor}` }}>
                     {isSelectionEnabled && (
                         <input
                             type="checkbox"
@@ -1107,7 +1104,7 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
                 </div>
 
                 {/* Task Name + subtask chevron + subtask count badge */}
-                <div className="sticky left-[58px] z-10 bg-inherit pr-1 min-w-0 flex items-center gap-1">
+                <div className="sticky left-[28px] z-10 bg-inherit pr-1 min-w-0 flex items-center gap-1">
                     {/* Chevron — solo si tiene subtareas */}
                     {totalSubs > 0 ? (
                         <button
@@ -1660,7 +1657,7 @@ function TableGroup({ isMobile, isSelectionEnabled, label, color, tasks, engProj
     return (
         <div className="animate-in fade-in duration-200">
             {/* Sticky Group Header */}
-            <div className="sticky top-[34px] left-0 z-25 w-full bg-slate-900/95 backdrop-blur-md border-b border-slate-800/40 py-1.5 pl-3 md:pl-[39px] pr-3 flex items-center justify-between">
+            <div className="sticky top-[34px] left-0 z-25 w-full bg-slate-900/95 backdrop-blur-md border-b border-slate-800/40 py-1.5 px-3 flex items-center justify-between">
                 <button onClick={onToggle} className="flex items-center gap-2 text-left transition-colors group py-1">
                     {isExpanded
                         ? <ChevronDown className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300" />
@@ -1674,30 +1671,7 @@ function TableGroup({ isMobile, isSelectionEnabled, label, color, tasks, engProj
             </div>
 
             {isExpanded && (
-                <div className="divide-y divide-slate-800/20 relative">
-                    {!isMobile && (
-                        <div 
-                            className="absolute left-0 top-0 bottom-0 w-[30px] z-15 flex flex-col items-center select-none pointer-events-none"
-                            style={{ 
-                                borderLeft: `3px solid ${color}`,
-                                backgroundColor: `${color}0d`, // 5% opacity
-                                borderRight: '1px solid rgba(148, 163, 184, 0.08)'
-                            }}
-                        >
-                            <div className="sticky top-[68px] flex items-center justify-center h-[calc(100vh-140px)] w-full">
-                                <span 
-                                    className="whitespace-nowrap font-black text-[9px] tracking-[0.25em] uppercase"
-                                    style={{ 
-                                        writingMode: 'vertical-lr', 
-                                        transform: 'rotate(180deg)',
-                                        color: color
-                                    }}
-                                >
-                                    {label}
-                                </span>
-                            </div>
-                        </div>
-                    )}
+                <div className="divide-y divide-slate-800/20">
                     {/* Inline Add Task Row */}
                     {canEdit && (
                         isMobile ? (
@@ -1735,12 +1709,11 @@ function TableGroup({ isMobile, isSelectionEnabled, label, color, tasks, engProj
                             </div>
                         ) : (
                             <div
-                                className="grid items-center px-2 py-1.5 border-b border-slate-800/30 bg-[var(--bg-table-row)] min-w-[1130px]"
+                                className="grid items-center px-2 py-1.5 border-b border-slate-800/30 bg-[var(--bg-table-row)] min-w-[1100px]"
                                 style={{ gridTemplateColumns: GRID_COLS }}
                             >
-                                <div className="sticky left-0 z-10 bg-[var(--bg-table-row)] h-full" style={{ borderLeft: `3px solid ${color}` }}></div>
-                                <div className="sticky left-[30px] z-10 bg-[var(--bg-table-row)] h-full flex items-center justify-center"></div>
-                                <div className="sticky left-[58px] z-10 bg-[var(--bg-table-row)] pr-1 min-w-0 flex items-center h-full">
+                                <div className="sticky left-0 z-10 bg-[var(--bg-table-row)] h-full flex items-center justify-center" style={{ borderLeft: `3px solid ${color}` }}></div>
+                                <div className="sticky left-[28px] z-10 bg-[var(--bg-table-row)] pr-1 min-w-0 flex items-center h-full">
                                     {addingTask ? (
                                         <div className="flex items-center gap-1 w-full">
                                             <input
@@ -1807,12 +1780,11 @@ function TableGroup({ isMobile, isSelectionEnabled, label, color, tasks, engProj
                     {/* Group Summary Row — Monday.com style */}
                     {tasks.length > 0 && !isMobile && (
                         <div
-                            className="grid items-center px-2 py-2 border-t border-slate-700/40 bg-[var(--bg-table-row-summary)] min-w-[1130px]"
+                            className="grid items-center px-2 py-2 border-t border-slate-700/40 bg-[var(--bg-table-row-summary)] min-w-[1100px]"
                             style={{ gridTemplateColumns: GRID_COLS }}
                         >
-                            <div className="sticky left-0 z-10 bg-[var(--bg-table-row-summary)] h-full flex items-center justify-center" style={{ borderLeft: `3px solid ${color}` }}></div> {/* 1. Relleno Proyecto */}
-                            <div className="sticky left-[30px] z-10 bg-[var(--bg-table-row-summary)] h-full"></div> {/* 2. Checkbox */}
-                            <div className="sticky left-[58px] z-10 bg-[var(--bg-table-row-summary)] h-full"></div> {/* 3. Task */}
+                            <div className="sticky left-0 z-10 bg-[var(--bg-table-row-summary)] h-full flex items-center justify-center" style={{ borderLeft: `3px solid ${color}` }}></div> {/* 1. Checkbox */}
+                            <div className="sticky left-[28px] z-10 bg-[var(--bg-table-row-summary)] h-full"></div> {/* 2. Task */}
                             <div></div> {/* 3. Comentarios placeholder */}
                             <div></div> {/* 4. Owner */}
                             <div></div> {/* 5. STN placeholder */}
@@ -2347,7 +2319,7 @@ export default function MainTable({ forceProjectId = null }) {
                 )}
 
                 {/* Scrollable Table Container */}
-                <div className="flex-1 overflow-auto max-h-[75vh] border border-slate-800/50 bg-slate-800/5 rounded-xl">
+                <div className="flex-1 overflow-auto max-h-[calc(100vh-220px)] border border-slate-800/50 bg-slate-800/5 rounded-xl">
                     {/* Global columns header */}
                     {isMobile ? (
                         <div
@@ -2368,11 +2340,10 @@ export default function MainTable({ forceProjectId = null }) {
                         </div>
                     ) : (
                         <div
-                            className="grid items-center px-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-[var(--bg-table-header-solid)] text-center sticky top-0 z-30 min-w-[1130px] h-[34px] py-0"
+                            className="grid items-center px-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-[var(--bg-table-header-solid)] text-center sticky top-0 z-30 min-w-[1100px] h-[34px] py-0"
                             style={{ gridTemplateColumns: GRID_COLS }}
                         >
-                            <div className="sticky left-0 z-20 bg-[var(--bg-table-header-solid)] border-b border-slate-800/50 h-full w-full"></div>
-                            <div className="sticky left-[30px] z-20 bg-[var(--bg-table-header-solid)] flex items-center justify-center h-full">
+                            <div className="sticky left-0 z-20 bg-[var(--bg-table-header-solid)] flex items-center justify-center h-full">
                                 {isSelectionEnabled && (
                                     <input
                                         type="checkbox"
@@ -2391,7 +2362,7 @@ export default function MainTable({ forceProjectId = null }) {
                                     />
                                 )}
                             </div>
-                            <div className="sticky left-[58px] z-20 text-left bg-[var(--bg-table-header-solid)] h-full flex items-center">Tarea</div>
+                            <div className="sticky left-[28px] z-20 text-left bg-[var(--bg-table-header-solid)] h-full flex items-center">Tarea</div>
                             <div className="text-left px-1 flex items-center gap-1" title="Comentarios">💬 Comentarios</div>
                             <div>Resp</div>
                             <div>STN</div>
