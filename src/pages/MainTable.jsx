@@ -144,7 +144,7 @@ function InlineEditText({ value, onSave, className = '', placeholder = '', ariaL
 // INLINE EDIT: DROPDOWN
 // ============================================================
 
-function InlineDropdown({ value, options, onSelect, renderValue, className = '' }) {
+function InlineDropdown({ value, options, onSelect, renderValue, className = '', triggerClassName = '' }) {
     const [open, setOpen] = useState(false);
     const triggerRef = useRef(null);
     const menuRef = useRef(null);
@@ -182,7 +182,11 @@ function InlineDropdown({ value, options, onSelect, renderValue, className = '' 
 
     return (
         <div className={`relative w-full h-full ${className}`} onClick={e => e.stopPropagation()}>
-            <button ref={triggerRef} onClick={handleOpen} className="w-full h-full hover:bg-slate-800/60 rounded transition-colors flex items-center justify-center">
+            <button
+                ref={triggerRef}
+                onClick={handleOpen}
+                className={triggerClassName || "w-full h-full hover:bg-slate-800/60 rounded transition-colors flex items-center justify-center"}
+            >
                 {renderValue(value)}
             </button>
             {open && createPortal(
@@ -268,13 +272,16 @@ function InlineEditNumber({ value, onSave, suffix = 'h' }) {
 // INLINE DATE PICKER
 // ============================================================
 
-function InlineDatePicker({ value, onSave }) {
+function InlineDatePicker({ value, onSave, className = '' }) {
     const inputRef = useRef(null);
-    const display = value ? new Date(value).toLocaleDateString('es-MX', { month: 'short', day: 'numeric' }) : '—';
+    const display = value ? new Date(value).toLocaleDateString('es-MX', { month: 'short', day: 'numeric' }).replace('.', '') : '—';
 
     return (
         <span className="relative" onClick={e => e.stopPropagation()}>
-            <button onClick={() => inputRef.current?.showPicker?.()} className="text-[10px] text-slate-400 hover:text-white hover:bg-slate-800/60 rounded px-0.5 transition-colors whitespace-nowrap">
+            <button
+                onClick={() => inputRef.current?.showPicker?.()}
+                className={className || "text-[10px] text-slate-400 hover:text-white hover:bg-slate-800/60 rounded px-0.5 transition-colors whitespace-nowrap"}
+            >
                 {display}
             </button>
             <input
@@ -286,6 +293,49 @@ function InlineDatePicker({ value, onSave }) {
             />
         </span>
     );
+}
+
+function formatTimelineRange(startVal, endVal) {
+    if (!startVal && !endVal) return '—';
+    
+    const getMonthName = (dStr) => {
+        if (!dStr) return '';
+        const d = new Date(dStr);
+        if (isNaN(d.getTime())) return '';
+        const m = d.toLocaleDateString('es-MX', { month: 'short' }).replace('.', '').trim();
+        return m;
+    };
+    
+    const getDay = (dStr) => {
+        if (!dStr) return '';
+        const d = new Date(dStr);
+        if (isNaN(d.getTime())) return '';
+        return d.getDate();
+    };
+
+    if (startVal && endVal) {
+        const startDay = getDay(startVal);
+        const endDay = getDay(endVal);
+        const startMonth = getMonthName(startVal);
+        const endMonth = getMonthName(endVal);
+        
+        if (startMonth === endMonth) {
+            if (startDay === endDay) {
+                return `${startDay} ${startMonth}`;
+            }
+            return `${startDay} - ${endDay} ${startMonth}`;
+        } else {
+            return `${startDay} ${startMonth} - ${endDay} ${endMonth}`;
+        }
+    }
+    
+    const singleDate = startVal || endVal;
+    if (singleDate) {
+        const day = getDay(singleDate);
+        const month = getMonthName(singleDate);
+        return `${day} ${month}`;
+    }
+    return '—';
 }
 
 // ============================================================
@@ -834,14 +884,14 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
 
                     {/* Renglón 2: Atributos en Grid (Desplazables horizontalmente de forma unificada) */}
                     <div 
-                        className="grid items-center gap-2 text-center text-[10px] pl-6 pr-2 min-w-[1075px]"
+                        className="grid items-stretch gap-2 text-center text-[10px] pl-6 pr-2 min-w-[1075px]"
                         style={{ gridTemplateColumns: MOBILE_GRID_COLS }}
                         onClick={(e) => e.stopPropagation()}
                         onDoubleClick={(e) => e.stopPropagation()}
                     >
                         {/* 1. Comentarios */}
                         <div 
-                            className="flex flex-col gap-1 px-2 py-0.5 min-w-0 cursor-pointer hover:bg-slate-500/5 rounded-lg transition-colors text-left"
+                            className="flex flex-col justify-center gap-1 px-2 py-1.5 min-w-0 cursor-pointer hover:bg-slate-500/5 rounded-lg transition-colors text-left h-full"
                             onClick={(e) => { e.stopPropagation(); onOpenModal(task); }}
                         >
                             {taskComments && taskComments.length > 0 ? (
@@ -854,7 +904,7 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
                         </div>
 
                         {/* 2. Resp */}
-                        <div className="flex items-center justify-center">
+                        <div className="flex items-center justify-center py-1.5 h-full">
                             {canEdit ? (
                                 <InlineDropdown
                                     value={task.assignedTo || ''}
@@ -869,21 +919,22 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
                         </div>
 
                         {/* 3. STN */}
-                        <div className="flex items-center justify-center">
+                        <div className="flex items-center justify-center py-1.5 h-full">
                             <StationCell task={task} canEdit={canEdit} onSave={v => saveField('stationId', v)} />
                         </div>
 
                         {/* 3. Estado */}
-                        <div className="flex items-stretch p-0.5">
+                        <div className="flex items-stretch p-0">
                             {canEdit ? (
                                 <InlineDropdown
                                     value={task.status}
                                     options={statusOptions}
                                     onSelect={v => saveField('status', v)}
+                                    triggerClassName="w-full h-full rounded-none hover:brightness-110 flex items-center justify-center transition-all px-1 min-h-[32px] text-[9px] font-bold text-white text-center leading-tight"
                                     renderValue={(val) => {
                                         const cfg = TASK_STATUS_CONFIG[val] || {};
                                         return (
-                                            <div className="w-full h-full flex items-center justify-center rounded text-[9px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                            <div className="w-full h-full flex items-center justify-center"
                                                 style={{ background: cfg.color || '#64748b' }}>
                                                 {cfg.label || val}
                                             </div>
@@ -891,7 +942,7 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
                                     }}
                                 />
                             ) : (
-                                <div className="w-full h-full flex items-center justify-center rounded text-[9px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                <div className="w-full h-full flex items-center justify-center px-1 min-h-[32px] text-[9px] font-bold text-white text-center leading-tight rounded-none"
                                     style={{ background: statusCfg.color || '#64748b' }}>
                                     {statusCfg.label || task.status}
                                 </div>
@@ -899,7 +950,7 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
                         </div>
 
                         {/* 4. Área */}
-                        <div className="min-w-0 overflow-hidden flex items-center justify-center">
+                        <div className="min-w-0 overflow-hidden flex items-center justify-center py-1.5 h-full">
                             {(() => {
                                 const wa = (workAreaTypes || []).find(a => a.id === task.workAreaTypeId);
                                 const areaOptions = [
@@ -922,7 +973,7 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
                         </div>
 
                         {/* 5. Tipo */}
-                        <div className="min-w-0 overflow-hidden flex items-center justify-center">
+                        <div className="min-w-0 overflow-hidden flex items-center justify-center py-1.5 h-full">
                             {(() => {
                                 const selectedArea = (workAreaTypes || []).find(a => a.id === task.workAreaTypeId);
                                 const allowedValues = selectedArea?.defaultTaskTypes || [];
@@ -958,7 +1009,7 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
                         </div>
 
                         {/* 6. Avance */}
-                        <div className="flex items-center justify-center">
+                        <div className="flex items-center justify-center py-1.5 h-full">
                             <div className="flex flex-col items-center gap-0.5 w-full px-1">
                                 <span className="text-[9px] font-black" style={{ color: progressColor }}>{progressPct}%</span>
                                 <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
@@ -968,30 +1019,41 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
                         </div>
 
                         {/* 7. Timeline */}
-                        <div className="min-w-0 overflow-hidden flex flex-col items-center justify-center gap-0.5">
-                            <div className="flex items-center justify-center gap-1.5 text-[9px] min-w-0 w-full">
+                        <div className="min-w-0 overflow-hidden flex items-center justify-center py-1 h-full">
+                            <div className={`rounded-full px-3 py-1 text-[9px] font-bold text-center flex items-center justify-center gap-1 min-w-[95px] max-w-fit mx-auto shadow-sm ${
+                                task.status === 'completed' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-200'
+                            }`}>
+                                {task.status === 'completed' && <Check className="w-3 h-3 text-white shrink-0 mr-0.5" />}
                                 {canEdit ? (
-                                    <>
+                                    <div className="flex items-center justify-center gap-1 min-w-0">
                                         {(canEditDates || !startRaw) ? (
-                                            <InlineDatePicker value={startRaw} onSave={v => saveField('plannedStartDate', v)} />
+                                            <InlineDatePicker
+                                                value={startRaw}
+                                                onSave={v => saveField('plannedStartDate', v)}
+                                                className="text-[9px] text-inherit hover:bg-white/10 rounded px-0.5 transition-colors whitespace-nowrap"
+                                            />
                                         ) : (
-                                            <span className="text-slate-400 text-[9px] whitespace-nowrap">{fmtDate(startDate)}</span>
+                                            <span className="text-inherit text-[9px] whitespace-nowrap">{fmtDate(startDate)}</span>
                                         )}
-                                        <span className="text-slate-600 shrink-0">→</span>
+                                        <span className="text-slate-500 shrink-0">→</span>
                                         {(canEditDates || !endRaw) ? (
-                                            <InlineDatePicker value={endRaw} onSave={v => saveField('dueDate', v)} />
+                                            <InlineDatePicker
+                                                value={endRaw}
+                                                onSave={v => saveField('dueDate', v)}
+                                                className="text-[9px] text-inherit hover:bg-white/10 rounded px-0.5 transition-colors whitespace-nowrap"
+                                            />
                                         ) : (
-                                            <span className="text-slate-400 text-[9px] whitespace-nowrap">{fmtDate(endDate)}</span>
+                                            <span className="text-inherit text-[9px] whitespace-nowrap">{fmtDate(endDate)}</span>
                                         )}
-                                    </>
+                                    </div>
                                 ) : (
-                                    <span className="text-slate-400 truncate text-[9px] whitespace-nowrap">{fmtDate(startDate)} → {fmtDate(endDate)}</span>
+                                    <span className="truncate whitespace-nowrap">{formatTimelineRange(startRaw, endRaw)}</span>
                                 )}
                             </div>
                         </div>
 
                         {/* 8. Horas */}
-                        <div className="min-w-0 overflow-hidden flex flex-col items-center justify-center gap-0.5">
+                        <div className="min-w-0 overflow-hidden flex items-center justify-center py-1.5 h-full">
                             {(actual > 0 || estimated > 0) ? (
                                 <div className="flex items-center justify-center gap-0.5 text-[9px] min-w-0 w-full">
                                     <span className="text-slate-400 font-bold shrink-0">{actual.toFixed(1)}h</span>
@@ -999,27 +1061,28 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
                                     {canEdit ? (
                                         <InlineEditNumber value={estimated} onSave={v => saveField('estimatedHours', v)} />
                                     ) : (
-                                        <span className="text-slate-400 shrink-0">{estimated}h</span>
+                                        <span className="text-slate-450 shrink-0">{estimated}h</span>
                                     )}
                                 </div>
                             ) : (
-                                <span className="text-[9px] text-slate-600">—</span>
+                                <span className="text-[9px] text-slate-605">—</span>
                             )}
                         </div>
 
                         {/* 9. Prioridad */}
-                        <div className="flex items-stretch p-0.5">
+                        <div className="flex items-stretch p-0">
                             {canEdit ? (
                                 <InlineDropdown
                                     value={task.priority || 'medium'}
                                     options={priorityOptions}
                                     onSelect={v => saveField('priority', v)}
+                                    triggerClassName="w-full h-full rounded-none hover:brightness-110 flex items-center justify-center transition-all px-1 min-h-[32px] text-[9px] font-bold text-white text-center leading-tight"
                                     renderValue={(val) => {
                                         const colors = { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' };
                                         const c = colors[val] || '#579bfc';
                                         const cfg = TASK_PRIORITY_CONFIG[val] || {};
                                         return (
-                                            <div className="w-full h-full flex items-center justify-center rounded text-[9px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                            <div className="w-full h-full flex items-center justify-center"
                                                 style={{ background: c }}>
                                                 {cfg.label || val}
                                             </div>
@@ -1027,7 +1090,7 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
                                     }}
                                 />
                             ) : (
-                                <div className="w-full h-full flex items-center justify-center rounded text-[9px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                <div className="w-full h-full flex items-center justify-center px-1 min-h-[32px] text-[9px] font-bold text-white text-center leading-tight rounded-none"
                                     style={{ background: { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' }[task.priority] || '#579bfc' }}>
                                     {(TASK_PRIORITY_CONFIG[task.priority] || {}).label || '—'}
                                 </div>
@@ -1035,7 +1098,7 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
                         </div>
 
                         {/* 10. Asig. */}
-                        <div className="flex items-center justify-center">
+                        <div className="flex items-center justify-center py-1.5 h-full">
                             {canEdit ? (
                                 <InlineDropdown
                                     value={task.assignedBy || ''}
@@ -1081,7 +1144,7 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
         <>
             <div
                 onDoubleClick={() => onOpenModal(task)}
-                className={`grid items-stretch px-2 py-1.5 transition-all duration-150 group/row min-w-[1100px]
+                className={`grid items-stretch px-2 py-0 transition-all duration-150 group/row min-w-[1100px]
                     ${!isLast ? 'border-b border-slate-800/30' : ''} 
                     ${isCritical ? 'bg-[var(--bg-table-row-critical)] hover:bg-[var(--bg-table-row-critical-hover)]' : 'bg-[var(--bg-table-row)] hover:bg-[var(--bg-table-row-hover)]'}
                     ${isOverdue ? 'ring-1 ring-inset ring-rose-500/20' : ''}
@@ -1092,7 +1155,7 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
             >
 
                 {/* Checkbox / Select */}
-                <div className="sticky left-0 z-10 bg-inherit flex items-center justify-center" onClick={e => e.stopPropagation()} style={{ borderLeft: `3px solid ${isCritical ? '#ef4444' : groupColor}` }}>
+                <div className="sticky left-0 z-10 bg-inherit flex items-center justify-center py-2 h-full" onClick={e => e.stopPropagation()} style={{ borderLeft: `3px solid ${isCritical ? '#ef4444' : groupColor}` }}>
                     {isSelectionEnabled && (
                         <input
                             type="checkbox"
@@ -1104,7 +1167,7 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
                 </div>
 
                 {/* Task Name + subtask chevron + subtask count badge */}
-                <div className="sticky left-[28px] z-10 bg-inherit pr-1 min-w-0 flex items-center gap-1">
+                <div className="sticky left-[28px] z-10 bg-inherit pr-1 min-w-0 flex items-center gap-1 py-2 h-full">
                     {/* Chevron — solo si tiene subtareas */}
                     {totalSubs > 0 ? (
                         <button
@@ -1159,7 +1222,7 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
 
                 {/* Comentarios */}
                 <div 
-                    className="flex flex-col gap-1 px-2 py-1.5 min-w-0 cursor-pointer hover:bg-slate-500/5 dark:hover:bg-slate-700/10 rounded-lg transition-colors"
+                    className="flex flex-col justify-center gap-1 px-2 py-2 min-w-0 cursor-pointer hover:bg-slate-500/5 dark:hover:bg-slate-700/10 rounded-lg transition-colors h-full"
                     onClick={(e) => { e.stopPropagation(); onOpenModal(task); }}
                     title="Hacer clic para ver o agregar comentarios"
                 >
@@ -1179,7 +1242,7 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
                 </div>
 
                 {/* Owner */}
-                <div className="flex items-center justify-center">
+                <div className="flex items-center justify-center py-2 h-full">
                     {canEdit ? (
                         <InlineDropdown
                             value={task.assignedTo || ''}
@@ -1193,22 +1256,23 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
                     )}
                 </div>
 
-
-
                 {/* Station (STN) */}
-                <StationCell task={task} canEdit={canEdit} onSave={v => saveField('stationId', v)} />
+                <div className="flex items-center justify-center py-2 h-full">
+                    <StationCell task={task} canEdit={canEdit} onSave={v => saveField('stationId', v)} />
+                </div>
 
                 {/* Status — Monday.com full-width colored cell */}
-                <div className="flex items-stretch p-0.5" onClick={e => e.stopPropagation()}>
+                <div className="flex items-stretch p-0" onClick={e => e.stopPropagation()}>
                     {canEdit ? (
                         <InlineDropdown
                             value={task.status}
                             options={statusOptions}
                             onSelect={v => saveField('status', v)}
+                            triggerClassName="w-full h-full rounded-none hover:brightness-110 flex items-center justify-center transition-all px-2 text-[10px] font-bold text-white text-center leading-tight"
                             renderValue={(val) => {
                                 const cfg = TASK_STATUS_CONFIG[val] || {};
                                 return (
-                                    <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[26px]"
+                                    <div className="w-full h-full flex items-center justify-center"
                                         style={{ background: cfg.color || '#64748b' }}>
                                         {cfg.label || val}
                                     </div>
@@ -1216,7 +1280,7 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
                             }}
                         />
                     ) : (
-                        <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[26px]"
+                        <div className="w-full h-full flex items-center justify-center px-2 text-[10px] font-bold text-white text-center leading-tight rounded-none"
                             style={{ background: statusCfg.color || '#64748b' }}>
                             {statusCfg.label || task.status}
                         </div>
@@ -1224,7 +1288,7 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
                 </div>
 
                 {/* Área */}
-                <div className="min-w-0 overflow-hidden flex items-center justify-center" onClick={e => e.stopPropagation()}>
+                <div className="min-w-0 overflow-hidden flex items-center justify-center py-2 h-full" onClick={e => e.stopPropagation()}>
                     {(() => {
                         const wa = (workAreaTypes || []).find(a => a.id === task.workAreaTypeId);
                         const areaOptions = [
@@ -1266,7 +1330,7 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
                 </div>
 
                 {/* Tipo (filtered by area) */}
-                <div className="min-w-0 overflow-hidden flex items-center justify-center" onClick={e => e.stopPropagation()}>
+                <div className="min-w-0 overflow-hidden flex items-center justify-center py-2 h-full" onClick={e => e.stopPropagation()}>
                     {(() => {
                         const selectedArea = (workAreaTypes || []).find(a => a.id === task.workAreaTypeId);
                         const allowedValues = selectedArea?.defaultTaskTypes || [];
@@ -1302,7 +1366,7 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
                 </div>
 
                 {/* ── Avance %% ── */}
-                <div className="flex items-center justify-center" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-center py-2 h-full" onClick={e => e.stopPropagation()}>
                     <div className="flex flex-col items-center gap-0.5 w-full px-1">
                         <span className="text-[11px] font-black" style={{ color: progressColor }}>{progressPct}%</span>
                         <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
@@ -1311,57 +1375,51 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
                     </div>
                 </div>
 
-
-
                 {/* Timeline */}
-                <div className="min-w-0 overflow-hidden flex flex-col items-center justify-end gap-1.5 py-1.5 px-1" onClick={e => e.stopPropagation()}>
-                    <div className="flex items-center justify-center gap-1.5 text-[11px] min-w-0 w-full mt-auto">
+                <div className="min-w-0 overflow-hidden flex items-center justify-center py-2 h-full" onClick={e => e.stopPropagation()}>
+                    <div className={`rounded-full px-3 py-1.5 text-[10px] font-bold text-center flex items-center justify-center gap-1 min-w-[95px] max-w-fit mx-auto shadow-sm ${
+                        task.status === 'completed' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-200'
+                    }`}>
+                        {task.status === 'completed' && <Check className="w-3.5 h-3.5 text-white shrink-0 mr-0.5" />}
                         {canEdit ? (
-                            <>
+                            <div className="flex items-center justify-center gap-1 min-w-0">
                                 {(canEditDates || !startRaw) ? (
-                                    <InlineDatePicker value={startRaw} onSave={v => saveField('plannedStartDate', v)} />
+                                    <InlineDatePicker
+                                        value={startRaw}
+                                        onSave={v => saveField('plannedStartDate', v)}
+                                        className="text-[10px] text-inherit hover:bg-white/10 rounded px-0.5 transition-colors whitespace-nowrap"
+                                    />
                                 ) : (
-                                    <span className="text-slate-400 text-[11px] whitespace-nowrap">{fmtDate(startDate)}</span>
+                                    <span className="text-inherit text-[10px] whitespace-nowrap">{fmtDate(startDate)}</span>
                                 )}
-                                <span className="text-slate-600 shrink-0">→</span>
+                                <span className="text-slate-500 shrink-0">→</span>
                                 {(canEditDates || !endRaw) ? (
-                                    <InlineDatePicker value={endRaw} onSave={v => saveField('dueDate', v)} />
+                                    <InlineDatePicker
+                                        value={endRaw}
+                                        onSave={v => saveField('dueDate', v)}
+                                        className="text-[10px] text-inherit hover:bg-white/10 rounded px-0.5 transition-colors whitespace-nowrap"
+                                    />
                                 ) : (
-                                    <span className="text-slate-400 text-[11px] whitespace-nowrap">{fmtDate(endDate)}</span>
+                                    <span className="text-inherit text-[10px] whitespace-nowrap">{fmtDate(endDate)}</span>
                                 )}
-                            </>
+                            </div>
                         ) : (
-                            <span className="text-slate-400 truncate whitespace-nowrap">{fmtDate(startDate)} → {fmtDate(endDate)}</span>
-                        )}
-                        {daysLeft !== null && task.status === 'completed' && (
-                            <span className="text-[11px] font-bold shrink-0 px-1 rounded text-slate-500">✓</span>
+                            <span className="truncate whitespace-nowrap">{formatTimelineRange(startRaw, endRaw)}</span>
                         )}
                     </div>
-                    {startDate && endDate && (
-                        <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden shrink-0">
-                            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${timelinePct}%`, background: timelineColor }} />
-                        </div>
-                    )}
                 </div>
 
                 {/* Hours — own column with bar */}
-                <div className="min-w-0 overflow-hidden flex flex-col items-center justify-end gap-1.5 py-1.5 px-1" onClick={e => e.stopPropagation()}>
+                <div className="min-w-0 overflow-hidden flex items-center justify-center py-2 h-full" onClick={e => e.stopPropagation()}>
                     {(actual > 0 || estimated > 0) ? (
-                        <>
-                            <div className="flex items-center justify-center gap-1 text-[11px] min-w-0 w-full mt-auto">
+                        <div className="flex flex-col items-center gap-1 w-full px-1">
+                            <div className="flex items-center justify-center gap-0.5 text-[11px] min-w-0 w-full">
                                 <span className="text-slate-400 font-bold shrink-0">{actual.toFixed(1)}h</span>
                                 <span className="text-slate-600 shrink-0">/</span>
                                 {canEdit ? (
                                     <InlineEditNumber value={estimated} onSave={v => saveField('estimatedHours', v)} />
                                 ) : (
-                                    <span className="text-slate-400 shrink-0">{estimated}h</span>
-                                )}
-                                {estimated > 0 && (
-                                    <span className={`text-[11px] font-bold shrink-0 ml-1 ${
-                                        hoursPct > 100 ? 'text-rose-400' : hoursPct > 80 ? 'text-amber-400' : 'text-emerald-400'
-                                    }`}>
-                                        {hoursPct}%
-                                    </span>
+                                    <span className="text-slate-450 shrink-0">{estimated}h</span>
                                 )}
                             </div>
                             {estimated > 0 && (
@@ -1372,25 +1430,26 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
                                     }} />
                                 </div>
                             )}
-                        </>
+                        </div>
                     ) : (
                         <span className="text-[11px] text-slate-600">—</span>
                     )}
                 </div>
 
                 {/* Priority — Monday.com full-width colored cell */}
-                <div className="flex items-stretch p-0.5" onClick={e => e.stopPropagation()}>
+                <div className="flex items-stretch p-0" onClick={e => e.stopPropagation()}>
                     {canEdit ? (
                         <InlineDropdown
                             value={task.priority || 'medium'}
                             options={priorityOptions}
                             onSelect={v => saveField('priority', v)}
+                            triggerClassName="w-full h-full rounded-none hover:brightness-110 flex items-center justify-center transition-all px-2 text-[10px] font-bold text-white text-center leading-tight"
                             renderValue={(val) => {
                                 const colors = { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' };
                                 const c = colors[val] || '#579bfc';
                                 const cfg = TASK_PRIORITY_CONFIG[val] || {};
                                 return (
-                                    <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[26px]"
+                                    <div className="w-full h-full flex items-center justify-center"
                                         style={{ background: c }}>
                                         {cfg.label || val}
                                     </div>
@@ -1398,17 +1457,15 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
                             }}
                         />
                     ) : (
-                        <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[26px]"
+                        <div className="w-full h-full flex items-center justify-center px-2 text-[10px] font-bold text-white text-center leading-tight rounded-none"
                             style={{ background: { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' }[task.priority] || '#579bfc' }}>
                             {(TASK_PRIORITY_CONFIG[task.priority] || {}).label || '—'}
                         </div>
                     )}
                 </div>
 
-
-
                 {/* Assigned By (who assigned — far right) */}
-                <div className="flex items-center justify-center">
+                <div className="flex items-center justify-center py-2 h-full">
                     {canEdit ? (
                         <InlineDropdown
                             value={task.assignedBy || ''}

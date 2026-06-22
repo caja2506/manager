@@ -97,7 +97,7 @@ function InlineEditText({ value, onSave, className = '', placeholder = '', ariaL
     );
 }
 
-function InlineDropdown({ value, options, onSelect, renderValue, className = '' }) {
+function InlineDropdown({ value, options, onSelect, renderValue, className = '', triggerClassName = '' }) {
     const [open, setOpen] = useState(false);
     const triggerRef = useRef(null);
     const menuRef = useRef(null);
@@ -135,7 +135,11 @@ function InlineDropdown({ value, options, onSelect, renderValue, className = '' 
 
     return (
         <div className={`relative w-full h-full ${className}`} onClick={e => e.stopPropagation()}>
-            <button ref={triggerRef} onClick={handleOpen} className="w-full h-full hover:bg-slate-850/60 rounded transition-colors flex items-center justify-center">
+            <button
+                ref={triggerRef}
+                onClick={handleOpen}
+                className={triggerClassName || "w-full h-full hover:bg-slate-850/60 rounded transition-colors flex items-center justify-center"}
+            >
                 {renderValue(value)}
             </button>
             {open && createPortal(
@@ -213,13 +217,16 @@ function InlineEditNumber({ value, onSave, suffix = 'h' }) {
     );
 }
 
-function InlineDatePicker({ value, onSave }) {
+function InlineDatePicker({ value, onSave, className = '' }) {
     const inputRef = useRef(null);
-    const display = value ? new Date(value).toLocaleDateString('es-MX', { month: 'short', day: 'numeric' }) : '—';
+    const display = value ? new Date(value).toLocaleDateString('es-MX', { month: 'short', day: 'numeric' }).replace('.', '') : '—';
 
     return (
         <span className="relative" onClick={e => e.stopPropagation()}>
-            <button onClick={() => inputRef.current?.showPicker?.()} className="text-[10px] text-slate-450 hover:text-white hover:bg-slate-850/60 rounded px-0.5 transition-colors whitespace-nowrap">
+            <button
+                onClick={() => inputRef.current?.showPicker?.()}
+                className={className || "text-[10px] text-slate-450 hover:text-white hover:bg-slate-850/60 rounded px-0.5 transition-colors whitespace-nowrap"}
+            >
                 {display}
             </button>
             <input
@@ -318,6 +325,49 @@ function StationCell({ task, canEdit, onSave }) {
             </span>
         </div>
     );
+}
+
+function formatTimelineRange(startVal, endVal) {
+    if (!startVal && !endVal) return '—';
+    
+    const getMonthName = (dStr) => {
+        if (!dStr) return '';
+        const d = new Date(dStr);
+        if (isNaN(d.getTime())) return '';
+        const m = d.toLocaleDateString('es-MX', { month: 'short' }).replace('.', '').trim();
+        return m;
+    };
+    
+    const getDay = (dStr) => {
+        if (!dStr) return '';
+        const d = new Date(dStr);
+        if (isNaN(d.getTime())) return '';
+        return d.getDate();
+    };
+
+    if (startVal && endVal) {
+        const startDay = getDay(startVal);
+        const endDay = getDay(endVal);
+        const startMonth = getMonthName(startVal);
+        const endMonth = getMonthName(endVal);
+        
+        if (startMonth === endMonth) {
+            if (startDay === endDay) {
+                return `${startDay} ${startMonth}`;
+            }
+            return `${startDay} - ${endDay} ${startMonth}`;
+        } else {
+            return `${startDay} ${startMonth} - ${endDay} ${endMonth}`;
+        }
+    }
+    
+    const singleDate = startVal || endVal;
+    if (singleDate) {
+        const day = getDay(singleDate);
+        const month = getMonthName(singleDate);
+        return `${day} ${month}`;
+    }
+    return '—';
 }
 
 export default function MyWork() {
@@ -857,14 +907,13 @@ export default function MyWork() {
                                     >
                                         Crear
                                     </button>
-                                </div>
-                                {/* Row 2: Grid details */}
+                                </div >
                                 <div
-                                    className="grid items-center gap-2 text-center text-[10px] pl-6 pr-2 min-w-[930px]"
+                                    className="grid items-stretch gap-2 text-center text-[10px] pl-6 pr-2 min-w-[930px] mt-1"
                                     style={{ gridTemplateColumns: MOBILE_GRID_COLS }}
                                 >
                                     {/* 1. Proyecto */}
-                                    <div className="text-left">
+                                    <div className="text-left flex items-center h-full py-1.5">
                                         <InlineDropdown
                                             value={quickProjectId}
                                             options={engProjects.map(p => ({ value: p.id, label: p.name }))}
@@ -880,17 +929,18 @@ export default function MyWork() {
                                         />
                                     </div>
                                     {/* 2. Estado */}
-                                    <div className="flex items-stretch px-0.5">
+                                    <div className="w-full h-full flex items-stretch">
                                         <InlineDropdown
                                             value={quickStatus}
                                             options={Object.entries(TASK_STATUS_CONFIG)
                                                 .filter(([k]) => k !== 'backlog')
                                                 .map(([k, cfg]) => ({ value: k, label: cfg.label, color: cfg.color }))}
                                             onSelect={v => setQuickStatus(v)}
+                                            triggerClassName="w-full h-full flex items-center justify-center transition-all hover:brightness-110"
                                             renderValue={(val) => {
                                                 const cfg = TASK_STATUS_CONFIG[val] || {};
                                                 return (
-                                                    <div className="w-full h-full flex items-center justify-center rounded text-[9px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                                    <div className="w-full h-full flex items-center justify-center text-[9px] font-bold text-white text-center leading-tight py-1.5 px-1"
                                                         style={{ background: cfg.color || '#64748b' }}>
                                                         {cfg.label || val}
                                                     </div>
@@ -899,17 +949,18 @@ export default function MyWork() {
                                         />
                                     </div>
                                     {/* 3. Prioridad */}
-                                    <div className="flex items-stretch px-0.5 font-bold text-white">
+                                    <div className="w-full h-full flex items-stretch">
                                         <InlineDropdown
                                             value={quickPriority}
                                             options={Object.entries(TASK_PRIORITY_CONFIG).map(([k, cfg]) => ({ value: k, label: cfg.label, color: cfg.color || '#64748b' }))}
                                             onSelect={v => setQuickPriority(v)}
+                                            triggerClassName="w-full h-full flex items-center justify-center transition-all hover:brightness-110"
                                             renderValue={(val) => {
                                                 const colors = { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' };
                                                 const c = colors[val] || '#579bfc';
                                                 const cfg = TASK_PRIORITY_CONFIG[val] || {};
                                                 return (
-                                                    <div className="w-full h-full flex items-center justify-center rounded text-[9px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                                    <div className="w-full h-full flex items-center justify-center text-[9px] font-bold text-white text-center leading-tight py-1.5 px-1"
                                                         style={{ background: c }}>
                                                         {cfg.label || val}
                                                     </div>
@@ -918,7 +969,7 @@ export default function MyWork() {
                                         />
                                     </div>
                                     {/* 4. STN */}
-                                    <div>
+                                    <div className="flex items-center justify-center h-full py-1.5 min-w-0">
                                         <InlineDropdown
                                             value={quickStationId}
                                             options={[
@@ -942,7 +993,7 @@ export default function MyWork() {
                                         />
                                     </div>
                                     {/* 5. Área */}
-                                    <div>
+                                    <div className="flex items-center justify-center h-full py-1.5 min-w-0">
                                         <InlineDropdown
                                             value={quickWorkAreaTypeId}
                                             options={[
@@ -961,7 +1012,7 @@ export default function MyWork() {
                                         />
                                     </div>
                                     {/* 6. Tipo */}
-                                    <div>
+                                    <div className="flex items-center justify-center h-full py-1.5 min-w-0">
                                         <InlineDropdown
                                             value={quickTaskTypeId}
                                             options={[
@@ -980,18 +1031,20 @@ export default function MyWork() {
                                         />
                                     </div>
                                     {/* 7. Avance */}
-                                    <div className="text-center text-slate-650">—</div>
+                                    <div className="text-center text-slate-650 h-full flex items-center justify-center py-1.5">—</div>
                                     {/* 8. Timeline */}
-                                    <div className="flex items-center justify-center gap-1 text-[8.5px] font-bold text-slate-400 bg-slate-900/40 px-1 py-0.5 rounded">
-                                        <input
-                                            type="date"
-                                            value={quickDueDate}
-                                            onChange={e => setQuickDueDate(e.target.value)}
-                                            className="bg-slate-800 border border-slate-700/50 rounded px-1 py-0.5 text-[9px] text-slate-355 focus:outline-none w-full text-center"
-                                        />
+                                    <div className="min-w-0 overflow-hidden flex items-center justify-center h-full py-1.5">
+                                        <div className="flex items-center justify-center gap-1 text-[8.5px] font-bold text-slate-400 bg-slate-900/40 px-1 py-0.5 rounded-full min-w-[90px] max-w-fit mx-auto h-fit self-center">
+                                            <input
+                                                type="date"
+                                                value={quickDueDate}
+                                                onChange={e => setQuickDueDate(e.target.value)}
+                                                className="bg-transparent text-slate-200 focus:outline-none w-full text-center text-[9px] font-bold"
+                                            />
+                                        </div>
                                     </div>
                                     {/* 9. Horas */}
-                                    <div className="flex items-center justify-center gap-0.5 text-[9px] min-w-0 w-full font-bold text-slate-355">
+                                    <div className="flex items-center justify-center gap-0.5 text-[9px] min-w-0 w-full font-bold text-slate-355 h-full py-1.5">
                                         <input
                                             type="number"
                                             placeholder="Est."
@@ -1003,18 +1056,18 @@ export default function MyWork() {
                                         />
                                     </div>
                                     {/* 10. Acciones/Placeholder */}
-                                    <div className="text-[9px] text-slate-500 italic select-none">Fija ↑</div>
+                                    <div className="text-[9px] text-slate-500 italic select-none h-full flex items-center justify-center py-1.5">Fija ↑</div>
                                 </div>
                             </div>
                         ) : (
                             <div
-                                className="grid items-center px-2 py-1.5 border-b border-slate-850 bg-slate-900/40 text-center text-xs min-w-[1100px]"
+                                className="grid items-stretch px-2 py-0 border-b border-slate-850 bg-slate-900/40 text-center text-xs min-w-[1100px]"
                                 style={{ gridTemplateColumns: GRID_COLS }}
                             >
                                 <div className="sticky left-0 z-10 bg-slate-900 h-full flex items-center justify-center border-l-3 border-l-indigo-600">
                                     <Plus className="w-3.5 h-3.5 text-indigo-400" />
                                 </div>
-                                <div className="sticky left-[28px] z-10 bg-slate-900 pr-1 min-w-0 flex items-center h-full">
+                                <div className="sticky left-[28px] z-10 bg-slate-900 pr-1 min-w-0 flex items-center h-full py-2">
                                     <input
                                         type="text"
                                         placeholder="Nombre de la nueva tarea..."
@@ -1024,7 +1077,7 @@ export default function MyWork() {
                                         className="w-full bg-slate-850 border border-slate-700/55 rounded px-2 py-1 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-indigo-500/50"
                                     />
                                 </div>
-                                <div className="text-left px-2">
+                                <div className="text-left px-2 flex items-center h-full py-2">
                                     <InlineDropdown
                                         value={quickProjectId}
                                         options={engProjects.map(p => ({ value: p.id, label: p.name }))}
@@ -1039,8 +1092,8 @@ export default function MyWork() {
                                         }}
                                     />
                                 </div>
-                                <div className="text-center text-slate-600">—</div>
-                                <div>
+                                <div className="text-center text-slate-600 h-full flex items-center justify-center py-2">—</div>
+                                <div className="flex items-center justify-center h-full py-2 min-w-0">
                                     <InlineDropdown
                                         value={quickStationId}
                                         options={[
@@ -1063,7 +1116,7 @@ export default function MyWork() {
                                         className={!quickProjectId ? 'opacity-40 pointer-events-none' : ''}
                                     />
                                 </div>
-                                <div>
+                                <div className="flex items-center justify-center h-full py-2 min-w-0">
                                     <InlineDropdown
                                         value={quickWorkAreaTypeId}
                                         options={[
@@ -1081,7 +1134,7 @@ export default function MyWork() {
                                         }}
                                     />
                                 </div>
-                                <div>
+                                <div className="flex items-center justify-center h-full py-2 min-w-0">
                                     <InlineDropdown
                                         value={quickTaskTypeId}
                                         options={[
@@ -1099,17 +1152,18 @@ export default function MyWork() {
                                         }}
                                     />
                                 </div>
-                                <div className="flex items-stretch px-0.5">
+                                <div className="w-full h-full flex items-stretch">
                                     <InlineDropdown
                                         value={quickStatus}
                                         options={Object.entries(TASK_STATUS_CONFIG)
                                             .filter(([k]) => k !== 'backlog')
                                             .map(([k, cfg]) => ({ value: k, label: cfg.label, color: cfg.color }))}
                                         onSelect={v => setQuickStatus(v)}
+                                        triggerClassName="w-full h-full flex items-center justify-center transition-all hover:brightness-110"
                                         renderValue={(val) => {
                                             const cfg = TASK_STATUS_CONFIG[val] || {};
                                             return (
-                                                <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                                <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-white text-center leading-tight py-2 px-1"
                                                     style={{ background: cfg.color || '#64748b' }}>
                                                     {cfg.label || val}
                                                 </div>
@@ -1117,16 +1171,18 @@ export default function MyWork() {
                                         }}
                                     />
                                 </div>
-                                <div className="text-center text-slate-650">—</div>
-                                <div className="flex items-center justify-center">
-                                    <input
-                                        type="date"
-                                        value={quickDueDate}
-                                        onChange={e => setQuickDueDate(e.target.value)}
-                                        className="bg-slate-800 border border-slate-700/50 rounded px-1 py-0.5 text-[10px] text-slate-350 focus:outline-none w-full text-center"
-                                    />
+                                <div className="text-center text-slate-655 h-full flex items-center justify-center py-2">—</div>
+                                <div className="flex items-center justify-center h-full py-2 min-w-[95px] max-w-fit mx-auto">
+                                    <div className="flex items-center justify-center gap-1 text-[9px] font-bold text-slate-400 bg-slate-900/40 px-2 py-0.5 rounded-full">
+                                        <input
+                                            type="date"
+                                            value={quickDueDate}
+                                            onChange={e => setQuickDueDate(e.target.value)}
+                                            className="bg-transparent text-slate-200 focus:outline-none w-full text-center text-[10px] font-bold"
+                                        />
+                                    </div>
                                 </div>
-                                <div className="flex items-center justify-center">
+                                <div className="flex items-center justify-center h-full py-2">
                                     <input
                                         type="number"
                                         placeholder="Est."
@@ -1137,17 +1193,18 @@ export default function MyWork() {
                                         step="0.5"
                                     />
                                 </div>
-                                <div className="flex items-stretch px-0.5">
+                                <div className="w-full h-full flex items-stretch">
                                     <InlineDropdown
                                         value={quickPriority}
                                         options={Object.entries(TASK_PRIORITY_CONFIG).map(([k, cfg]) => ({ value: k, label: cfg.label, color: cfg.color || '#64748b' }))}
                                         onSelect={v => setQuickPriority(v)}
+                                        triggerClassName="w-full h-full flex items-center justify-center transition-all hover:brightness-110"
                                         renderValue={(val) => {
                                             const colors = { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' };
                                             const c = colors[val] || '#579bfc';
                                             const cfg = TASK_PRIORITY_CONFIG[val] || {};
                                             return (
-                                                <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                                <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-white text-center leading-tight py-2 px-1"
                                                     style={{ background: c }}>
                                                     {cfg.label || val}
                                                 </div>
@@ -1155,11 +1212,11 @@ export default function MyWork() {
                                         }}
                                     />
                                 </div>
-                                <div className="flex items-center justify-center">
+                                <div className="flex items-center justify-end h-full py-2 pr-1">
                                     <button
                                         onClick={handleQuickAddTask}
                                         disabled={!quickTitle.trim() || !quickProjectId}
-                                        className="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded text-[10px] font-bold transition-all"
+                                        className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-655 text-white rounded text-[10px] font-bold transition-all"
                                     >
                                         Crear
                                     </button>
@@ -1320,16 +1377,16 @@ export default function MyWork() {
                                                 )}
                                             </div>
                                         </div>
- 
+
                                         {/* Renglón 2: Atributos en Grid (Desplazables horizontalmente de forma unificada) */}
                                         <div 
-                                            className="grid items-center gap-2 text-center text-[10px] pl-6 pr-2 min-w-[930px]"
+                                            className="grid items-stretch gap-2 text-center text-[10px] pl-6 pr-2 min-w-[930px]"
                                             style={{ gridTemplateColumns: MOBILE_GRID_COLS }}
                                             onClick={(e) => e.stopPropagation()}
                                             onDoubleClick={(e) => e.stopPropagation()}
                                         >
                                             {/* Proyecto */}
-                                            <div className="text-left">
+                                            <div className="text-left flex items-center h-full py-1.5">
                                                 {canEdit ? (
                                                     <InlineDropdown
                                                         value={task.projectId || ''}
@@ -1347,9 +1404,9 @@ export default function MyWork() {
                                                     </span>
                                                 )}
                                             </div>
- 
+
                                             {/* Estado */}
-                                            <div className="flex items-stretch px-0.5">
+                                            <div className="w-full h-full flex items-stretch">
                                                 {canEdit ? (
                                                     <InlineDropdown
                                                         value={task.status}
@@ -1357,10 +1414,11 @@ export default function MyWork() {
                                                             .filter(([k]) => k !== 'backlog')
                                                             .map(([k, cfg]) => ({ value: k, label: cfg.label, color: cfg.color }))}
                                                         onSelect={v => handleStatusChange(task, v)}
+                                                        triggerClassName="w-full h-full flex items-center justify-center transition-all hover:brightness-110"
                                                         renderValue={(val) => {
                                                             const cfg = TASK_STATUS_CONFIG[val] || {};
                                                             return (
-                                                                <div className="w-full h-full flex items-center justify-center rounded text-[9px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                                                <div className="w-full h-full flex items-center justify-center text-[9px] font-bold text-white text-center leading-tight py-1.5 px-1"
                                                                     style={{ background: cfg.color || '#64748b' }}>
                                                                     {cfg.label || val}
                                                                 </div>
@@ -1368,26 +1426,27 @@ export default function MyWork() {
                                                         }}
                                                     />
                                                 ) : (
-                                                    <div className="w-full h-full flex items-center justify-center rounded text-[9px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                                    <div className="w-full h-full flex items-center justify-center text-[9px] font-bold text-white text-center leading-tight py-1.5 px-1"
                                                         style={{ background: statusCfg.color || '#64748b' }}>
                                                         {statusCfg.label || task.status}
                                                     </div>
                                                 )}
                                             </div>
- 
+
                                             {/* Prioridad */}
-                                            <div className="flex items-stretch px-0.5 font-bold text-white">
+                                            <div className="w-full h-full flex items-stretch text-white">
                                                 {canEdit ? (
                                                     <InlineDropdown
                                                         value={task.priority || 'medium'}
                                                         options={Object.entries(TASK_PRIORITY_CONFIG).map(([k, cfg]) => ({ value: k, label: cfg.label, color: cfg.color || '#64748b' }))}
                                                         onSelect={v => handlePriorityChange(task, v)}
+                                                        triggerClassName="w-full h-full flex items-center justify-center transition-all hover:brightness-110"
                                                         renderValue={(val) => {
                                                             const colors = { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' };
                                                             const c = colors[val] || '#579bfc';
                                                             const cfg = TASK_PRIORITY_CONFIG[val] || {};
                                                             return (
-                                                                <div className="w-full h-full flex items-center justify-center rounded text-[9px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                                                <div className="w-full h-full flex items-center justify-center text-[9px] font-bold text-white text-center leading-tight py-1.5 px-1"
                                                                     style={{ background: c }}>
                                                                     {cfg.label || val}
                                                                 </div>
@@ -1395,18 +1454,20 @@ export default function MyWork() {
                                                         }}
                                                     />
                                                 ) : (
-                                                    <div className="w-full h-full flex items-center justify-center rounded text-[9px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                                    <div className="w-full h-full flex items-center justify-center text-[9px] font-bold text-white text-center leading-tight py-1.5 px-1"
                                                         style={{ background: { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' }[task.priority] || '#579bfc' }}>
                                                         {(TASK_PRIORITY_CONFIG[task.priority] || {}).label || '—'}
                                                     </div>
                                                 )}
                                             </div>
- 
+
                                             {/* Estación (STN) */}
-                                            <StationCell task={task} canEdit={canEdit} onSave={v => saveField(task, 'stationId', v)} />
+                                            <div className="flex items-center justify-center h-full py-1.5 min-w-0">
+                                                <StationCell task={task} canEdit={canEdit} onSave={v => saveField(task, 'stationId', v)} />
+                                            </div>
 
                                             {/* Área */}
-                                            <div className="min-w-0 overflow-hidden flex items-center justify-center">
+                                            <div className="min-w-0 overflow-hidden flex items-center justify-center h-full py-1.5">
                                                 {(() => {
                                                     const wa = (workAreaTypes || []).find(a => a.id === task.workAreaTypeId);
                                                     const areaOptions = [
@@ -1448,7 +1509,7 @@ export default function MyWork() {
                                             </div>
 
                                             {/* Tipo */}
-                                            <div className="min-w-0 overflow-hidden flex items-center justify-center">
+                                            <div className="min-w-0 overflow-hidden flex items-center justify-center h-full py-1.5">
                                                 {(() => {
                                                     const selectedArea = (workAreaTypes || []).find(a => a.id === task.workAreaTypeId);
                                                     const allowedValues = selectedArea?.defaultTaskTypes || [];
@@ -1482,33 +1543,43 @@ export default function MyWork() {
                                                     );
                                                 })()}
                                             </div>
- 
+
                                             {/* Avance */}
-                                            <div className="flex items-center gap-1 px-1">
+                                            <div className="flex items-center gap-1 px-1 h-full py-1.5">
                                                 <div className="w-full h-1 bg-slate-950 rounded-full overflow-hidden shrink-0">
                                                     <div className="h-full rounded-full" style={{ width: `${progressPct}%`, backgroundColor: progressColor }} />
                                                 </div>
                                                 <span className="text-[8.5px] font-black text-slate-455">{progressPct}%</span>
                                             </div>
- 
+
                                             {/* Timeline */}
-                                            <div className="flex items-center justify-center gap-1 text-[8.5px] font-bold text-slate-400 bg-slate-900/40 px-1 py-0.5 rounded">
-                                                {canEdit ? (
-                                                    <>
-                                                        <InlineDatePicker value={startRaw} onSave={v => saveField(task, 'plannedStartDate', v)} />
-                                                        <span className="text-slate-650 shrink-0">→</span>
-                                                        <InlineDatePicker value={endRaw} onSave={v => saveField(task, 'dueDate', v)} />
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Calendar className="w-2.5 h-2.5 text-slate-500" style={{ color: timelineColor }} />
-                                                        <span className={isOverdue ? 'text-red-400 font-black' : ''}>{formattedDueDate}</span>
-                                                    </>
-                                                )}
+                                            <div className="min-w-0 overflow-hidden flex items-center justify-center h-full py-1.5">
+                                                <div className={`flex items-center justify-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold shadow-sm transition-all select-none min-w-[90px] max-w-fit mx-auto
+                                                    ${task.status === 'completed' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-200'}`}
+                                                >
+                                                    {task.status === 'completed' && <Check className="w-2.5 h-2.5 text-white shrink-0 mr-0.5" />}
+                                                    {canEdit ? (
+                                                        <div className="flex items-center gap-0.5">
+                                                            <InlineDatePicker
+                                                                value={startRaw}
+                                                                onSave={v => saveField(task, 'plannedStartDate', v)}
+                                                                className="text-inherit hover:underline px-0.5 font-bold text-[9px]"
+                                                            />
+                                                            <span className="opacity-60 shrink-0 text-[8px]">-</span>
+                                                            <InlineDatePicker
+                                                                value={endRaw}
+                                                                onSave={v => saveField(task, 'dueDate', v)}
+                                                                className="text-inherit hover:underline px-0.5 font-bold text-[9px]"
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <span className="whitespace-nowrap">{formatTimelineRange(startRaw, endRaw)}</span>
+                                                    )}
+                                                </div>
                                             </div>
- 
+
                                             {/* Horas */}
-                                            <div className="flex items-center justify-center gap-0.5 text-[9px] min-w-0 w-full font-bold text-slate-350">
+                                            <div className="flex items-center justify-center gap-0.5 text-[9px] min-w-0 w-full font-bold text-slate-350 h-full py-1.5">
                                                 <span className="text-slate-400 shrink-0">{actual.toFixed(1)}h</span>
                                                 <span className="text-slate-650 shrink-0">/</span>
                                                 {canEdit ? (
@@ -1517,9 +1588,9 @@ export default function MyWork() {
                                                     <span className="text-slate-400 shrink-0">{estimated}h</span>
                                                 )}
                                             </div>
- 
+
                                             {/* Espacio o Placeholder para acciones */}
-                                            <div className="text-[9px] text-slate-500 italic select-none">Fija ↑</div>
+                                            <div className="text-[9px] text-slate-500 italic select-none h-full flex items-center justify-center py-1.5">Fija ↑</div>
                                         </div>
  
                                         {/* Subtareas */}
@@ -1541,7 +1612,7 @@ export default function MyWork() {
                             <React.Fragment key={task.id}>
                                 <div
                                     onDoubleClick={() => handleOpenTask(task)}
-                                    className={`grid items-center px-2 py-2 hover:bg-slate-800/10 transition-colors text-xs text-center cursor-pointer
+                                    className={`grid items-stretch px-2 py-0 hover:bg-slate-800/10 transition-colors text-xs text-center cursor-pointer
                                         ${isTaskActive ? 'bg-indigo-500/5 hover:bg-indigo-500/10' : 'bg-slate-900/10'}
                                         ${isOverdue ? 'ring-1 ring-inset ring-rose-500/20' : ''}
                                     `}
@@ -1550,9 +1621,9 @@ export default function MyWork() {
                                     {/* Borde izquierdo de color */}
                                     <div className="sticky left-0 z-10 bg-slate-950/40 h-full flex items-center justify-center" style={{ borderLeft: `3px solid ${isCritical ? '#ef4444' : projectColor}` }}>
                                     </div>
- 
+
                                     {/* Tarea */}
-                                    <div className="sticky left-[28px] z-10 bg-slate-950/40 text-left px-1 flex items-center gap-1.5 font-semibold text-slate-200 min-w-0">
+                                    <div className="sticky left-[28px] z-10 bg-slate-950/40 text-left px-1 flex items-center gap-1.5 font-semibold text-slate-200 min-w-0 h-full py-2">
                                         {totalSubs > 0 ? (
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); toggleTaskExpanded(task.id); }}
@@ -1595,9 +1666,9 @@ export default function MyWork() {
                                             </span>
                                         )}
                                     </div>
- 
+
                                     {/* Proyecto */}
-                                    <div className="text-left px-2">
+                                    <div className="text-left px-2 flex items-center h-full py-2">
                                         {canEdit ? (
                                             <InlineDropdown
                                                 value={task.projectId || ''}
@@ -1615,21 +1686,23 @@ export default function MyWork() {
                                             </span>
                                         )}
                                     </div>
- 
+
                                     {/* Comentarios Link */}
                                     <div 
-                                        className="flex items-center justify-center text-slate-500 hover:text-slate-200 cursor-pointer"
+                                        className="flex items-center justify-center text-slate-500 hover:text-slate-200 cursor-pointer h-full py-2"
                                         onClick={(e) => { e.stopPropagation(); handleOpenTask(task); }}
                                         onDoubleClick={(e) => e.stopPropagation()}
                                     >
                                         <MessageSquare className="w-3.5 h-3.5" />
                                     </div>
- 
+
                                     {/* Estación */}
-                                    <StationCell task={task} canEdit={canEdit} onSave={v => saveField(task, 'stationId', v)} />
+                                    <div className="flex items-center justify-center h-full py-2 min-w-0">
+                                        <StationCell task={task} canEdit={canEdit} onSave={v => saveField(task, 'stationId', v)} />
+                                    </div>
 
                                     {/* Área */}
-                                    <div className="min-w-0 overflow-hidden flex items-center justify-center">
+                                    <div className="min-w-0 overflow-hidden flex items-center justify-center h-full py-2">
                                         {(() => {
                                             const wa = (workAreaTypes || []).find(a => a.id === task.workAreaTypeId);
                                             const areaOptions = [
@@ -1671,7 +1744,7 @@ export default function MyWork() {
                                     </div>
 
                                     {/* Tipo */}
-                                    <div className="min-w-0 overflow-hidden flex items-center justify-center">
+                                    <div className="min-w-0 overflow-hidden flex items-center justify-center h-full py-2">
                                         {(() => {
                                             const selectedArea = (workAreaTypes || []).find(a => a.id === task.workAreaTypeId);
                                             const allowedValues = selectedArea?.defaultTaskTypes || [];
@@ -1707,7 +1780,7 @@ export default function MyWork() {
                                     </div>
 
                                     {/* Estado Dropdown */}
-                                    <div className="flex items-stretch px-0.5" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+                                    <div className="w-full h-full flex items-stretch" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
                                         {canEdit ? (
                                             <InlineDropdown
                                                 value={task.status}
@@ -1715,10 +1788,11 @@ export default function MyWork() {
                                                     .filter(([k]) => k !== 'backlog')
                                                     .map(([k, cfg]) => ({ value: k, label: cfg.label, color: cfg.color }))}
                                                 onSelect={v => handleStatusChange(task, v)}
+                                                triggerClassName="w-full h-full flex items-center justify-center transition-all hover:brightness-110"
                                                 renderValue={(val) => {
                                                     const cfg = TASK_STATUS_CONFIG[val] || {};
                                                     return (
-                                                        <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[24px]"
+                                                        <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-white text-center leading-tight py-2 px-1"
                                                             style={{ background: cfg.color || '#64748b' }}>
                                                             {cfg.label || val}
                                                         </div>
@@ -1726,46 +1800,49 @@ export default function MyWork() {
                                                 }}
                                             />
                                         ) : (
-                                            <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[24px]"
+                                            <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-white text-center leading-tight py-2 px-1"
                                                 style={{ background: statusCfg.color || '#64748b' }}>
                                                 {statusCfg.label || task.status}
                                             </div>
                                         )}
                                     </div>
- 
+
                                     {/* Avance */}
-                                    <div className="flex items-center gap-1.5 px-2">
+                                    <div className="flex items-center gap-1.5 px-2 h-full py-2">
                                         <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden shrink-0">
                                             <div className="h-full rounded-full" style={{ width: `${progressPct}%`, backgroundColor: progressColor }} />
                                         </div>
                                         <span className="text-[9px] font-black text-slate-450">{progressPct}%</span>
                                     </div>
- 
+
                                     {/* Timeline */}
-                                    <div className="min-w-0 overflow-hidden flex flex-col items-center justify-center gap-0.5">
-                                        <div className="flex items-center justify-center gap-1 text-[9px] font-bold min-w-0 w-full">
+                                    <div className="min-w-0 overflow-hidden flex items-center justify-center h-full py-2">
+                                        <div className={`flex items-center justify-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold shadow-sm transition-all select-none min-w-[95px] max-w-fit mx-auto
+                                            ${task.status === 'completed' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-200'}`}
+                                        >
+                                            {task.status === 'completed' && <Check className="w-3 h-3 text-white shrink-0" />}
                                             {canEdit ? (
-                                                <>
-                                                    <InlineDatePicker value={startRaw} onSave={v => saveField(task, 'plannedStartDate', v)} />
-                                                    <span className="text-slate-650 shrink-0">→</span>
-                                                    <InlineDatePicker value={endRaw} onSave={v => saveField(task, 'dueDate', v)} />
-                                                </>
+                                                <div className="flex items-center gap-0.5">
+                                                    <InlineDatePicker
+                                                        value={startRaw}
+                                                        onSave={v => saveField(task, 'plannedStartDate', v)}
+                                                        className="text-inherit hover:underline px-0.5 font-bold text-[10px]"
+                                                    />
+                                                    <span className="opacity-60 shrink-0 text-[9px]">-</span>
+                                                    <InlineDatePicker
+                                                        value={endRaw}
+                                                        onSave={v => saveField(task, 'dueDate', v)}
+                                                        className="text-inherit hover:underline px-0.5 font-bold text-[10px]"
+                                                    />
+                                                </div>
                                             ) : (
-                                                <>
-                                                    <Calendar className="w-3 h-3 text-slate-500" style={{ color: timelineColor }} />
-                                                    <span className={isOverdue ? 'text-red-400 font-black' : 'text-slate-400'}>{formattedDueDate}</span>
-                                                </>
+                                                <span className="whitespace-nowrap">{formatTimelineRange(startRaw, endRaw)}</span>
                                             )}
                                         </div>
-                                        {daysLeft !== null && (
-                                            <span className={`text-[8px] font-black uppercase tracking-wider ${isOverdue ? 'text-red-400' : 'text-slate-550'}`}>
-                                                {isOverdue ? `${Math.abs(daysLeft)}d atraso` : `${daysLeft}d restantes`}
-                                            </span>
-                                        )}
                                     </div>
- 
+
                                     {/* Horas */}
-                                    <div className="flex items-center justify-center gap-0.5 text-[10px] min-w-0 w-full font-bold text-slate-350">
+                                    <div className="flex items-center justify-center gap-0.5 text-[10px] min-w-0 w-full font-bold text-slate-350 h-full py-2">
                                         <span className="text-slate-400 shrink-0">{actual.toFixed(1)}h</span>
                                         <span className="text-slate-650 shrink-0">/</span>
                                         {canEdit ? (
@@ -1774,20 +1851,21 @@ export default function MyWork() {
                                             <span className="text-slate-450 shrink-0">{estimated}h</span>
                                         )}
                                     </div>
- 
+
                                     {/* Prioridad Dropdown */}
-                                    <div className="flex items-stretch px-0.5 font-black text-white" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+                                    <div className="w-full h-full flex items-stretch text-white" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
                                         {canEdit ? (
                                             <InlineDropdown
                                                 value={task.priority || 'medium'}
                                                 options={Object.entries(TASK_PRIORITY_CONFIG).map(([k, cfg]) => ({ value: k, label: cfg.label, color: cfg.color || '#64748b' }))}
                                                 onSelect={v => handlePriorityChange(task, v)}
+                                                triggerClassName="w-full h-full flex items-center justify-center transition-all hover:brightness-110"
                                                 renderValue={(val) => {
                                                     const colors = { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' };
                                                     const c = colors[val] || '#579bfc';
                                                     const cfg = TASK_PRIORITY_CONFIG[val] || {};
                                                     return (
-                                                        <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[24px]"
+                                                        <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-white text-center leading-tight py-2 px-1"
                                                             style={{ background: c }}>
                                                             {cfg.label || val}
                                                         </div>
@@ -1795,15 +1873,15 @@ export default function MyWork() {
                                                 }}
                                             />
                                         ) : (
-                                            <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[24px]"
+                                            <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-white text-center leading-tight py-2 px-1"
                                                 style={{ background: { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' }[task.priority] || '#579bfc' }}>
                                                 {(TASK_PRIORITY_CONFIG[task.priority] || {}).label || '—'}
                                             </div>
                                         )}
                                     </div>
- 
+
                                     {/* Acciones */}
-                                    <div className="flex items-center justify-end gap-1 px-1" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+                                    <div className="flex items-center justify-end gap-1 px-1 h-full py-2" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
                                         {isTaskActive ? (
                                             <>
                                                 <button
