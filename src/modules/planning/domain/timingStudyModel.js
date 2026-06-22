@@ -829,19 +829,21 @@ export function calculateTimingStudyMetrics(study, steps, stations = []) {
         oeeFactor = (100 - oeePenalty) / 100;
     }
 
-    let targetPPM = Number(normalizedStudy.targetPPM) || 10;
+    let targetPPM = Number(normalizedStudy.targetPPM) ?? 10;
 
     if (calcMode === 'demand') {
         const piezasDiaReq = diasAnuales > 0 ? annualDemand / diasAnuales : 0;
         const piezasDiaBrutoReq = oeeFactor > 0 ? piezasDiaReq / oeeFactor : 0;
         const piezasHoraTarget = shiftHours > 0 ? piezasDiaBrutoReq / shiftHours : 0;
         targetPPM = cycleOutputQty > 0 ? (piezasHoraTarget / 60 / cycleOutputQty) : 0;
-    } else {
+    } else if (calcMode === 'pieces') {
         const targetPiecesPerShift = normalizedStudy.targetPiecesPerShift !== undefined ? Number(normalizedStudy.targetPiecesPerShift) : 8000;
         const piezasDiaReq = targetPiecesPerShift;
         const piezasDiaBrutoReq = oeeFactor > 0 ? piezasDiaReq / oeeFactor : 0;
         const piezasHoraTarget = shiftHours > 0 ? piezasDiaBrutoReq / shiftHours : 0;
         targetPPM = cycleOutputQty > 0 ? (piezasHoraTarget / 60 / cycleOutputQty) : 0;
+    } else {
+        targetPPM = Number(normalizedStudy.targetPPM) || 0;
     }
 
     const targetCycleTimeSec = targetPPM > 0 ? 60 / targetPPM : 0;
@@ -974,19 +976,21 @@ export function validateTimingStudy(study, steps = [], stations = []) {
         oeeFactor = (100 - oeePenalty) / 100;
     }
 
-    let targetPPM = Number(study?.targetPPM) || 10;
+    let targetPPM = Number(study?.targetPPM) ?? 10;
 
     if (calcMode === 'demand') {
         const piezasDiaReq = diasAnuales > 0 ? annualDemand / diasAnuales : 0;
         const piezasDiaBrutoReq = oeeFactor > 0 ? piezasDiaReq / oeeFactor : 0;
         const piezasHoraTarget = shiftHours > 0 ? piezasDiaBrutoReq / shiftHours : 0;
         targetPPM = cycleOutputQty > 0 ? (piezasHoraTarget / 60 / cycleOutputQty) : 0;
-    } else {
+    } else if (calcMode === 'pieces') {
         const targetPiecesPerShift = study?.targetPiecesPerShift !== undefined ? Number(study.targetPiecesPerShift) : 8000;
         const piezasDiaReq = targetPiecesPerShift;
         const piezasDiaBrutoReq = oeeFactor > 0 ? piezasDiaReq / oeeFactor : 0;
         const piezasHoraTarget = shiftHours > 0 ? piezasDiaBrutoReq / shiftHours : 0;
         targetPPM = cycleOutputQty > 0 ? (piezasHoraTarget / 60 / cycleOutputQty) : 0;
+    } else {
+        targetPPM = Number(study?.targetPPM) || 0;
     }
 
     if (targetPPM <= 0) {

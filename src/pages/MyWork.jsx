@@ -37,7 +37,7 @@ function getGreeting() {
     return 'Buenas noches';
 }
 
-const GRID_COLS = '28px minmax(180px, 1.2fr) minmax(120px, 1fr) 32px 55px 86px 68px 56px minmax(100px, 140px) 76px 70px 36px';
+const GRID_COLS = '28px minmax(180px, 1.2fr) minmax(120px, 1fr) 32px 50px 86px 68px 56px minmax(100px, 140px) 76px 85px 90px';
 
 const PRIORITY_BADGES = {
     critical: { label: 'CRÍTICA', bg: 'rgba(239, 68, 68, 0.15)', text: '#ef4444' },
@@ -401,7 +401,7 @@ export default function MyWork() {
             {/* Layout de Columna Única: Tabla con diseño MainTable */}
             <div className="rounded-xl border border-slate-800/50 bg-slate-800/20 max-h-[78vh] overflow-auto">
                 <div
-                    className="grid items-center px-2 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-900/90 text-center sticky top-0 z-20 min-w-[1100px]"
+                    className="grid items-center px-2 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-900/90 text-center sticky top-0 z-20 min-w-[1150px]"
                     style={{ gridTemplateColumns: GRID_COLS }}
                 >
                     <div className="sticky left-0 z-10 bg-slate-900 h-full flex items-center justify-center border-l-3 border-l-slate-700"></div>
@@ -418,7 +418,7 @@ export default function MyWork() {
                     <div className="text-right pr-2">Acciones</div>
                 </div>
 
-                <div className="min-w-[1100px] divide-y divide-slate-800/30">
+                <div className="min-w-[1150px] divide-y divide-slate-800/30">
                     {sortedTasks.map((task, idx) => {
                         const isTaskActive = activeTimer?.taskId === task.id;
                         const isBlocked = task.status === 'blocked';
