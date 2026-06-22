@@ -38,6 +38,7 @@ function getGreeting() {
 }
 
 const GRID_COLS = '28px minmax(180px, 1.2fr) minmax(120px, 1fr) 32px 50px 86px 68px 56px minmax(100px, 140px) 76px 85px 60px';
+const MOBILE_GRID_COLS = '120px 86px 80px 50px 70px 70px 105px 76px 60px';
 
 const PRIORITY_BADGES = {
     critical: { label: 'CRÍTICA', bg: 'rgba(239, 68, 68, 0.15)', text: '#ef4444' },
@@ -423,7 +424,22 @@ export default function MyWork() {
 
             {/* Layout de Columna Única: Tabla con diseño MainTable */}
             <div className="rounded-xl border border-slate-800/50 bg-slate-800/20 max-h-[78vh] overflow-auto">
-                {!isMobile && (
+                {isMobile ? (
+                    <div
+                        className="grid items-center gap-2 text-center text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-900/90 py-2 pl-6 pr-2 min-w-[732px] sticky top-0 z-20"
+                        style={{ gridTemplateColumns: MOBILE_GRID_COLS }}
+                    >
+                        <div className="text-left">Proyecto</div>
+                        <div>Estado</div>
+                        <div>Prioridad</div>
+                        <div>STN</div>
+                        <div>Tipo</div>
+                        <div>Avance</div>
+                        <div>Timeline</div>
+                        <div>Horas</div>
+                        <div className="text-right pr-2">Timer</div>
+                    </div>
+                ) : (
                     <div
                         className="grid items-center px-2 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-900/90 text-center sticky top-0 z-20 min-w-[1100px]"
                         style={{ gridTemplateColumns: GRID_COLS }}
@@ -443,11 +459,13 @@ export default function MyWork() {
                     </div>
                 )}
 
-                <div className={isMobile ? "divide-y divide-slate-800/20" : "min-w-[1100px] divide-y divide-slate-800/30"}>
+                <div className={isMobile ? "divide-y divide-slate-800/20 min-w-[732px]" : "min-w-[1100px] divide-y divide-slate-800/30"}>
                     {sortedTasks.map((task, idx) => {
                         const isTaskActive = activeTimer?.taskId === task.id;
                         const isBlocked = task.status === 'blocked';
                         const isCritical = task.priority === 'critical';
+                        const isExpanded = expandedTaskIds.has(task.id);
+                        const taskSubtasks = task.subtasks || [];
                         
                         const project = engProjects.find(p => p.id === task.projectId);
                         const projectColor = project?.colorKey || '#6366f1';
@@ -497,22 +515,21 @@ export default function MyWork() {
                         // Task Type name
                         const typeName = taskTypes?.find(tt => tt.id === task.taskTypeId)?.name || '—';
 
-                        const isExpanded = expandedTaskIds.has(task.id);
-                        const taskSubtasks = engSubtasks.filter(s => s.taskId === task.id);
-
-                        if (isMobile) {
+                                               if (isMobile) {
                             return (
                                 <React.Fragment key={task.id}>
                                     <div
                                         onDoubleClick={() => handleOpenTask(task)}
-                                        className={`flex flex-col gap-2 p-3 hover:bg-slate-800/10 transition-colors text-xs cursor-pointer border-b border-slate-850
+                                        className={`flex flex-col gap-1.5 py-3 px-0 hover:bg-slate-800/10 transition-colors text-xs cursor-pointer border-b border-slate-850 bg-inherit
                                             ${isTaskActive ? 'bg-indigo-500/5 hover:bg-indigo-500/10' : 'bg-slate-900/10'}
                                             ${isOverdue ? 'ring-1 ring-inset ring-rose-500/20' : ''}
                                         `}
-                                        style={{ borderLeft: `3px solid ${isCritical ? '#ef4444' : '#6366f1'}` }}
                                     >
-                                        {/* Renglón 1: Título y controles esenciales */}
-                                        <div className="flex items-center gap-2 w-full">
+                                        {/* Renglón 1: Título de Tarea (Fijo horizontalmente con borde de prioridad) */}
+                                        <div 
+                                            className="sticky left-0 w-[calc(100vw-36px)] shrink-0 z-10 flex items-center gap-2 pl-5 pr-3 bg-inherit"
+                                            style={{ borderLeft: `3px solid ${isCritical ? '#ef4444' : '#6366f1'}` }}
+                                        >
                                             {/* Chevron de Subtareas */}
                                             {totalSubs > 0 ? (
                                                 <button
@@ -589,31 +606,32 @@ export default function MyWork() {
                                                         }`}
                                                         title={isBlocked ? 'Iniciar' : 'Iniciar'}
                                                     >
-                                                        <Play className="w-3 h-3 fill-white" />
+                                                        <Play className="w-3.5 h-3.5 fill-white" />
                                                     </button>
                                                 )}
                                             </div>
                                         </div>
 
-                                        {/* Renglón 2: Atributos scrollables horizontalmente */}
+                                        {/* Renglón 2: Atributos en Grid (Desplazables horizontalmente de forma unificada) */}
                                         <div 
-                                            className="flex items-center gap-3 overflow-x-auto py-1 scrollbar-none select-none pr-2 ml-3.5"
+                                            className="grid items-center gap-2 text-center text-[10px] pl-6 pr-2 min-w-[732px]"
+                                            style={{ gridTemplateColumns: MOBILE_GRID_COLS }}
                                             onClick={(e) => e.stopPropagation()}
                                             onDoubleClick={(e) => e.stopPropagation()}
                                         >
                                             {/* Proyecto */}
-                                            <div className="shrink-0">
-                                                <span className="text-[9.5px] font-black px-2 py-0.5 bg-slate-900 border border-slate-800/80 rounded whitespace-nowrap" style={{ color: projectColor, borderColor: `${projectColor}30` }}>
+                                            <div className="text-left">
+                                                <span className="text-[9px] font-black px-2 py-0.5 bg-slate-900 border border-slate-800 rounded whitespace-nowrap" style={{ color: projectColor, borderColor: `${projectColor}30` }}>
                                                     {task.projectName}
                                                 </span>
                                             </div>
 
                                             {/* Estado */}
-                                            <div className="shrink-0 w-[86px]">
+                                            <div className="flex items-stretch px-0.5">
                                                 <select
                                                     value={task.status}
                                                     onChange={e => handleStatusChange(task, e.target.value)}
-                                                    className="w-full text-center py-0.5 rounded text-[9.5px] font-black text-white cursor-pointer focus:outline-none"
+                                                    className="w-full text-center py-0.5 rounded text-[9px] font-black text-white cursor-pointer focus:outline-none"
                                                     style={{ background: statusCfg.color || '#64748b' }}
                                                 >
                                                     {Object.entries(TASK_STATUS_CONFIG)
@@ -628,11 +646,11 @@ export default function MyWork() {
                                             </div>
 
                                             {/* Prioridad */}
-                                            <div className="shrink-0 w-[80px]">
+                                            <div className="flex items-stretch px-0.5">
                                                 <select
                                                     value={task.priority}
                                                     onChange={e => handlePriorityChange(task, e.target.value)}
-                                                    className="w-full text-center py-0.5 rounded text-[9.5px] font-black cursor-pointer focus:outline-none"
+                                                    className="w-full text-center py-0.5 rounded text-[9px] font-black cursor-pointer focus:outline-none"
                                                     style={{ 
                                                         background: pStyle.bg,
                                                         color: pStyle.text
@@ -647,49 +665,47 @@ export default function MyWork() {
                                             </div>
 
                                             {/* Estación (STN) */}
-                                            <div className="shrink-0 text-[9.5px] font-bold text-slate-400 bg-slate-900/60 px-1.5 py-0.5 rounded border border-slate-800/40">
+                                            <div className="text-[9px] font-bold text-slate-400 bg-slate-900/60 px-1 py-0.5 rounded border border-slate-800/40">
                                                 {stationLabel}
                                             </div>
 
                                             {/* Tipo */}
-                                            {typeName !== '—' && (
-                                                <div className="shrink-0 text-[9.5px] text-slate-450 bg-slate-900/60 px-1.5 py-0.5 rounded border border-slate-800/40">
-                                                    {typeName}
-                                                </div>
-                                            )}
-
-                                            {/* Horas */}
-                                            <div className="shrink-0 text-[9.5px] font-bold text-slate-355 bg-slate-900/60 px-1.5 py-0.5 rounded border border-slate-800/20">
-                                                {actual.toFixed(1)} / {estimated.toFixed(1)} h
+                                            <div className="text-[9px] text-slate-450 bg-slate-900/60 px-1 py-0.5 rounded border border-slate-800/40 truncate">
+                                                {typeName}
                                             </div>
 
                                             {/* Avance */}
-                                            <div className="shrink-0 flex items-center gap-1.5">
-                                                <div className="w-14 h-1 bg-slate-950 rounded-full overflow-hidden shrink-0">
+                                            <div className="flex items-center gap-1 px-1">
+                                                <div className="w-full h-1 bg-slate-950 rounded-full overflow-hidden shrink-0">
                                                     <div className="h-full rounded-full" style={{ width: `${progressPct}%`, backgroundColor: progressColor }} />
                                                 </div>
-                                                <span className="text-[9px] font-black text-slate-400">{progressPct}%</span>
+                                                <span className="text-[8.5px] font-black text-slate-450">{progressPct}%</span>
                                             </div>
 
                                             {/* Timeline */}
-                                            <div className="shrink-0 flex items-center gap-1 text-[9px] font-bold text-slate-400 bg-slate-900/40 px-1.5 py-0.5 rounded">
-                                                <Calendar className="w-3 h-3 text-slate-500" style={{ color: timelineColor }} />
+                                            <div className="flex items-center justify-center gap-1 text-[8.5px] font-bold text-slate-400 bg-slate-900/40 px-1 py-0.5 rounded">
+                                                <Calendar className="w-2.5 h-2.5 text-slate-500" style={{ color: timelineColor }} />
                                                 <span className={isOverdue ? 'text-red-400 font-black' : ''}>{formattedDueDate}</span>
-                                                {daysLeft !== null && (
-                                                    <span className={`text-[8px] font-black uppercase ${isOverdue ? 'text-red-400' : 'text-slate-550'} ml-1`}>
-                                                        ({isOverdue ? `atraso` : `${daysLeft}d`})
-                                                    </span>
-                                                )}
                                             </div>
+
+                                            {/* Horas */}
+                                            <div className="text-[9px] font-bold text-slate-350 bg-slate-900/60 px-1 py-0.5 rounded border border-slate-800/20">
+                                                {actual.toFixed(1)}/{estimated.toFixed(1)} h
+                                            </div>
+
+                                            {/* Espacio o Placeholder para acciones */}
+                                            <div className="text-[9px] text-slate-500 italic select-none">Fija ↑</div>
                                         </div>
 
                                         {/* Subtareas */}
                                         {isExpanded && totalSubs > 0 && (
-                                            <SubtaskExpander
-                                                subtasks={taskSubtasks}
-                                                taskId={task.id}
-                                                canEdit={canEdit}
-                                            />
+                                            <div className="sticky left-0 w-[calc(100vw-36px)] shrink-0 z-10 pl-6 pr-3 bg-inherit">
+                                                <SubtaskExpander
+                                                    subtasks={taskSubtasks}
+                                                    taskId={task.id}
+                                                    canEdit={canEdit}
+                                                />
+                                            </div>
                                         )}
                                     </div>
                                 </React.Fragment>
