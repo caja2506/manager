@@ -52,7 +52,7 @@ export default function MyWork() {
     const {
         engTasks, engProjects, engSubtasks,
         taskTypes, teamMembers, timeLogs, delayCauses,
-        refetchTable,
+        refetch: refetchTable,
     } = useEngineeringData();
 
     // ── Weekly plan items ──
