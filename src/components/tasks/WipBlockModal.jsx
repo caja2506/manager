@@ -9,7 +9,7 @@
  *  - Responsible person for the delay (dropdown)
  */
 import React, { useState } from 'react';
-import { AlertTriangle, Pause, X, User, MessageSquare, ArrowRight, ChevronDown, Zap } from 'lucide-react';
+import { AlertTriangle, Pause, Play, X, User, MessageSquare, ArrowRight, ChevronDown, Zap } from 'lucide-react';
 
 export default function WipBlockModal({
     isOpen,
