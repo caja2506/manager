@@ -1657,237 +1657,190 @@ function TableGroup({ isMobile, isSelectionEnabled, label, color, tasks, engProj
     }, [tasks]);
 
     return (
-        <div className="mb-4 animate-in fade-in duration-200">
-            <button onClick={onToggle} className="flex items-center gap-2.5 w-full text-left px-2 py-2 rounded-lg hover:bg-slate-800/50 transition-colors group">
-                {isExpanded
-                    ? <ChevronDown className="w-4 h-4 text-slate-500 group-hover:text-slate-300" />
-                    : <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-slate-300" />
-                }
-                <span className="font-bold text-sm" style={{ color }}>{label}</span>
-                <span className="text-[11px] font-bold text-slate-500 bg-slate-800/80 px-2.5 py-0.5 rounded-full border border-slate-700/50">
-                    {tasks.length}
-                </span>
-            </button>
+        <div className="animate-in fade-in duration-200">
+            {/* Sticky Group Header */}
+            <div className="sticky left-0 z-10 w-full bg-slate-900/40 border-b border-slate-800/40 py-1.5 px-3 flex items-center justify-between">
+                <button onClick={onToggle} className="flex items-center gap-2 text-left transition-colors group py-1">
+                    {isExpanded
+                        ? <ChevronDown className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300" />
+                        : <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300" />
+                    }
+                    <span className="font-bold text-sm" style={{ color }}>{label}</span>
+                    <span className="text-[11px] font-bold text-slate-500 bg-slate-800/80 px-2.5 py-0.5 rounded-full border border-slate-700/50">
+                        {tasks.length}
+                    </span>
+                </button>
+            </div>
 
             {isExpanded && (
-                <>
-                    {/* Responsive Grid Table (using isMobile layout) */}
-                    <div className="mt-1 rounded-xl border border-slate-800/50 bg-slate-800/20 max-h-[70vh] overflow-auto">
-                        {isMobile ? (
+                <div className="divide-y divide-slate-800/20">
+                    {/* Inline Add Task Row */}
+                    {canEdit && (
+                        isMobile ? (
                             <div
-                                className="grid items-center gap-2 text-center text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-[var(--bg-table-header-solid)] py-2 pl-6 pr-2 min-w-[1075px] sticky top-0 z-20"
-                                style={{ gridTemplateColumns: MOBILE_GRID_COLS }}
+                                className="flex flex-col gap-1.5 py-3 px-0 border-b border-slate-800/30 bg-[var(--bg-table-row)] min-w-[1075px]"
                             >
-                                <div className="text-left">Comentarios</div>
-                                <div>Resp</div>
-                                <div>STN</div>
-                                <div>Estado</div>
-                                <div>Área</div>
-                                <div>Tipo</div>
-                                <div>Avance</div>
-                                <div>Timeline</div>
-                                <div>Horas</div>
-                                <div>Prioridad</div>
-                                <div className="text-right pr-2">Asig.</div>
+                                <div 
+                                    className="sticky left-0 w-[calc(100vw-36px)] shrink-0 z-10 flex items-center gap-2 pl-5 pr-3 bg-inherit"
+                                    style={{ borderLeft: `3px solid ${color}` }}
+                                >
+                                    {addingTask ? (
+                                        <div className="flex items-center gap-1 w-full animate-in fade-in duration-200">
+                                            <input
+                                                ref={addInputRef}
+                                                value={newTaskTitle}
+                                                onChange={e => setNewTaskTitle(e.target.value)}
+                                                onKeyDown={e => { if (e.key === 'Enter') handleAddTask(); if (e.key === 'Escape') { setAddingTask(false); setNewTaskTitle(''); } }}
+                                                placeholder="Nombre de la nueva tarea..."
+                                                className="flex-1 bg-transparent text-sm text-slate-300 placeholder:text-slate-600 outline-none"
+                                                autoFocus
+                                            />
+                                            <button onClick={() => { setAddingTask(false); setNewTaskTitle(''); }} className="text-slate-600 hover:text-slate-400 shrink-0">
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={() => { setAddingTask(true); setTimeout(() => addInputRef.current?.focus(), 50); }}
+                                            className="flex items-center gap-1.5 text-[11px] text-slate-600 hover:text-indigo-400 transition-colors py-1"
+                                        >
+                                            <Plus className="w-3 h-3" /> Agregar tarea
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         ) : (
                             <div
-                                className="grid items-center px-2 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-[var(--bg-table-header-solid)] text-center sticky top-0 z-20 min-w-[1100px]"
+                                className="grid items-center px-2 py-1.5 border-b border-slate-800/30 bg-[var(--bg-table-row)] min-w-[1100px]"
                                 style={{ gridTemplateColumns: GRID_COLS }}
                             >
-                                <div className="sticky left-0 z-10 bg-[var(--bg-table-header-solid)] flex items-center justify-center h-full" style={{ borderLeft: `3px solid ${color}` }}>
-                                    {isSelectionEnabled && (
-                                        <input
-                                            type="checkbox"
-                                            checked={tasks.length > 0 && tasks.every(t => selectedTaskIds?.has(t.id))}
-                                            onChange={() => { tasks.forEach(t => onToggleSelect?.(t.id)); }}
-                                            className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-700 text-violet-500 focus:ring-violet-500/30 cursor-pointer"
-                                            title="Seleccionar todo el grupo"
-                                        />
+                                <div className="sticky left-0 z-10 bg-[var(--bg-table-row)] h-full flex items-center justify-center" style={{ borderLeft: `3px solid ${color}` }}></div>
+                                <div className="sticky left-[28px] z-10 bg-[var(--bg-table-row)] pr-1 min-w-0 flex items-center h-full">
+                                    {addingTask ? (
+                                        <div className="flex items-center gap-1 w-full">
+                                            <input
+                                                ref={addInputRef}
+                                                value={newTaskTitle}
+                                                onChange={e => setNewTaskTitle(e.target.value)}
+                                                onKeyDown={e => { if (e.key === 'Enter') handleAddTask(); if (e.key === 'Escape') { setAddingTask(false); setNewTaskTitle(''); } }}
+                                                placeholder="Nombre de la nueva tarea..."
+                                                className="flex-1 bg-transparent text-sm text-slate-300 placeholder:text-slate-600 outline-none"
+                                                autoFocus
+                                            />
+                                            <button onClick={() => { setAddingTask(false); setNewTaskTitle(''); }} className="text-slate-600 hover:text-slate-400 shrink-0">
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={() => { setAddingTask(true); setTimeout(() => addInputRef.current?.focus(), 50); }}
+                                            className="flex items-center gap-1.5 text-[11px] text-slate-600 hover:text-indigo-400 transition-colors py-1"
+                                        >
+                                            <Plus className="w-3 h-3" /> Agregar tarea
+                                        </button>
                                     )}
                                 </div>
-                                <div className="sticky left-[28px] z-10 text-left bg-[var(--bg-table-header-solid)] h-full flex items-center">Tarea</div>
-                                <div className="text-left px-1 flex items-center gap-1" title="Comentarios">💬 Comentarios</div>
-                                <div>Resp</div>
-                                <div>STN</div>
-                                <div>Estado</div>
-                                <div>Área</div>
-                                <div>Tipo</div>
-                                <div>Avance</div>
-                                <div>Timeline</div>
-                                <div>Horas</div>
-                                <div>Prioridad</div>
-                                <div>Asig.</div>
+                                <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
                             </div>
-                        )}
+                        )
+                    )}
 
-                        {/* Inline Add Task Row */}
-                        {canEdit && (
-                            isMobile ? (
-                                <div
-                                    className="flex flex-col gap-1.5 py-3 px-0 border-b border-slate-800/30 bg-[var(--bg-table-row)] min-w-[1075px]"
-                                >
-                                    <div 
-                                        className="sticky left-0 w-[calc(100vw-36px)] shrink-0 z-10 flex items-center gap-2 pl-5 pr-3 bg-inherit"
-                                        style={{ borderLeft: `3px solid ${color}` }}
-                                    >
-                                        {addingTask ? (
-                                            <div className="flex items-center gap-1 w-full animate-in fade-in duration-200">
-                                                <input
-                                                    ref={addInputRef}
-                                                    value={newTaskTitle}
-                                                    onChange={e => setNewTaskTitle(e.target.value)}
-                                                    onKeyDown={e => { if (e.key === 'Enter') handleAddTask(); if (e.key === 'Escape') { setAddingTask(false); setNewTaskTitle(''); } }}
-                                                    placeholder="Nombre de la nueva tarea..."
-                                                    className="flex-1 bg-transparent text-sm text-slate-300 placeholder:text-slate-600 outline-none"
-                                                    autoFocus
-                                                />
-                                                <button onClick={() => { setAddingTask(false); setNewTaskTitle(''); }} className="text-slate-600 hover:text-slate-400 shrink-0">
-                                                    <X className="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <button
-                                                onClick={() => { setAddingTask(true); setTimeout(() => addInputRef.current?.focus(), 50); }}
-                                                className="flex items-center gap-1.5 text-[11px] text-slate-600 hover:text-indigo-400 transition-colors py-1"
-                                            >
-                                                <Plus className="w-3 h-3" /> Agregar tarea
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            ) : (
-                                <div
-                                    className="grid items-center px-2 py-1.5 border-b border-slate-800/30 bg-[var(--bg-table-row)] min-w-[1100px]"
-                                    style={{ gridTemplateColumns: GRID_COLS }}
-                                >
-                                    <div className="sticky left-0 z-10 bg-[var(--bg-table-row)] h-full flex items-center justify-center" style={{ borderLeft: `3px solid ${color}` }}></div>
-                                    <div className="sticky left-[28px] z-10 bg-[var(--bg-table-row)] pr-1 min-w-0 flex items-center h-full">
-                                        {addingTask ? (
-                                            <div className="flex items-center gap-1 w-full">
-                                                <input
-                                                    ref={addInputRef}
-                                                    value={newTaskTitle}
-                                                    onChange={e => setNewTaskTitle(e.target.value)}
-                                                    onKeyDown={e => { if (e.key === 'Enter') handleAddTask(); if (e.key === 'Escape') { setAddingTask(false); setNewTaskTitle(''); } }}
-                                                    placeholder="Nombre de la nueva tarea..."
-                                                    className="flex-1 bg-transparent text-sm text-slate-300 placeholder:text-slate-600 outline-none"
-                                                    autoFocus
-                                                />
-                                                <button onClick={() => { setAddingTask(false); setNewTaskTitle(''); }} className="text-slate-600 hover:text-slate-400 shrink-0">
-                                                    <X className="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <button
-                                                onClick={() => { setAddingTask(true); setTimeout(() => addInputRef.current?.focus(), 50); }}
-                                                className="flex items-center gap-1.5 text-[11px] text-slate-600 hover:text-indigo-400 transition-colors py-1"
-                                            >
-                                                <Plus className="w-3 h-3" /> Agregar tarea
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
-                                </div>
-                            )
-                        )}
-
-                        <div className={isMobile ? "divide-y divide-slate-800/20 min-w-[1075px]" : "min-w-[1100px] divide-y divide-slate-800/30"}>
-                            {tasks.length === 0 ? (
-                                <div className="px-4 py-5 text-center text-sm text-slate-600" style={{ borderLeft: `3px solid ${color}` }}>
-                                    Sin tareas
-                                </div>
-                            ) : (
-                                tasks.map((task, idx) => (
-                                    <TaskRow
-                                        key={task.id}
-                                        isMobile={isMobile}
-                                        isSelectionEnabled={isSelectionEnabled}
-                                        task={task}
-                                        engProjects={engProjects}
-                                        teamMembers={teamMembers}
-                                        subtasks={engSubtasks.filter(s => s.taskId === task.id)}
-                                        canEdit={canEdit}
-                                        canEditDates={canEditDates}
-                                        onOpenModal={onOpenModal}
-                                        groupColor={color}
-                                        isLast={idx === tasks.length - 1}
-                                        savedField={savedField}
-                                        onSaved={onSaved}
-                                        taskTypes={taskTypes}
-                                        workAreaTypes={workAreaTypes}
-                                        isSelected={selectedTaskIds?.has(task.id)}
-                                        onToggleSelect={onToggleSelect}
-                                        commentCount={commentCounts?.[task.id] || 0}
-                                        taskComments={taskCommentsMap?.[task.id] || []}
-                                    />
-                                ))
-                            )}
-                        </div>
-
-                        {/* Group Summary Row — Monday.com style */}
-                        {tasks.length > 0 && !isMobile && (
-                            <div
-                                className="grid items-center px-2 py-2 border-t border-slate-700/40 bg-[var(--bg-table-row-summary)] min-w-[1100px]"
-                                style={{ gridTemplateColumns: GRID_COLS }}
-                            >
-                                <div className="sticky left-0 z-10 bg-[var(--bg-table-row-summary)] h-full flex items-center justify-center" style={{ borderLeft: `3px solid ${color}` }}></div> {/* 1. Checkbox */}
-                                <div className="sticky left-[28px] z-10 bg-[var(--bg-table-row-summary)] h-full"></div> {/* 2. Task */}
-                                <div></div> {/* 3. Comentarios placeholder */}
-                                <div></div> {/* 4. Owner */}
-                                <div></div> {/* 5. STN placeholder */}
-                                
-                                {/* 6. Status distribution mini bars */}
-                                <div className="flex h-5 rounded overflow-hidden mx-1" title="Distribución de estados">
-                                    {Object.entries(statusDist).map(([status, count]) => {
-                                        const cfg = TASK_STATUS_CONFIG[status] || {};
-                                        return (
-                                            <div
-                                                key={status}
-                                                style={{ width: `${(count / tasks.length) * 100}%`, background: cfg.color || '#64748b' }}
-                                                className="h-full"
-                                                title={`${cfg.label || status}: ${count}`}
-                                            />
-                                        );
-                                    })}
-                                </div>
-                                
-                                <div></div> {/* 7. Área */}
-                                <div></div> {/* 8. Tipo */}
-                                <div></div> {/* 9. Avance placeholder */}
-
-                                
-                                {/* 12. Date range (Timeline) */}
-                                <div className="flex items-center justify-center">
-                                    {dateRange && (
-                                        <span className="text-[9px] font-bold text-slate-400 bg-slate-800 px-2 py-1 rounded-full whitespace-nowrap">
-                                            {dateRange}
-                                        </span>
-                                    )}
-                                </div>
-                                
-                                <div></div> {/* 13. Horas placeholder */}
-                                
-                                {/* 14. Priority distribution mini bars */}
-                                <div className="flex h-5 rounded overflow-hidden mx-1" title="Distribución de prioridades">
-                                    {Object.entries(priorityDist).map(([pri, count]) => {
-                                        const colors = { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' };
-                                        return (
-                                            <div
-                                                key={pri}
-                                                style={{ width: `${(count / tasks.length) * 100}%`, background: colors[pri] || '#579bfc' }}
-                                                className="h-full"
-                                                title={`${pri}: ${count}`}
-                                            />
-                                        );
-                                    })}
-                                </div>
-                                
-                                <div></div> {/* 15. Asig. placeholder */}
+                    {/* Task Rows List */}
+                    <div className={isMobile ? "divide-y divide-slate-800/20 min-w-[1075px]" : "min-w-[1100px] divide-y divide-slate-800/30"}>
+                        {tasks.length === 0 ? (
+                            <div className="px-4 py-5 text-center text-sm text-slate-600" style={{ borderLeft: `3px solid ${color}` }}>
+                                Sin tareas
                             </div>
+                        ) : (
+                            tasks.map((task, idx) => (
+                                <TaskRow
+                                    key={task.id}
+                                    isMobile={isMobile}
+                                    isSelectionEnabled={isSelectionEnabled}
+                                    task={task}
+                                    engProjects={engProjects}
+                                    teamMembers={teamMembers}
+                                    subtasks={engSubtasks.filter(s => s.taskId === task.id)}
+                                    canEdit={canEdit}
+                                    canEditDates={canEditDates}
+                                    onOpenModal={onOpenModal}
+                                    groupColor={color}
+                                    isLast={idx === tasks.length - 1}
+                                    savedField={savedField}
+                                    onSaved={onSaved}
+                                    taskTypes={taskTypes}
+                                    workAreaTypes={workAreaTypes}
+                                    isSelected={selectedTaskIds?.has(task.id)}
+                                    onToggleSelect={onToggleSelect}
+                                    commentCount={commentCounts?.[task.id] || 0}
+                                    taskComments={taskCommentsMap?.[task.id] || []}
+                                />
+                            ))
                         )}
                     </div>
-                </>
+
+                    {/* Group Summary Row — Monday.com style */}
+                    {tasks.length > 0 && !isMobile && (
+                        <div
+                            className="grid items-center px-2 py-2 border-t border-slate-700/40 bg-[var(--bg-table-row-summary)] min-w-[1100px]"
+                            style={{ gridTemplateColumns: GRID_COLS }}
+                        >
+                            <div className="sticky left-0 z-10 bg-[var(--bg-table-row-summary)] h-full flex items-center justify-center" style={{ borderLeft: `3px solid ${color}` }}></div> {/* 1. Checkbox */}
+                            <div className="sticky left-[28px] z-10 bg-[var(--bg-table-row-summary)] h-full"></div> {/* 2. Task */}
+                            <div></div> {/* 3. Comentarios placeholder */}
+                            <div></div> {/* 4. Owner */}
+                            <div></div> {/* 5. STN placeholder */}
+                            
+                            {/* 6. Status distribution mini bars */}
+                            <div className="flex h-5 rounded overflow-hidden mx-1" title="Distribución de estados">
+                                {Object.entries(statusDist).map(([status, count]) => {
+                                    const cfg = TASK_STATUS_CONFIG[status] || {};
+                                    return (
+                                        <div
+                                            key={status}
+                                            style={{ width: `${(count / tasks.length) * 100}%`, background: cfg.color || '#64748b' }}
+                                            className="h-full"
+                                            title={`${cfg.label || status}: ${count}`}
+                                        />
+                                    );
+                                })}
+                            </div>
+                            
+                            <div></div> {/* 7. Área */}
+                            <div></div> {/* 8. Tipo */}
+                            <div></div> {/* 9. Avance placeholder */}
+
+                            
+                            {/* 12. Date range (Timeline) */}
+                            <div className="flex items-center justify-center">
+                                {dateRange && (
+                                    <span className="text-[9px] font-bold text-slate-400 bg-slate-800 px-2 py-1 rounded-full whitespace-nowrap">
+                                        {dateRange}
+                                    </span>
+                                )}
+                            </div>
+                            
+                            <div></div> {/* 13. Horas placeholder */}
+                            
+                            {/* 14. Priority distribution mini bars */}
+                            <div className="flex h-5 rounded overflow-hidden mx-1" title="Distribución de prioridades">
+                                {Object.entries(priorityDist).map(([pri, count]) => {
+                                    const colors = { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' };
+                                    return (
+                                        <div
+                                            key={pri}
+                                            style={{ width: `${(count / tasks.length) * 100}%`, background: colors[pri] || '#579bfc' }}
+                                            className="h-full"
+                                            title={`${pri}: ${count}`}
+                                        />
+                                    );
+                                })}
+                            </div>
+                            
+                            <div></div> {/* 15. Asig. placeholder */}
+                        </div>
+                    )}
+                </div>
             )}
         </div>
     );
@@ -2367,40 +2320,102 @@ export default function MainTable({ forceProjectId = null }) {
                     </div>
                 )}
 
-                {projectGroups.map(group => {
-                    return (
-                        <TableGroup
-                            key={group.projectId}
-                            isMobile={isMobile}
-                            isSelectionEnabled={isSelectionEnabled}
-                            label={group.label}
-                            color={group.color}
-                            tasks={group.tasks}
-                            engProjects={engProjects}
-                            engSubtasks={engSubtasks}
-                            teamMembers={teamMembers}
-                            canEdit={canEdit}
-                            canEditDates={canEditDates}
-                            onOpenModal={openTask}
-                            isExpanded={!collapsedGroups[group.projectId]}
-                            onToggle={() => toggleGroup(group.projectId)}
-                            savedField={savedField}
-                            onSaved={showSaved}
-                            taskTypes={taskTypes}
-                            workAreaTypes={workAreaTypes}
-                            groupStatus={'pending'}
-                            groupProjectId={group.projectId !== '__none__' ? group.projectId : null}
-                            user={user}
-                            selectedTaskIds={selectedTaskIds}
-                            onToggleSelect={toggleSelectTask}
-                            onTaskCreated={handleTaskCreated}
-                            activeFilterProject={taskFilterProject}
-                            activeFilterAssignee={taskFilterAssignee}
-                            commentCounts={commentCounts}
-                            taskCommentsMap={taskCommentsMap}
-                        />
-                    );
-                })}
+                {/* Scrollable Table Container */}
+                <div className="flex-1 overflow-auto max-h-[75vh] border border-slate-800/50 bg-slate-800/5 rounded-xl">
+                    {/* Global columns header */}
+                    {isMobile ? (
+                        <div
+                            className="grid items-center gap-2 text-center text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-[var(--bg-table-header-solid)] py-2 pl-6 pr-2 min-w-[1075px] sticky top-0 z-20"
+                            style={{ gridTemplateColumns: MOBILE_GRID_COLS }}
+                        >
+                            <div className="text-left">Comentarios</div>
+                            <div>Resp</div>
+                            <div>STN</div>
+                            <div>Estado</div>
+                            <div>Área</div>
+                            <div>Tipo</div>
+                            <div>Avance</div>
+                            <div>Timeline</div>
+                            <div>Horas</div>
+                            <div>Prioridad</div>
+                            <div className="text-right pr-2">Asig.</div>
+                        </div>
+                    ) : (
+                        <div
+                            className="grid items-center px-2 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-[var(--bg-table-header-solid)] text-center sticky top-0 z-20 min-w-[1100px]"
+                            style={{ gridTemplateColumns: GRID_COLS }}
+                        >
+                            <div className="sticky left-0 z-10 bg-[var(--bg-table-header-solid)] flex items-center justify-center h-full">
+                                {isSelectionEnabled && (
+                                    <input
+                                        type="checkbox"
+                                        checked={filteredTasks.length > 0 && filteredTasks.every(t => selectedTaskIds?.has(t.id))}
+                                        onChange={() => {
+                                            const allSelected = filteredTasks.every(t => selectedTaskIds?.has(t.id));
+                                            const next = new Set(selectedTaskIds);
+                                            filteredTasks.forEach(t => {
+                                                if (allSelected) next.delete(t.id);
+                                                else next.add(t.id);
+                                            });
+                                            setSelectedTaskIds(next);
+                                        }}
+                                        className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-700 text-violet-500 focus:ring-violet-500/30 cursor-pointer"
+                                        title="Seleccionar todas las tareas"
+                                    />
+                                )}
+                            </div>
+                            <div className="sticky left-[28px] z-10 text-left bg-[var(--bg-table-header-solid)] h-full flex items-center">Tarea</div>
+                            <div className="text-left px-1 flex items-center gap-1" title="Comentarios">💬 Comentarios</div>
+                            <div>Resp</div>
+                            <div>STN</div>
+                            <div>Estado</div>
+                            <div>Área</div>
+                            <div>Tipo</div>
+                            <div>Avance</div>
+                            <div>Timeline</div>
+                            <div>Horas</div>
+                            <div>Prioridad</div>
+                            <div>Asig.</div>
+                        </div>
+                    )}
+
+                    <div className="divide-y divide-slate-800/30">
+                        {projectGroups.map(group => {
+                            return (
+                                <TableGroup
+                                    key={group.projectId}
+                                    isMobile={isMobile}
+                                    isSelectionEnabled={isSelectionEnabled}
+                                    label={group.label}
+                                    color={group.color}
+                                    tasks={group.tasks}
+                                    engProjects={engProjects}
+                                    engSubtasks={engSubtasks}
+                                    teamMembers={teamMembers}
+                                    canEdit={canEdit}
+                                    canEditDates={canEditDates}
+                                    onOpenModal={openTask}
+                                    isExpanded={!collapsedGroups[group.projectId]}
+                                    onToggle={() => toggleGroup(group.projectId)}
+                                    savedField={savedField}
+                                    onSaved={showSaved}
+                                    taskTypes={taskTypes}
+                                    workAreaTypes={workAreaTypes}
+                                    groupStatus={'pending'}
+                                    groupProjectId={group.projectId !== '__none__' ? group.projectId : null}
+                                    user={user}
+                                    selectedTaskIds={selectedTaskIds}
+                                    onToggleSelect={toggleSelectTask}
+                                    onTaskCreated={handleTaskCreated}
+                                    activeFilterProject={taskFilterProject}
+                                    activeFilterAssignee={taskFilterAssignee}
+                                    commentCounts={commentCounts}
+                                    taskCommentsMap={taskCommentsMap}
+                                />
+                            );
+                        })}
+                    </div>
+                </div>
 
                 {filteredTasks.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-20 text-center">
