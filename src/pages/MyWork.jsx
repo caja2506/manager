@@ -38,7 +38,7 @@ function getGreeting() {
 }
 
 const GRID_COLS = '28px minmax(180px, 1.2fr) minmax(120px, 1fr) 32px 50px 86px 68px 56px minmax(100px, 140px) 76px 85px 60px';
-const MOBILE_GRID_COLS = '120px 86px 80px 50px 70px 70px 105px 76px 60px';
+const MOBILE_GRID_COLS = '140px 100px 95px 65px 90px 100px 115px 85px 75px';
 
 const PRIORITY_BADGES = {
     critical: { label: 'CRÍTICA', bg: 'rgba(239, 68, 68, 0.15)', text: '#ef4444' },
@@ -426,7 +426,7 @@ export default function MyWork() {
             <div className="rounded-xl border border-slate-800/50 bg-slate-800/20 max-h-[78vh] overflow-auto">
                 {isMobile ? (
                     <div
-                        className="grid items-center gap-2 text-center text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-900/90 py-2 pl-6 pr-2 min-w-[732px] sticky top-0 z-20"
+                        className="grid items-center gap-2 text-center text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-900/90 py-2 pl-6 pr-2 min-w-[930px] sticky top-0 z-20"
                         style={{ gridTemplateColumns: MOBILE_GRID_COLS }}
                     >
                         <div className="text-left">Proyecto</div>
@@ -459,7 +459,7 @@ export default function MyWork() {
                     </div>
                 )}
 
-                <div className={isMobile ? "divide-y divide-slate-800/20 min-w-[732px]" : "min-w-[1100px] divide-y divide-slate-800/30"}>
+                <div className={isMobile ? "divide-y divide-slate-800/20 min-w-[930px]" : "min-w-[1100px] divide-y divide-slate-800/30"}>
                     {sortedTasks.map((task, idx) => {
                         const isTaskActive = activeTimer?.taskId === task.id;
                         const isBlocked = task.status === 'blocked';
@@ -614,7 +614,7 @@ export default function MyWork() {
 
                                         {/* Renglón 2: Atributos en Grid (Desplazables horizontalmente de forma unificada) */}
                                         <div 
-                                            className="grid items-center gap-2 text-center text-[10px] pl-6 pr-2 min-w-[732px]"
+                                            className="grid items-center gap-2 text-center text-[10px] pl-6 pr-2 min-w-[930px]"
                                             style={{ gridTemplateColumns: MOBILE_GRID_COLS }}
                                             onClick={(e) => e.stopPropagation()}
                                             onDoubleClick={(e) => e.stopPropagation()}
