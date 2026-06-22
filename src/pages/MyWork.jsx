@@ -40,8 +40,8 @@ function getGreeting() {
     return 'Buenas noches';
 }
 
-const GRID_COLS = '28px minmax(180px, 1.2fr) minmax(120px, 1fr) 32px 50px 86px 68px 56px minmax(100px, 140px) 76px 85px 60px';
-const MOBILE_GRID_COLS = '140px 100px 95px 65px 90px 100px 115px 85px 75px';
+const GRID_COLS = '28px minmax(200px, 1.2fr) minmax(120px, 1fr) 32px 50px 86px 68px 86px 56px minmax(105px, 140px) 76px 85px 60px';
+const MOBILE_GRID_COLS = '140px 100px 95px 65px 86px 90px 100px 115px 85px 75px';
 
 const PRIORITY_BADGES = {
     critical: { label: 'CRÍTICA', bg: 'rgba(239, 68, 68, 0.15)', text: '#ef4444' },
@@ -362,6 +362,32 @@ export default function MyWork() {
     const [quickEstimatedHours, setQuickEstimatedHours] = useState('');
     const [quickPriority, setQuickPriority] = useState('medium');
     const [quickStations, setQuickStations] = useState([]);
+    const [quickWorkAreaTypeId, setQuickWorkAreaTypeId] = useState('');
+
+    const filteredQuickTaskTypes = useMemo(() => {
+        if (!quickWorkAreaTypeId) return taskTypes || [];
+        const selectedArea = (workAreaTypes || []).find(a => a.id === quickWorkAreaTypeId);
+        const allowedValues = selectedArea?.defaultTaskTypes || [];
+        if (allowedValues.length === 0) return taskTypes || [];
+        return (taskTypes || []).filter(t => 
+            allowedValues.includes(t.id) || 
+            allowedValues.includes(t.name) || 
+            (t.firestoreId && allowedValues.includes(t.firestoreId)) ||
+            allowedValues.some(val => 
+                (t.name && val?.toString().toLowerCase() === t.name.toLowerCase()) ||
+                (t.firestoreId && val?.toString().toLowerCase() === t.firestoreId.toLowerCase())
+            )
+        );
+    }, [quickWorkAreaTypeId, taskTypes, workAreaTypes]);
+
+    // Clear quickTaskTypeId if it becomes invalid under new area
+    useEffect(() => {
+        if (!quickTaskTypeId) return;
+        const isValid = filteredQuickTaskTypes.some(t => t.id === quickTaskTypeId);
+        if (!isValid) {
+            setQuickTaskTypeId('');
+        }
+    }, [filteredQuickTaskTypes, quickTaskTypeId]);
 
     // Auto-fetch stations for the selected project in quick task creator
     useEffect(() => {
@@ -383,6 +409,7 @@ export default function MyWork() {
                 title: quickTitle.trim(),
                 projectId: quickProjectId || null,
                 stationId: quickStationId || null,
+                workAreaTypeId: quickWorkAreaTypeId || null,
                 status: quickStatus || 'pending',
                 taskTypeId: quickTaskTypeId || null,
                 dueDate: quickDueDate || null,
@@ -395,6 +422,7 @@ export default function MyWork() {
             // Reset fields
             setQuickTitle('');
             setQuickStationId('');
+            setQuickWorkAreaTypeId('');
             setQuickTaskTypeId('');
             setQuickDueDate('');
             setQuickEstimatedHours('');
@@ -778,6 +806,7 @@ export default function MyWork() {
                         <div>Estado</div>
                         <div>Prioridad</div>
                         <div>STN</div>
+                        <div>Área</div>
                         <div>Tipo</div>
                         <div>Avance</div>
                         <div>Timeline</div>
@@ -794,8 +823,9 @@ export default function MyWork() {
                         <div className="text-left px-2">Proyecto</div>
                         <div className="text-center">💬</div>
                         <div>STN</div>
-                        <div>Estado</div>
+                        <div>Área</div>
                         <div>Tipo</div>
+                        <div>Estado</div>
                         <div>Avance</div>
                         <div>Timeline</div>
                         <div>Horas</div>
@@ -808,34 +838,172 @@ export default function MyWork() {
                     {/* Fila de Creación Rápida */}
                     {canEdit && (
                         isMobile ? (
-                            <div className="flex flex-col gap-1.5 py-3 px-4 border-b border-slate-800/30 bg-slate-900/40 text-xs min-w-[930px]">
-                                <div className="flex items-center gap-2">
+                            <div className="flex flex-col gap-1.5 py-3 px-0 border-b border-slate-850 bg-slate-900/40 text-xs min-w-[930px]">
+                                {/* Row 1: Title & Button */}
+                                <div className="sticky left-0 w-[calc(100vw-36px)] shrink-0 z-10 flex items-center gap-2 pl-5 pr-3 bg-inherit">
                                     <Plus className="w-4 h-4 text-indigo-400 shrink-0" />
                                     <input
                                         type="text"
-                                        placeholder="Nueva tarea..."
+                                        placeholder="Nombre de la nueva tarea..."
                                         value={quickTitle}
                                         onChange={e => setQuickTitle(e.target.value)}
                                         onKeyDown={e => { if (e.key === 'Enter') handleQuickAddTask(); }}
-                                        className="flex-1 bg-slate-800 border border-slate-700/50 rounded px-2 py-1 text-slate-200 outline-none"
+                                        className="flex-1 bg-slate-800 border border-slate-700/50 rounded px-2 py-1 text-slate-200 outline-none text-xs"
                                     />
-                                    <select
-                                        value={quickProjectId}
-                                        onChange={e => setQuickProjectId(e.target.value)}
-                                        className="bg-slate-800 border border-slate-700/50 rounded px-2 py-1 text-slate-300 outline-none w-36"
-                                    >
-                                        <option value="">Proyecto...</option>
-                                        {engProjects.map(p => (
-                                            <option key={p.id} value={p.id}>{p.name}</option>
-                                        ))}
-                                    </select>
                                     <button
                                         onClick={handleQuickAddTask}
                                         disabled={!quickTitle.trim() || !quickProjectId}
-                                        className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded font-bold transition-all shrink-0"
+                                        className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded font-bold text-[11px] transition-all shrink-0"
                                     >
                                         Crear
                                     </button>
+                                </div>
+                                {/* Row 2: Grid details */}
+                                <div
+                                    className="grid items-center gap-2 text-center text-[10px] pl-6 pr-2 min-w-[930px]"
+                                    style={{ gridTemplateColumns: MOBILE_GRID_COLS }}
+                                >
+                                    {/* 1. Proyecto */}
+                                    <div className="text-left">
+                                        <InlineDropdown
+                                            value={quickProjectId}
+                                            options={engProjects.map(p => ({ value: p.id, label: p.name }))}
+                                            onSelect={v => setQuickProjectId(v)}
+                                            renderValue={(val) => {
+                                                const pObj = engProjects.find(p => p.id === val);
+                                                return (
+                                                    <span className={`text-[9px] font-black px-2 py-0.5 bg-slate-900 border border-slate-800 rounded whitespace-nowrap ${val ? 'text-indigo-400' : 'text-slate-500'}`}>
+                                                        {pObj?.name || 'Proyecto...'}
+                                                    </span>
+                                                );
+                                            }}
+                                        />
+                                    </div>
+                                    {/* 2. Estado */}
+                                    <div className="flex items-stretch px-0.5">
+                                        <InlineDropdown
+                                            value={quickStatus}
+                                            options={Object.entries(TASK_STATUS_CONFIG)
+                                                .filter(([k]) => k !== 'backlog')
+                                                .map(([k, cfg]) => ({ value: k, label: cfg.label, color: cfg.color }))}
+                                            onSelect={v => setQuickStatus(v)}
+                                            renderValue={(val) => {
+                                                const cfg = TASK_STATUS_CONFIG[val] || {};
+                                                return (
+                                                    <div className="w-full h-full flex items-center justify-center rounded text-[9px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                                        style={{ background: cfg.color || '#64748b' }}>
+                                                        {cfg.label || val}
+                                                    </div>
+                                                );
+                                            }}
+                                        />
+                                    </div>
+                                    {/* 3. Prioridad */}
+                                    <div className="flex items-stretch px-0.5 font-bold text-white">
+                                        <InlineDropdown
+                                            value={quickPriority}
+                                            options={Object.entries(TASK_PRIORITY_CONFIG).map(([k, cfg]) => ({ value: k, label: cfg.label, color: cfg.color || '#64748b' }))}
+                                            onSelect={v => setQuickPriority(v)}
+                                            renderValue={(val) => {
+                                                const colors = { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' };
+                                                const c = colors[val] || '#579bfc';
+                                                const cfg = TASK_PRIORITY_CONFIG[val] || {};
+                                                return (
+                                                    <div className="w-full h-full flex items-center justify-center rounded text-[9px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                                        style={{ background: c }}>
+                                                        {cfg.label || val}
+                                                    </div>
+                                                );
+                                            }}
+                                        />
+                                    </div>
+                                    {/* 4. STN */}
+                                    <div>
+                                        <InlineDropdown
+                                            value={quickStationId}
+                                            options={[
+                                                { value: '', label: 'Sin estación' },
+                                                ...quickStations.map(s => {
+                                                    const label = formatStationLabel(s, hasMultipleIndexers(quickStations));
+                                                    return { value: s.id, label: s.description ? `${label} — ${s.description}` : label };
+                                                })
+                                            ]}
+                                            onSelect={v => setQuickStationId(v || '')}
+                                            renderValue={(val) => {
+                                                const sObj = quickStations.find(s => s.id === val);
+                                                const label = sObj ? formatStationLabel(sObj, hasMultipleIndexers(quickStations)) : '';
+                                                return (
+                                                    <span className={`text-[9px] font-black truncate block text-center ${val ? 'text-cyan-400' : 'text-slate-500'}`}>
+                                                        {label || 'STN...'}
+                                                    </span>
+                                                );
+                                            }}
+                                            className={!quickProjectId ? 'opacity-40 pointer-events-none' : ''}
+                                        />
+                                    </div>
+                                    {/* 5. Área */}
+                                    <div>
+                                        <InlineDropdown
+                                            value={quickWorkAreaTypeId}
+                                            options={[
+                                                { value: '', label: 'Sin área' },
+                                                ...(workAreaTypes || []).map(a => ({ value: a.id, label: a.name }))
+                                            ]}
+                                            onSelect={v => setQuickWorkAreaTypeId(v || '')}
+                                            renderValue={(val) => {
+                                                const aObj = (workAreaTypes || []).find(a => a.id === val);
+                                                return (
+                                                    <span className={`text-[9px] font-black truncate block text-center ${val ? 'text-slate-300' : 'text-slate-500'}`}>
+                                                        {aObj?.name || 'Área...'}
+                                                    </span>
+                                                );
+                                            }}
+                                        />
+                                    </div>
+                                    {/* 6. Tipo */}
+                                    <div>
+                                        <InlineDropdown
+                                            value={quickTaskTypeId}
+                                            options={[
+                                                { value: '', label: 'Sin tipo' },
+                                                ...filteredQuickTaskTypes.map(t => ({ value: t.id, label: t.name }))
+                                            ]}
+                                            onSelect={v => setQuickTaskTypeId(v || '')}
+                                            renderValue={(val) => {
+                                                const tObj = (taskTypes || []).find(t => t.id === val);
+                                                return (
+                                                    <span className={`text-[9px] font-black truncate block text-center ${val ? 'text-slate-350' : 'text-slate-500'}`}>
+                                                        {tObj?.name || 'Tipo...'}
+                                                    </span>
+                                                );
+                                            }}
+                                        />
+                                    </div>
+                                    {/* 7. Avance */}
+                                    <div className="text-center text-slate-650">—</div>
+                                    {/* 8. Timeline */}
+                                    <div className="flex items-center justify-center gap-1 text-[8.5px] font-bold text-slate-400 bg-slate-900/40 px-1 py-0.5 rounded">
+                                        <input
+                                            type="date"
+                                            value={quickDueDate}
+                                            onChange={e => setQuickDueDate(e.target.value)}
+                                            className="bg-slate-800 border border-slate-700/50 rounded px-1 py-0.5 text-[9px] text-slate-355 focus:outline-none w-full text-center"
+                                        />
+                                    </div>
+                                    {/* 9. Horas */}
+                                    <div className="flex items-center justify-center gap-0.5 text-[9px] min-w-0 w-full font-bold text-slate-355">
+                                        <input
+                                            type="number"
+                                            placeholder="Est."
+                                            value={quickEstimatedHours}
+                                            onChange={e => setQuickEstimatedHours(e.target.value)}
+                                            className="w-full bg-slate-800 border border-slate-700/50 rounded px-1 py-0.5 text-[9px] text-slate-300 focus:outline-none text-center"
+                                            min="0"
+                                            step="0.5"
+                                        />
+                                    </div>
+                                    {/* 10. Acciones/Placeholder */}
+                                    <div className="text-[9px] text-slate-500 italic select-none">Fija ↑</div>
                                 </div>
                             </div>
                         ) : (
@@ -853,62 +1021,101 @@ export default function MyWork() {
                                         value={quickTitle}
                                         onChange={e => setQuickTitle(e.target.value)}
                                         onKeyDown={e => { if (e.key === 'Enter') handleQuickAddTask(); }}
-                                        className="w-full bg-slate-800 border border-slate-700/50 rounded px-2 py-1 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-indigo-500/50"
+                                        className="w-full bg-slate-850 border border-slate-700/55 rounded px-2 py-1 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-indigo-500/50"
                                     />
                                 </div>
                                 <div className="text-left px-2">
-                                    <select
+                                    <InlineDropdown
                                         value={quickProjectId}
-                                        onChange={e => setQuickProjectId(e.target.value)}
-                                        className="w-full bg-slate-800 border border-slate-700/50 rounded px-1 py-0.5 text-[11px] text-slate-300 focus:outline-none"
-                                    >
-                                        <option value="">Proyecto...</option>
-                                        {engProjects.map(p => (
-                                            <option key={p.id} value={p.id}>{p.name}</option>
-                                        ))}
-                                    </select>
+                                        options={engProjects.map(p => ({ value: p.id, label: p.name }))}
+                                        onSelect={v => setQuickProjectId(v)}
+                                        renderValue={(val) => {
+                                            const pObj = engProjects.find(p => p.id === val);
+                                            return (
+                                                <span className={`text-[10px] font-bold truncate block text-center ${val ? 'text-indigo-400' : 'text-slate-500'}`}>
+                                                    {pObj?.name || 'Proyecto...'}
+                                                </span>
+                                            );
+                                        }}
+                                    />
                                 </div>
                                 <div className="text-center text-slate-600">—</div>
                                 <div>
-                                    <select
+                                    <InlineDropdown
                                         value={quickStationId}
-                                        onChange={e => setQuickStationId(e.target.value)}
-                                        className="w-full bg-slate-800 border border-slate-700/50 rounded px-1 py-0.5 text-[11px] text-slate-300 focus:outline-none"
-                                        disabled={!quickProjectId}
-                                    >
-                                        <option value="">STN...</option>
-                                        {quickStations.map(s => (
-                                            <option key={s.id} value={s.id}>
-                                                {s.stationNumber != null ? `STN ${s.stationNumber}` : s.id}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        options={[
+                                            { value: '', label: 'Sin estación' },
+                                            ...quickStations.map(s => {
+                                                const label = formatStationLabel(s, hasMultipleIndexers(quickStations));
+                                                return { value: s.id, label: s.description ? `${label} — ${s.description}` : label };
+                                            })
+                                        ]}
+                                        onSelect={v => setQuickStationId(v || '')}
+                                        renderValue={(val) => {
+                                            const sObj = quickStations.find(s => s.id === val);
+                                            const label = sObj ? formatStationLabel(sObj, hasMultipleIndexers(quickStations)) : '';
+                                            return (
+                                                <span className={`text-[10px] font-bold truncate block text-center ${val ? 'text-cyan-400' : 'text-slate-500'}`}>
+                                                    {label || 'STN...'}
+                                                </span>
+                                            );
+                                        }}
+                                        className={!quickProjectId ? 'opacity-40 pointer-events-none' : ''}
+                                    />
                                 </div>
-                                <div className="flex items-stretch px-0.5">
-                                    <select
-                                        value={quickStatus}
-                                        onChange={e => setQuickStatus(e.target.value)}
-                                        className="w-full bg-slate-800 border border-slate-700/50 rounded px-1 py-0.5 text-[11px] text-slate-350 focus:outline-none text-center font-bold"
-                                    >
-                                        {Object.entries(TASK_STATUS_CONFIG)
-                                            .filter(([k]) => k !== 'backlog')
-                                            .map(([k, cfg]) => (
-                                                <option key={k} value={k}>{cfg.label}</option>
-                                            ))
-                                        }
-                                    </select>
+                                <div>
+                                    <InlineDropdown
+                                        value={quickWorkAreaTypeId}
+                                        options={[
+                                            { value: '', label: 'Sin área' },
+                                            ...(workAreaTypes || []).map(a => ({ value: a.id, label: a.name }))
+                                        ]}
+                                        onSelect={v => setQuickWorkAreaTypeId(v || '')}
+                                        renderValue={(val) => {
+                                            const aObj = (workAreaTypes || []).find(a => a.id === val);
+                                            return (
+                                                <span className={`text-[10px] font-bold truncate block text-center ${val ? 'text-slate-300' : 'text-slate-500'}`}>
+                                                    {aObj?.name || 'Área...'}
+                                                </span>
+                                            );
+                                        }}
+                                    />
                                 </div>
-                                <div className="flex items-stretch px-0.5">
-                                    <select
+                                <div>
+                                    <InlineDropdown
                                         value={quickTaskTypeId}
-                                        onChange={e => setQuickTaskTypeId(e.target.value)}
-                                        className="w-full bg-slate-800 border border-slate-700/50 rounded px-1 py-0.5 text-[11px] text-slate-350 focus:outline-none text-center"
-                                    >
-                                        <option value="">Tipo...</option>
-                                        {taskTypes.map(t => (
-                                            <option key={t.id} value={t.id}>{t.name}</option>
-                                        ))}
-                                    </select>
+                                        options={[
+                                            { value: '', label: 'Sin tipo' },
+                                            ...filteredQuickTaskTypes.map(t => ({ value: t.id, label: t.name }))
+                                        ]}
+                                        onSelect={v => setQuickTaskTypeId(v || '')}
+                                        renderValue={(val) => {
+                                            const tObj = (taskTypes || []).find(t => t.id === val);
+                                            return (
+                                                <span className={`text-[10px] font-bold truncate block text-center ${val ? 'text-slate-350' : 'text-slate-500'}`}>
+                                                    {tObj?.name || 'Tipo...'}
+                                                </span>
+                                            );
+                                        }}
+                                    />
+                                </div>
+                                <div className="flex items-stretch px-0.5">
+                                    <InlineDropdown
+                                        value={quickStatus}
+                                        options={Object.entries(TASK_STATUS_CONFIG)
+                                            .filter(([k]) => k !== 'backlog')
+                                            .map(([k, cfg]) => ({ value: k, label: cfg.label, color: cfg.color }))}
+                                        onSelect={v => setQuickStatus(v)}
+                                        renderValue={(val) => {
+                                            const cfg = TASK_STATUS_CONFIG[val] || {};
+                                            return (
+                                                <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                                    style={{ background: cfg.color || '#64748b' }}>
+                                                    {cfg.label || val}
+                                                </div>
+                                            );
+                                        }}
+                                    />
                                 </div>
                                 <div className="text-center text-slate-650">—</div>
                                 <div className="flex items-center justify-center">
@@ -916,7 +1123,7 @@ export default function MyWork() {
                                         type="date"
                                         value={quickDueDate}
                                         onChange={e => setQuickDueDate(e.target.value)}
-                                        className="bg-slate-800 border border-slate-700/50 rounded px-1 py-0.5 text-[10px] text-slate-350 focus:outline-none w-24 text-center"
+                                        className="bg-slate-800 border border-slate-700/50 rounded px-1 py-0.5 text-[10px] text-slate-350 focus:outline-none w-full text-center"
                                     />
                                 </div>
                                 <div className="flex items-center justify-center">
@@ -925,21 +1132,28 @@ export default function MyWork() {
                                         placeholder="Est."
                                         value={quickEstimatedHours}
                                         onChange={e => setQuickEstimatedHours(e.target.value)}
-                                        className="w-14 bg-slate-800 border border-slate-700/50 rounded px-1 py-0.5 text-xs text-slate-300 focus:outline-none text-center"
+                                        className="w-full bg-slate-800 border border-slate-700/50 rounded px-1 py-0.5 text-[10px] text-slate-300 focus:outline-none text-center"
                                         min="0"
                                         step="0.5"
                                     />
                                 </div>
                                 <div className="flex items-stretch px-0.5">
-                                    <select
+                                    <InlineDropdown
                                         value={quickPriority}
-                                        onChange={e => setQuickPriority(e.target.value)}
-                                        className="w-full bg-slate-800 border border-slate-700/50 rounded px-1 py-0.5 text-[11px] text-slate-350 focus:outline-none text-center font-bold"
-                                    >
-                                        {Object.entries(TASK_PRIORITY_CONFIG).map(([k, cfg]) => (
-                                            <option key={k} value={k}>{cfg.label}</option>
-                                        ))}
-                                    </select>
+                                        options={Object.entries(TASK_PRIORITY_CONFIG).map(([k, cfg]) => ({ value: k, label: cfg.label, color: cfg.color || '#64748b' }))}
+                                        onSelect={v => setQuickPriority(v)}
+                                        renderValue={(val) => {
+                                            const colors = { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' };
+                                            const c = colors[val] || '#579bfc';
+                                            const cfg = TASK_PRIORITY_CONFIG[val] || {};
+                                            return (
+                                                <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                                    style={{ background: c }}>
+                                                    {cfg.label || val}
+                                                </div>
+                                            );
+                                        }}
+                                    />
                                 </div>
                                 <div className="flex items-center justify-center">
                                     <button
@@ -1190,7 +1404,49 @@ export default function MyWork() {
  
                                             {/* Estación (STN) */}
                                             <StationCell task={task} canEdit={canEdit} onSave={v => saveField(task, 'stationId', v)} />
- 
+
+                                            {/* Área */}
+                                            <div className="min-w-0 overflow-hidden flex items-center justify-center">
+                                                {(() => {
+                                                    const wa = (workAreaTypes || []).find(a => a.id === task.workAreaTypeId);
+                                                    const areaOptions = [
+                                                        { value: '', label: 'Sin área' },
+                                                        ...(workAreaTypes || []).map(a => ({ value: a.id, label: a.name })),
+                                                    ];
+                                                    return canEdit ? (
+                                                        <InlineDropdown
+                                                            value={task.workAreaTypeId || ''}
+                                                            options={areaOptions}
+                                                            onSelect={v => {
+                                                                saveField(task, 'workAreaTypeId', v || null);
+                                                                if (v && task.taskTypeId) {
+                                                                    const newArea = (workAreaTypes || []).find(a => a.id === v);
+                                                                    const allowedValues = newArea?.defaultTaskTypes || [];
+                                                                    const currentType = (taskTypes || []).find(t => t.id === task.taskTypeId);
+                                                                    if (currentType && allowedValues.length > 0) {
+                                                                        const isAllowed = allowedValues.includes(currentType.id) || 
+                                                                                          allowedValues.includes(currentType.name) ||
+                                                                                          (currentType.firestoreId && allowedValues.includes(currentType.firestoreId)) ||
+                                                                                          allowedValues.some(val => 
+                                                                                              (currentType.name && val?.toString().toLowerCase() === currentType.name.toLowerCase()) ||
+                                                                                              (currentType.firestoreId && val?.toString().toLowerCase() === currentType.firestoreId.toLowerCase())
+                                                                                          );
+                                                                        if (!isAllowed) {
+                                                                            saveField(task, 'taskTypeId', null);
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }}
+                                                            renderValue={() => (
+                                                                <span className="text-[9px] text-slate-455 truncate block text-center font-semibold leading-tight">{wa?.name || '—'}</span>
+                                                            )}
+                                                        />
+                                                    ) : (
+                                                        <span className="text-[9px] text-slate-455 truncate block text-center">{wa?.name || '—'}</span>
+                                                    );
+                                                })()}
+                                            </div>
+
                                             {/* Tipo */}
                                             <div className="min-w-0 overflow-hidden flex items-center justify-center">
                                                 {(() => {
@@ -1371,34 +1627,49 @@ export default function MyWork() {
  
                                     {/* Estación */}
                                     <StationCell task={task} canEdit={canEdit} onSave={v => saveField(task, 'stationId', v)} />
- 
-                                    {/* Estado Dropdown */}
-                                    <div className="flex items-stretch px-0.5" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
-                                        {canEdit ? (
-                                            <InlineDropdown
-                                                value={task.status}
-                                                options={Object.entries(TASK_STATUS_CONFIG)
-                                                    .filter(([k]) => k !== 'backlog')
-                                                    .map(([k, cfg]) => ({ value: k, label: cfg.label, color: cfg.color }))}
-                                                onSelect={v => handleStatusChange(task, v)}
-                                                renderValue={(val) => {
-                                                    const cfg = TASK_STATUS_CONFIG[val] || {};
-                                                    return (
-                                                        <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[24px]"
-                                                            style={{ background: cfg.color || '#64748b' }}>
-                                                            {cfg.label || val}
-                                                        </div>
-                                                    );
-                                                }}
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[24px]"
-                                                style={{ background: statusCfg.color || '#64748b' }}>
-                                                {statusCfg.label || task.status}
-                                            </div>
-                                        )}
+
+                                    {/* Área */}
+                                    <div className="min-w-0 overflow-hidden flex items-center justify-center">
+                                        {(() => {
+                                            const wa = (workAreaTypes || []).find(a => a.id === task.workAreaTypeId);
+                                            const areaOptions = [
+                                                { value: '', label: 'Sin área' },
+                                                ...(workAreaTypes || []).map(a => ({ value: a.id, label: a.name })),
+                                            ];
+                                            return canEdit ? (
+                                                <InlineDropdown
+                                                    value={task.workAreaTypeId || ''}
+                                                    options={areaOptions}
+                                                    onSelect={v => {
+                                                        saveField(task, 'workAreaTypeId', v || null);
+                                                        if (v && task.taskTypeId) {
+                                                            const newArea = (workAreaTypes || []).find(a => a.id === v);
+                                                            const allowedValues = newArea?.defaultTaskTypes || [];
+                                                            const currentType = (taskTypes || []).find(t => t.id === task.taskTypeId);
+                                                            if (currentType && allowedValues.length > 0) {
+                                                                const isAllowed = allowedValues.includes(currentType.id) || 
+                                                                                  allowedValues.includes(currentType.name) ||
+                                                                                  (currentType.firestoreId && allowedValues.includes(currentType.firestoreId)) ||
+                                                                                  allowedValues.some(val => 
+                                                                                      (currentType.name && val?.toString().toLowerCase() === currentType.name.toLowerCase()) ||
+                                                                                      (currentType.firestoreId && val?.toString().toLowerCase() === currentType.firestoreId.toLowerCase())
+                                                                                  );
+                                                                if (!isAllowed) {
+                                                                    saveField(task, 'taskTypeId', null);
+                                                                }
+                                                            }
+                                                        }
+                                                    }}
+                                                    renderValue={() => (
+                                                        <span className="text-[10px] text-slate-400 truncate block text-center">{wa?.name || '—'}</span>
+                                                    )}
+                                                />
+                                            ) : (
+                                                <span className="text-[10px] text-slate-400 truncate block text-center">{wa?.name || '—'}</span>
+                                            );
+                                        })()}
                                     </div>
- 
+
                                     {/* Tipo */}
                                     <div className="min-w-0 overflow-hidden flex items-center justify-center">
                                         {(() => {
@@ -1433,6 +1704,33 @@ export default function MyWork() {
                                                 <span className="text-[10px] text-slate-400 truncate block text-center">{tt?.name || '—'}</span>
                                             );
                                         })()}
+                                    </div>
+
+                                    {/* Estado Dropdown */}
+                                    <div className="flex items-stretch px-0.5" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+                                        {canEdit ? (
+                                            <InlineDropdown
+                                                value={task.status}
+                                                options={Object.entries(TASK_STATUS_CONFIG)
+                                                    .filter(([k]) => k !== 'backlog')
+                                                    .map(([k, cfg]) => ({ value: k, label: cfg.label, color: cfg.color }))}
+                                                onSelect={v => handleStatusChange(task, v)}
+                                                renderValue={(val) => {
+                                                    const cfg = TASK_STATUS_CONFIG[val] || {};
+                                                    return (
+                                                        <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[24px]"
+                                                            style={{ background: cfg.color || '#64748b' }}>
+                                                            {cfg.label || val}
+                                                        </div>
+                                                    );
+                                                }}
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center rounded text-[10px] font-bold text-white text-center leading-tight min-h-[24px]"
+                                                style={{ background: statusCfg.color || '#64748b' }}>
+                                                {statusCfg.label || task.status}
+                                            </div>
+                                        )}
                                     </div>
  
                                     {/* Avance */}
