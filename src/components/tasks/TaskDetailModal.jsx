@@ -614,7 +614,12 @@ export default function TaskDetailModal({
         setDeleteError(null);
         try {
             await deleteTask(task.id);
-            if (typeof refetch === 'function') refetch();
+            if (typeof refetch === 'function') {
+                await refetch('tasks');
+                await refetch('subtasks');
+                await refetch('time_logs');
+                await refetch('delays');
+            }
             setShowDeleteConfirm(false);
             onClose();
         } catch (err) {
