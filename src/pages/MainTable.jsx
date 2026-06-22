@@ -1096,15 +1096,13 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
 
                 {/* Checkbox / Select */}
                 <div className="sticky left-[30px] z-10 bg-inherit flex items-center justify-center" onClick={e => e.stopPropagation()}>
-                    {isSelectionEnabled ? (
+                    {isSelectionEnabled && (
                         <input
                             type="checkbox"
                             checked={!!isSelected}
                             onChange={() => onToggleSelect?.(task.id)}
                             className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-700 text-violet-500 focus:ring-violet-500/30 cursor-pointer"
                         />
-                    ) : (
-                        <span className="w-1.5 h-1.5 rounded-full bg-slate-700/60" />
                     )}
                 </div>
 
@@ -1662,7 +1660,7 @@ function TableGroup({ isMobile, isSelectionEnabled, label, color, tasks, engProj
     return (
         <div className="animate-in fade-in duration-200">
             {/* Sticky Group Header */}
-            <div className="sticky top-[34px] left-0 z-10 w-full bg-slate-900/95 backdrop-blur-md border-b border-slate-800/40 py-1.5 pl-3 md:pl-[39px] pr-3 flex items-center justify-between">
+            <div className="sticky top-[34px] left-0 z-25 w-full bg-slate-900/95 backdrop-blur-md border-b border-slate-800/40 py-1.5 pl-3 md:pl-[39px] pr-3 flex items-center justify-between">
                 <button onClick={onToggle} className="flex items-center gap-2 text-left transition-colors group py-1">
                     {isExpanded
                         ? <ChevronDown className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300" />
@@ -2353,7 +2351,7 @@ export default function MainTable({ forceProjectId = null }) {
                     {/* Global columns header */}
                     {isMobile ? (
                         <div
-                            className="grid items-center gap-2 text-center text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-[var(--bg-table-header-solid)] h-[34px] py-0 pl-6 pr-2 min-w-[1075px] sticky top-0 z-20"
+                            className="grid items-center gap-2 text-center text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-[var(--bg-table-header-solid)] h-[34px] py-0 pl-6 pr-2 min-w-[1075px] sticky top-0 z-30"
                             style={{ gridTemplateColumns: MOBILE_GRID_COLS }}
                         >
                             <div className="text-left">Comentarios</div>
@@ -2370,7 +2368,7 @@ export default function MainTable({ forceProjectId = null }) {
                         </div>
                     ) : (
                         <div
-                            className="grid items-center px-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-[var(--bg-table-header-solid)] text-center sticky top-0 z-20 min-w-[1130px] h-[34px] py-0"
+                            className="grid items-center px-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-[var(--bg-table-header-solid)] text-center sticky top-0 z-30 min-w-[1130px] h-[34px] py-0"
                             style={{ gridTemplateColumns: GRID_COLS }}
                         >
                             <div className="sticky left-0 z-20 bg-[var(--bg-table-header-solid)] border-b border-slate-800/50 h-full w-full"></div>
