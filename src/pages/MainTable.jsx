@@ -2319,7 +2319,7 @@ export default function MainTable({ forceProjectId = null }) {
                 )}
 
                 {/* Scrollable Table Container */}
-                <div className="flex-1 overflow-auto max-h-[calc(100vh-220px)] border border-slate-800/50 bg-slate-800/5 rounded-xl">
+                <div className="flex-1 overflow-auto max-h-[calc(100vh-170px)] border border-slate-800/50 bg-slate-800/5 rounded-xl">
                     {/* Global columns header */}
                     {isMobile ? (
                         <div
