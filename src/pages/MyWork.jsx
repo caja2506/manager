@@ -40,7 +40,7 @@ function getGreeting() {
     return 'Buenas noches';
 }
 
-const GRID_COLS = '28px minmax(200px, 1.2fr) 32px minmax(120px, 1fr) 50px 86px 68px 86px 56px minmax(105px, 140px) 76px 85px 60px';
+const GRID_COLS = '28px minmax(200px, 1.2fr) 32px 90px 50px 86px 68px 86px 56px minmax(105px, 140px) 76px 85px 60px';
 const MOBILE_GRID_COLS = '140px 100px 95px 65px 86px 90px 100px 115px 85px 75px';
 
 const PRIORITY_BADGES = {
