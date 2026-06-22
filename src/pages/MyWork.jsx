@@ -55,6 +55,15 @@ export default function MyWork() {
         refetch: refetchTable,
     } = useEngineeringData();
 
+    // Detectar si es dispositivo móvil
+    const [isMobile, setIsMobile] = useState(false);
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
     // ── Weekly plan items ──
     const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
     const weekStartStr = format(weekStart, 'yyyy-MM-dd');
@@ -414,25 +423,27 @@ export default function MyWork() {
 
             {/* Layout de Columna Única: Tabla con diseño MainTable */}
             <div className="rounded-xl border border-slate-800/50 bg-slate-800/20 max-h-[78vh] overflow-auto">
-                <div
-                    className="grid items-center px-2 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-900/90 text-center sticky top-0 z-20 min-w-[1100px]"
-                    style={{ gridTemplateColumns: GRID_COLS }}
-                >
-                    <div className="sticky left-0 z-10 bg-slate-900 h-full flex items-center justify-center border-l-3 border-l-slate-700"></div>
-                    <div className="sticky left-[28px] z-10 text-left bg-slate-900 h-full flex items-center">Tarea</div>
-                    <div className="text-left px-2">Proyecto</div>
-                    <div className="text-center">💬</div>
-                    <div>STN</div>
-                    <div>Estado</div>
-                    <div>Tipo</div>
-                    <div>Avance</div>
-                    <div>Timeline</div>
-                    <div>Horas</div>
-                    <div>Prioridad</div>
-                    <div className="text-right pr-2">Acciones</div>
-                </div>
+                {!isMobile && (
+                    <div
+                        className="grid items-center px-2 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-900/90 text-center sticky top-0 z-20 min-w-[1100px]"
+                        style={{ gridTemplateColumns: GRID_COLS }}
+                    >
+                        <div className="sticky left-0 z-10 bg-slate-900 h-full flex items-center justify-center border-l-3 border-l-slate-700"></div>
+                        <div className="sticky left-[28px] z-10 text-left bg-slate-900 h-full flex items-center">Tarea</div>
+                        <div className="text-left px-2">Proyecto</div>
+                        <div className="text-center">💬</div>
+                        <div>STN</div>
+                        <div>Estado</div>
+                        <div>Tipo</div>
+                        <div>Avance</div>
+                        <div>Timeline</div>
+                        <div>Horas</div>
+                        <div>Prioridad</div>
+                        <div className="text-right pr-2">Acciones</div>
+                    </div>
+                )}
 
-                <div className="min-w-[1100px] divide-y divide-slate-800/30">
+                <div className={isMobile ? "divide-y divide-slate-800/20" : "min-w-[1100px] divide-y divide-slate-800/30"}>
                     {sortedTasks.map((task, idx) => {
                         const isTaskActive = activeTimer?.taskId === task.id;
                         const isBlocked = task.status === 'blocked';
@@ -488,6 +499,202 @@ export default function MyWork() {
 
                         const isExpanded = expandedTaskIds.has(task.id);
                         const taskSubtasks = engSubtasks.filter(s => s.taskId === task.id);
+
+                        if (isMobile) {
+                            return (
+                                <React.Fragment key={task.id}>
+                                    <div
+                                        onDoubleClick={() => handleOpenTask(task)}
+                                        className={`flex flex-col gap-2 p-3 hover:bg-slate-800/10 transition-colors text-xs cursor-pointer border-b border-slate-850
+                                            ${isTaskActive ? 'bg-indigo-500/5 hover:bg-indigo-500/10' : 'bg-slate-900/10'}
+                                            ${isOverdue ? 'ring-1 ring-inset ring-rose-500/20' : ''}
+                                        `}
+                                        style={{ borderLeft: `3px solid ${isCritical ? '#ef4444' : '#6366f1'}` }}
+                                    >
+                                        {/* Renglón 1: Título y controles esenciales */}
+                                        <div className="flex items-center gap-2 w-full">
+                                            {/* Chevron de Subtareas */}
+                                            {totalSubs > 0 ? (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); toggleTaskExpanded(task.id); }}
+                                                    className="shrink-0 text-slate-500 hover:text-slate-200 transition-colors"
+                                                    title={isExpanded ? 'Ocultar subtareas' : 'Ver subtareas'}
+                                                >
+                                                    {isExpanded
+                                                        ? <ChevronDown className="w-3.5 h-3.5" />
+                                                        : <ChevronRight className="w-3.5 h-3.5" />
+                                                    }
+                                                </button>
+                                            ) : (
+                                                <span className="w-3.5 shrink-0" />
+                                            )}
+
+                                            {/* Título de la tarea */}
+                                            <span 
+                                                onClick={(e) => { e.stopPropagation(); handleOpenTask(task); }}
+                                                className="hover:text-indigo-400 font-semibold text-slate-200 flex-1 truncate text-[12.5px] pr-1"
+                                            >
+                                                {task.title || 'Sin título'}
+                                            </span>
+
+                                            {/* Badge Subtareas */}
+                                            {totalSubs > 0 && (
+                                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded shrink-0 ${
+                                                    subsPct === 100 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700/60 text-slate-400'
+                                                }`}>
+                                                    {doneSubs}/{totalSubs}
+                                                </span>
+                                            )}
+
+                                            {/* Badge Bloqueada */}
+                                            {isBlocked && (
+                                                <span className="text-[9px] font-black uppercase px-1 py-0.5 bg-red-600 text-white rounded shrink-0 scale-90">
+                                                    Bloqueada
+                                                </span>
+                                            )}
+
+                                            {/* Icono Comentarios */}
+                                            <div 
+                                                className="flex items-center justify-center text-slate-500 hover:text-slate-200 cursor-pointer p-1 shrink-0"
+                                                onClick={(e) => { e.stopPropagation(); handleOpenTask(task); }}
+                                                onDoubleClick={(e) => e.stopPropagation()}
+                                            >
+                                                <MessageSquare className="w-3.5 h-3.5" />
+                                            </div>
+
+                                            {/* Controles del timer (Acciones) */}
+                                            <div className="flex items-center gap-1 shrink-0 ml-1" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+                                                {isTaskActive ? (
+                                                    <>
+                                                        <button
+                                                            onClick={() => handleCompleteTask(task)}
+                                                            className="p-1 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white rounded transition-all"
+                                                            title="Completar"
+                                                        >
+                                                            <Check className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handlePauseTask(task)}
+                                                            className="p-1 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 border border-slate-750 rounded transition-all"
+                                                            title="Pausar"
+                                                        >
+                                                            <Pause className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => handleStartTask(task)}
+                                                        className={`p-1 rounded transition-all active:scale-95 text-white ${
+                                                            isBlocked ? 'bg-amber-600 hover:bg-amber-500' : 'bg-indigo-600 hover:bg-indigo-500'
+                                                        }`}
+                                                        title={isBlocked ? 'Iniciar' : 'Iniciar'}
+                                                    >
+                                                        <Play className="w-3 h-3 fill-white" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Renglón 2: Atributos scrollables horizontalmente */}
+                                        <div 
+                                            className="flex items-center gap-3 overflow-x-auto py-1 scrollbar-none select-none pr-2 ml-3.5"
+                                            onClick={(e) => e.stopPropagation()}
+                                            onDoubleClick={(e) => e.stopPropagation()}
+                                        >
+                                            {/* Proyecto */}
+                                            <div className="shrink-0">
+                                                <span className="text-[9.5px] font-black px-2 py-0.5 bg-slate-900 border border-slate-800/80 rounded whitespace-nowrap" style={{ color: projectColor, borderColor: `${projectColor}30` }}>
+                                                    {task.projectName}
+                                                </span>
+                                            </div>
+
+                                            {/* Estado */}
+                                            <div className="shrink-0 w-[86px]">
+                                                <select
+                                                    value={task.status}
+                                                    onChange={e => handleStatusChange(task, e.target.value)}
+                                                    className="w-full text-center py-0.5 rounded text-[9.5px] font-black text-white cursor-pointer focus:outline-none"
+                                                    style={{ background: statusCfg.color || '#64748b' }}
+                                                >
+                                                    {Object.entries(TASK_STATUS_CONFIG)
+                                                        .filter(([k]) => k !== 'backlog')
+                                                        .map(([k, cfg]) => (
+                                                            <option key={k} value={k} className="bg-slate-900 text-slate-200 text-xs font-semibold text-left">
+                                                                {cfg.label}
+                                                            </option>
+                                                        ))
+                                                    }
+                                                </select>
+                                            </div>
+
+                                            {/* Prioridad */}
+                                            <div className="shrink-0 w-[80px]">
+                                                <select
+                                                    value={task.priority}
+                                                    onChange={e => handlePriorityChange(task, e.target.value)}
+                                                    className="w-full text-center py-0.5 rounded text-[9.5px] font-black cursor-pointer focus:outline-none"
+                                                    style={{ 
+                                                        background: pStyle.bg,
+                                                        color: pStyle.text
+                                                    }}
+                                                >
+                                                    {Object.entries(TASK_PRIORITY_CONFIG).map(([k, cfg]) => (
+                                                        <option key={k} value={k} className="bg-slate-900 text-slate-200 text-xs font-semibold text-left">
+                                                            {cfg.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
+                                            {/* Estación (STN) */}
+                                            <div className="shrink-0 text-[9.5px] font-bold text-slate-400 bg-slate-900/60 px-1.5 py-0.5 rounded border border-slate-800/40">
+                                                {stationLabel}
+                                            </div>
+
+                                            {/* Tipo */}
+                                            {typeName !== '—' && (
+                                                <div className="shrink-0 text-[9.5px] text-slate-450 bg-slate-900/60 px-1.5 py-0.5 rounded border border-slate-800/40">
+                                                    {typeName}
+                                                </div>
+                                            )}
+
+                                            {/* Horas */}
+                                            <div className="shrink-0 text-[9.5px] font-bold text-slate-355 bg-slate-900/60 px-1.5 py-0.5 rounded border border-slate-800/20">
+                                                {actual.toFixed(1)} / {estimated.toFixed(1)} h
+                                            </div>
+
+                                            {/* Avance */}
+                                            <div className="shrink-0 flex items-center gap-1.5">
+                                                <div className="w-14 h-1 bg-slate-950 rounded-full overflow-hidden shrink-0">
+                                                    <div className="h-full rounded-full" style={{ width: `${progressPct}%`, backgroundColor: progressColor }} />
+                                                </div>
+                                                <span className="text-[9px] font-black text-slate-400">{progressPct}%</span>
+                                            </div>
+
+                                            {/* Timeline */}
+                                            <div className="shrink-0 flex items-center gap-1 text-[9px] font-bold text-slate-400 bg-slate-900/40 px-1.5 py-0.5 rounded">
+                                                <Calendar className="w-3 h-3 text-slate-500" style={{ color: timelineColor }} />
+                                                <span className={isOverdue ? 'text-red-400 font-black' : ''}>{formattedDueDate}</span>
+                                                {daysLeft !== null && (
+                                                    <span className={`text-[8px] font-black uppercase ${isOverdue ? 'text-red-400' : 'text-slate-550'} ml-1`}>
+                                                        ({isOverdue ? `atraso` : `${daysLeft}d`})
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Subtareas */}
+                                        {isExpanded && totalSubs > 0 && (
+                                            <SubtaskExpander
+                                                subtasks={taskSubtasks}
+                                                taskId={task.id}
+                                                canEdit={canEdit}
+                                            />
+                                        )}
+                                    </div>
+                                </React.Fragment>
+                            );
+                        }
 
                         return (
                             <React.Fragment key={task.id}>
@@ -596,7 +803,7 @@ export default function MyWork() {
                                             <span className={isOverdue ? 'text-red-400 font-black' : 'text-slate-400'}>{formattedDueDate}</span>
                                         </div>
                                         {daysLeft !== null && (
-                                            <span className={`text-[8px] font-black uppercase tracking-wider ${isOverdue ? 'text-red-400' : 'text-slate-500'}`}>
+                                            <span className={`text-[8px] font-black uppercase tracking-wider ${isOverdue ? 'text-red-400' : 'text-slate-550'}`}>
                                                 {isOverdue ? `${Math.abs(daysLeft)}d atraso` : `${daysLeft}d restantes`}
                                             </span>
                                         )}
