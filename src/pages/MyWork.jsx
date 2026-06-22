@@ -846,10 +846,10 @@ export default function MyWork() {
             </div>
 
             {/* Layout de Columna Única: Tabla con diseño MainTable */}
-            <div className="rounded-xl border border-slate-800/50 bg-slate-800/20 max-h-[78vh] overflow-auto">
+            <div className="rounded-xl border border-slate-800/50 bg-slate-800/5 max-h-[78vh] overflow-auto">
                 {isMobile ? (
                     <div
-                        className="grid items-center gap-2 text-center text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-900/90 py-2 pl-6 pr-2 min-w-[930px] sticky top-0 z-20"
+                        className="grid items-center gap-2 text-center text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-[var(--bg-table-header-solid)] py-2 pl-6 pr-2 min-w-[930px] sticky top-0 z-20"
                         style={{ gridTemplateColumns: MOBILE_GRID_COLS }}
                     >
                         <div className="text-left">Proyecto</div>
@@ -865,11 +865,11 @@ export default function MyWork() {
                     </div>
                 ) : (
                     <div
-                        className="grid items-center px-2 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-slate-900/90 text-center sticky top-0 z-20 min-w-[1100px]"
+                        className="grid items-center px-2 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-[var(--bg-table-header-solid)] text-center sticky top-0 z-20 min-w-[1100px]"
                         style={{ gridTemplateColumns: GRID_COLS }}
                     >
-                        <div className="sticky left-0 z-10 bg-slate-900 h-full flex items-center justify-center border-l-3 border-l-slate-700"></div>
-                        <div className="sticky left-[28px] z-10 text-left bg-slate-900 h-full flex items-center">Tarea</div>
+                        <div className="sticky left-0 z-10 bg-inherit h-full flex items-center justify-center border-l-3 border-l-slate-700"></div>
+                        <div className="sticky left-[28px] z-10 text-left bg-inherit h-full flex items-center">Tarea</div>
                         <div className="text-center">💬</div>
                         <div className="text-left px-2">Proyecto</div>
                         <div>STN</div>
@@ -888,7 +888,7 @@ export default function MyWork() {
                     {/* Fila de Creación Rápida */}
                     {canEdit && (
                         isMobile ? (
-                            <div className="flex flex-col gap-1.5 py-3 px-0 border-b border-slate-850 bg-slate-900/40 text-xs min-w-[930px]">
+                            <div className="flex flex-col gap-1.5 py-3 px-0 border-b border-slate-850 bg-[var(--bg-table-row)] text-xs min-w-[930px]">
                                 {/* Row 1: Title & Button */}
                                 <div className="sticky left-0 w-[calc(100vw-36px)] shrink-0 z-10 flex items-center gap-2 pl-5 pr-3 bg-inherit">
                                     <Plus className="w-4 h-4 text-indigo-400 shrink-0" />
@@ -1063,13 +1063,13 @@ export default function MyWork() {
                             </div>
                         ) : (
                             <div
-                                className="grid items-stretch px-2 py-0 border-b border-slate-850 bg-slate-900/40 text-center text-xs min-w-[1100px]"
+                                className="grid items-stretch px-2 py-0 border-b border-slate-850 bg-[var(--bg-table-row)] text-center text-xs min-w-[1100px]"
                                 style={{ gridTemplateColumns: GRID_COLS }}
                             >
-                                <div className="sticky left-0 z-10 bg-slate-900 h-full flex items-center justify-center border-l-3 border-l-indigo-600">
+                                <div className="sticky left-0 z-10 bg-inherit h-full flex items-center justify-center border-l-3 border-l-indigo-600">
                                     <Plus className="w-3.5 h-3.5 text-indigo-400" />
                                 </div>
-                                <div className="sticky left-[28px] z-10 bg-slate-900 pr-1 min-w-0 flex items-center h-full py-2">
+                                <div className="sticky left-[28px] z-10 bg-inherit pr-1 min-w-0 flex items-center h-full py-2">
                                     <input
                                         type="text"
                                         placeholder="Nombre de la nueva tarea..."
@@ -1284,8 +1284,10 @@ export default function MyWork() {
                                 <React.Fragment key={task.id}>
                                     <div
                                         onDoubleClick={() => handleOpenTask(task)}
-                                        className={`flex flex-col gap-1.5 py-3 px-0 hover:bg-slate-800/10 transition-colors text-xs cursor-pointer border-b border-slate-850 bg-inherit
-                                            ${isTaskActive ? 'bg-indigo-500/5 hover:bg-indigo-500/10' : 'bg-slate-900/10'}
+                                        className={`flex flex-col gap-1.5 py-3 px-0 transition-colors text-xs cursor-pointer border-b border-slate-850
+                                            ${isTaskActive 
+                                                ? 'bg-indigo-500/5 hover:bg-indigo-500/10' 
+                                                : 'bg-[var(--bg-table-row)] hover:bg-[var(--bg-table-row-hover)]'}
                                             ${isOverdue ? 'ring-1 ring-inset ring-rose-500/20' : ''}
                                         `}
                                     >
@@ -1315,13 +1317,13 @@ export default function MyWork() {
                                                 <InlineEditText
                                                     value={task.title || ''}
                                                     onSave={v => saveField(task, 'title', v)}
-                                                    className="text-[12.5px] font-semibold text-slate-200 flex-1 whitespace-normal break-words py-1 pr-1"
+                                                    className="text-[12.5px] font-semibold text-[var(--text-primary)] flex-1 whitespace-normal break-words py-1 pr-1"
                                                     placeholder="Sin título"
                                                 />
                                             ) : (
                                                 <span 
                                                     onClick={(e) => { e.stopPropagation(); handleOpenTask(task); }}
-                                                    className="hover:text-indigo-400 font-semibold text-slate-200 flex-1 whitespace-normal break-words py-1 text-[12.5px] pr-1"
+                                                    className="hover:text-indigo-400 font-semibold text-[var(--text-primary)] flex-1 whitespace-normal break-words py-1 text-[12.5px] pr-1"
                                                 >
                                                     {task.title || 'Sin título'}
                                                 </span>
@@ -1634,18 +1636,20 @@ export default function MyWork() {
                             <React.Fragment key={task.id}>
                                 <div
                                     onDoubleClick={() => handleOpenTask(task)}
-                                    className={`grid items-stretch px-2 py-0 hover:bg-slate-800/10 transition-colors text-xs text-center cursor-pointer
-                                        ${isTaskActive ? 'bg-indigo-500/5 hover:bg-indigo-500/10' : 'bg-slate-900/10'}
+                                    className={`grid items-stretch px-2 py-0 transition-colors text-xs text-center cursor-pointer
+                                        ${isTaskActive 
+                                            ? 'bg-indigo-500/5 hover:bg-indigo-500/10' 
+                                            : 'bg-[var(--bg-table-row)] hover:bg-[var(--bg-table-row-hover)]'}
                                         ${isOverdue ? 'ring-1 ring-inset ring-rose-500/20' : ''}
                                     `}
                                     style={{ gridTemplateColumns: GRID_COLS }}
                                 >
                                     {/* Borde izquierdo de color */}
-                                    <div className="sticky left-0 z-10 bg-slate-950/40 h-full flex items-center justify-center" style={{ borderLeft: `3px solid ${isCritical ? '#ef4444' : projectColor}` }}>
+                                    <div className="sticky left-0 z-10 bg-inherit h-full flex items-center justify-center" style={{ borderLeft: `3px solid ${isCritical ? '#ef4444' : projectColor}` }}>
                                     </div>
 
                                     {/* Tarea */}
-                                    <div className="sticky left-[28px] z-10 bg-slate-950/40 text-left px-1 flex items-center gap-1.5 font-semibold text-slate-200 min-w-0 h-full py-2">
+                                    <div className="sticky left-[28px] z-10 bg-inherit text-left px-1 flex items-center gap-1.5 font-semibold text-[var(--text-primary)] min-w-0 h-full py-2">
                                         {totalSubs > 0 ? (
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); toggleTaskExpanded(task.id); }}
@@ -1664,7 +1668,7 @@ export default function MyWork() {
                                             <InlineEditText
                                                 value={task.title || ''}
                                                 onSave={v => saveField(task, 'title', v)}
-                                                className="text-xs font-semibold text-slate-200 flex-1 whitespace-normal break-words py-1"
+                                                className="text-xs font-semibold text-[var(--text-primary)] flex-1 whitespace-normal break-words py-1"
                                                 placeholder="Sin título"
                                             />
                                         ) : (
