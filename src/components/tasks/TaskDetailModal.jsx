@@ -729,6 +729,16 @@ export default function TaskDetailModal({
 
 
 
+                {/* Stepper Banner for Blocked/Cancelled tasks */}
+                {!isNew && (
+                    <TaskStatusStepper
+                        currentStatus={form.status}
+                        onStatusChange={handleStatusChange}
+                        canEdit={effectiveCanEdit}
+                        variant="bannerOnly"
+                    />
+                )}
+
                 {/* Third Row: 5 states Stepper & Health Score */}
                 {!isNew && (
                     <div className="hidden lg:flex flex-col lg:flex-row bg-slate-900 border-b border-slate-800 relative z-20">

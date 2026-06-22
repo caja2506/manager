@@ -66,7 +66,7 @@ function Section({ title, icon: Icon, defaultOpen = true, children, badge, noBor
 
 export default function TaskControlPanel({
     form, setForm, isNew, task,
-    canEdit, canEditDates, subtasks = [], teamMembers = [], taskTypes = [],
+    canEdit, canEditDates, teamMembers = [], taskTypes = [],
     timeLogs = [], allTasks = [], delays = [], dependencies = [], plannerItems = [],
     userPlanItems = [],
     projectMilestones = [], milestoneWorkAreas = [],
@@ -74,7 +74,7 @@ export default function TaskControlPanel({
     onStatusChange, onOpenDelayReport, onOpenListManager, onDeleteDependency,
     onAddManualTime, isSavingManualTime,
     onOpenPRRequest, onOpenPRExecution, onOpenPRFeedback, onWaivePR,
-    activePeerReview, currentUserId, teamRole, isAdmin, resourceAssignments, onOpenAutoPlanner, onOpenActivity,
+    currentUserId, teamRole, isAdmin, resourceAssignments, onOpenAutoPlanner, onOpenActivity,
     children
 }) {
     // Clipboard state for network path copy
@@ -119,14 +119,6 @@ export default function TaskControlPanel({
             }
         }
     }
-    // ── Subtask-based auto progress ──
-    const totalSubtasks = subtasks.length;
-    const completedSubtasks = subtasks.filter(s => s.completed).length;
-    const autoProgress = totalSubtasks > 0
-        ? Math.round((completedSubtasks / totalSubtasks) * 100)
-        : null;
-    const displayProgress = autoProgress !== null ? autoProgress : (form.percentComplete || 0);
-
     // ── Actual hours from timeLogs ──
     const taskId = task?.id;
     const actualHours = taskId
@@ -737,13 +729,21 @@ export default function TaskControlPanel({
                 <div className="p-4 space-y-3">
                     {/* Stepper móvil */}
                     {!isNew && (
-                        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden p-1">
+                        <div className="flex flex-col gap-2">
                             <TaskStatusStepper
                                 currentStatus={form.status}
                                 onStatusChange={onStatusChange}
                                 canEdit={canEdit}
-                                variant="inline"
+                                variant="bannerOnly"
                             />
+                            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden p-1">
+                                <TaskStatusStepper
+                                    currentStatus={form.status}
+                                    onStatusChange={onStatusChange}
+                                    canEdit={canEdit}
+                                    variant="inline"
+                                />
+                            </div>
                         </div>
                     )}
 
