@@ -17,7 +17,7 @@
 import { supabase } from '../supabase';
 import { calculateProjectRisk } from './riskService';
 import { logActivity, ACTIVITY_TYPES } from './activityLogService';
-import { getEffectiveHours, getBreakHoursInRange } from '../utils/breakTimeUtils';
+import { getEffectiveHours } from '../utils/breakTimeUtils';
 
 // Pure functions (no DB dependency)
 export function getActiveTimerFromLogs(timeLogs, userId) {
@@ -160,6 +160,41 @@ export async function startTimerSafe({
     taskId, projectId, userId, notes = '', overtime = false,
     taskTitle = '', projectName = '', displayName = '', source = 'manual', onConfirm
 }) {
+    let effectiveTaskTitle = taskTitle;
+    let effectiveProjectName = projectName;
+    let effectiveProjectId = projectId;
+
+    if (taskId && (!effectiveTaskTitle || !effectiveProjectId)) {
+        try {
+            const { data: taskRow } = await supabase
+                .from('tasks')
+                .select('title, project_id')
+                .eq('id', taskId)
+                .single();
+            if (taskRow) {
+                if (!effectiveTaskTitle) effectiveTaskTitle = taskRow.title;
+                if (!effectiveProjectId) effectiveProjectId = taskRow.project_id;
+            }
+        } catch (err) {
+            console.warn('[timeService.sb] startTimerSafe failed to fetch task info:', err.message);
+        }
+    }
+
+    if (effectiveProjectId && !effectiveProjectName) {
+        try {
+            const { data: projRow } = await supabase
+                .from('proyectos_bom')
+                .select('name')
+                .eq('id', effectiveProjectId)
+                .single();
+            if (projRow) {
+                effectiveProjectName = projRow.name;
+            }
+        } catch (err) {
+            console.warn('[timeService.sb] startTimerSafe failed to fetch project info:', err.message);
+        }
+    }
+
     // 1. Check for active timers
     const { data: activeLogs, error } = await supabase
         .from('time_logs')
@@ -186,7 +221,7 @@ export async function startTimerSafe({
         if (onConfirm) {
             const confirmed = await onConfirm({
                 activeTaskTitle,
-                newTaskTitle: taskTitle || taskId || 'nueva tarea',
+                newTaskTitle: effectiveTaskTitle || taskId || 'nueva tarea',
             });
             if (!confirmed) return null;
         }
@@ -202,7 +237,17 @@ export async function startTimerSafe({
     }
 
     // 3. Start new timer
-    return await startTimer({ taskId, projectId, userId, notes, overtime, taskTitle, projectName, displayName, source });
+    return await startTimer({
+        taskId,
+        projectId: effectiveProjectId,
+        userId,
+        notes,
+        overtime,
+        taskTitle: effectiveTaskTitle,
+        projectName: effectiveProjectName,
+        displayName,
+        source
+    });
 }
 
 export async function handleTaskStatusTimerSync({
