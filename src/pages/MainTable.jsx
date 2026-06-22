@@ -78,6 +78,7 @@ const STATUS_GROUPS = [
 
 // 13-column grid: ☐ | Task | Comments | Owner | STN | Status | Área | Tipo | Avance | Timeline | Hours | Priority | Asig.
 const GRID_COLS = '28px minmax(200px, 1fr) minmax(120px, 200px) 36px 55px 86px 68px 68px 56px minmax(105px,150px) minmax(65px,95px) 76px 36px';
+const MOBILE_GRID_COLS = '120px 65px 100px 85px 90px 100px 125px 85px 95px 65px';
 
 // ============================================================
 // SAVE FEEDBACK HOOK
@@ -591,7 +592,7 @@ function StationCell({ task, canEdit, onSave }) {
 // TASK ROW
 // ============================================================
 
-function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDates, onOpenModal, groupColor, isLast, savedField, onSaved, taskTypes, workAreaTypes, isSelected, onToggleSelect, commentCount, taskComments }) {
+function TaskRow({ isMobile, task, engProjects, teamMembers, subtasks, canEdit, canEditDates, onOpenModal, groupColor, isLast, savedField, onSaved, taskTypes, workAreaTypes, isSelected, onToggleSelect, commentCount, taskComments }) {
     const { refetch } = useEngineeringData();
     const [popover, setPopover] = useState(null); // 'health' | 'score' | null
     const healthRef = useRef(null);
@@ -740,6 +741,339 @@ function TaskRow({ task, engProjects, teamMembers, subtasks, canEdit, canEditDat
         { label: 'Budget de horas', penalty: hoursPct > 120 ? '-25' : hoursPct > 100 ? '-15' : hoursPct > 85 ? '-5' : '0', passed: hoursPct <= 85 },
         { label: 'Avance vs timeline', penalty: (timelinePct > 70 && progressPct < 30) ? '-20' : (timelinePct > 50 && progressPct < 20) ? '-10' : '0', passed: !((timelinePct > 70 && progressPct < 30) || (timelinePct > 50 && progressPct < 20)) },
     ] : [];
+
+    if (isMobile) {
+        return (
+            <React.Fragment key={task.id}>
+                <div
+                    onDoubleClick={() => onOpenModal(task)}
+                    className={`flex flex-col gap-1.5 py-3 px-0 hover:bg-slate-800/10 transition-colors text-xs cursor-pointer border-b border-slate-800/30 bg-inherit
+                        ${isCritical ? 'bg-[var(--bg-table-row-critical)] hover:bg-[var(--bg-table-row-critical-hover)]' : 'bg-[var(--bg-table-row)] hover:bg-[var(--bg-table-row-hover)]'}
+                        ${isOverdue ? 'ring-1 ring-inset ring-rose-500/20' : ''}
+                    `}
+                >
+                    {/* Renglón 1: Título de Tarea (Fijo horizontalmente con borde de prioridad) */}
+                    <div 
+                        className="sticky left-0 w-[calc(100vw-36px)] shrink-0 z-10 flex items-center gap-2 pl-5 pr-3 bg-inherit"
+                        style={{ borderLeft: `3px solid ${isCritical ? '#ef4444' : groupColor}` }}
+                    >
+                        {/* Checkbox / Select */}
+                        <div className="shrink-0 flex items-center justify-center p-1" onClick={e => e.stopPropagation()}>
+                            <input
+                                type="checkbox"
+                                checked={!!isSelected}
+                                onChange={() => onToggleSelect?.(task.id)}
+                                className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-700 text-violet-500 focus:ring-violet-500/30 cursor-pointer"
+                            />
+                        </div>
+
+                        {/* Chevron de Subtareas */}
+                        {totalSubs > 0 ? (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setExpandedSubs(!expandedSubs); }}
+                                className="shrink-0 text-slate-500 hover:text-slate-200 transition-colors"
+                                title={expandedSubs ? 'Ocultar subtareas' : 'Ver subtareas'}
+                            >
+                                {expandedSubs
+                                    ? <ChevronDown className="w-3.5 h-3.5" />
+                                    : <ChevronRight className="w-3.5 h-3.5" />
+                                }
+                            </button>
+                        ) : (
+                            <span className="w-3.5 shrink-0" />
+                        )}
+
+                        {/* Título de la tarea */}
+                        <div className="min-w-0 flex-1 flex items-center gap-1.5">
+                            {canEdit ? (
+                                <InlineEditText
+                                    value={task.title || ''}
+                                    onSave={v => saveField('title', v)}
+                                    className={`text-sm font-semibold text-slate-200 whitespace-normal break-words ${isSaved('title') ? 'bg-emerald-500/10' : ''}`}
+                                    placeholder="Sin título"
+                                />
+                            ) : (
+                                <p className="text-sm font-semibold text-slate-200 whitespace-normal break-words">{task.title || 'Sin título'}</p>
+                            )}
+
+                            {/* Badge Subtareas */}
+                            {totalSubs > 0 && (
+                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded shrink-0 ${
+                                    subsPct === 100 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700/60 text-slate-400'
+                                }`}>
+                                    {doneSubs}/{totalSubs}
+                                </span>
+                            )}
+
+                            {/* Badge Overdue */}
+                            {isOverdue && (
+                                <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-rose-500 text-white animate-pulse shrink-0 flex items-center gap-1">
+                                    <Calendar className="w-2.5 h-2.5" />
+                                    {Math.abs(daysLeft)}d atraso
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Owner (Responsable) */}
+                        <div className="shrink-0 flex items-center ml-1">
+                            {canEdit ? (
+                                <InlineDropdown
+                                    value={task.assignedTo || ''}
+                                    options={ownerOptions}
+                                    onSelect={v => saveField('assignedTo', v || null)}
+                                    renderValue={() => <OwnerAvatar task={task} teamMembers={teamMembers} />}
+                                    className="h-auto!"
+                                />
+                            ) : (
+                                <OwnerAvatar task={task} teamMembers={teamMembers} />
+                            )}
+                        </div>
+
+                        {/* Comentarios Link / Icono */}
+                        <div 
+                            className="shrink-0 flex items-center justify-center text-slate-500 hover:text-slate-200 cursor-pointer p-1"
+                            onClick={(e) => { e.stopPropagation(); onOpenModal(task); }}
+                        >
+                            <div className="relative">
+                                <MessageSquare className="w-3.5 h-3.5" />
+                                {commentCount > 0 && (
+                                    <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-violet-600 text-white text-[8px] font-black rounded-full flex items-center justify-center">
+                                        {commentCount}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Renglón 2: Atributos en Grid (Desplazables horizontalmente de forma unificada) */}
+                    <div 
+                        className="grid items-center gap-2 text-center text-[10px] pl-6 pr-2 min-w-[1010px]"
+                        style={{ gridTemplateColumns: MOBILE_GRID_COLS }}
+                        onClick={(e) => e.stopPropagation()}
+                        onDoubleClick={(e) => e.stopPropagation()}
+                    >
+                        {/* 1. Comentarios */}
+                        <div 
+                            className="flex flex-col gap-1 px-2 py-0.5 min-w-0 cursor-pointer hover:bg-slate-500/5 rounded-lg transition-colors text-left"
+                            onClick={(e) => { e.stopPropagation(); onOpenModal(task); }}
+                        >
+                            {taskComments && taskComments.length > 0 ? (
+                                <span className="text-[10px] text-[var(--text-secondary)] truncate">
+                                    {taskComments[0].text}
+                                </span>
+                            ) : (
+                                <span className="text-[10px] text-slate-600 italic select-none truncate">—</span>
+                            )}
+                        </div>
+
+                        {/* 2. STN */}
+                        <div className="flex items-center justify-center">
+                            <StationCell task={task} canEdit={canEdit} onSave={v => saveField('stationId', v)} />
+                        </div>
+
+                        {/* 3. Estado */}
+                        <div className="flex items-stretch p-0.5">
+                            {canEdit ? (
+                                <InlineDropdown
+                                    value={task.status}
+                                    options={statusOptions}
+                                    onSelect={v => saveField('status', v)}
+                                    renderValue={(val) => {
+                                        const cfg = TASK_STATUS_CONFIG[val] || {};
+                                        return (
+                                            <div className="w-full h-full flex items-center justify-center rounded text-[9px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                                style={{ background: cfg.color || '#64748b' }}>
+                                                {cfg.label || val}
+                                            </div>
+                                        );
+                                    }}
+                                />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center rounded text-[9px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                    style={{ background: statusCfg.color || '#64748b' }}>
+                                    {statusCfg.label || task.status}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 4. Área */}
+                        <div className="min-w-0 overflow-hidden flex items-center justify-center">
+                            {(() => {
+                                const wa = (workAreaTypes || []).find(a => a.id === task.workAreaTypeId);
+                                const areaOptions = [
+                                    { value: '', label: 'Sin área' },
+                                    ...(workAreaTypes || []).map(a => ({ value: a.id, label: a.name })),
+                                ];
+                                return canEdit ? (
+                                    <InlineDropdown
+                                        value={task.workAreaTypeId || ''}
+                                        options={areaOptions}
+                                        onSelect={v => saveField('workAreaTypeId', v || null)}
+                                        renderValue={() => (
+                                            <span className="text-[9px] text-slate-400 truncate block text-center">{wa?.name || '—'}</span>
+                                        )}
+                                    />
+                                ) : (
+                                    <span className="text-[9px] text-slate-400 truncate block text-center">{wa?.name || '—'}</span>
+                                );
+                            })()}
+                        </div>
+
+                        {/* 5. Tipo */}
+                        <div className="min-w-0 overflow-hidden flex items-center justify-center">
+                            {(() => {
+                                const selectedArea = (workAreaTypes || []).find(a => a.id === task.workAreaTypeId);
+                                const allowedValues = selectedArea?.defaultTaskTypes || [];
+                                const filteredTypes = allowedValues.length > 0
+                                    ? (taskTypes || []).filter(t => 
+                                          allowedValues.includes(t.id) || 
+                                          allowedValues.includes(t.name) || 
+                                          (t.firestoreId && allowedValues.includes(t.firestoreId)) ||
+                                          allowedValues.some(val => 
+                                              (t.name && val?.toString().toLowerCase() === t.name.toLowerCase()) ||
+                                              (t.firestoreId && val?.toString().toLowerCase() === t.firestoreId.toLowerCase())
+                                          )
+                                      )
+                                    : (taskTypes || []);
+                                const tt = (taskTypes || []).find(t => t.id === task.taskTypeId);
+                                const typeOptions = [
+                                    { value: '', label: 'Sin tipo' },
+                                    ...filteredTypes.map(t => ({ value: t.id, label: t.name })),
+                                ];
+                                return canEdit ? (
+                                    <InlineDropdown
+                                        value={task.taskTypeId || ''}
+                                        options={typeOptions}
+                                        onSelect={v => saveField('taskTypeId', v || null)}
+                                        renderValue={() => (
+                                            <span className="text-[9px] text-slate-400 truncate block text-center">{tt?.name || '—'}</span>
+                                        )}
+                                    />
+                                ) : (
+                                    <span className="text-[9px] text-slate-400 truncate block text-center">{tt?.name || '—'}</span>
+                                );
+                            })()}
+                        </div>
+
+                        {/* 6. Avance */}
+                        <div className="flex items-center justify-center">
+                            <div className="flex flex-col items-center gap-0.5 w-full px-1">
+                                <span className="text-[9px] font-black" style={{ color: progressColor }}>{progressPct}%</span>
+                                <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progressPct}%`, background: progressColor }} />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 7. Timeline */}
+                        <div className="min-w-0 overflow-hidden flex flex-col items-center justify-center gap-0.5">
+                            <div className="flex items-center justify-center gap-1.5 text-[9px] min-w-0 w-full">
+                                {canEdit ? (
+                                    <>
+                                        {(canEditDates || !startRaw) ? (
+                                            <InlineDatePicker value={startRaw} onSave={v => saveField('plannedStartDate', v)} />
+                                        ) : (
+                                            <span className="text-slate-400 text-[9px] whitespace-nowrap">{fmtDate(startDate)}</span>
+                                        )}
+                                        <span className="text-slate-600 shrink-0">→</span>
+                                        {(canEditDates || !endRaw) ? (
+                                            <InlineDatePicker value={endRaw} onSave={v => saveField('dueDate', v)} />
+                                        ) : (
+                                            <span className="text-slate-400 text-[9px] whitespace-nowrap">{fmtDate(endDate)}</span>
+                                        )}
+                                    </>
+                                ) : (
+                                    <span className="text-slate-400 truncate text-[9px] whitespace-nowrap">{fmtDate(startDate)} → {fmtDate(endDate)}</span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* 8. Horas */}
+                        <div className="min-w-0 overflow-hidden flex flex-col items-center justify-center gap-0.5">
+                            {(actual > 0 || estimated > 0) ? (
+                                <div className="flex items-center justify-center gap-0.5 text-[9px] min-w-0 w-full">
+                                    <span className="text-slate-400 font-bold shrink-0">{actual.toFixed(1)}h</span>
+                                    <span className="text-slate-600 shrink-0">/</span>
+                                    {canEdit ? (
+                                        <InlineEditNumber value={estimated} onSave={v => saveField('estimatedHours', v)} />
+                                    ) : (
+                                        <span className="text-slate-400 shrink-0">{estimated}h</span>
+                                    )}
+                                </div>
+                            ) : (
+                                <span className="text-[9px] text-slate-600">—</span>
+                            )}
+                        </div>
+
+                        {/* 9. Prioridad */}
+                        <div className="flex items-stretch p-0.5">
+                            {canEdit ? (
+                                <InlineDropdown
+                                    value={task.priority || 'medium'}
+                                    options={priorityOptions}
+                                    onSelect={v => saveField('priority', v)}
+                                    renderValue={(val) => {
+                                        const colors = { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' };
+                                        const c = colors[val] || '#579bfc';
+                                        const cfg = TASK_PRIORITY_CONFIG[val] || {};
+                                        return (
+                                            <div className="w-full h-full flex items-center justify-center rounded text-[9px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                                style={{ background: c }}>
+                                                {cfg.label || val}
+                                            </div>
+                                        );
+                                    }}
+                                />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center rounded text-[9px] font-bold text-white text-center leading-tight min-h-[22px]"
+                                    style={{ background: { low: '#579bfc', medium: '#a25ddc', high: '#fdab3d', critical: '#e2445c' }[task.priority] || '#579bfc' }}>
+                                    {(TASK_PRIORITY_CONFIG[task.priority] || {}).label || '—'}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 10. Asig. */}
+                        <div className="flex items-center justify-center">
+                            {canEdit ? (
+                                <InlineDropdown
+                                    value={task.assignedBy || ''}
+                                    options={ownerOptions}
+                                    onSelect={v => saveField('assignedBy', v || null)}
+                                    renderValue={(val) => {
+                                        const assigner = teamMembers.find(m => m.uid === val);
+                                        if (!assigner) return <span className="text-[9px] text-slate-700">—</span>;
+                                        const initials = (assigner.displayName || assigner.email || '??').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                                        return (
+                                            <div className="w-6 h-6 rounded-full bg-purple-600/20 border border-purple-500/30 flex items-center justify-center hover:bg-purple-600/40 transition-colors cursor-pointer" title={`Asignado por: ${assigner.displayName || assigner.email}`}>
+                                                <span className="text-[8px] font-bold text-purple-400">{initials}</span>
+                                            </div>
+                                        );
+                                    }}
+                                    className="h-auto!"
+                                />
+                            ) : (() => {
+                                const assigner = teamMembers.find(m => m.uid === task.assignedBy);
+                                if (!assigner) return <span className="text-[9px] text-slate-700">—</span>;
+                                const initials = (assigner.displayName || assigner.email || '??').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                                return (
+                                    <div className="w-6 h-6 rounded-full bg-purple-600/20 border border-purple-500/30 flex items-center justify-center" title={`Asignado por: ${assigner.displayName || assigner.email}`}>
+                                        <span className="text-[8px] font-bold text-purple-400">{initials}</span>
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    </div>
+
+                    {/* Subtareas */}
+                    {expandedSubs && totalSubs > 0 && (
+                        <div className="sticky left-0 w-[calc(100vw-36px)] shrink-0 z-10 pl-6 pr-3 bg-inherit">
+                            <SubtaskExpander subtasks={subtasks} taskId={task.id} canEdit={canEdit} />
+                        </div>
+                    )}
+                </div>
+            </React.Fragment>
+        );
+    }
 
     return (
         <>
@@ -1259,7 +1593,7 @@ function MobileTaskCard({ task, engProjects, teamMembers, subtasks, canEdit, onO
 // TABLE GROUP (responsive: grid on desktop, cards on mobile)
 // ============================================================
 
-function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers, canEdit, canEditDates, onOpenModal, isExpanded, onToggle, savedField, onSaved, taskTypes, workAreaTypes, groupStatus, groupProjectId, user, selectedTaskIds, onToggleSelect, onTaskCreated, activeFilterProject, activeFilterAssignee, commentCounts, taskCommentsMap }) {
+function TableGroup({ isMobile, label, color, tasks, engProjects, engSubtasks, teamMembers, canEdit, canEditDates, onOpenModal, isExpanded, onToggle, savedField, onSaved, taskTypes, workAreaTypes, groupStatus, groupProjectId, user, selectedTaskIds, onToggleSelect, onTaskCreated, activeFilterProject, activeFilterAssignee, commentCounts, taskCommentsMap }) {
     const [addingTask, setAddingTask] = useState(false);
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const addInputRef = useRef(null);
@@ -1331,104 +1665,158 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
 
             {isExpanded && (
                 <>
-                    {/* Desktop: grid table (hidden on mobile) */}
-                    <div className="mt-1 rounded-xl border border-slate-800/50 bg-slate-800/20 hidden md:block max-h-[70vh] overflow-auto">
-                        <div
-                            className="grid items-center px-2 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-[var(--bg-table-header-solid)] text-center sticky top-0 z-20 min-w-[1100px]"
-                            style={{ gridTemplateColumns: GRID_COLS }}
-                        >
-                            <div className="sticky left-0 z-10 bg-[var(--bg-table-header-solid)] flex items-center justify-center h-full" style={{ borderLeft: `3px solid ${color}` }}>
-                                <input
-                                    type="checkbox"
-                                    checked={tasks.length > 0 && tasks.every(t => selectedTaskIds?.has(t.id))}
-                                    onChange={() => { tasks.forEach(t => onToggleSelect?.(t.id)); }}
-                                    className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-700 text-violet-500 focus:ring-violet-500/30 cursor-pointer"
-                                    title="Seleccionar todo el grupo"
-                                />
+                    {/* Responsive Grid Table (using isMobile layout) */}
+                    <div className="mt-1 rounded-xl border border-slate-800/50 bg-slate-800/20 max-h-[70vh] overflow-auto">
+                        {isMobile ? (
+                            <div
+                                className="grid items-center gap-2 text-center text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-[var(--bg-table-header-solid)] py-2 pl-6 pr-2 min-w-[1010px] sticky top-0 z-20"
+                                style={{ gridTemplateColumns: MOBILE_GRID_COLS }}
+                            >
+                                <div className="text-left">Comentarios</div>
+                                <div>STN</div>
+                                <div>Estado</div>
+                                <div>Área</div>
+                                <div>Tipo</div>
+                                <div>Avance</div>
+                                <div>Timeline</div>
+                                <div>Horas</div>
+                                <div>Prioridad</div>
+                                <div className="text-right pr-2">Asig.</div>
                             </div>
-                            <div className="sticky left-[28px] z-10 text-left bg-[var(--bg-table-header-solid)] h-full flex items-center">Tarea</div>
-                            <div className="text-left px-1 flex items-center gap-1" title="Comentarios">💬 Comentarios</div>
-                            <div>Resp</div>
-                            <div>STN</div>
-                            <div>Estado</div>
-                            <div>Área</div>
-                            <div>Tipo</div>
-                            <div>Avance</div>
-
-                            <div>Timeline</div>
-                            <div>Horas</div>
-                            <div>Prioridad</div>
-                            <div>Asig.</div>
-                        </div>
+                        ) : (
+                            <div
+                                className="grid items-center px-2 py-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-[var(--bg-table-header-solid)] text-center sticky top-0 z-20 min-w-[1100px]"
+                                style={{ gridTemplateColumns: GRID_COLS }}
+                            >
+                                <div className="sticky left-0 z-10 bg-[var(--bg-table-header-solid)] flex items-center justify-center h-full" style={{ borderLeft: `3px solid ${color}` }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={tasks.length > 0 && tasks.every(t => selectedTaskIds?.has(t.id))}
+                                        onChange={() => { tasks.forEach(t => onToggleSelect?.(t.id)); }}
+                                        className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-700 text-violet-500 focus:ring-violet-500/30 cursor-pointer"
+                                        title="Seleccionar todo el grupo"
+                                    />
+                                </div>
+                                <div className="sticky left-[28px] z-10 text-left bg-[var(--bg-table-header-solid)] h-full flex items-center">Tarea</div>
+                                <div className="text-left px-1 flex items-center gap-1" title="Comentarios">💬 Comentarios</div>
+                                <div>Resp</div>
+                                <div>STN</div>
+                                <div>Estado</div>
+                                <div>Área</div>
+                                <div>Tipo</div>
+                                <div>Avance</div>
+                                <div>Timeline</div>
+                                <div>Horas</div>
+                                <div>Prioridad</div>
+                                <div>Asig.</div>
+                            </div>
+                        )}
 
                         {/* Inline Add Task Row */}
                         {canEdit && (
-                            <div
-                                className="grid items-center px-2 py-1.5 border-b border-slate-800/30 bg-[var(--bg-table-row)] min-w-[1100px]"
-                                style={{ gridTemplateColumns: GRID_COLS }}
-                            >
-                                <div className="sticky left-0 z-10 bg-[var(--bg-table-row)] h-full flex items-center justify-center" style={{ borderLeft: `3px solid ${color}` }}></div>
-                                <div className="sticky left-[28px] z-10 bg-[var(--bg-table-row)] pr-1 min-w-0 flex items-center h-full">
-                                    {addingTask ? (
-                                        <div className="flex items-center gap-1 w-full">
-                                            <input
-                                                ref={addInputRef}
-                                                value={newTaskTitle}
-                                                onChange={e => setNewTaskTitle(e.target.value)}
-                                                onKeyDown={e => { if (e.key === 'Enter') handleAddTask(); if (e.key === 'Escape') { setAddingTask(false); setNewTaskTitle(''); } }}
-                                                placeholder="Nombre de la nueva tarea..."
-                                                className="flex-1 bg-transparent text-sm text-slate-300 placeholder:text-slate-600 outline-none"
-                                                autoFocus
-                                            />
-                                            <button onClick={() => { setAddingTask(false); setNewTaskTitle(''); }} className="text-slate-600 hover:text-slate-400 shrink-0">
-                                                <X className="w-3.5 h-3.5" />
+                            isMobile ? (
+                                <div
+                                    className="flex flex-col gap-1.5 py-3 px-0 border-b border-slate-800/30 bg-[var(--bg-table-row)] min-w-[1010px]"
+                                >
+                                    <div 
+                                        className="sticky left-0 w-[calc(100vw-36px)] shrink-0 z-10 flex items-center gap-2 pl-5 pr-3 bg-inherit"
+                                        style={{ borderLeft: `3px solid ${color}` }}
+                                    >
+                                        {addingTask ? (
+                                            <div className="flex items-center gap-1 w-full animate-in fade-in duration-200">
+                                                <input
+                                                    ref={addInputRef}
+                                                    value={newTaskTitle}
+                                                    onChange={e => setNewTaskTitle(e.target.value)}
+                                                    onKeyDown={e => { if (e.key === 'Enter') handleAddTask(); if (e.key === 'Escape') { setAddingTask(false); setNewTaskTitle(''); } }}
+                                                    placeholder="Nombre de la nueva tarea..."
+                                                    className="flex-1 bg-transparent text-sm text-slate-300 placeholder:text-slate-600 outline-none"
+                                                    autoFocus
+                                                />
+                                                <button onClick={() => { setAddingTask(false); setNewTaskTitle(''); }} className="text-slate-600 hover:text-slate-400 shrink-0">
+                                                    <X className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => { setAddingTask(true); setTimeout(() => addInputRef.current?.focus(), 50); }}
+                                                className="flex items-center gap-1.5 text-[11px] text-slate-600 hover:text-indigo-400 transition-colors py-1"
+                                            >
+                                                <Plus className="w-3 h-3" /> Agregar tarea
                                             </button>
-                                        </div>
-                                    ) : (
-                                        <button
-                                            onClick={() => { setAddingTask(true); setTimeout(() => addInputRef.current?.focus(), 50); }}
-                                            className="flex items-center gap-1.5 text-[11px] text-slate-600 hover:text-indigo-400 transition-colors py-1"
-                                        >
-                                            <Plus className="w-3 h-3" /> Agregar tarea
-                                        </button>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
-                                {/* Rest of columns empty */}
-                                <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
-                            </div>
+                            ) : (
+                                <div
+                                    className="grid items-center px-2 py-1.5 border-b border-slate-800/30 bg-[var(--bg-table-row)] min-w-[1100px]"
+                                    style={{ gridTemplateColumns: GRID_COLS }}
+                                >
+                                    <div className="sticky left-0 z-10 bg-[var(--bg-table-row)] h-full flex items-center justify-center" style={{ borderLeft: `3px solid ${color}` }}></div>
+                                    <div className="sticky left-[28px] z-10 bg-[var(--bg-table-row)] pr-1 min-w-0 flex items-center h-full">
+                                        {addingTask ? (
+                                            <div className="flex items-center gap-1 w-full">
+                                                <input
+                                                    ref={addInputRef}
+                                                    value={newTaskTitle}
+                                                    onChange={e => setNewTaskTitle(e.target.value)}
+                                                    onKeyDown={e => { if (e.key === 'Enter') handleAddTask(); if (e.key === 'Escape') { setAddingTask(false); setNewTaskTitle(''); } }}
+                                                    placeholder="Nombre de la nueva tarea..."
+                                                    className="flex-1 bg-transparent text-sm text-slate-300 placeholder:text-slate-600 outline-none"
+                                                    autoFocus
+                                                />
+                                                <button onClick={() => { setAddingTask(false); setNewTaskTitle(''); }} className="text-slate-600 hover:text-slate-400 shrink-0">
+                                                    <X className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => { setAddingTask(true); setTimeout(() => addInputRef.current?.focus(), 50); }}
+                                                className="flex items-center gap-1.5 text-[11px] text-slate-600 hover:text-indigo-400 transition-colors py-1"
+                                            >
+                                                <Plus className="w-3 h-3" /> Agregar tarea
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+                                </div>
+                            )
                         )}
 
-                        {tasks.length === 0 ? (
-                            <div className="px-4 py-5 text-center text-sm text-slate-600" style={{ borderLeft: `3px solid ${color}` }}>
-                                Sin tareas
-                            </div>
-                        ) : (
-                            tasks.map((task, idx) => (
-                                <TaskRow
-                                    key={task.id}
-                                    task={task}
-                                    engProjects={engProjects}
-                                    teamMembers={teamMembers}
-                                    subtasks={engSubtasks.filter(s => s.taskId === task.id)}
-                                    canEdit={canEdit}
-                                    canEditDates={canEditDates}
-                                    onOpenModal={onOpenModal}
-                                    groupColor={color}
-                                    isLast={idx === tasks.length - 1}
-                                    savedField={savedField}
-                                    onSaved={onSaved}
-                                    taskTypes={taskTypes}
-                                    workAreaTypes={workAreaTypes}
-                                    isSelected={selectedTaskIds?.has(task.id)}
-                                    onToggleSelect={onToggleSelect}
-                                    commentCount={commentCounts?.[task.id] || 0}
-                                    taskComments={taskCommentsMap?.[task.id] || []}
-                                />
-                            ))
-                        )}
+                        <div className={isMobile ? "divide-y divide-slate-800/20 min-w-[1010px]" : "min-w-[1100px] divide-y divide-slate-800/30"}>
+                            {tasks.length === 0 ? (
+                                <div className="px-4 py-5 text-center text-sm text-slate-600" style={{ borderLeft: `3px solid ${color}` }}>
+                                    Sin tareas
+                                </div>
+                            ) : (
+                                tasks.map((task, idx) => (
+                                    <TaskRow
+                                        key={task.id}
+                                        isMobile={isMobile}
+                                        task={task}
+                                        engProjects={engProjects}
+                                        teamMembers={teamMembers}
+                                        subtasks={engSubtasks.filter(s => s.taskId === task.id)}
+                                        canEdit={canEdit}
+                                        canEditDates={canEditDates}
+                                        onOpenModal={onOpenModal}
+                                        groupColor={color}
+                                        isLast={idx === tasks.length - 1}
+                                        savedField={savedField}
+                                        onSaved={onSaved}
+                                        taskTypes={taskTypes}
+                                        workAreaTypes={workAreaTypes}
+                                        isSelected={selectedTaskIds?.has(task.id)}
+                                        onToggleSelect={onToggleSelect}
+                                        commentCount={commentCounts?.[task.id] || 0}
+                                        taskComments={taskCommentsMap?.[task.id] || []}
+                                    />
+                                ))
+                            )}
+                        </div>
 
                         {/* Group Summary Row — Monday.com style */}
-                        {tasks.length > 0 && (
+                        {tasks.length > 0 && !isMobile && (
                             <div
                                 className="grid items-center px-2 py-2 border-t border-slate-700/40 bg-[var(--bg-table-row-summary)] min-w-[1100px]"
                                 style={{ gridTemplateColumns: GRID_COLS }}
@@ -1489,73 +1877,6 @@ function TableGroup({ label, color, tasks, engProjects, engSubtasks, teamMembers
                             </div>
                         )}
                     </div>
-
-                    {/* Mobile: card stack (hidden on desktop) */}
-                    <div className="mt-2 space-y-3 md:hidden">
-                        {/* Mobile add task */}
-                        {canEdit && (
-                            addingTask ? (
-                                <div className="p-3 bg-slate-800/40 border border-slate-700 rounded-xl flex items-center gap-2">
-                                    <input
-                                        ref={addInputRef}
-                                        value={newTaskTitle}
-                                        onChange={e => setNewTaskTitle(e.target.value)}
-                                        onKeyDown={e => { 
-                                            if (e.key === 'Enter') handleAddTask(); 
-                                            if (e.key === 'Escape') { setAddingTask(false); setNewTaskTitle(''); } 
-                                        }}
-                                        placeholder="Nombre de la nueva tarea..."
-                                        className="flex-1 bg-transparent text-sm text-slate-300 placeholder:text-slate-600 outline-none"
-                                        autoFocus
-                                    />
-                                    <button 
-                                        onClick={handleAddTask} 
-                                        className="text-indigo-400 hover:text-indigo-300 shrink-0 text-xs font-bold px-2 py-1 bg-indigo-500/10 rounded"
-                                    >
-                                        Agregar
-                                    </button>
-                                    <button 
-                                        onClick={() => { setAddingTask(false); setNewTaskTitle(''); }} 
-                                        className="text-slate-500 hover:text-slate-300 shrink-0"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            ) : (
-                                <button
-                                    onClick={() => { 
-                                        setAddingTask(true); 
-                                        setTimeout(() => addInputRef.current?.focus(), 50); 
-                                    }}
-                                    className="w-full py-3 text-sm text-slate-600 hover:text-indigo-400 flex items-center justify-center gap-2 bg-slate-800/20 border border-dashed border-slate-700 rounded-xl transition-colors"
-                                >
-                                    <Plus className="w-4 h-4" /> Agregar tarea
-                                </button>
-                            )
-                        )}
-
-                        {tasks.length === 0 ? (
-                            <div className="px-4 py-5 text-center text-sm text-slate-600 bg-slate-800/30 rounded-xl border border-slate-700/50">
-                                Sin tareas en esta sección
-                            </div>
-                        ) : (
-                            tasks.map(task => (
-                                <MobileTaskCard
-                                    key={task.id}
-                                    task={task}
-                                    engProjects={engProjects}
-                                    teamMembers={teamMembers}
-                                    subtasks={engSubtasks.filter(s => s.taskId === task.id)}
-                                    canEdit={canEdit}
-                                    onOpenModal={onOpenModal}
-                                    groupColor={color}
-                                    taskTypes={taskTypes}
-                                    workAreaTypes={workAreaTypes}
-                                    onSaved={onSaved}
-                                />
-                            ))
-                        )}
-                    </div>
                 </>
             )}
         </div>
@@ -1578,6 +1899,14 @@ export default function MainTable({ forceProjectId = null }) {
         taskFilterPriority, setTaskFilterPriority,
         taskFilterArea, setTaskFilterArea
     } = useEngineeringData();
+
+    const [isMobile, setIsMobile] = useState(false);
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
@@ -2012,6 +2341,7 @@ export default function MainTable({ forceProjectId = null }) {
                     return (
                         <TableGroup
                             key={group.projectId}
+                            isMobile={isMobile}
                             label={group.label}
                             color={group.color}
                             tasks={group.tasks}
