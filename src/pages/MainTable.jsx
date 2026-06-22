@@ -741,9 +741,9 @@ function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers,
     const fmtDate = (d) => d ? d.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' }) : '—';
 
     // ──── % Avance ────
-    // Usa progressPct del task si existe, si no lo calcula de subtareas
-    const progressPct = task.progressPct != null
-        ? Math.round(task.progressPct)
+    // Usa percentComplete del task si existe, si no lo calcula de subtareas
+    const progressPct = task.percentComplete != null
+        ? Math.round(task.percentComplete)
         : (task.status === 'completed' ? 100 : subsPct);
     const progressColor = progressPct === 100 ? '#22c55e' : progressPct >= 60 ? '#6366f1' : progressPct >= 30 ? '#f59e0b' : '#ef4444';
 

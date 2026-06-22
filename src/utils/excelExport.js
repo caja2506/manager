@@ -138,7 +138,7 @@ export function exportMainTableToExcel({ tasks, engProjects, teamMembers, taskTy
         const totalSubs = subs.length;
         const doneSubs = subs.filter(s => s.completed || s.done).length;
         const subsPct = totalSubs > 0 ? Math.round((doneSubs / totalSubs) * 100) : 0;
-        const progressPct = task.progressPct != null ? Math.round(task.progressPct) : (task.status === 'completed' ? 100 : subsPct);
+        const progressPct = task.percentComplete != null ? Math.round(task.percentComplete) : (task.status === 'completed' ? 100 : subsPct);
 
         // Health (metodología)
         let methHealth = 0;
