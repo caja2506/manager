@@ -11,8 +11,8 @@ import { Plus, Folder, Table2, KanbanSquare, Calendar, Clock, BarChart3, Users }
 
 const TABS = [
     { label: 'Proyectos', path: '/projects', icon: Folder },
-    { label: 'Main Table', path: '/main-table', icon: Table2 },
-    { label: 'Kanban', path: '/tasks', icon: KanbanSquare },
+    { label: 'Main Table', path: '/tasks', icon: Table2 },
+    { label: 'Kanban', path: '/kanban', icon: KanbanSquare },
     { label: 'Weekly Planner', path: '/planner', icon: Calendar },
     { label: 'Daily Scrum', path: '/daily-scrum', icon: Users },
     { label: 'Daily Board', path: '/daily-board', icon: Clock },

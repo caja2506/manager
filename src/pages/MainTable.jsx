@@ -21,7 +21,7 @@ import {
 import { onProjectStations, hasMultipleIndexers } from '../services/stationService';
 import {
     Search, Filter, X, ChevronDown, ChevronRight, User, Calendar,
-    Check, Plus, Maximize2, Download, Sparkles, Loader2, MessageSquare
+    Check, Plus, Maximize2, Download, Sparkles, Loader2, MessageSquare, CheckSquare
 } from 'lucide-react';
 import { supabase } from '../supabase';
 
@@ -78,7 +78,7 @@ const STATUS_GROUPS = [
 
 // 13-column grid: ☐ | Task | Comments | Owner | STN | Status | Área | Tipo | Avance | Timeline | Hours | Priority | Asig.
 const GRID_COLS = '28px minmax(200px, 1fr) minmax(120px, 200px) 36px 55px 86px 68px 68px 56px minmax(105px,150px) minmax(65px,95px) 76px 36px';
-const MOBILE_GRID_COLS = '120px 65px 100px 85px 90px 100px 125px 85px 95px 65px';
+const MOBILE_GRID_COLS = '120px 65px 65px 100px 85px 90px 100px 125px 85px 95px 65px';
 
 // ============================================================
 // SAVE FEEDBACK HOOK
@@ -592,7 +592,7 @@ function StationCell({ task, canEdit, onSave }) {
 // TASK ROW
 // ============================================================
 
-function TaskRow({ isMobile, task, engProjects, teamMembers, subtasks, canEdit, canEditDates, onOpenModal, groupColor, isLast, savedField, onSaved, taskTypes, workAreaTypes, isSelected, onToggleSelect, commentCount, taskComments }) {
+function TaskRow({ isMobile, isSelectionEnabled, task, engProjects, teamMembers, subtasks, canEdit, canEditDates, onOpenModal, groupColor, isLast, savedField, onSaved, taskTypes, workAreaTypes, isSelected, onToggleSelect, commentCount, taskComments }) {
     const { refetch } = useEngineeringData();
     const [popover, setPopover] = useState(null); // 'health' | 'score' | null
     const healthRef = useRef(null);
@@ -758,14 +758,16 @@ function TaskRow({ isMobile, task, engProjects, teamMembers, subtasks, canEdit, 
                         style={{ borderLeft: `3px solid ${isCritical ? '#ef4444' : groupColor}` }}
                     >
                         {/* Checkbox / Select */}
-                        <div className="shrink-0 flex items-center justify-center p-1" onClick={e => e.stopPropagation()}>
-                            <input
-                                type="checkbox"
-                                checked={!!isSelected}
-                                onChange={() => onToggleSelect?.(task.id)}
-                                className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-700 text-violet-500 focus:ring-violet-500/30 cursor-pointer"
-                            />
-                        </div>
+                        {isSelectionEnabled && (
+                            <div className="shrink-0 flex items-center justify-center p-1" onClick={e => e.stopPropagation()}>
+                                <input
+                                    type="checkbox"
+                                    checked={!!isSelected}
+                                    onChange={() => onToggleSelect?.(task.id)}
+                                    className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-700 text-violet-500 focus:ring-violet-500/30 cursor-pointer"
+                                />
+                            </div>
+                        )}
 
                         {/* Chevron de Subtareas */}
                         {totalSubs > 0 ? (
@@ -814,21 +816,6 @@ function TaskRow({ isMobile, task, engProjects, teamMembers, subtasks, canEdit, 
                             )}
                         </div>
 
-                        {/* Owner (Responsable) */}
-                        <div className="shrink-0 flex items-center ml-1">
-                            {canEdit ? (
-                                <InlineDropdown
-                                    value={task.assignedTo || ''}
-                                    options={ownerOptions}
-                                    onSelect={v => saveField('assignedTo', v || null)}
-                                    renderValue={() => <OwnerAvatar task={task} teamMembers={teamMembers} />}
-                                    className="h-auto!"
-                                />
-                            ) : (
-                                <OwnerAvatar task={task} teamMembers={teamMembers} />
-                            )}
-                        </div>
-
                         {/* Comentarios Link / Icono */}
                         <div 
                             className="shrink-0 flex items-center justify-center text-slate-500 hover:text-slate-200 cursor-pointer p-1"
@@ -847,7 +834,7 @@ function TaskRow({ isMobile, task, engProjects, teamMembers, subtasks, canEdit, 
 
                     {/* Renglón 2: Atributos en Grid (Desplazables horizontalmente de forma unificada) */}
                     <div 
-                        className="grid items-center gap-2 text-center text-[10px] pl-6 pr-2 min-w-[1010px]"
+                        className="grid items-center gap-2 text-center text-[10px] pl-6 pr-2 min-w-[1075px]"
                         style={{ gridTemplateColumns: MOBILE_GRID_COLS }}
                         onClick={(e) => e.stopPropagation()}
                         onDoubleClick={(e) => e.stopPropagation()}
@@ -866,7 +853,22 @@ function TaskRow({ isMobile, task, engProjects, teamMembers, subtasks, canEdit, 
                             )}
                         </div>
 
-                        {/* 2. STN */}
+                        {/* 2. Resp */}
+                        <div className="flex items-center justify-center">
+                            {canEdit ? (
+                                <InlineDropdown
+                                    value={task.assignedTo || ''}
+                                    options={ownerOptions}
+                                    onSelect={v => saveField('assignedTo', v || null)}
+                                    renderValue={() => <OwnerAvatar task={task} teamMembers={teamMembers} />}
+                                    className="h-auto!"
+                                />
+                            ) : (
+                                <OwnerAvatar task={task} teamMembers={teamMembers} />
+                            )}
+                        </div>
+
+                        {/* 3. STN */}
                         <div className="flex items-center justify-center">
                             <StationCell task={task} canEdit={canEdit} onSave={v => saveField('stationId', v)} />
                         </div>
@@ -1091,12 +1093,16 @@ function TaskRow({ isMobile, task, engProjects, teamMembers, subtasks, canEdit, 
 
                 {/* Checkbox / Select */}
                 <div className="sticky left-0 z-10 bg-inherit flex items-center justify-center" onClick={e => e.stopPropagation()} style={{ borderLeft: `3px solid ${isCritical ? '#ef4444' : groupColor}` }}>
-                    <input
-                        type="checkbox"
-                        checked={!!isSelected}
-                        onChange={() => onToggleSelect?.(task.id)}
-                        className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-700 text-violet-500 focus:ring-violet-500/30 cursor-pointer"
-                    />
+                    {isSelectionEnabled ? (
+                        <input
+                            type="checkbox"
+                            checked={!!isSelected}
+                            onChange={() => onToggleSelect?.(task.id)}
+                            className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-700 text-violet-500 focus:ring-violet-500/30 cursor-pointer"
+                        />
+                    ) : (
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-700/60" />
+                    )}
                 </div>
 
                 {/* Task Name + subtask chevron + subtask count badge */}
@@ -1593,7 +1599,7 @@ function MobileTaskCard({ task, engProjects, teamMembers, subtasks, canEdit, onO
 // TABLE GROUP (responsive: grid on desktop, cards on mobile)
 // ============================================================
 
-function TableGroup({ isMobile, label, color, tasks, engProjects, engSubtasks, teamMembers, canEdit, canEditDates, onOpenModal, isExpanded, onToggle, savedField, onSaved, taskTypes, workAreaTypes, groupStatus, groupProjectId, user, selectedTaskIds, onToggleSelect, onTaskCreated, activeFilterProject, activeFilterAssignee, commentCounts, taskCommentsMap }) {
+function TableGroup({ isMobile, isSelectionEnabled, label, color, tasks, engProjects, engSubtasks, teamMembers, canEdit, canEditDates, onOpenModal, isExpanded, onToggle, savedField, onSaved, taskTypes, workAreaTypes, groupStatus, groupProjectId, user, selectedTaskIds, onToggleSelect, onTaskCreated, activeFilterProject, activeFilterAssignee, commentCounts, taskCommentsMap }) {
     const [addingTask, setAddingTask] = useState(false);
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const addInputRef = useRef(null);
@@ -1669,10 +1675,11 @@ function TableGroup({ isMobile, label, color, tasks, engProjects, engSubtasks, t
                     <div className="mt-1 rounded-xl border border-slate-800/50 bg-slate-800/20 max-h-[70vh] overflow-auto">
                         {isMobile ? (
                             <div
-                                className="grid items-center gap-2 text-center text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-[var(--bg-table-header-solid)] py-2 pl-6 pr-2 min-w-[1010px] sticky top-0 z-20"
+                                className="grid items-center gap-2 text-center text-[9px] font-black text-slate-500 uppercase tracking-[0.12em] border-b border-slate-800/50 bg-[var(--bg-table-header-solid)] py-2 pl-6 pr-2 min-w-[1075px] sticky top-0 z-20"
                                 style={{ gridTemplateColumns: MOBILE_GRID_COLS }}
                             >
                                 <div className="text-left">Comentarios</div>
+                                <div>Resp</div>
                                 <div>STN</div>
                                 <div>Estado</div>
                                 <div>Área</div>
@@ -1689,13 +1696,15 @@ function TableGroup({ isMobile, label, color, tasks, engProjects, engSubtasks, t
                                 style={{ gridTemplateColumns: GRID_COLS }}
                             >
                                 <div className="sticky left-0 z-10 bg-[var(--bg-table-header-solid)] flex items-center justify-center h-full" style={{ borderLeft: `3px solid ${color}` }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={tasks.length > 0 && tasks.every(t => selectedTaskIds?.has(t.id))}
-                                        onChange={() => { tasks.forEach(t => onToggleSelect?.(t.id)); }}
-                                        className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-700 text-violet-500 focus:ring-violet-500/30 cursor-pointer"
-                                        title="Seleccionar todo el grupo"
-                                    />
+                                    {isSelectionEnabled && (
+                                        <input
+                                            type="checkbox"
+                                            checked={tasks.length > 0 && tasks.every(t => selectedTaskIds?.has(t.id))}
+                                            onChange={() => { tasks.forEach(t => onToggleSelect?.(t.id)); }}
+                                            className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-700 text-violet-500 focus:ring-violet-500/30 cursor-pointer"
+                                            title="Seleccionar todo el grupo"
+                                        />
+                                    )}
                                 </div>
                                 <div className="sticky left-[28px] z-10 text-left bg-[var(--bg-table-header-solid)] h-full flex items-center">Tarea</div>
                                 <div className="text-left px-1 flex items-center gap-1" title="Comentarios">💬 Comentarios</div>
@@ -1716,7 +1725,7 @@ function TableGroup({ isMobile, label, color, tasks, engProjects, engSubtasks, t
                         {canEdit && (
                             isMobile ? (
                                 <div
-                                    className="flex flex-col gap-1.5 py-3 px-0 border-b border-slate-800/30 bg-[var(--bg-table-row)] min-w-[1010px]"
+                                    className="flex flex-col gap-1.5 py-3 px-0 border-b border-slate-800/30 bg-[var(--bg-table-row)] min-w-[1075px]"
                                 >
                                     <div 
                                         className="sticky left-0 w-[calc(100vw-36px)] shrink-0 z-10 flex items-center gap-2 pl-5 pr-3 bg-inherit"
@@ -1783,7 +1792,7 @@ function TableGroup({ isMobile, label, color, tasks, engProjects, engSubtasks, t
                             )
                         )}
 
-                        <div className={isMobile ? "divide-y divide-slate-800/20 min-w-[1010px]" : "min-w-[1100px] divide-y divide-slate-800/30"}>
+                        <div className={isMobile ? "divide-y divide-slate-800/20 min-w-[1075px]" : "min-w-[1100px] divide-y divide-slate-800/30"}>
                             {tasks.length === 0 ? (
                                 <div className="px-4 py-5 text-center text-sm text-slate-600" style={{ borderLeft: `3px solid ${color}` }}>
                                     Sin tareas
@@ -1793,6 +1802,7 @@ function TableGroup({ isMobile, label, color, tasks, engProjects, engSubtasks, t
                                     <TaskRow
                                         key={task.id}
                                         isMobile={isMobile}
+                                        isSelectionEnabled={isSelectionEnabled}
                                         task={task}
                                         engProjects={engProjects}
                                         teamMembers={teamMembers}
@@ -1912,6 +1922,7 @@ export default function MainTable({ forceProjectId = null }) {
     const [selectedTask, setSelectedTask] = useState(null);
     const [collapsedGroups, setCollapsedGroups] = useState({});
     const [showMobileFilters, setShowMobileFilters] = useState(false);
+    const [isSelectionEnabled, setIsSelectionEnabled] = useState(false);
 
     // --- Comment counts and all comments per task (global query, single fetch with realtime subscription) ---
     const [commentCounts, setCommentCounts] = useState({});
@@ -2226,6 +2237,25 @@ export default function MainTable({ forceProjectId = null }) {
                             className="pl-8 pr-3 py-1.5 w-full border border-slate-700/60 rounded-lg text-xs text-white outline-none focus:ring-1 focus:ring-indigo-500/50 bg-slate-800/60 placeholder:text-slate-600" />
                     </div>
 
+                    {/* Selection Mode Toggle Button */}
+                    <button
+                        onClick={() => {
+                            setIsSelectionEnabled(!isSelectionEnabled);
+                            if (isSelectionEnabled) {
+                                setSelectedTaskIds(new Set());
+                            }
+                        }}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-xs font-semibold transition-all shrink-0 ${
+                            isSelectionEnabled
+                                ? 'bg-indigo-600/20 border-indigo-500 text-indigo-400 font-bold'
+                                : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:bg-slate-700/60'
+                        }`}
+                        title="Activar/Desactivar selección de tareas"
+                    >
+                        <CheckSquare className="w-3.5 h-3.5" />
+                        <span>Seleccionar</span>
+                    </button>
+
                     {/* Mobile Filter Toggle Button */}
                     <button
                         onClick={() => setShowMobileFilters(!showMobileFilters)}
@@ -2342,6 +2372,7 @@ export default function MainTable({ forceProjectId = null }) {
                         <TableGroup
                             key={group.projectId}
                             isMobile={isMobile}
+                            isSelectionEnabled={isSelectionEnabled}
                             label={group.label}
                             color={group.color}
                             tasks={group.tasks}

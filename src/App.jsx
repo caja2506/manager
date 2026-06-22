@@ -178,8 +178,9 @@ export default function App() {
           {/* Engineering */}
           <Route path="/projects" element={<ErrorBoundary module="Proyectos"><Projects /></ErrorBoundary>} />
           <Route path="/projects/:projectId" element={<ErrorBoundary module="Proyecto Detalle"><ProjectDetailPage /></ErrorBoundary>} />
-          <Route path="/tasks" element={<ErrorBoundary module="Tareas"><TaskManager /></ErrorBoundary>} />
-          <Route path="/main-table" element={<ErrorBoundary module="Tabla Principal"><MainTable /></ErrorBoundary>} />
+          <Route path="/tasks" element={<ErrorBoundary module="Tabla Principal"><MainTable /></ErrorBoundary>} />
+          <Route path="/kanban" element={<ErrorBoundary module="Tareas"><TaskManager /></ErrorBoundary>} />
+          <Route path="/main-table" element={<Navigate to="/tasks" replace />} />
 
           {/* Milestones — project-scoped routes (primary) */}
           <Route path="/projects/:projectId/milestones/:milestoneId" element={<ErrorBoundary module="Milestone Detalle"><MilestoneDetailPage /></ErrorBoundary>} />

@@ -36,7 +36,6 @@ const FULL_SECTIONS = [
         items: [
             { to: '/projects', label: 'Proyectos', icon: Briefcase },
             { to: '/tasks', label: 'Tareas', icon: ListTodo },
-            { to: '/main-table', label: 'Main Table', icon: LayoutList },
             { to: '/engineering/lists', label: 'Clasificadores', icon: Settings },
             { to: '/daily-scrum', label: 'Equipo Hoy', icon: Users },
             { to: '/planner', label: 'Weekly Planner', icon: CalendarDays },

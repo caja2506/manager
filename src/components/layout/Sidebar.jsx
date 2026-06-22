@@ -43,7 +43,6 @@ const SECTIONS = [
         items: [
             { to: '/projects', label: 'Proyectos', icon: Briefcase, countKey: 'engProjects' },
             { to: '/tasks', label: 'Tareas', icon: ListTodo, countKey: 'engTasks' },
-            { to: '/main-table', label: 'Main Table', icon: LayoutList },
             { to: '/engineering/lists', label: 'Clasificadores', icon: ListTree },
             { to: '/engineering/timing', label: 'Estudio de Tiempos', icon: Timer },
             { to: '/daily-scrum', label: 'Equipo Hoy', icon: Users },

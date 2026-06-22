@@ -19,7 +19,8 @@ import { useAppData } from '../../contexts/AppDataContext';
 // ── Route-based page context config ──
 const PAGE_CONTEXT = [
     { match: '/main-table',    title: 'Main Table',          icon: Table2 },
-    { match: '/tasks',         title: 'Kanban',              icon: KanbanSquare },
+    { match: '/tasks',         title: 'Main Table',          icon: Table2 },
+    { match: '/kanban',        title: 'Kanban',              icon: KanbanSquare },
     { match: '/planner',       title: 'Weekly Planner',      icon: Calendar },
     { match: '/daily-board',   title: 'Daily Board',         icon: Clock },
     { match: '/gantt',         title: 'Gantt',               icon: BarChart3 },
@@ -42,7 +43,7 @@ const PAGE_CONTEXT = [
 ];
 
 // Task management routes that show task stats
-const TASK_ROUTES = ['/main-table', '/tasks', '/planner', '/daily-board', '/gantt', '/projects'];
+const TASK_ROUTES = ['/main-table', '/tasks', '/kanban', '/planner', '/daily-board', '/gantt', '/projects'];
 
 export default function TopBar() {
     const navigate = useNavigate();
