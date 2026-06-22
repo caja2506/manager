@@ -177,11 +177,9 @@ export async function syncPlannerExcelToSupabase(projectId, parsedData, userId) 
     // B. Crear Tareas nuevas
     if (tasksToCreate.length > 0) {
         const taskRows = tasksToCreate.map(t => {
-            let initialStatus = 'backlog';
+            let initialStatus = 'pending';
             if (t.percentComplete >= 1.0) {
                 initialStatus = 'completed';
-            } else if (t.percentComplete > 0.0) {
-                initialStatus = 'in_progress';
             }
 
             const milestoneId = outlineToMilestoneUuidMap.get(t.parentOutlineNumber) || null;
