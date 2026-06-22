@@ -612,6 +612,7 @@ The system must support **Excel export** for:
 - [x] Preserve existing AutoBOM modules (Projects, Catalog, BOM) — all functional
 - [x] Begin modularizing App.jsx (1249→85 lines, extracted to AppDataContext + pages)
 - [x] Add mobile-responsive navigation (bottom nav bar)
+- [x] Refinar vista móvil responsiva de 2 renglones estilo Airtable en MyWork.jsx
 
 ### Phase 4 — Projects & Task Management ✅
 > **Status:** COMPLETE
