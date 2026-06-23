@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * AppDataContext
  * ==============
@@ -22,6 +23,7 @@ import React, { createContext, useContext, useState } from 'react';
 import { useAutoBomData } from '../hooks/useAutoBomData';
 import {
     executePdfUploadPipeline as aiHandlePdfUpload,
+    executeImageUploadPipeline as aiHandleImageUpload,
     executePdfImport,
     executeExcelImport,
     testGeminiConnection as aiTestConnection,
@@ -96,7 +98,7 @@ export function AppDataProvider({ children }) {
                 setPdfSupplierAnalysis(supplierAnalysis);
                 setIsPdfReviewOpen(true);
             },
-        });
+        }, activeProject?.id);
         if (e?.target) e.target.value = null;
     };
 
@@ -105,6 +107,17 @@ export function AppDataProvider({ children }) {
         setIsPdfReviewOpen(false);
         setPdfReviewData(null);
         setPdfSupplierAnalysis(null);
+    };
+
+    const handleImageUpload = async (imageFile, activeProject) => {
+        await aiHandleImageUpload(imageFile, bomData.managedLists.providers, {
+            ...processingCallbacks,
+            onReviewReady: ({ reviewData, supplierAnalysis }) => {
+                setPdfReviewData(reviewData);
+                setPdfSupplierAnalysis(supplierAnalysis);
+                setIsPdfReviewOpen(true);
+            },
+        }, activeProject?.id);
     };
 
     const handleExcelUpload = async (e) => {
@@ -146,9 +159,10 @@ export function AppDataProvider({ children }) {
         isGlobalTaskModalOpen, setIsGlobalTaskModalOpen,
         isGlobalTimeLogModalOpen, setIsGlobalTimeLogModalOpen,
 
-        // Handlers (AI/PDF/Excel — delegated)
+        // Handlers (AI/PDF/Excel/Image — delegated)
         testConnection,
         handlePdfUpload,
+        handleImageUpload,
         handleConfirmImport,
         handleExcelUpload,
 

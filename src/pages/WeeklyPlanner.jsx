@@ -18,8 +18,10 @@ import AutoPlannerModal from '../components/planner/AutoPlannerModal';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
 import TaskModuleBanner from '../components/layout/TaskModuleBanner';
 import {
-    CalendarDays, ChevronLeft, ChevronRight, Plus, PanelLeftOpen, PanelLeftClose
+    CalendarDays, ChevronLeft, ChevronRight, Plus, PanelLeftOpen, PanelLeftClose,
+    RefreshCw, Loader2
 } from 'lucide-react';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import {
     format, startOfWeek, addDays, addWeeks, subWeeks, isToday, isSameDay, parseISO
 } from 'date-fns';
@@ -33,7 +35,9 @@ const PROJECT_COLOR_KEYS = ['indigo', 'violet', 'emerald', 'amber', 'rose', 'cya
 export default function WeeklyPlanner() {
     const { user } = useAuth();
     const { canEdit, canDelete, teamRole, isAdmin } = useRole();
-    const { engTasks, engProjects, engSubtasks, timeLogs, teamMembers, taskTypes } = useEngineeringData();
+    const { engTasks, engProjects, engSubtasks, timeLogs, teamMembers, taskTypes, refetch: refetchTable } = useEngineeringData();
+
+
 
     // ──────────────── Week navigation ────────────────
     const [weekOffset, setWeekOffset] = useState(0);
@@ -96,6 +100,29 @@ export default function WeeklyPlanner() {
     }, [weekStartStr]);
 
     useEffect(() => { fetchPlanItems(); }, [fetchPlanItems]);
+
+    // ──────────────── Sincronizar Temporizadores con Planificador ────────────────
+    const [isSyncing, setIsSyncing] = useState(false);
+    const handleSyncPlanner = useCallback(async () => {
+        setIsSyncing(true);
+        try {
+            const functions = getFunctions();
+            const fn = httpsCallable(functions, 'executeRoutineManually');
+            await fn({ routineKey: 'planner_timer_sync' });
+            // Refrescar registros de tiempo y tareas
+            if (refetchTable) {
+                await Promise.all([
+                    refetchTable('time_logs'),
+                    refetchTable('tasks'),
+                ]);
+            }
+            await fetchPlanItems();
+        } catch (e) {
+            console.error('Error syncing planner:', e);
+            alert('Error al sincronizar los temporizadores: ' + e.message);
+        }
+        setIsSyncing(false);
+    }, [refetchTable, fetchPlanItems]);
 
     // ──────────────── Enrich plan items with live task data ────────────────
     // This is the core change: instead of reading snapshot fields,
@@ -470,7 +497,6 @@ export default function WeeklyPlanner() {
 
             {/* ══ Shared Banner ══ */}
             <TaskModuleBanner onNewTask={() => setTaskModalTask(null)} canEdit={canEdit}>
-                {/* Week navigation */}
                 <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-0.5">
                     <button onClick={() => setWeekOffset(w => w - 1)} className="p-1.5 hover:bg-slate-700 rounded-md transition-colors text-slate-400">
                         <ChevronLeft className="w-3.5 h-3.5" />
@@ -482,6 +508,20 @@ export default function WeeklyPlanner() {
                         <ChevronRight className="w-3.5 h-3.5" />
                     </button>
                 </div>
+
+                <button
+                    onClick={handleSyncPlanner}
+                    disabled={isSyncing}
+                    className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 hover:border-emerald-500/50 hover:text-emerald-400 text-slate-300 py-1.5 px-2.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
+                    title="Sincronizar temporizadores activos de todo el equipo de acuerdo con lo planificado hoy"
+                >
+                    {isSyncing ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                    ) : (
+                        <RefreshCw className="w-3.5 h-3.5 text-emerald-400" />
+                    )}
+                    <span>Sincronizar</span>
+                </button>
 
                 {/* Filters */}
                 <select

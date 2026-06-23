@@ -213,20 +213,23 @@ export function EngineeringDataProvider({ children }) {
             'motion_profiles': { setter: setMotionProfiles, mapper: r => ({ id: r.id, name: r.name, value: r.value, unit: r.unit }) },
         };
 
-        channel.on(
-            'postgres_changes',
-            { event: '*', schema: 'public' },
-            (payload) => {
-                const config = tableConfig[payload.table];
-                if (config) {
-                    applyEvent(config.setter, config.mapper, payload);
+        // Subscribe to each table individually to prevent RLS/schema-level permission blocks
+        Object.keys(tableConfig).forEach((table) => {
+            channel.on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: table },
+                (payload) => {
+                    const config = tableConfig[payload.table];
+                    if (config) {
+                        applyEvent(config.setter, config.mapper, payload);
+                    }
                 }
-            }
-        );
+            );
+        });
 
         channel.subscribe((status) => {
             if (status === 'SUBSCRIBED') {
-                console.log('[useEngineeringData.sb] ✅ Realtime subscribed');
+                console.log('[useEngineeringData.sb] ✅ Realtime subscribed to all tables');
             }
         });
 

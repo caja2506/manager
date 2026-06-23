@@ -98,6 +98,7 @@ const CAMEL_TO_SNAKE = {
     autoStopped: "auto_stopped",
     manualEntry: "manual_entry",
     overtimeHours: "overtime_hours",
+    planItemId: "plan_item_id",
 
     // users
     displayName: "display_name",

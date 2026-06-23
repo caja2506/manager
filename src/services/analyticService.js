@@ -8,17 +8,18 @@
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 import { supabase } from '../supabase';
-import { normalizePartNumber, findSimilarProviders } from '../utils/normalizers';
+import { findSimilarProviders } from '../utils/normalizers';
+import { recordAiTrace } from './analyticTraceService';
 
 import * as pdfjsLib from 'pdfjs-dist';
-import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import * as XLSX from 'xlsx';
 
-// Initialize PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+// Initialize PDF.js worker using jsDelivr matching the dependency version
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.5.207/build/pdf.worker.min.mjs';
 
 // Cloud Function references (with extended client timeouts to match server config)
 const analyzeQuotePdfFn = httpsCallable(functions, 'analyzeQuotePdf', { timeout: 180000 });
+const analyzeQuoteImageFn = httpsCallable(functions, 'analyzeQuoteImage', { timeout: 180000 });
 const testGeminiConnectionFn = httpsCallable(functions, 'testGeminiConnection', { timeout: 30000 });
 
 // ============================================================
@@ -32,15 +33,63 @@ const testGeminiConnectionFn = httpsCallable(functions, 'testGeminiConnection', 
  */
 export async function extractPdfText(file) {
     if (!pdfjsLib) throw new Error('Error cargando la herramienta PDF.');
+
+    console.log('[PDF Extract] Iniciando extracción de texto:', file.name, '| Tamaño:', (file.size / 1024).toFixed(1), 'KB');
+
     const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+    let pdf;
+    try {
+        pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    } catch (loadError) {
+        console.error('[PDF Extract] Error al cargar el documento PDF:', loadError);
+        throw new Error(`No se pudo abrir el archivo PDF. Asegúrate de que sea un PDF válido y no esté corrupto. (${loadError.message})`);
+    }
+
+    console.log('[PDF Extract] Documento abierto. Páginas:', pdf.numPages);
+
     let text = '';
+    let totalItems = 0;
+    let hasImageContent = false;
+
     for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const content = await page.getTextContent();
-        text += content.items.map(item => item.str).join(' ') + '\n';
+        const pageText = content.items.map(item => item.str).join(' ');
+        totalItems += content.items.length;
+        text += pageText + '\n';
+
+        console.log(`[PDF Extract] Página ${i}/${pdf.numPages}: ${content.items.length} elementos de texto, ${pageText.trim().length} caracteres`);
+
+        // Check if the page has image operators (indicates scanned PDF)
+        if (content.items.length === 0) {
+            try {
+                const ops = await page.getOperatorList();
+                const paintImageOps = ops.fnArray.filter(fn => fn === pdfjsLib.OPS.paintImageXObject || fn === pdfjsLib.OPS.paintJpegXObject);
+                if (paintImageOps.length > 0) {
+                    hasImageContent = true;
+                    console.log(`[PDF Extract] Página ${i} contiene ${paintImageOps.length} imagen(es) pero ningún texto.`);
+                }
+            } catch { /* ignore operator list errors */ }
+        }
     }
-    if (!text.trim()) throw new Error('No pudimos extraer texto de este PDF.');
+
+    console.log('[PDF Extract] Extracción completa. Total items:', totalItems, '| Caracteres:', text.trim().length, '| Tiene imágenes:', hasImageContent);
+
+    if (!text.trim()) {
+        if (hasImageContent) {
+            throw new Error(
+                'Este PDF parece ser un documento escaneado (imágenes). ' +
+                'La herramienta solo puede procesar PDFs con texto digital seleccionable. ' +
+                'Intenta usar un PDF generado directamente desde el sistema del proveedor, no una copia escaneada.'
+            );
+        }
+        throw new Error(
+            'No pudimos extraer texto de este PDF. ' +
+            'Verifica que el archivo sea un PDF válido con texto seleccionable (no escaneado).'
+        );
+    }
+
     return text;
 }
 
@@ -58,7 +107,82 @@ export async function analyzePdfWithAI(text) {
     if (!result.data || result.data.error) {
         throw new Error(result.data?.error || 'Error al analizar el PDF con IA.');
     }
-    return result.data;
+    return result.data?.data || result.data;
+}
+
+// ============================================================
+// Image — AI Vision Analysis
+// ============================================================
+
+/**
+ * Send image(s) to the Gemini Vision Cloud Function for analysis.
+ * @param {Array<{base64: string, mimeType: string}>} images — array of base64 images
+ * @returns {Promise<object>} — JSON object returned by Gemini Vision
+ */
+export async function analyzeImageWithAI(images) {
+    try {
+        console.log(`[Image AI] Enviando ${images.length} imagen(es) a Cloud Function. Tamaño total base64: ${images.reduce((s, i) => s + (i.base64?.length || 0), 0)} chars`);
+        const result = await analyzeQuoteImageFn({ images });
+        if (!result.data || result.data.error) {
+            throw new Error(result.data?.error || 'Error al analizar la imagen con IA.');
+        }
+        console.log('[Image AI] Respuesta exitosa:', result.data);
+        return result.data?.data || result.data;
+    } catch (err) {
+        // Firebase httpsCallable errors have .code, .message, and .details
+        const detail = err.details || err.message || err.code || 'Error desconocido';
+        const code = err.code || '';
+        console.error('[Image AI] Error completo:', { code, message: err.message, details: err.details, err });
+        throw new Error(`[${code}] ${detail}`);
+    }
+}
+
+/**
+ * Convert a File to a base64 string (without the data:... prefix).
+ * @param {File|Blob} file
+ * @returns {Promise<{base64: string, mimeType: string}>}
+ */
+async function fileToBase64(file) {
+    const buffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return { base64: btoa(binary), mimeType: file.type || 'image/png' };
+}
+
+/**
+ * Render PDF pages as images using pdf.js canvas rendering.
+ * Used as a fallback when a PDF has no selectable text (scanned/image PDF).
+ * @param {File} file — PDF file
+ * @returns {Promise<Array<{base64: string, mimeType: string}>>}
+ */
+async function renderPdfPagesToImages(file) {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const images = [];
+    const scale = 2.0; // High res for better OCR
+
+    for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale });
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d');
+
+        await page.render({ canvasContext: ctx, viewport }).promise;
+
+        // Convert canvas to base64 JPEG (smaller than PNG for upload)
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        const base64 = dataUrl.split(',')[1];
+        images.push({ base64, mimeType: 'image/jpeg' });
+
+        console.log(`[PDF→Image] Página ${i}/${pdf.numPages} renderizada (${viewport.width}x${viewport.height})`);
+    }
+
+    return images;
 }
 
 /**
@@ -67,7 +191,7 @@ export async function analyzePdfWithAI(text) {
  */
 function buildReviewItems(aiData, catalog, providers) {
     const reviewItems = (aiData.items || []).map(item => {
-        const pn = String(item.partNumber || '').trim();
+        const pn = String(item.pn || item.partNumber || '').trim();
         const normPn = String(pn).replace(/\s+/g, '').toUpperCase();
 
         const match = catalog.find(c => {
@@ -107,13 +231,21 @@ function buildReviewItems(aiData, catalog, providers) {
         name: aiData.supplier || '',
         matchedProvider: null,
         suggestions: [],
+        exactMatch: null,
+        similarMatches: []
     };
 
     if (aiData.supplier) {
         const matches = findSimilarProviders(aiData.supplier, providers);
-        if (matches.length > 0) {
-            supplierAnalysis.matchedProvider = matches[0];
-            supplierAnalysis.suggestions = matches;
+        if (matches) {
+            supplierAnalysis.exactMatch = matches.exactMatch;
+            supplierAnalysis.similarMatches = matches.similarMatches || [];
+            if (matches.exactMatch) {
+                supplierAnalysis.matchedProvider = matches.exactMatch;
+            } else if (matches.similarMatches?.length > 0) {
+                supplierAnalysis.matchedProvider = matches.similarMatches[0];
+            }
+            supplierAnalysis.suggestions = matches.similarMatches || [];
         }
     }
 
@@ -122,10 +254,13 @@ function buildReviewItems(aiData, catalog, providers) {
 
 /**
  * Process a PDF upload: extract text, send to Gemini, map with catalog, and callback.
+ * If the PDF has no selectable text (scanned), automatically falls back to
+ * rendering pages as images and using Gemini Vision for OCR + analysis.
  */
-export async function executePdfUploadPipeline(file, providers, callbacks) {
+export async function executePdfUploadPipeline(file, providers, callbacks, projectId = null) {
     const {
         setIsProcessing,
+        setIsDiagnosticOpen,
         setProcessingStatus,
         setLastError,
         onReviewReady,
@@ -137,10 +272,40 @@ export async function executePdfUploadPipeline(file, providers, callbacks) {
     setProcessingStatus('Extrayendo texto del PDF...');
     setLastError(null);
 
+    const correlationId = Math.random().toString(36).substring(7);
+
     try {
-        const text = await extractPdfText(file);
-        setProcessingStatus('Enviando texto a Cloud Function...');
-        const aiData = await analyzePdfWithAI(text);
+        let aiData;
+        let usedVisionFallback = false;
+
+        // Step 1: Try text extraction first
+        let text = null;
+        try {
+            text = await extractPdfText(file);
+        } catch (textErr) {
+            // If text extraction fails, it's likely a scanned PDF — use Vision fallback
+            console.log('[PDF Pipeline] Extracción de texto falló, activando fallback visual:', textErr.message);
+        }
+
+        if (text && text.trim()) {
+            // Normal flow — PDF has selectable text
+            setProcessingStatus('Enviando texto a Cloud Function...');
+            aiData = await analyzePdfWithAI(text);
+        } else {
+            // Fallback — Scanned/image PDF: render pages as images and use Vision
+            usedVisionFallback = true;
+            setProcessingStatus('📷 PDF escaneado detectado, convirtiendo páginas a imágenes...');
+
+            const images = await renderPdfPagesToImages(file);
+            if (images.length === 0) {
+                throw new Error('No se pudieron renderizar las páginas del PDF.');
+            }
+
+            console.log(`[PDF Pipeline] ${images.length} página(s) renderizada(s). Enviando a Gemini Vision...`);
+            setProcessingStatus(`📷 Analizando ${images.length} página(s) con IA Visual...`);
+
+            aiData = await analyzeImageWithAI(images);
+        }
 
         if (aiData.items) {
             setProcessingStatus('Analizando datos...');
@@ -154,18 +319,149 @@ export async function executePdfUploadPipeline(file, providers, callbacks) {
 
             const { reviewItems, supplierAnalysis } = buildReviewItems(aiData, currentCatalog, providers);
 
+            // Log trace for successful processing
+            await recordAiTrace({
+                correlationId,
+                triggerSource: 'user',
+                entityType: 'project',
+                entityId: projectId,
+                capability: usedVisionFallback ? 'image_vision_fallback' : 'pdf_extraction',
+                actionExecuted: 'pdf_upload_processed',
+                result: 'success',
+                metadata: {
+                    fileName: file.name,
+                    fileSize: file.size,
+                    itemsCount: reviewItems.length,
+                    supplier: aiData.supplier || '',
+                    usedVisionFallback,
+                }
+            });
+
             onReviewReady({
                 reviewData: { supplier: aiData.supplier || '', items: reviewItems },
                 supplierAnalysis,
             });
 
-            setProcessingStatus('✅ Datos listos para revisión');
+            setProcessingStatus(usedVisionFallback
+                ? '✅ Datos extraídos con IA Visual — listos para revisión'
+                : '✅ Datos listos para revisión');
             setTimeout(() => setIsProcessing(false), 1500);
         }
     } catch (err) {
+        // Log trace for failed processing
+        await recordAiTrace({
+            correlationId,
+            triggerSource: 'user',
+            entityType: 'project',
+            entityId: projectId,
+            capability: 'pdf_extraction',
+            actionExecuted: 'pdf_upload_processed',
+            result: 'failed',
+            metadata: {
+                fileName: file.name,
+                fileSize: file.size,
+                error: err.message
+            }
+        });
+
         setLastError(err.message);
         setProcessingStatus('❌ ERROR');
         setIsProcessing(false);
+        if (setIsDiagnosticOpen) setIsDiagnosticOpen(true);
+    }
+}
+
+// ============================================================
+// Image — Direct Image Upload Pipeline
+// ============================================================
+
+/**
+ * Process an image upload: convert to base64, send to Gemini Vision, map with catalog.
+ * @param {File} imageFile — image file (JPG/PNG/WEBP)
+ * @param {Array} providers — managed list of providers
+ * @param {object} callbacks — { setIsProcessing, setProcessingStatus, setLastError, onReviewReady }
+ * @param {string|null} projectId — optional project ID for audit trail
+ */
+export async function executeImageUploadPipeline(imageFile, providers, callbacks, projectId = null) {
+    const {
+        setIsProcessing,
+        setIsDiagnosticOpen,
+        setProcessingStatus,
+        setLastError,
+        onReviewReady,
+    } = callbacks;
+
+    if (!imageFile) return;
+
+    setIsProcessing(true);
+    setProcessingStatus('📷 Preparando imagen para IA Visual...');
+    setLastError(null);
+
+    const correlationId = Math.random().toString(36).substring(7);
+
+    try {
+        const { base64, mimeType } = await fileToBase64(imageFile);
+
+        console.log(`[Image Pipeline] Imagen: ${imageFile.name} | ${(imageFile.size / 1024).toFixed(1)} KB | ${mimeType}`);
+
+        setProcessingStatus('📷 Analizando imagen con IA Visual...');
+        const aiData = await analyzeImageWithAI([{ base64, mimeType }]);
+
+        if (aiData.items) {
+            setProcessingStatus('Analizando datos...');
+
+            const { data } = await supabase.from('catalogo_maestro').select('*');
+            const currentCatalog = (data || []).map(r => ({
+                ...r,
+                partNumber: r.part_number || '',
+            }));
+
+            const { reviewItems, supplierAnalysis } = buildReviewItems(aiData, currentCatalog, providers);
+
+            await recordAiTrace({
+                correlationId,
+                triggerSource: 'user',
+                entityType: 'project',
+                entityId: projectId,
+                capability: 'image_vision_direct',
+                actionExecuted: 'image_upload_processed',
+                result: 'success',
+                metadata: {
+                    fileName: imageFile.name,
+                    fileSize: imageFile.size,
+                    itemsCount: reviewItems.length,
+                    supplier: aiData.supplier || '',
+                }
+            });
+
+            onReviewReady({
+                reviewData: { supplier: aiData.supplier || '', items: reviewItems },
+                supplierAnalysis,
+            });
+
+            setProcessingStatus('✅ Datos extraídos con IA Visual — listos para revisión');
+            setTimeout(() => setIsProcessing(false), 1500);
+        }
+    } catch (err) {
+        await recordAiTrace({
+            correlationId,
+            triggerSource: 'user',
+            entityType: 'project',
+            entityId: projectId,
+            capability: 'image_vision_direct',
+            actionExecuted: 'image_upload_processed',
+            result: 'failed',
+            metadata: {
+                fileName: imageFile.name,
+                fileSize: imageFile.size,
+                error: err.message,
+            }
+        });
+
+        setLastError(err.message);
+        setProcessingStatus('❌ ERROR');
+        setIsProcessing(false);
+        if (setIsDiagnosticOpen) setIsDiagnosticOpen(true);
     }
 }
 
@@ -218,6 +514,23 @@ export async function executePdfImport(reviewedData, activeProject) {
             po_id: poId || null
         });
     }
+
+    // Log trace for successful import completion
+    await recordAiTrace({
+        correlationId: Math.random().toString(36).substring(7),
+        triggerSource: 'user',
+        entityType: 'project',
+        entityId: activeProject.id,
+        capability: 'pdf_extraction',
+        actionExecuted: 'pdf_import_confirmed',
+        result: 'success',
+        metadata: {
+            itemsCount: items.length,
+            prcr: prcr || '',
+            supplierId,
+            poId: poId || null
+        }
+    });
 }
 
 // ============================================================

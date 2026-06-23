@@ -21,7 +21,7 @@ const {
     loadActiveTimerForUser, loadActiveTimersForUser,
     insertTimeLog, updateTimeLog, loadTask, updateTask,
     recalculateTaskHours, loadWeeklyPlanItemsForDate,
-    transitionTaskStatus,
+    transitionTaskStatus, loadSetting,
 } = require("../db/coreDataReader");
 
 const TZ = "America/Costa_Rica";
@@ -69,36 +69,15 @@ async function execute(adminDb, token, targets, context) {
     const { dryRun } = context;
     const tag = "[plannerTimerSync]";
 
-    // ── 0. Auto-seed routine doc if missing ──
-    const routineRef = adminDb.collection(paths.AUTOMATION_ROUTINES).doc("planner_timer_sync");
-    const routineSnap = await routineRef.get();
-    if (!routineSnap.exists) {
-        console.log(`${tag} Creating automationRoutines/planner_timer_sync doc...`);
-        await routineRef.set({
-            key: "planner_timer_sync",
-            name: "Planner Timer Sync",
-            description: "Auto-starts/stops timers based on planner schedule",
-            enabled: true,
-            scheduleType: "interval",
-            scheduleConfig: { intervalMinutes: 15 },
-            channel: "none",
-            targetRole: "all",
-            dryRun: false,
-            debugMode: false,
-            createdAt: new Date().toISOString(),
-        });
-    }
-
-    // ── 1. Check if enabled ──
-    const schedDoc = await adminDb.doc("settings/daySchedule").get();
-    const schedData = schedDoc.exists ? schedDoc.data() : {};
+    // ── 1. Check if enabled from Supabase settings ──
+    const schedData = await loadSetting("daySchedule") || {};
     if (schedData.enabled === false) {
         console.log(`${tag} Day schedule disabled. Skipping.`);
         return { sentCount: 0, failedCount: 0, errors: [], synced: 0 };
     }
 
     // ── 2. Load break bands ──
-    await loadBreakBands(adminDb);
+    await loadBreakBands();
     const breakBands = schedData.breakBands || [];
     const currentHour = getCurrentDecimalHour();
 

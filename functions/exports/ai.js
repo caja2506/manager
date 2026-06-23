@@ -9,10 +9,10 @@ const { requireAdmin } = require("../middleware/authGuard");
 const MODEL_NAME = "gemini-2.5-flash";
 
 function createAiExports(adminDb, secrets) {
-    const { geminiApiKey, googleCseKey, googleCx, deepseekApiKey } = secrets;
+    const { geminiApiKey, googleCseKey, googleCx, deepseekApiKey, supabaseUrl, supabaseServiceRoleKey } = secrets;
 
     const testGeminiConnection = onCall(
-        { secrets: [geminiApiKey] },
+        { secrets: [geminiApiKey, supabaseUrl, supabaseServiceRoleKey] },
         async (request) => {
             if (!request.auth) throw new HttpsError("unauthenticated", "Authentication required.");
             await requireAdmin(adminDb, request);
@@ -96,6 +96,79 @@ ${text}`;
             }
         }
     );
+
+    // ── Analyze Quote Image (Vision) — for scanned PDFs and image uploads ──
+    const analyzeQuoteImage = onCall(
+        { secrets: [geminiApiKey], timeoutSeconds: 180 },
+        async (request) => {
+            if (!request.auth) throw new HttpsError("unauthenticated", "Authentication required.");
+
+            const { images } = request.data;
+            // images = [{ base64: string, mimeType: string }] — one per page/image
+            if (!images || !Array.isArray(images) || images.length === 0) {
+                throw new HttpsError("invalid-argument", "Se requiere al menos una imagen.");
+            }
+            if (images.length > 10) {
+                throw new HttpsError("invalid-argument", "Máximo 10 imágenes por solicitud.");
+            }
+
+            const apiKey = geminiApiKey.value();
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
+
+            const prompt = `Analiza esta(s) imagen(es) de una cotización de proveedor. Extrae los datos y devuelve EXCLUSIVAMENTE un JSON estricto con la siguiente estructura: { "supplier": "Nombre Proveedor", "items": [ { "pn": "Número de parte", "description": "Descripción", "quantity": numero, "unitPrice": numero, "leadTimeWeeks": numero } ] }.
+Reglas:
+1. Ignora texto irrelevante, encabezados, logos o textos legales.
+2. Los pn (Part Number) deben estar en MAYÚSCULAS y resolverse sin espacios.
+3. description debe ser concisa, técnica y resumida.
+4. quantity y unitPrice deben ser numéricos (usa 0 si falta el dato).
+5. Si no hay proveedor, usa "".
+6. leadTimeWeeks es el tiempo de entrega en SEMANAS. Si dice días, convierte dividiendo entre 7 y redondeando hacia arriba (mínimo 1). Si no se menciona, usa null.
+7. Busca frases como "lead time", "tiempo de entrega", "delivery", "plazo", "semanas", "weeks", "días", "days".
+8. Si hay múltiples imágenes (páginas), combina TODOS los ítems en un solo arreglo.
+Devuelve SOLO el JSON sin delimitadores markdown.`;
+
+            // Build parts: all images first, then the prompt text
+            const parts = images.map(img => ({
+                inlineData: {
+                    mimeType: img.mimeType || "image/png",
+                    data: img.base64,
+                },
+            }));
+            parts.push({ text: prompt });
+
+            try {
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Referer": "https://bom-ame-cr.web.app",
+                    },
+                    body: JSON.stringify({
+                        contents: [{ parts }],
+                        generationConfig: { response_mime_type: "application/json", temperature: 0.1 },
+                    }),
+                });
+
+                const result = await response.json();
+                if (!response.ok) {
+                    throw new HttpsError("internal", `Error de IA Vision: ${result.error?.message || "Fallo desconocido"}`);
+                }
+
+                const rawJson = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!rawJson) throw new HttpsError("internal", "La IA no devolvió respuesta de la imagen.");
+
+                const parsed = JSON.parse(rawJson.replace(/```json/g, "").replace(/```/g, "").trim());
+                return { data: parsed };
+            } catch (err) {
+                if (err instanceof HttpsError) throw err;
+                if (err instanceof SyntaxError) {
+                    throw new HttpsError("internal", "La IA devolvió JSON inválido al analizar la imagen. Intenta de nuevo.");
+                }
+                throw new HttpsError("internal", err.message);
+            }
+        }
+    );
+
 
     // Helper for scraping DuckDuckGo Image Search as a fallback
     const searchDuckDuckGoImages = async (query) => {
@@ -269,7 +342,7 @@ ${text}`;
     );
 
     const testAIExtraction = onCall(
-        { secrets: [geminiApiKey], timeoutSeconds: 30 },
+        { secrets: [geminiApiKey, supabaseUrl, supabaseServiceRoleKey], timeoutSeconds: 30 },
         async (request) => {
             if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
             await requireAdmin(adminDb, request);
@@ -282,7 +355,7 @@ ${text}`;
     );
 
     const testAIBriefing = onCall(
-        { secrets: [geminiApiKey], timeoutSeconds: 30 },
+        { secrets: [geminiApiKey, supabaseUrl, supabaseServiceRoleKey], timeoutSeconds: 30 },
         async (request) => {
             if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
             await requireAdmin(adminDb, request);
@@ -295,7 +368,7 @@ ${text}`;
     );
 
     const reprocesarReporteConIA = onCall(
-        { secrets: [geminiApiKey], timeoutSeconds: 30 },
+        { secrets: [geminiApiKey, supabaseUrl, supabaseServiceRoleKey], timeoutSeconds: 30 },
         async (request) => {
             if (!request.auth) throw new HttpsError("unauthenticated", "User must be authenticated.");
             await requireAdmin(adminDb, request);
@@ -531,7 +604,7 @@ Devuelve SOLO el JSON sin delimitadores markdown.`;
         }
     );
 
-    return { testGeminiConnection, analyzeQuotePdf, searchImages, generateInsights, testAIExtraction, testAIBriefing, reprocesarReporteConIA, analyzeStationImage, improveTaskDescriptions };
+    return { testGeminiConnection, analyzeQuotePdf, analyzeQuoteImage, searchImages, generateInsights, testAIExtraction, testAIBriefing, reprocesarReporteConIA, analyzeStationImage, improveTaskDescriptions };
 }
 
 module.exports = { createAiExports };

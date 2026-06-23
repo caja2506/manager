@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useRole } from '../contexts/RoleContext';
@@ -13,8 +14,10 @@ import {
     Search, Trash2, ArrowLeft, PackagePlus, X,
     Loader2, Sparkles, SlidersHorizontal, Check,
     Tag, Camera, Download, Edit3, Layers, AlertTriangle,
-    GitMerge, ShoppingCart, ChevronDown, ChevronUp, ChevronRight, CornerDownRight
+    GitMerge, ShoppingCart, ChevronDown, ChevronUp, ChevronRight, CornerDownRight,
+    Activity, ImagePlus
 } from 'lucide-react';
+import ImageImportModal from '../components/bom/ImageImportModal';
 
 // ============================================================
 // INLINE EDIT CELL — click to edit, blur/enter to save
@@ -73,14 +76,17 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
     const {
         proyectos, catalogo, bomItems, managedLists,
         brandOptions, categoryOptions, providerOptions,
-        isProcessing, handlePdfUpload, handleConfirmImport,
+        isProcessing, handlePdfUpload, handleImageUpload, handleConfirmImport,
         handleUpdateBomItem, handleAddFromCatalog,
         handleDeleteBomItem, handleDeleteBomItemsBatch,
         setConfirmDelete, setImagePickerItem, setZoomedImageUrl,
         pdfInputRef,
         handleEditClick, setEditingMasterRecord, setIsMasterRecordModalOpen,
         handleMergeAllDuplicates, handleMergeSingleDuplicate,
+        testConnection,
     } = useAppData();
+
+    const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 
     const activeProject = proyectos.find(p => p.id === resolvedProjectId);
     const activeBomItems = activeProject
@@ -643,6 +649,16 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
                 />
             )}
 
+            <ImageImportModal
+                isOpen={isImageModalOpen}
+                onClose={() => setIsImageModalOpen(false)}
+                onConfirm={(imageFile) => {
+                    setIsImageModalOpen(false);
+                    handleImageUpload(imageFile, activeProject);
+                }}
+                isProcessing={isProcessing}
+            />
+
             {/* Header — compact single row */}
             <div className="bg-slate-900/70 backdrop-blur-sm px-4 py-2 rounded-xl border border-slate-800 shadow-md flex flex-wrap items-center gap-3 shrink-0">
                 <h2 className="text-lg font-black text-white tracking-tight mr-auto truncate">{activeProject.name}</h2>
@@ -659,6 +675,14 @@ export default function BomProjectDetail({ forceProjectId = null, isEmbedded = f
                                 {isProcessing ? "..." : "PDF"}
                             </button>
                         </div>
+                        <button onClick={() => setIsImageModalOpen(true)} disabled={isProcessing} className="bg-slate-800 hover:bg-slate-700 text-white h-11 px-4 rounded-xl font-bold flex items-center shadow-lg active:scale-95 transition-all disabled:bg-slate-600 text-sm border border-slate-700">
+                            <ImagePlus className="w-4 h-4 mr-1.5 text-amber-400" />
+                            Imagen
+                        </button>
+                        <button onClick={testConnection} className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white h-11 px-3 rounded-xl font-bold flex items-center shadow-lg active:scale-95 transition-all text-sm border border-slate-700" title="Probar conexión de API de IA (Gemini)">
+                            <Activity className="w-4 h-4 mr-1.5 text-yellow-400" />
+                            Probar API
+                        </button>
                     </>
                 )}
                 <button

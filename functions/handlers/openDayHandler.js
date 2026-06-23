@@ -16,7 +16,53 @@ const {
     loadAllTimeLogs, loadTask,
     insertTimeLog, updateTimeLog,
     loadTaskUserTimeLogs,
+    loadWeeklyPlanItemsForDate,
 } = require("../db/coreDataReader");
+
+const TZ = "America/Costa_Rica";
+
+/**
+ * Get current date string in Costa Rica timezone: "YYYY-MM-DD"
+ */
+function getTodayDateString() {
+    return new Date().toLocaleString("en-CA", { timeZone: TZ }).split(",")[0];
+}
+
+/**
+ * Get current time as decimal hour in Costa Rica timezone
+ */
+function getCurrentDecimalHour() {
+    const parts = new Date().toLocaleString("en-US", {
+        timeZone: TZ, hour: "numeric", minute: "numeric", hour12: false,
+    }).split(":");
+    return parseInt(parts[0]) + parseInt(parts[1]) / 60;
+}
+
+function getDecimalHour(d) {
+    const parts = d.toLocaleString("en-US", {
+        timeZone: TZ, hour: "numeric", minute: "numeric", hour12: false,
+    }).split(":");
+    return parseInt(parts[0]) + parseInt(parts[1]) / 60;
+}
+
+/**
+ * Find the planner block that covers the current hour.
+ */
+function findActiveBlock(items, currentHour) {
+    for (const item of items) {
+        if (!item.startDateTime || !item.endDateTime) continue;
+        const startDate = new Date(item.startDateTime);
+        const endDate = new Date(item.endDateTime);
+
+        const startHour = getDecimalHour(startDate);
+        const endHour = getDecimalHour(endDate);
+
+        if (currentHour >= startHour && currentHour < endHour) {
+            return item;
+        }
+    }
+    return null;
+}
 
 /**
  * Execute the day open routine.
@@ -54,6 +100,11 @@ async function execute(adminDb, token, targets, context) {
         }
     }
 
+    // ── 2.5 Load today's weekly plan items to prioritize planner tasks ──
+    const todayStr = getTodayDateString();
+    const todayPlanItems = await loadWeeklyPlanItemsForDate(todayStr);
+    const currentHour = getCurrentDecimalHour();
+
     // ── 3. Check which tasks are still in_progress ──
     const tasksMap = {};
     const taskIds = [...new Set(uniqueTimers.map(t => t.taskId).filter(Boolean))];
@@ -66,6 +117,15 @@ async function execute(adminDb, token, targets, context) {
     let restarted = 0;
 
     for (const log of uniqueTimers) {
+        // Guard: Check if the user has an active block scheduled in the Planner at this hour.
+        // If they do, the Planner has priority, so we do not restart the auto-stopped timer of yesterday.
+        const userPlanItems = todayPlanItems.filter(item => item.assignedTo === log.userId);
+        const activeBlock = findActiveBlock(userPlanItems, currentHour);
+        if (activeBlock) {
+            console.log(`[openDay] Skipping restart for user ${log.userId} on task ${log.taskId} — user has active planner block scheduled now: task ${activeBlock.taskId}`);
+            continue;
+        }
+
         // Check task is still in_progress
         if (log.taskId) {
             const task = tasksMap[log.taskId];

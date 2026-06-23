@@ -7,8 +7,9 @@ import { es } from 'date-fns/locale';
 import { 
     User, CalendarDays, ExternalLink, Play, Square, Pause, 
     Check, AlertCircle, ChevronRight, MessageSquare, ChevronDown, Calendar, Plus,
-    Search, Filter
+    Search, Filter, RefreshCw, Loader2
 } from 'lucide-react';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 // Task modals
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
@@ -629,6 +630,29 @@ export default function MyWork() {
     const [wipCurrentTask, setWipCurrentTask] = useState(null);
     const [wipSwitching, setWipSwitching] = useState(false);
 
+    // ── Planner Sync ──
+    const [isSyncing, setIsSyncing] = useState(false);
+    const handleSyncPlanner = useCallback(async () => {
+        setIsSyncing(true);
+        try {
+            const functions = getFunctions();
+            const fn = httpsCallable(functions, 'executeRoutineManually');
+            await fn({ routineKey: 'planner_timer_sync' });
+            // Refrescar registros de tiempo y tareas
+            await Promise.all([
+                refetchTable('time_logs'),
+                refetchTable('tasks'),
+                plannerService.getWeeklyPlanItems(weekStartStr)
+                    .then(setWeekPlanItems)
+                    .catch(console.error)
+            ]);
+        } catch (e) {
+            console.error('Error syncing planner:', e);
+            alert('Error al sincronizar el Planificador: ' + e.message);
+        }
+        setIsSyncing(false);
+    }, [refetchTable, weekStartStr]);
+
     // ── Active Timer & tick ──
     const activeTimer = getActiveTimerFromLogs(timeLogs, user?.uid);
     const [elapsed, setElapsed] = useState('0:00:00');
@@ -863,14 +887,30 @@ export default function MyWork() {
                     </div>
                 )}
 
-                <a
-                    href="/planner"
-                    className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 border border-slate-800 hover:border-indigo-500/50 hover:text-indigo-400 text-slate-400 rounded-xl font-bold text-xs transition-all active:scale-95 self-start"
-                >
-                    <CalendarDays className="w-4 h-4" />
-                    Planificador Semanal
-                    <ExternalLink className="w-3.5 h-3.5 opacity-60" />
-                </a>
+                <div className="flex items-center gap-2 self-start md:self-auto">
+                    <button
+                        onClick={handleSyncPlanner}
+                        disabled={isSyncing}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 border border-slate-800 hover:border-emerald-500/50 hover:text-emerald-400 text-slate-400 rounded-xl font-bold text-xs transition-all active:scale-95 disabled:opacity-50"
+                        title="Sincronizar temporizadores con el Planificador para el día de hoy"
+                    >
+                        {isSyncing ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+                        ) : (
+                            <RefreshCw className="w-4 h-4 text-emerald-400" />
+                        )}
+                        <span>Sincronizar Planificador</span>
+                    </button>
+
+                    <a
+                        href="/planner"
+                        className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 border border-slate-800 hover:border-indigo-500/50 hover:text-indigo-400 text-slate-400 rounded-xl font-bold text-xs transition-all active:scale-95"
+                    >
+                        <CalendarDays className="w-4 h-4" />
+                        Planificador Semanal
+                        <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+                    </a>
+                </div>
             </div>
 
             {/* Layout de Columna Única: Tabla con diseño MainTable */}

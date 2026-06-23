@@ -733,6 +733,16 @@ The system must support **Excel export** for:
 - [x] Temporal analytics: team overlay chart, weekly bar chart, role comparison table
 - [x] Firestore collection: `dailyScoreLogs` with native types (Timestamp, number)
 
+### Phase M.2 — Planner-Timer Automation & Realtime UI Synchronization ✅
+> **Status:** COMPLETE (2026-06-23) — Automated weekly calendar sync with active user timers & realtime updates
+
+- [x] Realtime RLS bypass: Refactored Supabase Realtime subscriptions to table-level (`useEngineeringData.supabase.jsx`) to avoid public schema restrictions.
+- [x] Open-day planner priority: Adjusted `openDayHandler.js` to skip yesterday's timer reactivation if a planner block is currently active for the user.
+- [x] Manual trigger buttons: Added "Sincronizar Planificador" action buttons to the UI (`MyWork.jsx` and `WeeklyPlanner.jsx`) linking to the manual sync backend trigger.
+- [x] DB field mapping bugfix: Resolved silent insert failure by mapping camelCase `planItemId` to snake_case `plan_item_id` in `supabaseAdmin.js`.
+- [x] Database routines: Seeded and verified `planner_timer_sync` and `scheduled_timer_events` routines in production Supabase tables.
+
+
 ---
 
 ## 18. Audit Remediation Program

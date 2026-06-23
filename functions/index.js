@@ -42,6 +42,7 @@ const { createAiExports } = require("./exports/ai");
 const aiExports = createAiExports(adminDb, secrets);
 exports.testGeminiConnection = aiExports.testGeminiConnection;
 exports.analyzeQuotePdf = aiExports.analyzeQuotePdf;
+exports.analyzeQuoteImage = aiExports.analyzeQuoteImage;
 exports.searchImages = aiExports.searchImages;
 exports.generateInsights = aiExports.generateInsights;
 exports.testAIExtraction = aiExports.testAIExtraction;
