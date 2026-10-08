@@ -747,6 +747,22 @@ The system must support **Excel export** for:
 
 ## 18. Audit Remediation Program
 
+### SEC-2026-10-07 — Public database exposure contained
+
+User-authorized security repair in Manager/AutoBOM, applied to Supabase project
+`mkymgptfmtlqpdswvywo` on 2026-10-08 UTC (2026-10-07 Costa Rica).
+
+- [x] Enable RLS and remove client grants on the historical catalog backup.
+- [x] Remove anonymous grants on eight internal tables and the task transition RPC.
+- [x] Restrict three arbitrary-SQL maintenance RPCs to `service_role`/database administrators.
+- [x] Verify anonymous denial, signed-in database access, retained server access, and 2,720 preserved backup rows.
+- [x] Correct the maintenance helper bootstrap instructions so recreation keeps restrictive grants.
+
+This contains the reported exposure; the broader RBAC remediation remains open.
+See [deployment evidence and remaining findings](docs/security/2026-10-07-public-data-exposure.md).
+
+### Existing remediation program
+
 > **Reference:** [`remediation-plan.md`](file:///c:/Users/CJ00083620/.gemini/antigravity/scratch/autobom-pro/remediation-plan.md) — Full specification with Definition of Done per phase, dependency graph, regression risk matrix, and timeline.
 
 ### Purpose

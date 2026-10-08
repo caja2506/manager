@@ -157,33 +157,26 @@ async function main() {
 }
 
 async function createExecSqlFunction() {
-    // Create a SECURITY DEFINER function that can execute arbitrary SQL
-    // This is needed because Supabase REST API doesn't support raw DDL
+    // This privileged maintenance helper must never be callable by browser roles.
+    // Keep creation and grants in one transaction: new functions default to PUBLIC.
     const createFn = `
-        CREATE OR REPLACE FUNCTION exec_sql(query text)
+        BEGIN;
+        CREATE OR REPLACE FUNCTION public.exec_sql(query text)
         RETURNS void AS $$
         BEGIN
             EXECUTE query;
         END;
-        $$ LANGUAGE plpgsql SECURITY DEFINER;
+        $$ LANGUAGE plpgsql SECURITY DEFINER
+        SET search_path = pg_catalog, public, pg_temp;
+        REVOKE EXECUTE ON FUNCTION public.exec_sql(text) FROM PUBLIC, anon, authenticated;
+        GRANT EXECUTE ON FUNCTION public.exec_sql(text) TO service_role;
+        COMMIT;
     `;
-
-    // We need to bootstrap this via a different method
-    // Try using the Supabase SQL editor API
-    console.log("  Attempting to create exec_sql helper function...");
-
-    // Use the pg endpoint 
-    const endpoints = [
-        `${SUPABASE_URL}/rest/v1/rpc/`,
-    ];
 
     // Since we can't create the function via REST, let the user know
     console.log("  ⚠️  Cannot create exec_sql function via REST API.");
-    console.log("  ℹ️  Please execute the following in Supabase SQL Editor first:");
-    console.log("  ");
-    console.log("  CREATE OR REPLACE FUNCTION exec_sql(query text)");
-    console.log("  RETURNS void AS $$ BEGIN EXECUTE query; END; $$ LANGUAGE plpgsql SECURITY DEFINER;");
-    console.log("  ");
+    console.log("  ℹ️  An administrator must execute this complete block in Supabase SQL Editor:");
+    console.log(createFn);
 }
 
 main().catch(e => { console.error("❌", e.message); process.exit(1); });

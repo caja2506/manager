@@ -1,5 +1,21 @@
 # Changelog — Audit Remediation Program
 
+## 2026-10-07 — SEC-2026-10-07: public Supabase exposure
+
+- **Problem:** a catalog backup was readable/writable without RLS; public raw-SQL
+  RPCs could bypass database protections. Eight internal tables and a task RPC
+  also allowed anonymous access.
+- **Production fix:** backup RLS enabled, backup client privileges removed,
+  anonymous privileges removed on the affected internal tables/task RPC, and
+  raw-SQL RPCs restricted to the server/admin. All 2,720 backup rows preserved.
+- **Verified:** role-level negative/positive tests passed; the Security Advisor
+  no longer reports `rls_disabled_in_public`. Other security findings remain.
+- **Repository:** migration and repeatable SQL verification recorded; maintenance
+  bootstrap instructions corrected. No frontend or Firebase deployment required.
+- **Evidence:** [SEC-2026-10-07](docs/security/2026-10-07-public-data-exposure.md).
+
+## Historical remediation baseline — 2026-03-14
+
 > **Date:** 2026-03-14  
 > **Scope:** Full platform hardening pass  
 > **Objective:** Audit readiness for internal review
