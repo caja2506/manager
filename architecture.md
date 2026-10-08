@@ -316,6 +316,30 @@ Backlog → Planned(pending) → In Progress → Review(validation) → Complete
 
 ## 9. Security Architecture (Actual)
 
+### Supabase containment update — 2026-10-07
+
+The deployed Supabase permission changes supersede the historical Firestore table
+below for the affected objects. Firebase authentication and existing signed-in
+RLS policies were preserved.
+
+| Object | Anonymous client | Authenticated client | Server/admin |
+|--------|------------------|----------------------|--------------|
+| `catalogo_maestro_backup_20260708` | Denied | Denied | Existing access retained |
+| Catalog/BOM tables, `users`, `agent_write_log` | Direct table privileges revoked | Existing privileges/policies retained | Existing access retained |
+| `exec_sql`, `exec_query_json`, `query_sql` | Denied | Denied | Maintenance access retained |
+| `transition_task_status` | Denied | Existing access retained | Existing access retained |
+
+RLS is enabled on the backup with no client policies intentionally. Database
+administrators and `service_role` can still maintain it. The three arbitrary-SQL
+helpers must never be exposed to browser roles; the helper bootstrap prints
+creation and restrictive grants in one transaction.
+
+Retaining existing authenticated policies is not validation of their complete
+RBAC model. See [SEC-2026-10-07](docs/security/2026-10-07-public-data-exposure.md)
+for the remaining authorization risks and verification limits.
+
+### Historical Firestore permissions
+
 | Collection | Read | Create | Update | Delete |
 |------------|------|--------|--------|--------|
 | `users_roles` | auth'd | self only (viewer) | admin | admin |
