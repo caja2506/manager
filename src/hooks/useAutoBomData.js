@@ -2,27 +2,30 @@
 // ======================================
 // Custom hook owning all BOM-related subscriptions,
 // computed values, and CRUD handlers.
-// Dual-backend: Supabase or Firebase.
+// Supabase data, scoped to the current Firebase Auth session.
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 // ── Helpers ──
 
 const safeLocaleCompare = (a, b, field) =>
     String(a[field] || '').localeCompare(String(b[field] || ''));
 
-const fetchAllItemsBom = async () => {
+const fetchAllItemsBom = async (signal) => {
     let allItems = [];
     let start = 0;
     const pageSize = 1000;
     while (true) {
+        if (signal?.aborted) break;
         const { data, error } = await supabase
             .from('items_bom')
             .select('*')
-            .range(start, start + pageSize - 1);
+            .range(start, start + pageSize - 1)
+            .abortSignal(signal);
         if (error) {
-            console.error("Error al paginar items_bom:", error);
+            if (!signal?.aborted) console.error("Error al paginar items_bom:", error);
             break;
         }
         if (!data || data.length === 0) break;
@@ -33,18 +36,20 @@ const fetchAllItemsBom = async () => {
     return allItems;
 };
 
-const fetchAllCatalogoMaestro = async () => {
+const fetchAllCatalogoMaestro = async (signal) => {
     let allItems = [];
     let start = 0;
     const pageSize = 1000;
     while (true) {
+        if (signal?.aborted) break;
         const { data, error } = await supabase
             .from('catalogo_maestro')
             .select('*')
             .order('name')
-            .range(start, start + pageSize - 1);
+            .range(start, start + pageSize - 1)
+            .abortSignal(signal);
         if (error) {
-            console.error("Error al paginar catalogo_maestro:", error);
+            if (!signal?.aborted) console.error("Error al paginar catalogo_maestro:", error);
             break;
         }
         if (!data || data.length === 0) break;
@@ -60,6 +65,8 @@ const fetchAllCatalogoMaestro = async () => {
 // ============================================================
 
 export function useAutoBomData() {
+    const { user, loading: authLoading } = useAuth();
+    const userId = user?.uid;
 
     // ── State ──
 
@@ -125,16 +132,29 @@ export function useAutoBomData() {
     // ── Data Subscriptions ──
 
     useEffect(() => {
+        // AppDataProvider is mounted even on the login screen. Wait for
+        // Firebase to restore the session before querying protected BOM tables.
+        // Reset cached data on logout or account changes.
+        setProyectos([]);
+        setCatalogo([]);
+        setBomItems([]);
+        setManagedLists({ categories: [], providers: [], brands: [] });
+        if (authLoading || !userId) return;
+
+        const controller = new AbortController();
+        const { signal } = controller;
+
         // Initial fetch for all collections
         const fetchAll = async () => {
             const [p, c, b, cat, prov, br] = await Promise.all([
-                supabase.from('proyectos_bom').select('*').order('created_at', { ascending: false }),
-                fetchAllCatalogoMaestro(),
-                fetchAllItemsBom(),
-                supabase.from('categorias').select('*').order('name'),
-                supabase.from('proveedores').select('*').order('name'),
-                supabase.from('marcas').select('*').order('name'),
+                supabase.from('proyectos_bom').select('*').order('created_at', { ascending: false }).abortSignal(signal),
+                fetchAllCatalogoMaestro(signal),
+                fetchAllItemsBom(signal),
+                supabase.from('categorias').select('*').order('name').abortSignal(signal),
+                supabase.from('proveedores').select('*').order('name').abortSignal(signal),
+                supabase.from('marcas').select('*').order('name').abortSignal(signal),
             ]);
+            if (signal.aborted) return;
             if (p.data) setProyectos(p.data.map(mapProject));
             if (c) setCatalogo(c.map(mapCatalogItem));
             if (b) setBomItems(b.map(mapBomItem));
@@ -144,15 +164,19 @@ export function useAutoBomData() {
                 brands: (br.data || []).filter(d => d.name),
             });
         };
-        fetchAll();
+        fetchAll().catch(error => {
+            if (!signal.aborted) console.error('Error al cargar datos BOM:', error);
+        });
 
         // Realtime for key tables
         const refreshLists = async () => {
+            if (signal.aborted) return;
             const [cat, prov, br] = await Promise.all([
-                supabase.from('categorias').select('*').order('name'),
-                supabase.from('proveedores').select('*').order('name'),
-                supabase.from('marcas').select('*').order('name'),
+                supabase.from('categorias').select('*').order('name').abortSignal(signal),
+                supabase.from('proveedores').select('*').order('name').abortSignal(signal),
+                supabase.from('marcas').select('*').order('name').abortSignal(signal),
             ]);
+            if (signal.aborted) return;
             setManagedLists({
                 categories: (cat.data || []).filter(d => d.name),
                 providers: (prov.data || []).filter(d => d.name),
@@ -160,23 +184,32 @@ export function useAutoBomData() {
             });
         };
 
-        const ch = supabase.channel('autobom-realtime')
+        // Cleanup is asynchronous; never reuse a channel that is still leaving
+        // after logout or React StrictMode's setup/cleanup cycle.
+        const ch = supabase.channel(`autobom-realtime-${crypto.randomUUID()}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'proyectos_bom' }, () => {
-                supabase.from('proyectos_bom').select('*').order('created_at', { ascending: false }).then(({ data }) => data && setProyectos(data.map(mapProject)));
+                if (signal.aborted) return;
+                return supabase.from('proyectos_bom').select('*').order('created_at', { ascending: false }).abortSignal(signal)
+                    .then(({ data }) => !signal.aborted && data && setProyectos(data.map(mapProject)));
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'catalogo_maestro' }, () => {
-                fetchAllCatalogoMaestro().then(data => data && setCatalogo(data.map(mapCatalogItem)));
+                if (signal.aborted) return;
+                return fetchAllCatalogoMaestro(signal).then(data => !signal.aborted && data && setCatalogo(data.map(mapCatalogItem)));
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'items_bom' }, () => {
-                fetchAllItemsBom().then(data => data && setBomItems(data.map(mapBomItem)));
+                if (signal.aborted) return;
+                return fetchAllItemsBom(signal).then(data => !signal.aborted && data && setBomItems(data.map(mapBomItem)));
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'categorias' }, refreshLists)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'proveedores' }, refreshLists)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'marcas' }, refreshLists)
             .subscribe();
 
-        return () => supabase.removeChannel(ch);
-    }, []);
+        return () => {
+            controller.abort();
+            supabase.removeChannel(ch);
+        };
+    }, [authLoading, userId]);
 
     // ── Computed Values ──
 
@@ -202,7 +235,6 @@ export function useAutoBomData() {
     const handleSaveProject = async (e, projectData, editingProjectId) => {
         e.preventDefault();
         if (!projectData.name.trim()) return;
-        const data = { name: projectData.name, description: projectData.description, createdAt: new Date().toISOString() };
         const sbData = { name: projectData.name, description: projectData.description || '', created_at: new Date().toISOString() };
         if (editingProjectId) {
             await supabase.from('proyectos_bom').update(sbData).eq('id', editingProjectId);
