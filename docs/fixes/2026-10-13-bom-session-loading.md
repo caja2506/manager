@@ -50,3 +50,29 @@ After publication, open the app with a restored session and with a fresh login.
 Confirm that projects, catalog, and BOM items populate without reloading, and
 that the initial protected requests are authenticated. Keep anonymous access
 disabled. No database migration is needed.
+
+### Publish from a phone using Google Cloud Shell
+
+If the Firebase plugin cannot be installed, open the standard
+[Cloud Shell terminal](https://shell.cloud.google.com/?project=bom-ame-cr&show=terminal)
+with the Google account that owns this Firebase project. Authorize Cloud Shell
+when Google asks. Do not use the `cloudshell_git_repo` URL parameter: Google
+opens non-allowlisted repositories in an environment without account credentials.
+
+From the repository, run:
+
+```bash
+node scripts/deploy-hosting-cloud-shell.mjs
+```
+
+The helper verifies that the BOM fix is present, reads only the existing public
+frontend configuration from the deployed application, installs locked dependencies,
+builds, and deploys **Hosting only** to `bom-ame-cr`. Keys are passed directly to
+the build environment; they are not printed or written to a file. It stops before
+deployment if configuration is missing or ambiguous. Google credentials remain
+inside Cloud Shell. It does not change database permissions or user accounts.
+
+`--check-config` verifies configuration without installing, building, or deploying.
+`--build-only` verifies configuration and builds without deployment. Production
+access remains to be verified after the owner completes Google authorization and
+the deployment succeeds.

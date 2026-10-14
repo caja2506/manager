@@ -8,6 +8,8 @@ cleans up cached data, pending reads, and Realtime subscriptions on logout.
 Database grants and RLS remain unchanged. Implementation and regression tests
 are complete; Hosting publication and an authenticated production smoke check
 are the release steps. See [verification and release notes](docs/fixes/2026-10-13-bom-session-loading.md).
+An optional Cloud Shell helper supports Hosting publication when the owner only
+has a mobile browser and the Firebase plugin is unavailable.
 
 > **Version:** 4.2 — Individual Performance Score (IPS) System  
 > **Last Updated:** 2026-04-03  
