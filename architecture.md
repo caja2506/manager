@@ -1,5 +1,15 @@
 # Architecture — Engineering Management Platform
 
+## BOM session lifecycle (2026-10-13)
+
+`AppDataProvider` may mount before login, so `useAutoBomData` observes Firebase
+`useAuth()` directly. Protected Supabase reads and Realtime subscriptions start
+only after auth loading finishes with a user UID. Auth readiness/UID changes
+clear the cache and restart the subscription; cleanup aborts reads and guards
+against late responses. Each subscription uses a unique topic to avoid reusing
+an asynchronously closing channel. The existing context API and CRUD handlers
+are preserved. See [verification and release notes](docs/fixes/2026-10-13-bom-session-loading.md).
+
 > **Version:** 3.0  
 > **Last Updated:** 2026-03-20  
 > **Status:** Reflects actual codebase state (post Phase M.1 modularization)

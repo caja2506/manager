@@ -1,5 +1,14 @@
 # AutoBOM Pro — Engineering Management Platform Blueprint
 
+## Targeted repair — BOM session loading (2026-10-13)
+
+The owner requested restoration of BOM/project access. The BOM data hook now
+waits for Firebase session readiness, reloads on login/account changes, and
+cleans up cached data, pending reads, and Realtime subscriptions on logout.
+Database grants and RLS remain unchanged. Implementation and regression tests
+are complete; Hosting publication and an authenticated production smoke check
+are the release steps. See [verification and release notes](docs/fixes/2026-10-13-bom-session-loading.md).
+
 > **Version:** 4.2 — Individual Performance Score (IPS) System  
 > **Last Updated:** 2026-04-03  
 > **Status:** All core modules implemented + IPS scoring system deployed
